@@ -1,0 +1,3463 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "eslint.config.js",
+      "file_type": "code",
+      "source_file": "eslint.config.js",
+      "source_location": "L1",
+      "id": "eslint_config_js",
+      "community": 19,
+      "norm_label": "eslint.config.js"
+    },
+    {
+      "label": "vite.config.js",
+      "file_type": "code",
+      "source_file": "vite.config.js",
+      "source_location": "L1",
+      "id": "vite_config_js",
+      "community": 20,
+      "norm_label": "vite.config.js"
+    },
+    {
+      "label": "cleanupChannel.js",
+      "file_type": "code",
+      "source_file": "server/cleanupChannel.js",
+      "source_location": "L1",
+      "id": "server_cleanupchannel_js",
+      "community": 9,
+      "norm_label": "cleanupchannel.js"
+    },
+    {
+      "label": "cleanup()",
+      "file_type": "code",
+      "source_file": "server/cleanupChannel.js",
+      "source_location": "L5",
+      "id": "server_cleanupchannel_cleanup",
+      "community": 9,
+      "norm_label": "cleanup()"
+    },
+    {
+      "label": "seedAdmin.js",
+      "file_type": "code",
+      "source_file": "server/seedAdmin.js",
+      "source_location": "L1",
+      "id": "server_seedadmin_js",
+      "community": 10,
+      "norm_label": "seedadmin.js"
+    },
+    {
+      "label": "seedAdmin()",
+      "file_type": "code",
+      "source_file": "server/seedAdmin.js",
+      "source_location": "L5",
+      "id": "server_seedadmin_seedadmin",
+      "community": 10,
+      "norm_label": "seedadmin()"
+    },
+    {
+      "label": "seedDummyData.js",
+      "file_type": "code",
+      "source_file": "server/seedDummyData.js",
+      "source_location": "L1",
+      "id": "server_seeddummydata_js",
+      "community": 11,
+      "norm_label": "seeddummydata.js"
+    },
+    {
+      "label": "seedData()",
+      "file_type": "code",
+      "source_file": "server/seedDummyData.js",
+      "source_location": "L12",
+      "id": "server_seeddummydata_seeddata",
+      "community": 11,
+      "norm_label": "seeddata()"
+    },
+    {
+      "label": "server.js",
+      "file_type": "code",
+      "source_file": "server/server.js",
+      "source_location": "L1",
+      "id": "server_server_js",
+      "community": 21,
+      "norm_label": "server.js"
+    },
+    {
+      "label": "cloudinary.js",
+      "file_type": "code",
+      "source_file": "server/config/cloudinary.js",
+      "source_location": "L1",
+      "id": "server_config_cloudinary_js",
+      "community": 22,
+      "norm_label": "cloudinary.js"
+    },
+    {
+      "label": "db.js",
+      "file_type": "code",
+      "source_file": "server/config/db.js",
+      "source_location": "L1",
+      "id": "server_config_db_js",
+      "community": 12,
+      "norm_label": "db.js"
+    },
+    {
+      "label": "connectDB()",
+      "file_type": "code",
+      "source_file": "server/config/db.js",
+      "source_location": "L3",
+      "id": "config_db_connectdb",
+      "community": 12,
+      "norm_label": "connectdb()"
+    },
+    {
+      "label": "attendanceController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/attendanceController.js",
+      "source_location": "L1",
+      "id": "server_controllers_attendancecontroller_js",
+      "community": 23,
+      "norm_label": "attendancecontroller.js"
+    },
+    {
+      "label": "authController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/authController.js",
+      "source_location": "L1",
+      "id": "server_controllers_authcontroller_js",
+      "community": 13,
+      "norm_label": "authcontroller.js"
+    },
+    {
+      "label": "generateToken()",
+      "file_type": "code",
+      "source_file": "server/controllers/authController.js",
+      "source_location": "L5",
+      "id": "controllers_authcontroller_generatetoken",
+      "community": 13,
+      "norm_label": "generatetoken()"
+    },
+    {
+      "label": "calendarController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/calendarController.js",
+      "source_location": "L1",
+      "id": "server_controllers_calendarcontroller_js",
+      "community": 24,
+      "norm_label": "calendarcontroller.js"
+    },
+    {
+      "label": "chatController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/chatController.js",
+      "source_location": "L1",
+      "id": "server_controllers_chatcontroller_js",
+      "community": 14,
+      "norm_label": "chatcontroller.js"
+    },
+    {
+      "label": "canAccessChannel()",
+      "file_type": "code",
+      "source_file": "server/controllers/chatController.js",
+      "source_location": "L6",
+      "id": "controllers_chatcontroller_canaccesschannel",
+      "community": 14,
+      "norm_label": "canaccesschannel()"
+    },
+    {
+      "label": "clientController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/clientController.js",
+      "source_location": "L1",
+      "id": "server_controllers_clientcontroller_js",
+      "community": 25,
+      "norm_label": "clientcontroller.js"
+    },
+    {
+      "label": "dashboardController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/dashboardController.js",
+      "source_location": "L1",
+      "id": "server_controllers_dashboardcontroller_js",
+      "community": 26,
+      "norm_label": "dashboardcontroller.js"
+    },
+    {
+      "label": "expenseController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/expenseController.js",
+      "source_location": "L1",
+      "id": "server_controllers_expensecontroller_js",
+      "community": 27,
+      "norm_label": "expensecontroller.js"
+    },
+    {
+      "label": "leaveController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/leaveController.js",
+      "source_location": "L1",
+      "id": "server_controllers_leavecontroller_js",
+      "community": 28,
+      "norm_label": "leavecontroller.js"
+    },
+    {
+      "label": "profileController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/profileController.js",
+      "source_location": "L1",
+      "id": "server_controllers_profilecontroller_js",
+      "community": 29,
+      "norm_label": "profilecontroller.js"
+    },
+    {
+      "label": "projectController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/projectController.js",
+      "source_location": "L1",
+      "id": "server_controllers_projectcontroller_js",
+      "community": 30,
+      "norm_label": "projectcontroller.js"
+    },
+    {
+      "label": "settingsController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/settingsController.js",
+      "source_location": "L1",
+      "id": "server_controllers_settingscontroller_js",
+      "community": 15,
+      "norm_label": "settingscontroller.js"
+    },
+    {
+      "label": "getOrCreateSettings()",
+      "file_type": "code",
+      "source_file": "server/controllers/settingsController.js",
+      "source_location": "L4",
+      "id": "controllers_settingscontroller_getorcreatesettings",
+      "community": 15,
+      "norm_label": "getorcreatesettings()"
+    },
+    {
+      "label": "taskController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/taskController.js",
+      "source_location": "L1",
+      "id": "server_controllers_taskcontroller_js",
+      "community": 16,
+      "norm_label": "taskcontroller.js"
+    },
+    {
+      "label": "broadcastProjectProgress()",
+      "file_type": "code",
+      "source_file": "server/controllers/taskController.js",
+      "source_location": "L10",
+      "id": "controllers_taskcontroller_broadcastprojectprogress",
+      "community": 16,
+      "norm_label": "broadcastprojectprogress()"
+    },
+    {
+      "label": "teamController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/teamController.js",
+      "source_location": "L1",
+      "id": "server_controllers_teamcontroller_js",
+      "community": 31,
+      "norm_label": "teamcontroller.js"
+    },
+    {
+      "label": "timerController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/timerController.js",
+      "source_location": "L1",
+      "id": "server_controllers_timercontroller_js",
+      "community": 17,
+      "norm_label": "timercontroller.js"
+    },
+    {
+      "label": "broadcastTimer()",
+      "file_type": "code",
+      "source_file": "server/controllers/timerController.js",
+      "source_location": "L8",
+      "id": "controllers_timercontroller_broadcasttimer",
+      "community": 17,
+      "norm_label": "broadcasttimer()"
+    },
+    {
+      "label": "timesheetController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/timesheetController.js",
+      "source_location": "L1",
+      "id": "server_controllers_timesheetcontroller_js",
+      "community": 32,
+      "norm_label": "timesheetcontroller.js"
+    },
+    {
+      "label": "userController.js",
+      "file_type": "code",
+      "source_file": "server/controllers/userController.js",
+      "source_location": "L1",
+      "id": "server_controllers_usercontroller_js",
+      "community": 7,
+      "norm_label": "usercontroller.js"
+    },
+    {
+      "label": "syncUserTeamChannel()",
+      "file_type": "code",
+      "source_file": "server/controllers/userController.js",
+      "source_location": "L10",
+      "id": "controllers_usercontroller_syncuserteamchannel",
+      "community": 7,
+      "norm_label": "syncuserteamchannel()"
+    },
+    {
+      "label": "broadcastProjectProgress()",
+      "file_type": "code",
+      "source_file": "server/controllers/userController.js",
+      "source_location": "L31",
+      "id": "controllers_usercontroller_broadcastprojectprogress",
+      "community": 7,
+      "norm_label": "broadcastprojectprogress()"
+    },
+    {
+      "label": "runMailer()",
+      "file_type": "code",
+      "source_file": "server/controllers/userController.js",
+      "source_location": "L115",
+      "id": "controllers_usercontroller_runmailer",
+      "community": 7,
+      "norm_label": "runmailer()"
+    },
+    {
+      "label": "autoClockOut.js",
+      "file_type": "code",
+      "source_file": "server/cron/autoClockOut.js",
+      "source_location": "L1",
+      "id": "server_cron_autoclockout_js",
+      "community": 33,
+      "norm_label": "autoclockout.js"
+    },
+    {
+      "label": "deleteOldArchivedTasks.js",
+      "file_type": "code",
+      "source_file": "server/cron/deleteOldArchivedTasks.js",
+      "source_location": "L1",
+      "id": "server_cron_deleteoldarchivedtasks_js",
+      "community": 34,
+      "norm_label": "deleteoldarchivedtasks.js"
+    },
+    {
+      "label": "leaveBalanceReset.js",
+      "file_type": "code",
+      "source_file": "server/cron/leaveBalanceReset.js",
+      "source_location": "L1",
+      "id": "server_cron_leavebalancereset_js",
+      "community": 35,
+      "norm_label": "leavebalancereset.js"
+    },
+    {
+      "label": "overdueTaskFlagging.js",
+      "file_type": "code",
+      "source_file": "server/cron/overdueTaskFlagging.js",
+      "source_location": "L1",
+      "id": "server_cron_overduetaskflagging_js",
+      "community": 36,
+      "norm_label": "overduetaskflagging.js"
+    },
+    {
+      "label": "recurringTasks.js",
+      "file_type": "code",
+      "source_file": "server/cron/recurringTasks.js",
+      "source_location": "L1",
+      "id": "server_cron_recurringtasks_js",
+      "community": 37,
+      "norm_label": "recurringtasks.js"
+    },
+    {
+      "label": "authMiddleware.js",
+      "file_type": "code",
+      "source_file": "server/middleware/authMiddleware.js",
+      "source_location": "L1",
+      "id": "server_middleware_authmiddleware_js",
+      "community": 38,
+      "norm_label": "authmiddleware.js"
+    },
+    {
+      "label": "Attendance.js",
+      "file_type": "code",
+      "source_file": "server/models/Attendance.js",
+      "source_location": "L1",
+      "id": "server_models_attendance_js",
+      "community": 39,
+      "norm_label": "attendance.js"
+    },
+    {
+      "label": "Channel.js",
+      "file_type": "code",
+      "source_file": "server/models/Channel.js",
+      "source_location": "L1",
+      "id": "server_models_channel_js",
+      "community": 40,
+      "norm_label": "channel.js"
+    },
+    {
+      "label": "Client.js",
+      "file_type": "code",
+      "source_file": "server/models/Client.js",
+      "source_location": "L1",
+      "id": "server_models_client_js",
+      "community": 41,
+      "norm_label": "client.js"
+    },
+    {
+      "label": "Expense.js",
+      "file_type": "code",
+      "source_file": "server/models/Expense.js",
+      "source_location": "L1",
+      "id": "server_models_expense_js",
+      "community": 42,
+      "norm_label": "expense.js"
+    },
+    {
+      "label": "Leave.js",
+      "file_type": "code",
+      "source_file": "server/models/Leave.js",
+      "source_location": "L1",
+      "id": "server_models_leave_js",
+      "community": 43,
+      "norm_label": "leave.js"
+    },
+    {
+      "label": "LeaveBalance.js",
+      "file_type": "code",
+      "source_file": "server/models/LeaveBalance.js",
+      "source_location": "L1",
+      "id": "server_models_leavebalance_js",
+      "community": 44,
+      "norm_label": "leavebalance.js"
+    },
+    {
+      "label": "LeaveType.js",
+      "file_type": "code",
+      "source_file": "server/models/LeaveType.js",
+      "source_location": "L1",
+      "id": "server_models_leavetype_js",
+      "community": 45,
+      "norm_label": "leavetype.js"
+    },
+    {
+      "label": "Message.js",
+      "file_type": "code",
+      "source_file": "server/models/Message.js",
+      "source_location": "L1",
+      "id": "server_models_message_js",
+      "community": 46,
+      "norm_label": "message.js"
+    },
+    {
+      "label": "Project.js",
+      "file_type": "code",
+      "source_file": "server/models/Project.js",
+      "source_location": "L1",
+      "id": "server_models_project_js",
+      "community": 47,
+      "norm_label": "project.js"
+    },
+    {
+      "label": "PublicHoliday.js",
+      "file_type": "code",
+      "source_file": "server/models/PublicHoliday.js",
+      "source_location": "L1",
+      "id": "server_models_publicholiday_js",
+      "community": 48,
+      "norm_label": "publicholiday.js"
+    },
+    {
+      "label": "Settings.js",
+      "file_type": "code",
+      "source_file": "server/models/Settings.js",
+      "source_location": "L1",
+      "id": "server_models_settings_js",
+      "community": 49,
+      "norm_label": "settings.js"
+    },
+    {
+      "label": "Task.js",
+      "file_type": "code",
+      "source_file": "server/models/Task.js",
+      "source_location": "L1",
+      "id": "server_models_task_js",
+      "community": 50,
+      "norm_label": "task.js"
+    },
+    {
+      "label": "TaskComment.js",
+      "file_type": "code",
+      "source_file": "server/models/TaskComment.js",
+      "source_location": "L1",
+      "id": "server_models_taskcomment_js",
+      "community": 51,
+      "norm_label": "taskcomment.js"
+    },
+    {
+      "label": "TaskTransfer.js",
+      "file_type": "code",
+      "source_file": "server/models/TaskTransfer.js",
+      "source_location": "L1",
+      "id": "server_models_tasktransfer_js",
+      "community": 52,
+      "norm_label": "tasktransfer.js"
+    },
+    {
+      "label": "Team.js",
+      "file_type": "code",
+      "source_file": "server/models/Team.js",
+      "source_location": "L1",
+      "id": "server_models_team_js",
+      "community": 53,
+      "norm_label": "team.js"
+    },
+    {
+      "label": "Timesheet.js",
+      "file_type": "code",
+      "source_file": "server/models/Timesheet.js",
+      "source_location": "L1",
+      "id": "server_models_timesheet_js",
+      "community": 54,
+      "norm_label": "timesheet.js"
+    },
+    {
+      "label": "User.js",
+      "file_type": "code",
+      "source_file": "server/models/User.js",
+      "source_location": "L1",
+      "id": "server_models_user_js",
+      "community": 55,
+      "norm_label": "user.js"
+    },
+    {
+      "label": "attendanceRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/attendanceRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_attendanceroutes_js",
+      "community": 56,
+      "norm_label": "attendanceroutes.js"
+    },
+    {
+      "label": "authRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/authRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_authroutes_js",
+      "community": 57,
+      "norm_label": "authroutes.js"
+    },
+    {
+      "label": "calendarRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/calendarRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_calendarroutes_js",
+      "community": 58,
+      "norm_label": "calendarroutes.js"
+    },
+    {
+      "label": "chatRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/chatRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_chatroutes_js",
+      "community": 59,
+      "norm_label": "chatroutes.js"
+    },
+    {
+      "label": "clientRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/clientRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_clientroutes_js",
+      "community": 60,
+      "norm_label": "clientroutes.js"
+    },
+    {
+      "label": "dashboardRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/dashboardRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_dashboardroutes_js",
+      "community": 61,
+      "norm_label": "dashboardroutes.js"
+    },
+    {
+      "label": "expenseRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/expenseRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_expenseroutes_js",
+      "community": 62,
+      "norm_label": "expenseroutes.js"
+    },
+    {
+      "label": "leaveRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/leaveRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_leaveroutes_js",
+      "community": 63,
+      "norm_label": "leaveroutes.js"
+    },
+    {
+      "label": "projectRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/projectRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_projectroutes_js",
+      "community": 64,
+      "norm_label": "projectroutes.js"
+    },
+    {
+      "label": "settingsRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/settingsRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_settingsroutes_js",
+      "community": 65,
+      "norm_label": "settingsroutes.js"
+    },
+    {
+      "label": "taskRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/taskRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_taskroutes_js",
+      "community": 66,
+      "norm_label": "taskroutes.js"
+    },
+    {
+      "label": "teamRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/teamRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_teamroutes_js",
+      "community": 67,
+      "norm_label": "teamroutes.js"
+    },
+    {
+      "label": "timerRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/timerRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_timerroutes_js",
+      "community": 68,
+      "norm_label": "timerroutes.js"
+    },
+    {
+      "label": "timesheetRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/timesheetRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_timesheetroutes_js",
+      "community": 69,
+      "norm_label": "timesheetroutes.js"
+    },
+    {
+      "label": "userRoutes.js",
+      "file_type": "code",
+      "source_file": "server/routes/userRoutes.js",
+      "source_location": "L1",
+      "id": "server_routes_userroutes_js",
+      "community": 70,
+      "norm_label": "userroutes.js"
+    },
+    {
+      "label": "migrateLeaveBalances.js",
+      "file_type": "code",
+      "source_file": "server/scripts/migrateLeaveBalances.js",
+      "source_location": "L1",
+      "id": "server_scripts_migrateleavebalances_js",
+      "community": 18,
+      "norm_label": "migrateleavebalances.js"
+    },
+    {
+      "label": "run()",
+      "file_type": "code",
+      "source_file": "server/scripts/migrateLeaveBalances.js",
+      "source_location": "L22",
+      "id": "scripts_migrateleavebalances_run",
+      "community": 18,
+      "norm_label": "run()"
+    },
+    {
+      "label": "calendarService.js",
+      "file_type": "code",
+      "source_file": "server/services/calendarService.js",
+      "source_location": "L1",
+      "id": "server_services_calendarservice_js",
+      "community": 71,
+      "norm_label": "calendarservice.js"
+    },
+    {
+      "label": "mailer.js",
+      "file_type": "code",
+      "source_file": "server/utils/mailer.js",
+      "source_location": "L1",
+      "id": "server_utils_mailer_js",
+      "community": 72,
+      "norm_label": "mailer.js"
+    },
+    {
+      "label": "taskStartAccess.js",
+      "file_type": "code",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L1",
+      "id": "server_utils_taskstartaccess_js",
+      "community": 8,
+      "norm_label": "taskstartaccess.js"
+    },
+    {
+      "label": "getTodayStart()",
+      "file_type": "code",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L3",
+      "id": "utils_taskstartaccess_gettodaystart",
+      "community": 8,
+      "norm_label": "gettodaystart()"
+    },
+    {
+      "label": "getActiveAttendance()",
+      "file_type": "code",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L9",
+      "id": "utils_taskstartaccess_getactiveattendance",
+      "community": 8,
+      "norm_label": "getactiveattendance()"
+    },
+    {
+      "label": "ensureCanStartTask()",
+      "file_type": "code",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L19",
+      "id": "utils_taskstartaccess_ensurecanstarttask",
+      "community": 8,
+      "norm_label": "ensurecanstarttask()"
+    },
+    {
+      "label": "App.jsx",
+      "file_type": "code",
+      "source_file": "src/App.jsx",
+      "source_location": "L1",
+      "id": "src_app_jsx",
+      "community": 2,
+      "norm_label": "app.jsx"
+    },
+    {
+      "label": "App()",
+      "file_type": "code",
+      "source_file": "src/App.jsx",
+      "source_location": "L20",
+      "id": "src_app_app",
+      "community": 2,
+      "norm_label": "app()"
+    },
+    {
+      "label": "main.jsx",
+      "file_type": "code",
+      "source_file": "src/main.jsx",
+      "source_location": "L1",
+      "id": "src_main_jsx",
+      "community": 2,
+      "norm_label": "main.jsx"
+    },
+    {
+      "label": "ChatHighlight.jsx",
+      "file_type": "code",
+      "source_file": "src/components/ChatHighlight.jsx",
+      "source_location": "L1",
+      "id": "src_components_chathighlight_jsx",
+      "community": 0,
+      "norm_label": "chathighlight.jsx"
+    },
+    {
+      "label": "ChatHighlight()",
+      "file_type": "code",
+      "source_file": "src/components/ChatHighlight.jsx",
+      "source_location": "L4",
+      "id": "components_chathighlight_chathighlight",
+      "community": 0,
+      "norm_label": "chathighlight()"
+    },
+    {
+      "label": "CtaBanner.jsx",
+      "file_type": "code",
+      "source_file": "src/components/CtaBanner.jsx",
+      "source_location": "L1",
+      "id": "src_components_ctabanner_jsx",
+      "community": 0,
+      "norm_label": "ctabanner.jsx"
+    },
+    {
+      "label": "CtaBanner()",
+      "file_type": "code",
+      "source_file": "src/components/CtaBanner.jsx",
+      "source_location": "L4",
+      "id": "components_ctabanner_ctabanner",
+      "community": 0,
+      "norm_label": "ctabanner()"
+    },
+    {
+      "label": "DashboardLayout.jsx",
+      "file_type": "code",
+      "source_file": "src/components/DashboardLayout.jsx",
+      "source_location": "L1",
+      "id": "src_components_dashboardlayout_jsx",
+      "community": 1,
+      "norm_label": "dashboardlayout.jsx"
+    },
+    {
+      "label": "DashboardLayout()",
+      "file_type": "code",
+      "source_file": "src/components/DashboardLayout.jsx",
+      "source_location": "L7",
+      "id": "components_dashboardlayout_dashboardlayout",
+      "community": 1,
+      "norm_label": "dashboardlayout()"
+    },
+    {
+      "label": "Features.jsx",
+      "file_type": "code",
+      "source_file": "src/components/Features.jsx",
+      "source_location": "L1",
+      "id": "src_components_features_jsx",
+      "community": 0,
+      "norm_label": "features.jsx"
+    },
+    {
+      "label": "Features()",
+      "file_type": "code",
+      "source_file": "src/components/Features.jsx",
+      "source_location": "L4",
+      "id": "components_features_features",
+      "community": 0,
+      "norm_label": "features()"
+    },
+    {
+      "label": "Footer.jsx",
+      "file_type": "code",
+      "source_file": "src/components/Footer.jsx",
+      "source_location": "L1",
+      "id": "src_components_footer_jsx",
+      "community": 0,
+      "norm_label": "footer.jsx"
+    },
+    {
+      "label": "Footer()",
+      "file_type": "code",
+      "source_file": "src/components/Footer.jsx",
+      "source_location": "L3",
+      "id": "components_footer_footer",
+      "community": 0,
+      "norm_label": "footer()"
+    },
+    {
+      "label": "Hero.jsx",
+      "file_type": "code",
+      "source_file": "src/components/Hero.jsx",
+      "source_location": "L1",
+      "id": "src_components_hero_jsx",
+      "community": 0,
+      "norm_label": "hero.jsx"
+    },
+    {
+      "label": "Hero()",
+      "file_type": "code",
+      "source_file": "src/components/Hero.jsx",
+      "source_location": "L4",
+      "id": "components_hero_hero",
+      "community": 0,
+      "norm_label": "hero()"
+    },
+    {
+      "label": "HowItWorks.jsx",
+      "file_type": "code",
+      "source_file": "src/components/HowItWorks.jsx",
+      "source_location": "L1",
+      "id": "src_components_howitworks_jsx",
+      "community": 0,
+      "norm_label": "howitworks.jsx"
+    },
+    {
+      "label": "HowItWorks()",
+      "file_type": "code",
+      "source_file": "src/components/HowItWorks.jsx",
+      "source_location": "L4",
+      "id": "components_howitworks_howitworks",
+      "community": 0,
+      "norm_label": "howitworks()"
+    },
+    {
+      "label": "Navbar.jsx",
+      "file_type": "code",
+      "source_file": "src/components/Navbar.jsx",
+      "source_location": "L1",
+      "id": "src_components_navbar_jsx",
+      "community": 0,
+      "norm_label": "navbar.jsx"
+    },
+    {
+      "label": "Navbar()",
+      "file_type": "code",
+      "source_file": "src/components/Navbar.jsx",
+      "source_location": "L4",
+      "id": "components_navbar_navbar",
+      "community": 0,
+      "norm_label": "navbar()"
+    },
+    {
+      "label": "Pricing.jsx",
+      "file_type": "code",
+      "source_file": "src/components/Pricing.jsx",
+      "source_location": "L1",
+      "id": "src_components_pricing_jsx",
+      "community": 0,
+      "norm_label": "pricing.jsx"
+    },
+    {
+      "label": "Pricing()",
+      "file_type": "code",
+      "source_file": "src/components/Pricing.jsx",
+      "source_location": "L4",
+      "id": "components_pricing_pricing",
+      "community": 0,
+      "norm_label": "pricing()"
+    },
+    {
+      "label": "SocialProof.jsx",
+      "file_type": "code",
+      "source_file": "src/components/SocialProof.jsx",
+      "source_location": "L1",
+      "id": "src_components_socialproof_jsx",
+      "community": 0,
+      "norm_label": "socialproof.jsx"
+    },
+    {
+      "label": "SocialProof()",
+      "file_type": "code",
+      "source_file": "src/components/SocialProof.jsx",
+      "source_location": "L4",
+      "id": "components_socialproof_socialproof",
+      "community": 0,
+      "norm_label": "socialproof()"
+    },
+    {
+      "label": "TeamStatusPanel.jsx",
+      "file_type": "code",
+      "source_file": "src/components/TeamStatusPanel.jsx",
+      "source_location": "L1",
+      "id": "src_components_teamstatuspanel_jsx",
+      "community": 3,
+      "norm_label": "teamstatuspanel.jsx"
+    },
+    {
+      "label": "TeamStatusPanel()",
+      "file_type": "code",
+      "source_file": "src/components/TeamStatusPanel.jsx",
+      "source_location": "L5",
+      "id": "components_teamstatuspanel_teamstatuspanel",
+      "community": 3,
+      "norm_label": "teamstatuspanel()"
+    },
+    {
+      "label": "Testimonials.jsx",
+      "file_type": "code",
+      "source_file": "src/components/Testimonials.jsx",
+      "source_location": "L1",
+      "id": "src_components_testimonials_jsx",
+      "community": 0,
+      "norm_label": "testimonials.jsx"
+    },
+    {
+      "label": "Testimonials()",
+      "file_type": "code",
+      "source_file": "src/components/Testimonials.jsx",
+      "source_location": "L4",
+      "id": "components_testimonials_testimonials",
+      "community": 0,
+      "norm_label": "testimonials()"
+    },
+    {
+      "label": "SocketContext.jsx",
+      "file_type": "code",
+      "source_file": "src/context/SocketContext.jsx",
+      "source_location": "L1",
+      "id": "src_context_socketcontext_jsx",
+      "community": 1,
+      "norm_label": "socketcontext.jsx"
+    },
+    {
+      "label": "useSocket()",
+      "file_type": "code",
+      "source_file": "src/context/SocketContext.jsx",
+      "source_location": "L7",
+      "id": "context_socketcontext_usesocket",
+      "community": 1,
+      "norm_label": "usesocket()"
+    },
+    {
+      "label": "SocketProvider()",
+      "file_type": "code",
+      "source_file": "src/context/SocketContext.jsx",
+      "source_location": "L9",
+      "id": "context_socketcontext_socketprovider",
+      "community": 2,
+      "norm_label": "socketprovider()"
+    },
+    {
+      "label": "useFadeIn.jsx",
+      "file_type": "code",
+      "source_file": "src/hooks/useFadeIn.jsx",
+      "source_location": "L1",
+      "id": "src_hooks_usefadein_jsx",
+      "community": 0,
+      "norm_label": "usefadein.jsx"
+    },
+    {
+      "label": "useFadeIn()",
+      "file_type": "code",
+      "source_file": "src/hooks/useFadeIn.jsx",
+      "source_location": "L3",
+      "id": "hooks_usefadein_usefadein",
+      "community": 0,
+      "norm_label": "usefadein()"
+    },
+    {
+      "label": "FadeInSection()",
+      "file_type": "code",
+      "source_file": "src/hooks/useFadeIn.jsx",
+      "source_location": "L35",
+      "id": "hooks_usefadein_fadeinsection",
+      "community": 0,
+      "norm_label": "fadeinsection()"
+    },
+    {
+      "label": "AdminAttendance.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/AdminAttendance.jsx",
+      "source_location": "L1",
+      "id": "src_pages_adminattendance_jsx",
+      "community": 2,
+      "norm_label": "adminattendance.jsx"
+    },
+    {
+      "label": "AdminAttendance()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminAttendance.jsx",
+      "source_location": "L12",
+      "id": "pages_adminattendance_adminattendance",
+      "community": 2,
+      "norm_label": "adminattendance()"
+    },
+    {
+      "label": "AdminDashboard.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L1",
+      "id": "src_pages_admindashboard_jsx",
+      "community": 3,
+      "norm_label": "admindashboard.jsx"
+    },
+    {
+      "label": "getHeaders()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L9",
+      "id": "pages_admindashboard_getheaders",
+      "community": 3,
+      "norm_label": "getheaders()"
+    },
+    {
+      "label": "AdminDashboard()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L11",
+      "id": "pages_admindashboard_admindashboard",
+      "community": 3,
+      "norm_label": "admindashboard()"
+    },
+    {
+      "label": "formatTimer()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L200",
+      "id": "pages_admindashboard_formattimer",
+      "community": 3,
+      "norm_label": "formattimer()"
+    },
+    {
+      "label": "LiveTimerValue()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L208",
+      "id": "pages_admindashboard_livetimervalue",
+      "community": 3,
+      "norm_label": "livetimervalue()"
+    },
+    {
+      "label": "LiveWorkTimersPanel()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L231",
+      "id": "pages_admindashboard_liveworktimerspanel",
+      "community": 3,
+      "norm_label": "liveworktimerspanel()"
+    },
+    {
+      "label": "ApprovalActions()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L266",
+      "id": "pages_admindashboard_approvalactions",
+      "community": 3,
+      "norm_label": "approvalactions()"
+    },
+    {
+      "label": "MetricCard()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L289",
+      "id": "pages_admindashboard_metriccard",
+      "community": 3,
+      "norm_label": "metriccard()"
+    },
+    {
+      "label": "AdminUsers.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L1",
+      "id": "src_pages_adminusers_jsx",
+      "community": 4,
+      "norm_label": "adminusers.jsx"
+    },
+    {
+      "label": "toDateValue()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L10",
+      "id": "pages_adminusers_todatevalue",
+      "community": 4,
+      "norm_label": "todatevalue()"
+    },
+    {
+      "label": "formatDate()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L11",
+      "id": "pages_adminusers_formatdate",
+      "community": 4,
+      "norm_label": "formatdate()"
+    },
+    {
+      "label": "formatHours()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L12",
+      "id": "pages_adminusers_formathours",
+      "community": 4,
+      "norm_label": "formathours()"
+    },
+    {
+      "label": "isDone()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L13",
+      "id": "pages_adminusers_isdone",
+      "community": 4,
+      "norm_label": "isdone()"
+    },
+    {
+      "label": "isInRange()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L14",
+      "id": "pages_adminusers_isinrange",
+      "community": 4,
+      "norm_label": "isinrange()"
+    },
+    {
+      "label": "overlapsRange()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L20",
+      "id": "pages_adminusers_overlapsrange",
+      "community": 4,
+      "norm_label": "overlapsrange()"
+    },
+    {
+      "label": "AdminUsers()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L28",
+      "id": "pages_adminusers_adminusers",
+      "community": 4,
+      "norm_label": "adminusers()"
+    },
+    {
+      "label": "ReportMetric()",
+      "file_type": "code",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L695",
+      "id": "pages_adminusers_reportmetric",
+      "community": 4,
+      "norm_label": "reportmetric()"
+    },
+    {
+      "label": "Attendance.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Attendance.jsx",
+      "source_location": "L1",
+      "id": "src_pages_attendance_jsx",
+      "community": 2,
+      "norm_label": "attendance.jsx"
+    },
+    {
+      "label": "Attendance()",
+      "file_type": "code",
+      "source_file": "src/pages/Attendance.jsx",
+      "source_location": "L6",
+      "id": "pages_attendance_attendance",
+      "community": 2,
+      "norm_label": "attendance()"
+    },
+    {
+      "label": "Chat.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Chat.jsx",
+      "source_location": "L1",
+      "id": "src_pages_chat_jsx",
+      "community": 1,
+      "norm_label": "chat.jsx"
+    },
+    {
+      "label": "Chat()",
+      "file_type": "code",
+      "source_file": "src/pages/Chat.jsx",
+      "source_location": "L10",
+      "id": "pages_chat_chat",
+      "community": 1,
+      "norm_label": "chat()"
+    },
+    {
+      "label": "Dashboard.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L1",
+      "id": "src_pages_dashboard_jsx",
+      "community": 1,
+      "norm_label": "dashboard.jsx"
+    },
+    {
+      "label": "formatDate()",
+      "file_type": "code",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L13",
+      "id": "pages_dashboard_formatdate",
+      "community": 1,
+      "norm_label": "formatdate()"
+    },
+    {
+      "label": "isDone()",
+      "file_type": "code",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L14",
+      "id": "pages_dashboard_isdone",
+      "community": 1,
+      "norm_label": "isdone()"
+    },
+    {
+      "label": "Dashboard()",
+      "file_type": "code",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L16",
+      "id": "pages_dashboard_dashboard",
+      "community": 1,
+      "norm_label": "dashboard()"
+    },
+    {
+      "label": "Expenses.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Expenses.jsx",
+      "source_location": "L1",
+      "id": "src_pages_expenses_jsx",
+      "community": 2,
+      "norm_label": "expenses.jsx"
+    },
+    {
+      "label": "getHeaders()",
+      "file_type": "code",
+      "source_file": "src/pages/Expenses.jsx",
+      "source_location": "L7",
+      "id": "pages_expenses_getheaders",
+      "community": 2,
+      "norm_label": "getheaders()"
+    },
+    {
+      "label": "Expenses()",
+      "file_type": "code",
+      "source_file": "src/pages/Expenses.jsx",
+      "source_location": "L19",
+      "id": "pages_expenses_expenses",
+      "community": 2,
+      "norm_label": "expenses()"
+    },
+    {
+      "label": "Home.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L1",
+      "id": "src_pages_home_jsx",
+      "community": 0,
+      "norm_label": "home.jsx"
+    },
+    {
+      "label": "Home()",
+      "file_type": "code",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L13",
+      "id": "pages_home_home",
+      "community": 0,
+      "norm_label": "home()"
+    },
+    {
+      "label": "Leaves.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L1",
+      "id": "src_pages_leaves_jsx",
+      "community": 1,
+      "norm_label": "leaves.jsx"
+    },
+    {
+      "label": "H()",
+      "file_type": "code",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L8",
+      "id": "pages_leaves_h",
+      "community": 1,
+      "norm_label": "h()"
+    },
+    {
+      "label": "fmt()",
+      "file_type": "code",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L9",
+      "id": "pages_leaves_fmt",
+      "community": 1,
+      "norm_label": "fmt()"
+    },
+    {
+      "label": "Leaves()",
+      "file_type": "code",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L12",
+      "id": "pages_leaves_leaves",
+      "community": 1,
+      "norm_label": "leaves()"
+    },
+    {
+      "label": "Login.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Login.jsx",
+      "source_location": "L1",
+      "id": "src_pages_login_jsx",
+      "community": 2,
+      "norm_label": "login.jsx"
+    },
+    {
+      "label": "Login()",
+      "file_type": "code",
+      "source_file": "src/pages/Login.jsx",
+      "source_location": "L5",
+      "id": "pages_login_login",
+      "community": 2,
+      "norm_label": "login()"
+    },
+    {
+      "label": "ProjectManagement.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L1",
+      "id": "src_pages_projectmanagement_jsx",
+      "community": 6,
+      "norm_label": "projectmanagement.jsx"
+    },
+    {
+      "label": "getHeaders()",
+      "file_type": "code",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L8",
+      "id": "pages_projectmanagement_getheaders",
+      "community": 6,
+      "norm_label": "getheaders()"
+    },
+    {
+      "label": "fmtTime()",
+      "file_type": "code",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L11",
+      "id": "pages_projectmanagement_fmttime",
+      "community": 6,
+      "norm_label": "fmttime()"
+    },
+    {
+      "label": "LiveTimer()",
+      "file_type": "code",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L18",
+      "id": "pages_projectmanagement_livetimer",
+      "community": 6,
+      "norm_label": "livetimer()"
+    },
+    {
+      "label": "DescriptionToggle()",
+      "file_type": "code",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L35",
+      "id": "pages_projectmanagement_descriptiontoggle",
+      "community": 6,
+      "norm_label": "descriptiontoggle()"
+    },
+    {
+      "label": "ProjectManagement()",
+      "file_type": "code",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L52",
+      "id": "pages_projectmanagement_projectmanagement",
+      "community": 6,
+      "norm_label": "projectmanagement()"
+    },
+    {
+      "label": "Projects.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L1",
+      "id": "src_pages_projects_jsx",
+      "community": 1,
+      "norm_label": "projects.jsx"
+    },
+    {
+      "label": "getHeaders()",
+      "file_type": "code",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L8",
+      "id": "pages_projects_getheaders",
+      "community": 1,
+      "norm_label": "getheaders()"
+    },
+    {
+      "label": "fmtTime()",
+      "file_type": "code",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L19",
+      "id": "pages_projects_fmttime",
+      "community": 1,
+      "norm_label": "fmttime()"
+    },
+    {
+      "label": "LiveTimer()",
+      "file_type": "code",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L26",
+      "id": "pages_projects_livetimer",
+      "community": 1,
+      "norm_label": "livetimer()"
+    },
+    {
+      "label": "DescriptionToggle()",
+      "file_type": "code",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L47",
+      "id": "pages_projects_descriptiontoggle",
+      "community": 1,
+      "norm_label": "descriptiontoggle()"
+    },
+    {
+      "label": "TimerControls()",
+      "file_type": "code",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L68",
+      "id": "pages_projects_timercontrols",
+      "community": 1,
+      "norm_label": "timercontrols()"
+    },
+    {
+      "label": "Projects()",
+      "file_type": "code",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L100",
+      "id": "pages_projects_projects",
+      "community": 1,
+      "norm_label": "projects()"
+    },
+    {
+      "label": "Settings.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Settings.jsx",
+      "source_location": "L1",
+      "id": "src_pages_settings_jsx",
+      "community": 2,
+      "norm_label": "settings.jsx"
+    },
+    {
+      "label": "getHeaders()",
+      "file_type": "code",
+      "source_file": "src/pages/Settings.jsx",
+      "source_location": "L7",
+      "id": "pages_settings_getheaders",
+      "community": 2,
+      "norm_label": "getheaders()"
+    },
+    {
+      "label": "Settings()",
+      "file_type": "code",
+      "source_file": "src/pages/Settings.jsx",
+      "source_location": "L9",
+      "id": "pages_settings_settings",
+      "community": 2,
+      "norm_label": "settings()"
+    },
+    {
+      "label": "Signup.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Signup.jsx",
+      "source_location": "L1",
+      "id": "src_pages_signup_jsx",
+      "community": 2,
+      "norm_label": "signup.jsx"
+    },
+    {
+      "label": "Signup()",
+      "file_type": "code",
+      "source_file": "src/pages/Signup.jsx",
+      "source_location": "L5",
+      "id": "pages_signup_signup",
+      "community": 2,
+      "norm_label": "signup()"
+    },
+    {
+      "label": "Teams.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Teams.jsx",
+      "source_location": "L1",
+      "id": "src_pages_teams_jsx",
+      "community": 2,
+      "norm_label": "teams.jsx"
+    },
+    {
+      "label": "Teams()",
+      "file_type": "code",
+      "source_file": "src/pages/Teams.jsx",
+      "source_location": "L6",
+      "id": "pages_teams_teams",
+      "community": 2,
+      "norm_label": "teams()"
+    },
+    {
+      "label": "Timesheets.jsx",
+      "file_type": "code",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L1",
+      "id": "src_pages_timesheets_jsx",
+      "community": 5,
+      "norm_label": "timesheets.jsx"
+    },
+    {
+      "label": "getH()",
+      "file_type": "code",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L8",
+      "id": "pages_timesheets_geth",
+      "community": 5,
+      "norm_label": "geth()"
+    },
+    {
+      "label": "fmtTime()",
+      "file_type": "code",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L10",
+      "id": "pages_timesheets_fmttime",
+      "community": 5,
+      "norm_label": "fmttime()"
+    },
+    {
+      "label": "formatHrsMins()",
+      "file_type": "code",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L17",
+      "id": "pages_timesheets_formathrsmins",
+      "community": 5,
+      "norm_label": "formathrsmins()"
+    },
+    {
+      "label": "LiveTimer()",
+      "file_type": "code",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L27",
+      "id": "pages_timesheets_livetimer",
+      "community": 5,
+      "norm_label": "livetimer()"
+    },
+    {
+      "label": "TaskTimerCard()",
+      "file_type": "code",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L50",
+      "id": "pages_timesheets_tasktimercard",
+      "community": 5,
+      "norm_label": "tasktimercard()"
+    },
+    {
+      "label": "WorkLog()",
+      "file_type": "code",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L112",
+      "id": "pages_timesheets_worklog",
+      "community": 5,
+      "norm_label": "worklog()"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/cleanupChannel.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server_cleanupchannel_js",
+      "target": "server_cleanupchannel_cleanup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/seedAdmin.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server_seedadmin_js",
+      "target": "server_seedadmin_seedadmin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/seedDummyData.js",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "server_seeddummydata_js",
+      "target": "server_seeddummydata_seeddata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/config/db.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "server_config_db_js",
+      "target": "config_db_connectdb",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/authController.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server_controllers_authcontroller_js",
+      "target": "controllers_authcontroller_generatetoken",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/chatController.js",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "server_controllers_chatcontroller_js",
+      "target": "controllers_chatcontroller_canaccesschannel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/settingsController.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "server_controllers_settingscontroller_js",
+      "target": "controllers_settingscontroller_getorcreatesettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/taskController.js",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "server_controllers_taskcontroller_js",
+      "target": "controllers_taskcontroller_broadcastprojectprogress",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/timerController.js",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "server_controllers_timercontroller_js",
+      "target": "controllers_timercontroller_broadcasttimer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/userController.js",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "server_controllers_usercontroller_js",
+      "target": "controllers_usercontroller_syncuserteamchannel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/userController.js",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "server_controllers_usercontroller_js",
+      "target": "controllers_usercontroller_broadcastprojectprogress",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/controllers/userController.js",
+      "source_location": "L115",
+      "weight": 1.0,
+      "source": "server_controllers_usercontroller_js",
+      "target": "controllers_usercontroller_runmailer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/scripts/migrateLeaveBalances.js",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "server_scripts_migrateleavebalances_js",
+      "target": "scripts_migrateleavebalances_run",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "server_utils_taskstartaccess_js",
+      "target": "utils_taskstartaccess_gettodaystart",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "server_utils_taskstartaccess_js",
+      "target": "utils_taskstartaccess_getactiveattendance",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "server_utils_taskstartaccess_js",
+      "target": "utils_taskstartaccess_ensurecanstarttask",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "utils_taskstartaccess_getactiveattendance",
+      "target": "utils_taskstartaccess_gettodaystart",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server/utils/taskStartAccess.js",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "utils_taskstartaccess_ensurecanstarttask",
+      "target": "utils_taskstartaccess_getactiveattendance",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "context_socketcontext_socketprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_home_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_login_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_signup_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_dashboard_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_adminusers_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_teams_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_projects_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_projectmanagement_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_attendance_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_leaves_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_chat_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_adminattendance_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_expenses_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_settings_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_pages_admindashboard_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.jsx",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "src_app_jsx",
+      "target": "src_app_app",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_main_jsx",
+      "target": "src_app_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ChatHighlight.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_chathighlight_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ChatHighlight.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_chathighlight_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ChatHighlight.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_chathighlight_jsx",
+      "target": "components_chathighlight_chathighlight",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_chathighlight_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/CtaBanner.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_ctabanner_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/CtaBanner.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_ctabanner_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/CtaBanner.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_ctabanner_jsx",
+      "target": "components_ctabanner_ctabanner",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_ctabanner_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/DashboardLayout.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_components_dashboardlayout_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/DashboardLayout.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_components_dashboardlayout_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/DashboardLayout.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_components_dashboardlayout_jsx",
+      "target": "components_dashboardlayout_dashboardlayout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Attendance.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_attendance_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Chat.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_chat_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Expenses.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_expenses_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_leaves_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Settings.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_settings_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Teams.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_teams_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "src_components_dashboardlayout_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/components/DashboardLayout.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "components_dashboardlayout_dashboardlayout",
+      "target": "context_socketcontext_usesocket"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Features.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_features_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Features.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_features_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Features.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_features_jsx",
+      "target": "components_features_features",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_features_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Footer.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_components_footer_jsx",
+      "target": "components_footer_footer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_footer_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Hero.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_hero_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Hero.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_hero_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Hero.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_hero_jsx",
+      "target": "components_hero_hero",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_hero_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/HowItWorks.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_howitworks_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/HowItWorks.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_howitworks_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/HowItWorks.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_howitworks_jsx",
+      "target": "components_howitworks_howitworks",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_howitworks_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Navbar.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_navbar_jsx",
+      "target": "components_navbar_navbar",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_navbar_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Pricing.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_pricing_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Pricing.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_pricing_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Pricing.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_pricing_jsx",
+      "target": "components_pricing_pricing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_pricing_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/SocialProof.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_socialproof_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/SocialProof.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_socialproof_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/SocialProof.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_socialproof_jsx",
+      "target": "components_socialproof_socialproof",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_socialproof_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/TeamStatusPanel.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_components_teamstatuspanel_jsx",
+      "target": "components_teamstatuspanel_teamstatuspanel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "src_components_teamstatuspanel_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "src_components_teamstatuspanel_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Testimonials.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_testimonials_jsx",
+      "target": "src_hooks_usefadein_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Testimonials.jsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_testimonials_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/Testimonials.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_testimonials_jsx",
+      "target": "components_testimonials_testimonials",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "src_components_testimonials_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/context/SocketContext.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_context_socketcontext_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/context/SocketContext.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_context_socketcontext_jsx",
+      "target": "context_socketcontext_socketprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Chat.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_chat_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_leaves_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "src_context_socketcontext_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Chat.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_chat_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_leaves_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "context_socketcontext_usesocket",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/pages/Chat.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "pages_chat_chat",
+      "target": "context_socketcontext_usesocket"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "pages_dashboard_dashboard",
+      "target": "context_socketcontext_usesocket"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "pages_leaves_leaves",
+      "target": "context_socketcontext_usesocket"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "pages_projectmanagement_projectmanagement",
+      "target": "context_socketcontext_usesocket"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "pages_projects_projects",
+      "target": "context_socketcontext_usesocket"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "pages_timesheets_worklog",
+      "target": "context_socketcontext_usesocket"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useFadeIn.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_hooks_usefadein_jsx",
+      "target": "hooks_usefadein_usefadein",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useFadeIn.jsx",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "src_hooks_usefadein_jsx",
+      "target": "hooks_usefadein_fadeinsection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useFadeIn.jsx",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "hooks_usefadein_fadeinsection",
+      "target": "hooks_usefadein_usefadein",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminAttendance.jsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_pages_adminattendance_jsx",
+      "target": "pages_adminattendance_adminattendance",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Attendance.jsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_pages_attendance_jsx",
+      "target": "src_pages_adminattendance_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "pages_admindashboard_getheaders",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "pages_admindashboard_admindashboard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L200",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "pages_admindashboard_formattimer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L208",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "pages_admindashboard_livetimervalue",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L231",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "pages_admindashboard_liveworktimerspanel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L266",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "pages_admindashboard_approvalactions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L289",
+      "weight": 1.0,
+      "source": "src_pages_admindashboard_jsx",
+      "target": "pages_admindashboard_metriccard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminDashboard.jsx",
+      "source_location": "L226",
+      "weight": 1.0,
+      "source": "pages_admindashboard_livetimervalue",
+      "target": "pages_admindashboard_formattimer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_todatevalue",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_formatdate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_formathours",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_isdone",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_isinrange",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_overlapsrange",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_adminusers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L695",
+      "weight": 1.0,
+      "source": "src_pages_adminusers_jsx",
+      "target": "pages_adminusers_reportmetric",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L338",
+      "weight": 1.0,
+      "source": "pages_adminusers_adminusers",
+      "target": "pages_adminusers_formatdate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/AdminUsers.jsx",
+      "source_location": "L342",
+      "weight": 1.0,
+      "source": "pages_adminusers_adminusers",
+      "target": "pages_adminusers_formathours",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Attendance.jsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_pages_attendance_jsx",
+      "target": "pages_attendance_attendance",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Chat.jsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "src_pages_chat_jsx",
+      "target": "pages_chat_chat",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "src_pages_timesheets_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "pages_dashboard_formatdate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "pages_dashboard_isdone",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Dashboard.jsx",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "src_pages_dashboard_jsx",
+      "target": "pages_dashboard_dashboard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Expenses.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_pages_expenses_jsx",
+      "target": "pages_expenses_getheaders",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Expenses.jsx",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "src_pages_expenses_jsx",
+      "target": "pages_expenses_expenses",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Home.jsx",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "src_pages_home_jsx",
+      "target": "pages_home_home",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_pages_leaves_jsx",
+      "target": "pages_leaves_h",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_pages_leaves_jsx",
+      "target": "pages_leaves_fmt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_pages_leaves_jsx",
+      "target": "pages_leaves_leaves",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Leaves.jsx",
+      "source_location": "L420",
+      "weight": 1.0,
+      "source": "pages_leaves_leaves",
+      "target": "pages_leaves_fmt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Login.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_pages_login_jsx",
+      "target": "pages_login_login",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "pages_projectmanagement_getheaders",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "pages_projectmanagement_fmttime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "pages_projectmanagement_livetimer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "pages_projectmanagement_descriptiontoggle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "src_pages_projectmanagement_jsx",
+      "target": "pages_projectmanagement_projectmanagement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/ProjectManagement.jsx",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "pages_projectmanagement_livetimer",
+      "target": "pages_projectmanagement_fmttime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "pages_projects_getheaders",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "pages_projects_fmttime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "pages_projects_livetimer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "pages_projects_descriptiontoggle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "pages_projects_timercontrols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L100",
+      "weight": 1.0,
+      "source": "src_pages_projects_jsx",
+      "target": "pages_projects_projects",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Projects.jsx",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "pages_projects_livetimer",
+      "target": "pages_projects_fmttime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Settings.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_pages_settings_jsx",
+      "target": "pages_settings_getheaders",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Settings.jsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_pages_settings_jsx",
+      "target": "pages_settings_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Signup.jsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_pages_signup_jsx",
+      "target": "pages_signup_signup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Teams.jsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_pages_teams_jsx",
+      "target": "pages_teams_teams",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "pages_timesheets_geth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "pages_timesheets_fmttime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "pages_timesheets_formathrsmins",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "pages_timesheets_livetimer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L50",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "pages_timesheets_tasktimercard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L112",
+      "weight": 1.0,
+      "source": "src_pages_timesheets_jsx",
+      "target": "pages_timesheets_worklog",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "pages_timesheets_livetimer",
+      "target": "pages_timesheets_fmttime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/pages/Timesheets.jsx",
+      "source_location": "L221",
+      "weight": 1.0,
+      "source": "pages_timesheets_worklog",
+      "target": "pages_timesheets_formathrsmins",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "0d2031f554a23a217435538b559349c849f1cea2"
+}

@@ -1,0 +1,141 @@
+/* =============================================================================
+   KVJ Analytics — Design Tokens (implements docs/17-design-system.md)
+   Layer: Shared/Design System. The single source of truth for colour, surface,
+   type, spacing, radius, elevation and motion. Components read these SEMANTIC
+   variables ONLY — never raw hex — so theme + branding are one-line swaps.
+
+   Import once at app root (after Tailwind). Toggle theme via
+   <html data-theme="light|dark">. System mode maps to one of these via JS.
+   ============================================================================= */
+
+:root,
+[data-theme='light'] {
+  /* Brand & accent (branding tokens — overridable per §19) */
+  --brand: #2563EB;            /* Blue-600 */
+  --brand-hover: #1D4ED8;      /* Blue-700 */
+  --brand-contrast: #FFFFFF;
+  --accent: #8B5CF6;           /* Purple-500 */
+
+  /* Surfaces (light: soft, never flat white everywhere) */
+  --bg-app: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-panel: #FFFFFF;
+  --bg-sunken: #F1F5F9;
+  --bg-hover: rgba(15, 23, 42, 0.04);
+
+  /* Borders */
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+
+  /* Text */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  /* Status (soft bg + saturated fg pairs for Badges) */
+  --status-success: #059669;  --status-success-bg: #ECFDF5;
+  --status-warning: #B45309;  --status-warning-bg: #FFFBEB;
+  --status-danger:  #DC2626;  --status-danger-bg:  #FEF2F2;
+  --status-info:    #7C3AED;  --status-info-bg:    #F5F3FF;
+  --status-progress:#2563EB;  --status-progress-bg:#EFF6FF;
+  --status-neutral: #64748B;  --status-neutral-bg: #F1F5F9;
+
+  /* Focus */
+  --focus-ring: rgba(59, 130, 246, 0.45);
+
+  /* Elevation (soft, low-spread) */
+  --e1: 0 1px 2px rgba(15, 23, 42, .06);
+  --e2: 0 4px 12px rgba(15, 23, 42, .08);
+  --e3: 0 12px 28px rgba(15, 23, 42, .12);
+  --e4: 0 24px 48px rgba(15, 23, 42, .16);
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --brand: #3B82F6;            /* Blue-500 reads better on dark */
+  --brand-hover: #60A5FA;
+  --brand-contrast: #0B1220;
+  --accent: #A78BFA;
+
+  /* Mandated layered surfaces — never pure black (§3) */
+  --bg-app: #111827;
+  --bg-surface: #1F2937;
+  --bg-panel: #374151;
+  --bg-sunken: #0F1520;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+
+  --border: #374151;
+  --border-strong: #4B5563;
+
+  --text-primary: #F9FAFB;
+  --text-secondary: #D1D5DB;
+  --text-muted: #9CA3AF;
+
+  --status-success: #34D399;  --status-success-bg: rgba(16, 185, 129, .14);
+  --status-warning: #FBBF24;  --status-warning-bg: rgba(245, 158, 11, .15);
+  --status-danger:  #F87171;  --status-danger-bg:  rgba(239, 68, 68, .15);
+  --status-info:    #A78BFA;  --status-info-bg:    rgba(139, 92, 246, .16);
+  --status-progress:#60A5FA;  --status-progress-bg:rgba(59, 130, 246, .16);
+  --status-neutral: #94A3B8;  --status-neutral-bg: rgba(148, 163, 184, .14);
+
+  --focus-ring: rgba(96, 165, 250, 0.55);
+
+  --e1: 0 1px 2px rgba(0, 0, 0, .4);
+  --e2: 0 8px 20px rgba(0, 0, 0, .45);
+  --e3: 0 16px 32px rgba(0, 0, 0, .5);
+  --e4: 0 28px 56px rgba(0, 0, 0, .6);
+
+  color-scheme: dark;
+}
+
+/* Theme-independent scales -------------------------------------------------- */
+:root {
+  /* Spacing (4px grid) */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px; --space-20: 80px;
+
+  /* Radius */
+  --radius-xs: 6px; --radius-sm: 8px; --radius-md: 12px;
+  --radius-lg: 16px; --radius-xl: 20px; --radius-2xl: 24px; --radius-pill: 9999px;
+
+  /* Typography */
+  --font-ui: 'Inter', -apple-system, system-ui, sans-serif;
+  --font-report: 'Fraunces', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Motion */
+  --dur-instant: 80ms; --dur-fast: 120ms; --dur-base: 180ms; --dur-slow: 220ms;
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(.2, 0, 0, 1);
+
+  /* Z-index */
+  --z-sticky: 100; --z-dropdown: 1000; --z-drawer: 1100;
+  --z-modal: 1200; --z-toast: 1300; --z-tooltip: 1400;
+}
+
+/* Instant, smooth theme switching (respects reduced motion) */
+@media (prefers-reduced-motion: no-preference) {
+  :root { transition: none; }
+  [data-theme] body,
+  [data-theme] .ds-themed {
+    transition: background-color var(--dur-fast) var(--ease-standard),
+                color var(--dur-fast) var(--ease-standard),
+                border-color var(--dur-fast) var(--ease-standard);
+  }
+}
+
+/* Global reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

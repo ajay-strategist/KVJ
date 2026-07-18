@@ -1,0 +1,82 @@
+/* =============================================================================
+   KVJ Analytics — UI kit styles (token-driven; dark-mode automatic)
+   Import once at app root after tokens.css. Components use these classes.
+   ============================================================================= */
+
+.kvj-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600; line-height: 1;
+  border-radius: var(--radius-md); padding: 9px 16px; cursor: pointer;
+  border: 1px solid transparent; transition: transform var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+  white-space: nowrap; user-select: none;
+}
+.kvj-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.kvj-btn:disabled { opacity: .5; cursor: not-allowed; }
+.kvj-btn--primary { background: var(--brand); color: var(--brand-contrast); }
+.kvj-btn--primary:hover:not(:disabled) { background: var(--brand-hover); transform: translateY(-1px); box-shadow: var(--e2); }
+.kvj-btn--secondary { background: var(--bg-sunken); color: var(--text-primary); border-color: var(--border); }
+.kvj-btn--secondary:hover:not(:disabled) { box-shadow: var(--e2); transform: translateY(-1px); }
+.kvj-btn--ghost { background: transparent; color: var(--brand); }
+.kvj-btn--ghost:hover:not(:disabled) { background: var(--bg-hover); }
+.kvj-btn--danger { background: var(--status-danger-bg); color: var(--status-danger); }
+.kvj-btn--sm { padding: 6px 12px; font-size: 12px; }
+.kvj-btn--lg { padding: 12px 20px; font-size: 14px; }
+.kvj-icon-btn { width: 36px; height: 36px; padding: 0; border-radius: var(--radius-md); }
+
+.kvj-card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--e1);
+  transition: box-shadow var(--dur-base) var(--ease-standard), transform var(--dur-base) var(--ease-standard);
+}
+.kvj-card--hover:hover { box-shadow: var(--e2); transform: translateY(-2px); }
+.kvj-card__body { padding: var(--space-6); }
+
+.kvj-badge {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600;
+  padding: 3px 10px; border-radius: var(--radius-pill);
+}
+.kvj-badge--success { background: var(--status-success-bg); color: var(--status-success); }
+.kvj-badge--warning { background: var(--status-warning-bg); color: var(--status-warning); }
+.kvj-badge--danger  { background: var(--status-danger-bg);  color: var(--status-danger); }
+.kvj-badge--info    { background: var(--status-info-bg);    color: var(--status-info); }
+.kvj-badge--progress{ background: var(--status-progress-bg);color: var(--status-progress); }
+.kvj-badge--neutral { background: var(--status-neutral-bg); color: var(--status-neutral); }
+
+.kvj-avatar {
+  display: inline-grid; place-items: center; border-radius: var(--radius-pill);
+  background: var(--brand); color: var(--brand-contrast); font-weight: 700; overflow: hidden;
+}
+
+.kvj-input, .kvj-textarea, .kvj-select {
+  width: 100%; font-family: var(--font-ui); font-size: 14px; color: var(--text-primary);
+  background: var(--bg-sunken); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 10px 12px; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); outline: none;
+}
+.kvj-input:focus, .kvj-textarea:focus, .kvj-select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
+.kvj-input[aria-invalid="true"] { border-color: var(--status-danger); }
+.kvj-field { display: flex; flex-direction: column; gap: 6px; }
+.kvj-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+.kvj-error { font-size: 12px; color: var(--status-danger); }
+
+.kvj-skeleton {
+  position: relative; overflow: hidden; background: var(--bg-sunken); border-radius: var(--radius-sm);
+}
+.kvj-skeleton::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--bg-hover), transparent);
+  transform: translateX(-100%); animation: kvj-shimmer 1.2s infinite;
+}
+@keyframes kvj-shimmer { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .kvj-skeleton::after { animation: none; } }
+
+.kvj-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.kvj-table thead th {
+  position: sticky; top: 0; z-index: 1; text-align: left; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-muted); font-weight: 600; padding: 12px 14px;
+  background: var(--bg-surface); border-bottom: 1px solid var(--border);
+}
+.kvj-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+.kvj-table tbody tr { transition: background var(--dur-fast); }
+.kvj-table tbody tr:hover { background: var(--bg-hover); }
+.kvj-num { font-variant-numeric: tabular-nums; text-align: right; }

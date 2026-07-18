@@ -1,0 +1,426 @@
+{
+  "D:\\strategist\\PSA web\\eslint.config.js": {
+    "mtime": 1777007106.4345608,
+    "hash": "3aa4b57d7f08181d86bde52a4dcb7f22"
+  },
+  "D:\\strategist\\PSA web\\vite.config.js": {
+    "mtime": 1777096576.4676511,
+    "hash": "3b70a0b92236b6884dda15346af7cb25"
+  },
+  "D:\\strategist\\PSA web\\server\\cleanupChannel.js": {
+    "mtime": 1777353521.8234303,
+    "hash": "0696f529ec213f2de16c9c2687fd2939"
+  },
+  "D:\\strategist\\PSA web\\server\\seedAdmin.js": {
+    "mtime": 1777522436.908633,
+    "hash": "8fb722038a15397de7ff61e4027ea844"
+  },
+  "D:\\strategist\\PSA web\\server\\seedDummyData.js": {
+    "mtime": 1777955557.4695516,
+    "hash": "9be3393af3a17f19565577506b9a315f"
+  },
+  "D:\\strategist\\PSA web\\server\\server.js": {
+    "mtime": 1777886918.8765864,
+    "hash": "85f61208a8d7eeed0c9950b61bf62497"
+  },
+  "D:\\strategist\\PSA web\\server\\config\\cloudinary.js": {
+    "mtime": 1777350441.148256,
+    "hash": "0d18f922e109e8dd00bd8b2d856e5d6d"
+  },
+  "D:\\strategist\\PSA web\\server\\config\\db.js": {
+    "mtime": 1777097320.1592398,
+    "hash": "07d8eb612d1f3fc12923d70ed58a051f"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\attendanceController.js": {
+    "mtime": 1777711465.913261,
+    "hash": "a27249cc3a81a432cfc7ffce76b42b0e"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\authController.js": {
+    "mtime": 1777097330.0693467,
+    "hash": "e50a1ee304a1a017b80bdeaab36f015a"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\calendarController.js": {
+    "mtime": 1777886552.2211876,
+    "hash": "8ae6bfe8245824973812c6e831ec6415"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\chatController.js": {
+    "mtime": 1777700678.2125194,
+    "hash": "aa0a545a82df4b096af5795c1da3ed9c"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\clientController.js": {
+    "mtime": 1777358528.6035972,
+    "hash": "5fea4af492f7caa94c7b26ebf2a5b1d7"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\dashboardController.js": {
+    "mtime": 1777886892.7983387,
+    "hash": "8451d024cea7259c318f0c3be1d79d16"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\expenseController.js": {
+    "mtime": 1777884334.568336,
+    "hash": "f94b984aa0dd0b5ad1e78a78ee026c25"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\leaveController.js": {
+    "mtime": 1777886595.9263065,
+    "hash": "b41e2a8ced6eaedf66dd83c5dd92770f"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\profileController.js": {
+    "mtime": 1777358759.1891327,
+    "hash": "786b8358a248a7ac722596165daa6b72"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\projectController.js": {
+    "mtime": 1777358706.110593,
+    "hash": "665a31c05ebc4ef5b6e7835bf148e335"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\settingsController.js": {
+    "mtime": 1777358530.6224015,
+    "hash": "7d5855e1ad4408757d003417065b5ede"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\taskController.js": {
+    "mtime": 1778066037.7108562,
+    "hash": "ad03b7ee8091ae63c0a9d3f8738d4618"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\teamController.js": {
+    "mtime": 1777355106.0143206,
+    "hash": "443244423c67f363b38c5a1ebe364b0c"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\timerController.js": {
+    "mtime": 1778060535.4888408,
+    "hash": "608fc11de494780a6d6f3e66140675ee"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\timesheetController.js": {
+    "mtime": 1777888350.3174284,
+    "hash": "2a92c52702b3b31d6b077d806a6de912"
+  },
+  "D:\\strategist\\PSA web\\server\\controllers\\userController.js": {
+    "mtime": 1777525364.1498997,
+    "hash": "fe8686a5b9c2c1e15e1fad564947177c"
+  },
+  "D:\\strategist\\PSA web\\server\\cron\\autoClockOut.js": {
+    "mtime": 1777098994.991757,
+    "hash": "2f01f1f40fbdb4f8838f4d81bf782843"
+  },
+  "D:\\strategist\\PSA web\\server\\cron\\deleteOldArchivedTasks.js": {
+    "mtime": 1777878736.2731314,
+    "hash": "c3897f1f3cce03e4a7c06296aa7b4b37"
+  },
+  "D:\\strategist\\PSA web\\server\\cron\\leaveBalanceReset.js": {
+    "mtime": 1777445230.7769945,
+    "hash": "3b63beeca1bd05038e005f65416e34a9"
+  },
+  "D:\\strategist\\PSA web\\server\\cron\\overdueTaskFlagging.js": {
+    "mtime": 1777359217.6146033,
+    "hash": "a6611eddd08888ba827ec8dcba14de50"
+  },
+  "D:\\strategist\\PSA web\\server\\cron\\recurringTasks.js": {
+    "mtime": 1777358739.6883483,
+    "hash": "bf45b89804e3a671499f4ecfa6b3796d"
+  },
+  "D:\\strategist\\PSA web\\server\\middleware\\authMiddleware.js": {
+    "mtime": 1777114029.3799372,
+    "hash": "b7e11613b2b9b96ce7987eb7084538ab"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Attendance.js": {
+    "mtime": 1777358437.5929985,
+    "hash": "5ee8613a45b101e487fa9b2beddf9023"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Channel.js": {
+    "mtime": 1777350432.4597106,
+    "hash": "2c4e5d3d739769d7ca89e003dbaae914"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Client.js": {
+    "mtime": 1777358505.1504922,
+    "hash": "3f5a53688efd67816c0aca3ff7cfbcb7"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Expense.js": {
+    "mtime": 1777884332.5382504,
+    "hash": "19f55c4a7a28d5924284e80d2ff2f3eb"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Leave.js": {
+    "mtime": 1777877635.3207252,
+    "hash": "0bf5db448ff884a94c6917f0f5c6c8d0"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\LeaveBalance.js": {
+    "mtime": 1777115799.172489,
+    "hash": "34d86420628c8e32812d277f4b974234"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\LeaveType.js": {
+    "mtime": 1777115796.7741582,
+    "hash": "06582ffc6c201aa979ead62061c44b05"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Message.js": {
+    "mtime": 1777350425.4999418,
+    "hash": "4d21ebd5dacb588556e24fbbe11d2a9a"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Project.js": {
+    "mtime": 1777097613.5035932,
+    "hash": "a059d1654f1c7a1497bfb07a1aaeef7f"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\PublicHoliday.js": {
+    "mtime": 1777115802.2554655,
+    "hash": "c0002ed7bc10493bd686ec304c3e78bc"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Settings.js": {
+    "mtime": 1777358507.1674898,
+    "hash": "06a55e0f0e8fd312f7daeba7594c52d2"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Task.js": {
+    "mtime": 1778062661.5257037,
+    "hash": "c904db1604a41523763038bc4ffdfccd"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\TaskComment.js": {
+    "mtime": 1777877947.215549,
+    "hash": "ba0e9f9ace3ed17cf160d3da6c453f66"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\TaskTransfer.js": {
+    "mtime": 1777877949.2302032,
+    "hash": "0f2592fc013c0bd48cc077fc284ab531"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Team.js": {
+    "mtime": 1777106412.2495248,
+    "hash": "20d62454069ba07c2890c05a2bfe9a43"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\Timesheet.js": {
+    "mtime": 1777097752.159115,
+    "hash": "b7c091b91ce7319c22fe64594eb050bb"
+  },
+  "D:\\strategist\\PSA web\\server\\models\\User.js": {
+    "mtime": 1777886545.622079,
+    "hash": "ec4333eb940abc2665321ed64830b20c"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\attendanceRoutes.js": {
+    "mtime": 1777111450.1473975,
+    "hash": "8edf57224b0512438e9c5b30ac40015e"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\authRoutes.js": {
+    "mtime": 1777097332.1135416,
+    "hash": "814c5d8365607d7564decaf3cdc48459"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\calendarRoutes.js": {
+    "mtime": 1777886554.228974,
+    "hash": "726bfffcc76f313175386ab71faf6df6"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\chatRoutes.js": {
+    "mtime": 1777350516.5853422,
+    "hash": "a5d383d0b25cdf12378d85bc878fd998"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\clientRoutes.js": {
+    "mtime": 1777358552.1132312,
+    "hash": "147300715e3f48fa1b2c65ccd2967b91"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\dashboardRoutes.js": {
+    "mtime": 1777886894.8120947,
+    "hash": "1b31c7d5a4b8a2514dd8575f6fed356e"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\expenseRoutes.js": {
+    "mtime": 1777884336.5592606,
+    "hash": "d137395dc8ff8c12ee47c1f15ed0ea98"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\leaveRoutes.js": {
+    "mtime": 1777537117.9185123,
+    "hash": "663fef3251c6005580e591176a9e2ac5"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\projectRoutes.js": {
+    "mtime": 1777358689.7199042,
+    "hash": "5d8746013848bfc9484984cc152cd576"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\settingsRoutes.js": {
+    "mtime": 1777358554.126135,
+    "hash": "1743603cd217bf36139ed8eff370de7e"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\taskRoutes.js": {
+    "mtime": 1777878734.2550695,
+    "hash": "43743c45a0796ad9f914e7b55d586514"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\teamRoutes.js": {
+    "mtime": 1777097501.9044533,
+    "hash": "01577e4cef6bad6281207fb4614c1224"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\timerRoutes.js": {
+    "mtime": 1777445282.5106893,
+    "hash": "6bc5c3ff7aa513a343407b6a670e66e1"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\timesheetRoutes.js": {
+    "mtime": 1777445282.580415,
+    "hash": "f0c08192970d38277306489e7374d588"
+  },
+  "D:\\strategist\\PSA web\\server\\routes\\userRoutes.js": {
+    "mtime": 1777359044.8071592,
+    "hash": "8621cc129db96b10c1abf8fad7f5787a"
+  },
+  "D:\\strategist\\PSA web\\server\\scripts\\migrateLeaveBalances.js": {
+    "mtime": 1777877705.6572464,
+    "hash": "ed489bd2bdc790c614b9e13a860ec70b"
+  },
+  "D:\\strategist\\PSA web\\server\\services\\calendarService.js": {
+    "mtime": 1777886550.189788,
+    "hash": "ecfd6cb936ed238b87acbced84912ac0"
+  },
+  "D:\\strategist\\PSA web\\server\\utils\\mailer.js": {
+    "mtime": 1777445213.2165291,
+    "hash": "62c74b15f1ea192bb8c6a4014da9704b"
+  },
+  "D:\\strategist\\PSA web\\server\\utils\\taskStartAccess.js": {
+    "mtime": 1778060527.3969984,
+    "hash": "ad48cfe44196a528afba69b932f06edb"
+  },
+  "D:\\strategist\\PSA web\\src\\App.jsx": {
+    "mtime": 1777889771.430469,
+    "hash": "811b3da3108a08065b3cb5266b551846"
+  },
+  "D:\\strategist\\PSA web\\src\\main.jsx": {
+    "mtime": 1777007106.5154717,
+    "hash": "e13723e2574429d9a6d849727e3ff695"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\ChatHighlight.jsx": {
+    "mtime": 1777096794.5999253,
+    "hash": "58cfc5eedf4251de5dc4c23bffb5f717"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\CtaBanner.jsx": {
+    "mtime": 1777096851.7040963,
+    "hash": "180488c41122297330a7b80f0367a403"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\DashboardLayout.jsx": {
+    "mtime": 1778059428.1818185,
+    "hash": "c448f98d603b42b5f27b370871653bf5"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\Features.jsx": {
+    "mtime": 1777958490.8989546,
+    "hash": "7eab8b1e27e072f383b80e32645e12a1"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\Footer.jsx": {
+    "mtime": 1777096853.7355745,
+    "hash": "a77bde8bb7a7b055ad30b6d4816f9b2a"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\Hero.jsx": {
+    "mtime": 1777958490.9162028,
+    "hash": "39508d62522c709514bac57c205b5b68"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\HowItWorks.jsx": {
+    "mtime": 1777958490.8903673,
+    "hash": "be3b748b5d917a96b5a6992906226610"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\Navbar.jsx": {
+    "mtime": 1777097962.3318243,
+    "hash": "e851363f96c3783e9b9cd7247e638ea5"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\Pricing.jsx": {
+    "mtime": 1777096847.8108308,
+    "hash": "b1611e0ee68e9fb26fb73d2b57852287"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\SocialProof.jsx": {
+    "mtime": 1777096772.6513815,
+    "hash": "419751a2f853ecac4c233a284ef86c12"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\TeamStatusPanel.jsx": {
+    "mtime": 1777703251.3581252,
+    "hash": "9221befda4baf45367acf6818baf5f61"
+  },
+  "D:\\strategist\\PSA web\\src\\components\\Testimonials.jsx": {
+    "mtime": 1777096845.1522572,
+    "hash": "14155be10283da2eb3eebe89bb819a7f"
+  },
+  "D:\\strategist\\PSA web\\src\\context\\SocketContext.jsx": {
+    "mtime": 1777701474.408555,
+    "hash": "b3374fee1a629ef4bb96cff68525d65e"
+  },
+  "D:\\strategist\\PSA web\\src\\hooks\\useFadeIn.jsx": {
+    "mtime": 1777096696.0503747,
+    "hash": "a74b1f775ebc2bfc15c4346aadae27ca"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\AdminAttendance.jsx": {
+    "mtime": 1777877584.0721402,
+    "hash": "fcfabdb431d4b58d3a60aaa1ac39d009"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\AdminDashboard.jsx": {
+    "mtime": 1778043013.3685088,
+    "hash": "e50b8f0035c9983d7fdbc4ab054f6e4c"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\AdminUsers.jsx": {
+    "mtime": 1778044517.8677795,
+    "hash": "acd33a42bb7b8c38e9957df0d1e378ea"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Attendance.jsx": {
+    "mtime": 1777698920.1103387,
+    "hash": "d3ec1c40dc5786edadc93f017eb1de9b"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Chat.jsx": {
+    "mtime": 1777700350.4836488,
+    "hash": "ef8c7accfdbadea7a53ff95f03604e42"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Dashboard.jsx": {
+    "mtime": 1778044440.4950168,
+    "hash": "d20bd7a42eb51e3238dee7d7d9ab67b5"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Expenses.jsx": {
+    "mtime": 1777884485.4958787,
+    "hash": "dc406c503e267649892247b9dff6eee1"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Home.jsx": {
+    "mtime": 1777097944.3452563,
+    "hash": "8d58281446e0d882d7d0fc0b819c92a6"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Leaves.jsx": {
+    "mtime": 1778050565.7121882,
+    "hash": "006fe772d1b2551e627cc07fbb100fde"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Login.jsx": {
+    "mtime": 1777959263.052066,
+    "hash": "d2ac3be3ba70a003aa684b268f9e0667"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\ProjectManagement.jsx": {
+    "mtime": 1777884281.0236478,
+    "hash": "adc5e69813b31de4bd602f6d3d1be8af"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Projects.jsx": {
+    "mtime": 1778066041.8664024,
+    "hash": "a703686c894f3bf33a8723c0d24cd6dd"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Settings.jsx": {
+    "mtime": 1777886611.672178,
+    "hash": "a6a9e3547c3f4c90ce60dfd974c02388"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Signup.jsx": {
+    "mtime": 1777097956.4107728,
+    "hash": "b6123d559f5862c80955b4f04eb9346b"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Teams.jsx": {
+    "mtime": 1777545403.000883,
+    "hash": "570d5ff4530962792d43a8b20c6596b3"
+  },
+  "D:\\strategist\\PSA web\\src\\pages\\Timesheets.jsx": {
+    "mtime": 1777889686.4038975,
+    "hash": "a7c163bb8ff8fa714b7bb05a49e2094f"
+  },
+  "D:\\strategist\\PSA web\\index.html": {
+    "mtime": 1777096684.293218,
+    "hash": "714dde602f23a628616a741800fe6e10"
+  },
+  "D:\\strategist\\PSA web\\README.md": {
+    "mtime": 1777007106.5229108,
+    "hash": "a28dc4cb878325f3e9e5649f3e1469ac"
+  },
+  "D:\\strategist\\PSA web\\logo.png": {
+    "mtime": 1777363696.4432342,
+    "hash": "cdbdf55bf6cbb6ad4b1467450fe0ec5a"
+  },
+  "D:\\strategist\\PSA web\\public\\favicon.svg": {
+    "mtime": 1777007106.5806804,
+    "hash": "7e840862161341271697daa99a40d76b"
+  },
+  "D:\\strategist\\PSA web\\public\\icons.svg": {
+    "mtime": 1777007106.610785,
+    "hash": "3b4fcfcf393eca4d264dca4a4663bc37"
+  },
+  "D:\\strategist\\PSA web\\src\\assets\\hero.png": {
+    "mtime": 1777007106.545313,
+    "hash": "aead493361b27e7510691c5d7072dfc1"
+  },
+  "D:\\strategist\\PSA web\\src\\assets\\react.svg": {
+    "mtime": 1777007106.6372645,
+    "hash": "f0402b67b6ce880f65666bb49e841696"
+  },
+  "D:\\strategist\\PSA web\\src\\assets\\vite.svg": {
+    "mtime": 1777007106.6593447,
+    "hash": "9960a24288958394ac50e57ff638b036"
+  }
+}
