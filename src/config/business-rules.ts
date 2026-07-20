@@ -1,108 +1,182 @@
 /**
- * KVJ Analytics — BUSINESS RULE DEFAULTS  ⚠️ CONFIRM WITH KVJ
+ * KVJ Analytics — BUSINESS RULES
  * =============================================================================
- * Per the Master Context (Prompt 1): business rules must NOT be invented.
- * This file collects EVERY placeholder default in ONE place so KVJ can review
- * and override. Each value is flagged // CONFIRM. Engines read from here — no
- * business number is hardcoded anywhere else. In Phase 2 these move into the
- * editable Organization Settings (Supabase) so admins change them without code.
+ * Single source of truth for business policy. Engines read from here — no
+ * business number is hardcoded anywhere else. In Phase 2 the editable subset
+ * moves into Organization Settings (Supabase) so admins change them without code.
  *
- * Nothing here is a final KVJ policy. These are safe, documented starting values
- * that let the configurable engines be built now (per approved decision:
- * "Build engines with documented defaults, confirm later").
+ * Legend:
+ *   ✅ CONFIRMED  — locked by KVJ (do not change without KVJ approval)
+ *   ⚙️ CONFIG      — value is admin/CEO-editable at runtime; number here is only a seed
+ *   ⚠️ CONFIRM     — still a placeholder awaiting KVJ confirmation
  * =============================================================================
  */
 
 export const businessRules = {
-  // ── Authentication & session (Prompt 5 / Prompt 11) ───────────────────────
+  // ── Authentication & session ──────────────────────────────────────────────
   auth: {
-    sessionTimeoutMinutes: 60,            // CONFIRM idle timeout
-    rememberMeDays: 30,                   // CONFIRM
-    maxFailedLoginAttempts: 5,            // CONFIRM before lock
-    accountLockMinutes: 15,               // CONFIRM lock duration
-    passwordResetTokenExpiryMinutes: 30,  // CONFIRM
-    passwordPolicy: {
-      minLength: 8,                       // CONFIRM
-      requireUppercase: true,
-      requireNumber: true,
-      requireSymbol: true,
-    },
+    sessionTimeoutMinutes: 60,            // ⚠️ CONFIRM idle timeout
+    rememberMeDays: 30,                   // ⚠️ CONFIRM
+    maxFailedLoginAttempts: 5,            // ⚠️ CONFIRM before lock
+    accountLockMinutes: 15,               // ⚠️ CONFIRM lock duration
+    passwordResetTokenExpiryMinutes: 30,  // ⚠️ CONFIRM
+    passwordPolicy: { minLength: 8, requireUppercase: true, requireNumber: true, requireSymbol: true },
   },
 
-  // ── Attendance & work sessions (Prompt 5) ─────────────────────────────────
+  // ── Attendance & work sessions ────────────────────────────────────────────
+  // ✅ CONFIRMED:
+  //   - Class/Training days use the ORGANISATION's fixed timing (e.g. 08:30–17:00);
+  //     no Late tracking for these.
+  //   - Office 'Work' days have expected office hours → Late Reporting + Break
+  //     tracking apply ONLY to these.
   attendance: {
-    workingDays: [1, 2, 3, 4, 5, 6],      // CONFIRM Mon–Sat? (0=Sun..6=Sat)
-    workDayStart: '09:30',                // CONFIRM
-    workDayEnd: '18:30',                  // CONFIRM
-    lateAfter: '09:45',                   // CONFIRM grace → 'Late'
-    halfDayMaxHours: 5,                   // CONFIRM ≤ this ⇒ Half Day
-    fullDayMinHours: 8,                   // CONFIRM ≥ this ⇒ full 'Present'
-    autoClockOutAt: '23:59',              // existing behaviour preserved
+    enforceFixedSchedule: false,          // no global fixed schedule
+    lateAndBreakApplyTo: ['Office'],      // ✅ CONFIRMED — only Office/Work days
+    classUsesOrganisationTiming: true,    // ✅ CONFIRMED — Class days follow the org's fixed timing
+    autoClockOutAt: '23:59',              // safety net: close dangling sessions at day end
     workTypes: ['Office', 'Training', 'Marketing', 'Meeting', 'Work From Home', 'Client Visit', 'Other'],
   },
 
-  // ── Leave (Prompt 5) ──────────────────────────────────────────────────────
+  // ── Leave ─────────────────────────────────────────────────────────────────
+  // ✅ CONFIRMED: approval chain = Reporting Manager → CEO.
+  //   Self-escalation: if the requester already holds a role in the chain, that
+  //   step is skipped — so a Manager's OWN leave is approved by the CEO directly.
+  //   NOTE: salary is NOT computed by the platform; leave is tracked as work-time
+  //   records only. Balances below are informational, not pay-linked.
   leave: {
-    // CONFIRM approval chain. Master context showed: Employee → Manager → HR
-    approvalChain: ['ReportingManager', 'HR'],
-    // CONFIRM annual entitlements (days/year) per type
-    entitlements: {
+    approvalChain: ['ReportingManager', 'CEO'],   // ✅ CONFIRMED
+    skipStepIfRequesterHoldsRole: true,           // ✅ CONFIRMED (manager → CEO)
+    trackBalances: true,
+    salaryImpact: false,                          // ✅ CONFIRMED — no payroll/LOP calc
+    entitlements: {                               // ⚠️ CONFIRM annual days per type (informational)
       Casual: 12, Sick: 8, Earned: 15, Compensatory: 0,
       Maternity: 182, Paternity: 15, LossOfPay: 0, WorkFromHome: 0,
     } as Record<string, number>,
-    medicalCertRequiredAfterDays: 2,      // CONFIRM
+    medicalCertRequiredAfterDays: 2,      // ⚠️ CONFIRM
   },
 
-  // ── Training eligibility engine (Prompt 6) ────────────────────────────────
+  // ── Training: student eligibility ─────────────────────────────────────────
+  // ✅ CONFIRMED: eligibility is ASSESSMENT-BASED and trainer-configured.
+  //   - The trainer selects WHICH assessments count for a given training
+  //     (assessment names are custom per course).
+  //   - The student must score >= passMarkPercent in EVERY selected assessment.
+  //   - Attendance does NOT gate eligibility (it is tracked for reports only).
   eligibility: {
-    minAttendancePct: 75,                 // CONFIRM
-    minAssessmentPct: 40,                 // CONFIRM
-    finalExamRequired: true,              // CONFIRM
-    allowManualOverride: true,            // every override is audited
+    mode: 'perSelectedAssessment' as const,       // ✅ CONFIRMED
+    passMarkPercent: 84,                          // ✅ CONFIRMED — required in each selected assessment
+    mustClearAllSelected: true,                   // ✅ CONFIRMED
+    attendanceGates: false,                       // ✅ CONFIRMED — attendance is not a gate
+    assessmentsSelectedPerTraining: true,         // ✅ CONFIRMED — trainer picks per training
+    allowManualOverride: true,                    // every override is audited
   },
 
-  // ── Voucher engine (Prompt 6) ─────────────────────────────────────────────
+  // ── Training: final exam (external) ───────────────────────────────────────
+  // ✅ CONFIRMED: the final exam runs on an EXTERNAL platform.
+  //   - KVJ shares a link; the student enters their own final mark.
+  //   - If the student doesn't enter it, the trainer can update the final mark.
+  //   - There is no in-app exam or in-app pass/fail gate.
+  finalExam: {
+    conductedExternally: true,                    // ✅ CONFIRMED
+    markEnteredByStudentViaLink: true,            // ✅ CONFIRMED
+    trainerCanEnterMark: true,                    // ✅ CONFIRMED
+    inAppExamGate: false,                         // ✅ CONFIRMED
+  },
+
+  // ── Training: certificates ────────────────────────────────────────────────
+  // ✅ CONFIRMED: certificates are NOT generated by the platform.
+  //   The company prints and delivers physical certificates to the college.
+  //   The platform only records delivery status against the Training record.
+  certificate: {
+    generatedInApp: false,                        // ✅ CONFIRMED — no dynamic generation
+    trackStatusOnTraining: true,                  // ✅ CONFIRMED
+    statusFields: ['printed', 'deliveredToCollege', 'deliveryDate', 'remarks'],
+  },
+
+  // ── Exam vouchers ─────────────────────────────────────────────────────────
+  // ✅ CONFIRMED: bulk-purchased inventory, assigned MANUALLY to students.
   voucher: {
-    // CONFIRM: one voucher per eligible student? expiry window?
-    perEligibleStudent: 1,
-    expiryDays: 180,                      // CONFIRM
+    model: 'bulkInventoryManualAssign' as const,  // ✅ CONFIRMED
+    autoCalcFromEligible: false,                  // ✅ CONFIRMED — no auto per-eligible calc
+    expiryDays: null as number | null,            // ⚠️ CONFIRM — optional expiry (null = none)
   },
 
-  // ── Referral program (Prompt 6) ───────────────────────────────────────────
+  // ── Referral program ──────────────────────────────────────────────────────
+  // ✅ CONFIRMED: reward is a FIXED amount, configured PER COURSE.
+  //   The amount lives on the Course record (referralRewardAmount), not here.
   referral: {
-    rewardPercentOfCourseFee: 10,         // CONFIRM (master context default = 10%)
-    codeLength: 8,
-    rewardStages: ['Invited', 'Registered', 'Joined', 'PaymentConfirmed', 'RewardEarned'],
+    rewardType: 'fixedPerCourse' as const,        // ✅ CONFIRMED
+    amountSource: 'course.referralRewardAmount',  // ✅ CONFIRMED — per-course value
+    currency: 'INR',                              // ⚠️ CONFIRM
+    stages: ['Invited', 'Registered', 'Joined', 'PaymentConfirmed', 'RewardPaid'],
   },
 
-  // ── Finance: travel / per-diem / expense (Prompt 8) ───────────────────────
+  // ── Finance: expenses & travel ────────────────────────────────────────────
+  // ✅ CONFIRMED: ALL expenses/travel claims → Reporting Manager → CEO
+  //   (same self-escalation rule as leave). No amount threshold.
+  //   NOTE: no payroll/salary computation in the platform.
   finance: {
-    currency: 'INR',                      // CONFIRM
-    kmReimbursement: { Car: 12, Bike: 5 },// CONFIRM ₹ per km by vehicle
-    perDiem: { local: 0, outstation: 500 }, // CONFIRM ₹ per day
-    // CONFIRM expense approval chain. Master context: Manager → Finance
-    expenseApprovalChain: ['ReportingManager', 'Finance'],
-    gstDefaultPercent: 18,                // CONFIRM (optional on expenses)
+    currency: 'INR',                              // ⚠️ CONFIRM
+    expenseApprovalChain: ['ReportingManager', 'CEO'], // ✅ CONFIRMED (all amounts)
+    skipStepIfRequesterHoldsRole: true,           // ✅ CONFIRMED
+    payrollEnabled: false,                        // ✅ CONFIRMED — salary is NOT calculated here
+
+    // ✅ CONFIRMED expense line-item types (from the CEO expense summary report)
+    expenseTypes: ['Self Travel', 'Morning Tea', 'Lunch', 'Evening Tea', 'Dinner', 'Other'],
+
+    // ✅ CONFIRMED — Self Travel amount is DERIVED, not entered:
+    //   amount = km × ratePerKm[mode].  Rates are CEO-editable per vehicle.
+    selfTravel: {
+      modes: ['Bike', 'Car'],
+      ratePerKm: { Bike: 5, Car: 10 } as Record<string, number>, // ✅ CONFIRMED seed; CEO edits
+      rateEditableBy: 'CEO',                      // ✅ CONFIRMED
+      amountFormula: 'km * ratePerKm[mode]',      // ✅ CONFIRMED
+    },
+
+    // ✅ CONFIRMED — going forward each person's expense is entered as a SEPARATE line.
+    //   So a line's Amount is that single entry's total; No. of Persons defaults to 1.
+    perPersonSeparateLines: true,                  // ✅ CONFIRMED
+
+    // Claim rollup: Total = Σ line amounts (incl. derived Self Travel); Balance = Total − Advances.
+    supportsAdvances: true,                        // ✅ CONFIRMED (report shows Advances / Balance)
+
+    perDiem: { local: 0, outstation: 0 } as Record<string, number>,  // ⚠️ CONFIRM (or actuals only)
+    gstDefaultPercent: 18,                        // ⚠️ CONFIRM (GST optional on a claim)
   },
 
-  // ── Task approval (Prompt 7) ──────────────────────────────────────────────
+  // ── Task approval (project work) ──────────────────────────────────────────
   task: {
-    // CONFIRM: Manager step optional?
-    approvalChain: ['Supervisor'],        // + optional 'Manager'
-    managerApprovalOptional: true,
+    approvalChain: ['Supervisor', 'Manager', 'CEO'], // ✅ CONFIRMED (3-step)
   },
 
-  // ── Project health thresholds (Prompt 7) ──────────────────────────────────
+  // ── Management reports ────────────────────────────────────────────────────
+  // ✅ CONFIRMED: separate report screens (no single "payroll" report; no salary).
+  reports: {
+    attendanceReport: true,   // per-employee period: working days, leaves, holiday-worked,
+                              // break/late (Office only), accumulated figures, org & class/supervision summary
+    expenseReport: true,      // per-employee period: line items, Self Travel derived, Total − Advances = Balance
+    taskReport: true,         // ✅ tasks COMPLETED in the selected period + HOURS (per employee / project)
+    period: 'custom-range',   // reports run over a Start Date → End Date range
+  },
+
+  // ── Calendar / holidays ───────────────────────────────────────────────────
+  // ✅ CONFIRMED: Managers can add/update public holidays (as in the current app),
+  //   alongside Admin/CEO. Holidays drive the attendance calendar & "Holiday" rows.
+  holidays: {
+    managedByRoles: ['SUPER_ADMIN', 'CEO', 'OPERATIONS_MANAGER'], // ✅ Manager can add/update
+    holidayWorkedTracked: true,   // "Holiday Worked" appears in the attendance report
+  },
+
+  // ── Project health thresholds ─────────────────────────────────────────────
   projectHealth: {
-    atRiskIfOverduePct: 25,               // CONFIRM % tasks overdue ⇒ At Risk
-    delayedIfPastTargetDays: 0,           // CONFIRM
+    atRiskIfOverduePct: 25,               // ⚠️ CONFIRM % tasks overdue ⇒ At Risk
+    delayedIfPastTargetDays: 0,           // ⚠️ CONFIRM
   },
 
   // ── Platform-wide defaults ────────────────────────────────────────────────
   platform: {
     defaultPageSize: 20,
     maxPageSize: 200,
-    maxUploadMb: { receipt: 5, document: 10, photo: 5 }, // CONFIRM
+    maxUploadMb: { receipt: 5, document: 10, photo: 5 }, // ⚠️ CONFIRM
   },
 } as const;
 

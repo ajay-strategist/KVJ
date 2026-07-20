@@ -115,18 +115,30 @@ Verification: `tsc --noEmit -p tsconfig.json` over full `src` → **0 errors**.
 ### Next (Phase 2)
 Employee module → Attendance (clock in/out, work-type, geolocation) → Work Sessions + Breaks → Leave → Calendar, all mock-backed behind the service/repository seam, then Supabase in Phase 2 cutover.
 
-## Open items awaiting KVJ confirmation
+## Business rules — CONFIRMED by KVJ (encoded in `src/config/business-rules.ts`)
 
-These do not block foundation work; they gate the *final* logic of specific modules. All placeholder defaults live in `src/config/business-rules.ts`.
+Confirmed in the business-rules session; these are now the source of truth:
 
-1. **Attendance policy** — working days/hours, late grace, half/full-day thresholds.
-2. **Leave** — approval chain (default Employee→Manager→HR) and annual entitlements per type.
-3. **Training eligibility** — min attendance % (default 75), min assessment % (default 40), final-exam requirement.
-4. **Voucher** — allocation rule (default 1/eligible student) and expiry.
-5. **Referral** — reward % of course fee (default 10) and stages.
-6. **Finance** — currency, km reimbursement rates, per-diem, expense approval chain (default Manager→Finance), GST default.
-7. **Task/Project** — task approval chain (Manager step optional?), project-health thresholds.
-8. **Branding** — confirm primary colour (default Blue-600) and report display font.
+- **Attendance:** FLEXIBLE hours — no fixed schedule. Track clock-in/out + total work hours only; do **not** auto-classify Late/Half-Day. (`attendance.enforceFixedSchedule = false`)
+- **Leave approval:** Reporting Manager → CEO. Self-escalation: a Manager's own leave is approved by the CEO directly. **No salary/LOP calc** — leave is a work-time record only.
+- **Expense/travel approval:** ALL claims → Reporting Manager → CEO (no amount threshold); same self-escalation.
+- **Task approval:** Supervisor → Manager → CEO (3-step).
+- **Training eligibility:** ASSESSMENT-BASED and trainer-configured. Trainer selects which (custom-named) assessments count; student must score **≥84% in every selected assessment**; **attendance does NOT gate**. Manual override audited.
+- **Final exam:** conducted on an EXTERNAL platform. Student enters their own mark via a shared link; if not entered, the trainer can. **No in-app exam or pass/fail gate.**
+- **Certificates:** **NOT generated in-app.** Company prints & delivers physical certificates to the college; platform records `printed / deliveredToCollege / deliveryDate / remarks` on the Training only.
+- **Vouchers:** bulk-purchased inventory, **assigned manually** (no auto per-eligible calc).
+- **Referral reward:** FIXED amount, configured **per course** (`course.referralRewardAmount`), paid on payment confirmation.
+- **KM reimbursement:** editable by the **CEO** per vehicle type (seed: Car ₹12/km, Bike ₹5/km).
+- **Payroll/salary:** **OUT OF SCOPE** — the platform does not compute salary (`finance.payrollEnabled = false`).
+
+### Scope changes these confirmations imply (for the build)
+- The **Certificate Engine** becomes **status-tracking only** (no dynamic PDF generation).
+- The **Payroll** page becomes non-computing / can be dropped; keep expense reimbursement only.
+- The **Final Exam** step is a **mark-entry screen** (external link), not an in-app exam.
+- **Attendance** drops Late/Half-Day auto-logic; keep hours + work-type + breaks.
+
+## Still awaiting KVJ (minor — safe defaults in place, flagged ⚠️ CONFIRM)
+Auth timeouts/lockout; leave entitlement day-counts per type (informational only, no pay link); medical-cert threshold days; per-diem policy (or actuals-only); GST default %; project-health thresholds; upload size limits; currency label (assumed INR).
 
 ## Notes & guardrails
 - Type-checking requires `typescript` as a dev dependency (`npm i -D typescript`); Vite runs the `.ts` files via esbuild without it. To be added with the build tooling in the next increment.

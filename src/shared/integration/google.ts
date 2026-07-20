@@ -1,4 +1,3 @@
-import { appConfig } from '../../config/app-config';
 import { featureFlags } from '../../config/feature-flags';
 
 export interface GoogleIntegrationService {
@@ -19,7 +18,7 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
       return `https://drive.google.com/file/d/mock-real-uuid-${Math.random().toString(36).substring(2, 10)}/view`;
     } catch (e: any) {
       console.error('Google Drive Upload Failed', e);
-      throw new Error(`Google Drive Integration failed: ${e.message}`);
+      throw new Error(`Google Drive Integration failed: ${e.message}`, { cause: e });
     }
   }
 
@@ -35,7 +34,7 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
       return `https://calendar.google.com/event?eid=mock-real-uuid-${Math.random().toString(36).substring(2, 10)}`;
     } catch (e: any) {
       console.error('Google Calendar Booking Failed', e);
-      throw new Error(`Google Calendar integration failed: ${e.message}`);
+      throw new Error(`Google Calendar integration failed: ${e.message}`, { cause: e });
     }
   }
 }

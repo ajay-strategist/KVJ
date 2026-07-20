@@ -8,6 +8,8 @@
  *   'training.assigned' -> attendance seeds sessions -> notifications -> analytics dirty
  */
 
+import { logger } from '../shared/logging/logger';
+
 /**
  * Global application event map. Modules AUGMENT this interface to add their
  * own typed events (declaration merging), keeping payloads fully typed:
@@ -61,8 +63,7 @@ class EventBus {
       try {
         (h as Handler<K>)(payload);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error(`[event-bus] handler for "${String(event)}" threw:`, err);
+        logger.error(`handler for "${String(event)}" threw`, 'event-bus', err);
       }
     });
   }

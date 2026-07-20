@@ -36,12 +36,41 @@ const uuid = (): UUID =>
  */
 export class MemoryRepository<T extends Entity> implements IRepository<T> {
   protected store = new Map<UUID, T>();
+  /** localStorage key — unique per repository class so mock data survives refresh. */
+  private readonly persistKey = `kvj.repo.${this.constructor.name}`;
 
   constructor(
     protected defaults: { defaultStatus: string; pageSize: number },
     seed: T[] = [],
   ) {
-    seed.forEach((e) => this.store.set(e.id, e));
+    // Hydrate from localStorage if present; otherwise fall back to the seed and
+    // persist it so subsequent loads are stable. (Phase-1 mock persistence.)
+    const persisted = this.load();
+    if (persisted) {
+      persisted.forEach((e) => this.store.set(e.id, e));
+    } else {
+      seed.forEach((e) => this.store.set(e.id, e));
+      if (seed.length) this.persist();
+    }
+  }
+
+  private load(): T[] | null {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(this.persistKey) : null;
+      return raw ? (JSON.parse(raw) as T[]) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  protected persist(): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.persistKey, JSON.stringify([...this.store.values()]));
+      }
+    } catch {
+      /* storage full / unavailable — mock layer degrades to in-memory only */
+    }
   }
 
   async create(data: Partial<T>, actor: Actor): Promise<T> {
@@ -59,6 +88,7 @@ export class MemoryRepository<T extends Entity> implements IRepository<T> {
       deletedBy: null,
     } as T;
     this.store.set(id, entity);
+    this.persist();
     return entity;
   }
 
@@ -74,6 +104,7 @@ export class MemoryRepository<T extends Entity> implements IRepository<T> {
     if (!existing || existing.deletedAt) throw AppError.notFound();
     const updated = { ...existing, ...patch, id, updatedAt: now(), updatedBy: actor.id } as T;
     this.store.set(id, updated);
+    this.persist();
     return updated;
   }
 
@@ -81,6 +112,7 @@ export class MemoryRepository<T extends Entity> implements IRepository<T> {
     const existing = this.store.get(id);
     if (!existing || existing.deletedAt) throw AppError.notFound();
     this.store.set(id, { ...existing, deletedAt: now(), deletedBy: actor.id, updatedAt: now() });
+    this.persist();
   }
 
   async restore(id: UUID, actor: Actor): Promise<T> {
@@ -88,6 +120,7 @@ export class MemoryRepository<T extends Entity> implements IRepository<T> {
     if (!existing) throw AppError.notFound();
     const restored = { ...existing, deletedAt: null, deletedBy: null, updatedAt: now(), updatedBy: actor.id };
     this.store.set(id, restored);
+    this.persist();
     return restored;
   }
 

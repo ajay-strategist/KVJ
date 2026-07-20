@@ -58,7 +58,13 @@ interface NotificationContextValue {
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 const uid = () => Math.random().toString(36).slice(2);
 
-export function NotificationProvider({ children, service = new MockNotificationService() }: { children: ReactNode; service?: INotificationService }) {
+/** Module-level default so the service identity is stable across renders.
+ * (A `service = new MockNotificationService()` default parameter would create a
+ * fresh instance every render, re-triggering the [service] effect below in an
+ * infinite setItems loop that starves the whole app of commits.) */
+const defaultNotificationService = new MockNotificationService();
+
+export function NotificationProvider({ children, service = defaultNotificationService }: { children: ReactNode; service?: INotificationService }) {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
 

@@ -6,6 +6,7 @@
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { ServerError } from './pages/errors/ErrorPages';
+import { logger } from '../shared/logging/logger';
 
 interface State { hasError: boolean }
 
@@ -17,9 +18,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Hook for centralized logging (Prompt 11). Kept console-only in Phase 1.
-    // eslint-disable-next-line no-console
-    console.error('[ErrorBoundary]', error, info.componentStack);
+    // Centralized logging (Prompt 11). Phase 2: forwards to an external provider.
+    logger.error(error.message, 'ErrorBoundary', info.componentStack);
   }
 
   render() {

@@ -20,6 +20,7 @@ const MyDayPage = lazy(() => import('./pages/workspaces/WorkspacePages').then((m
 const DashboardPage = lazy(() => import('./pages/workspaces/WorkspacePages').then((m) => ({ default: m.DashboardPage })));
 const RoleWorkspacePage = lazy(() => import('./pages/workspaces/WorkspacePages').then((m) => ({ default: m.RoleWorkspacePage })));
 const ShowcasePage = lazy(() => import('./pages/ShowcasePage').then((m) => ({ default: m.ShowcasePage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const EmployeeDirectory = lazy(() => import('../modules/employee/pages/EmployeeDirectory').then((m) => ({ default: m.EmployeeDirectory })));
 const EmployeeProfile = lazy(() => import('../modules/employee/pages/EmployeeProfile').then((m) => ({ default: m.EmployeeProfile })));
 const AttendanceHistory = lazy(() => import('../modules/attendance/pages/AttendanceHistory').then((m) => ({ default: m.AttendanceHistory })));
@@ -83,6 +84,7 @@ export function AppRouter() {
           <Route path="/app/leave" element={<ProtectedRoute resource="leave" action="view"><LeaveBoard /></ProtectedRoute>} />
           <Route path="/app/approvals" element={<ProtectedRoute resource="leave" action="approve"><ApprovalsQueue /></ProtectedRoute>} />
           <Route path="/app/showcase" element={<ProtectedRoute><ShowcasePage /></ProtectedRoute>} />
+          <Route path="/app/settings" element={<ProtectedRoute resource="settings" action="view"><SettingsPage /></ProtectedRoute>} />
 
           {/* Training Platform */}
           <Route path="/app/training/courses" element={<ProtectedRoute resource="training" action="view"><CourseList /></ProtectedRoute>} />

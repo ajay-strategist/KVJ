@@ -36,6 +36,7 @@ The review is split into 15 focused reports. Read the [Executive Summary](01-exe
 | 17 | [**UI/UX Design System**](17-design-system.md) | **Prompt-3 deliverable** — full design language: tokens, themes, components, workspaces, motion, a11y, reports |
 | 18 | [**Architecture Specification**](18-architecture-specification.md) | **Prompt-4 deliverable** — clean-architecture foundation, module/layer contracts, Supabase/Google/engines/events/audit/security/migration |
 | 19 | [**Implementation Log & Program Tracker**](19-implementation-log.md) | **Prompts 5–12 build program** — phase map, confirmed decisions, per-increment progress, open confirmations |
+| 20 | [**Report Formats (CEO Excel reports)**](20-report-formats.md) | Target layouts: attendance/"payroll" summary + expense summary (incl. Self-Travel = KM × rate) |
 
 ## Scope & method
 

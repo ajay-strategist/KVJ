@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import type { AttendanceRecord, WorkSessionType } from '../attendance.repository';
+import type { GeoPoint } from '../../../core/types';
 import { useAuth } from '../../auth/AuthProvider';
 import { useGeolocation } from './useGeolocation';
 
@@ -29,7 +30,7 @@ export function useAttendance() {
   const clockIn = useCallback(async (workType: WorkSessionType) => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     setLoading(true);
-    let geo: any;
+    let geo: GeoPoint | undefined;
     try {
       geo = await getPosition();
     } catch {
@@ -47,7 +48,7 @@ export function useAttendance() {
   const clockOut = useCallback(async () => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     setLoading(true);
-    let geo: any;
+    let geo: GeoPoint | undefined;
     try {
       geo = await getPosition();
     } catch {
