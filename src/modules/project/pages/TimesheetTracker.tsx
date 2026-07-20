@@ -7,12 +7,14 @@ import Drawer from '../../../shared/ui/Drawer';
 import { Form, SelectField, TextField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { usePermissions } from '../../../shared/permissions/react';
 import type { TimesheetRecord } from '../project.repository';
 
 export function TimesheetTracker() {
   const { timesheets, projects, logTimesheet, approveTimesheet, loading } = useProject();
   const { toast } = useNotifications();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const [open, setOpen] = useState(false);
 
   const handleLogSubmit = async (values: Record<string, unknown>) => {
@@ -57,7 +59,7 @@ export function TimesheetTracker() {
       <span className={`kvj-badge kvj-badge--${t.status === 'approved' ? 'success' : 'neutral'}`}>{t.status}</span>
     )},
     { key: 'action', header: 'Actions', render: (t) => (
-      t.status === 'submitted' && (user?.role === 'OPERATIONS_MANAGER' || user?.role === 'PROJECT_SUPERVISOR' || user?.role === 'SUPER_ADMIN') ? (
+      t.status === 'submitted' && can('project', 'approve') ? (
         <Button size="sm" onClick={() => handleApprove(t.id)}>Approve</Button>
       ) : null
     )},

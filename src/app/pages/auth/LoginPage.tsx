@@ -13,11 +13,9 @@ import { AppError } from '../../../core/result';
 
 type View = 'login' | 'forgot' | 'reset';
 const DEMO = [
-  { label: 'Super Admin', email: 'admin@kvj.test' },
+  { label: 'Admin', email: 'admin@kvj.test' },
   { label: 'CEO', email: 'ceo@kvj.test' },
-  { label: 'Operations', email: 'ops@kvj.test' },
-  { label: 'Lead Trainer', email: 'lead@kvj.test' },
-  { label: 'Supervisor', email: 'supervisor@kvj.test' },
+  { label: 'Manager', email: 'manager@kvj.test' },
   { label: 'Employee', email: 'employee@kvj.test' },
 ];
 

@@ -4,7 +4,7 @@
  *
  *   const { can } = usePermissions();
  *   <Can resource="expense" action="approve"> <ApproveButton/> </Can>
- *   <Authorize roles={['HR','CEO']}> ... </Authorize>
+ *   <Authorize roles={['MANAGER','CEO']}> ... </Authorize>
  *   <ProtectedRoute resource="training" action="view"> <TrainingPage/> </ProtectedRoute>
  */
 

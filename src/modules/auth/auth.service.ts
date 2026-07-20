@@ -52,11 +52,9 @@ export const AUTH_SERVICE_TOKEN = createToken<IAuthService>('AuthService');
 // ── Phase-1 mock users (dummy data; NOT real credentials) ────────────────────
 interface MockRecord extends AuthUser { password: string }
 const MOCK_USERS: MockRecord[] = [
-  { id: 'u-admin', fullName: 'System Admin', email: 'admin@kvj.test', role: 'SUPER_ADMIN', password: 'demo1234' },
+  { id: 'u-admin', fullName: 'System Admin', email: 'admin@kvj.test', role: 'ADMIN', password: 'demo1234' },
   { id: 'u-ceo', fullName: 'Priya Nair', email: 'ceo@kvj.test', role: 'CEO', password: 'demo1234' },
-  { id: 'u-ops', fullName: 'Rahul Menon', email: 'ops@kvj.test', role: 'OPERATIONS_MANAGER', password: 'demo1234' },
-  { id: 'u-lead', fullName: 'Anita Rao', email: 'lead@kvj.test', role: 'LEAD_TRAINER', password: 'demo1234' },
-  { id: 'u-sup', fullName: 'Karthik Iyer', email: 'supervisor@kvj.test', role: 'PROJECT_SUPERVISOR', password: 'demo1234' },
+  { id: 'u-mgr', fullName: 'Rahul Menon', email: 'manager@kvj.test', role: 'MANAGER', password: 'demo1234' },
   { id: 'u-emp', fullName: 'Sara Pillai', email: 'employee@kvj.test', role: 'EMPLOYEE', password: 'demo1234' },
 ];
 

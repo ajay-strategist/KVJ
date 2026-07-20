@@ -95,20 +95,12 @@ export class LeaveService implements ILeaveService {
       const rec = await this.repo.findById(leaveId);
       if (!rec) return Err(AppError.notFound('Leave record not found.'));
 
-      let nextStep = rec.currentStep;
-      let nextStatus = rec.status;
-
-      if (rec.currentStep === 'ReportingManager') {
-        nextStep = 'HR';
-      } else if (rec.currentStep === 'HR') {
-        nextStep = undefined;
-        nextStatus = 'approved';
-      }
-
-      if (actor.role === 'HR' || actor.role === 'SUPER_ADMIN') {
-        nextStep = undefined;
-        nextStatus = 'approved';
-      }
+      // 4-role model: Admin/CEO/Manager have full control, so any of them
+      // approves a pending leave in a single step. (The multi-step chain is
+      // revisited in the Leaves / Approvals Queue modules.)
+      const isApprover = actor.role === 'ADMIN' || actor.role === 'CEO' || actor.role === 'MANAGER';
+      const nextStep = isApprover ? undefined : rec.currentStep;
+      const nextStatus = isApprover ? 'approved' : rec.status;
 
       const updated = await this.repo.update(
         leaveId,

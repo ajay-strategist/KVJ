@@ -27,114 +27,35 @@ export type Resource =
 
 export type Permission = `${Resource}:${Action}`;
 
-const ALL: Action[] = ['view', 'create', 'update', 'delete', 'approve', 'export', 'import', 'assign', 'manage', 'configure'];
-
-/** Helper: expand `resource:*` to all actions. */
-function all(resource: Resource): Permission[] {
-  return ALL.map((a) => `${resource}:${a}` as Permission);
-}
 /** Helper: specific actions for a resource. */
 function some(resource: Resource, actions: Action[]): Permission[] {
   return actions.map((a) => `${resource}:${a}` as Permission);
 }
 
 /**
- * Role → permission matrix (Phase-1 default).
- * SUPER_ADMIN is granted the wildcard and short-circuits in the engine.
+ * Role → permission matrix (4-role model).
+ *
+ * ADMIN, CEO and MANAGER hold the wildcard '*' — full control + full visibility
+ * across every module (the engine short-circuits on '*').
+ *
+ * EMPLOYEE is self-scoped ("user-level security"): it can view and manage its
+ * OWN attendance, work sessions, leaves, tasks and expenses, but cannot approve,
+ * manage, configure, or see other people's data. Row-level "own record only"
+ * scoping is enforced in the data layer (services/repositories, and Supabase RLS
+ * once connected) — this matrix controls module-level access.
  */
 export const ROLE_PERMISSIONS: Record<RoleKey, Permission[] | '*'> = {
-  SUPER_ADMIN: '*',
-
-  CEO: [
-    ...some('dashboard', ['view', 'manage', 'configure']),
-    ...some('analytics', ['view', 'export']), ...some('kpi', ['view', 'configure']),
-    ...some('report', ['view', 'export', 'create']),
-    ...some('employee', ['view', 'export']), ...some('attendance', ['view', 'export']),
-    ...some('training', ['view', 'export']), ...some('project', ['view', 'export']),
-    ...some('expense', ['view', 'approve', 'export']), ...some('payroll', ['view', 'approve']),
-    ...some('budget', ['view', 'approve', 'configure']),
-    ...some('announcement', ['view', 'create']), ...some('auditLog', ['view']),
-  ],
-
-  OPERATIONS_MANAGER: [
-    ...some('dashboard', ['view']), ...some('analytics', ['view', 'export']),
-    ...all('training'), ...all('student'), ...all('assessment'),
-    ...some('voucher', ['view', 'assign', 'manage']), ...some('certificate', ['view', 'create']),
-    ...all('project'), ...all('task'),
-    ...some('employee', ['view', 'export', 'assign']), ...some('attendance', ['view', 'update', 'export', 'approve']),
-    ...some('leave', ['view', 'approve']), ...some('expense', ['view', 'approve', 'export']),
-    ...all('report'), ...some('announcement', ['view', 'create', 'update']),
-    ...some('calendar', ['view', 'manage']), ...some('auditLog', ['view']),
-  ],
-
-  HR: [
-    ...all('employee'), ...some('attendance', ['view', 'update', 'export', 'approve']),
-    ...all('leave'), ...some('calendar', ['view', 'manage']),
-    ...some('payroll', ['view', 'create', 'update']),
-    ...some('report', ['view', 'export']), ...some('dashboard', ['view']),
-    ...some('announcement', ['view', 'create']), ...some('auditLog', ['view']),
-  ],
-
-  FINANCE: [
-    ...all('expense'), ...all('travel'), ...all('payroll'),
-    ...all('asset'), ...all('procurement'), ...all('vendor'), ...all('budget'),
-    ...some('report', ['view', 'export']), ...some('dashboard', ['view']),
-    ...some('analytics', ['view', 'export']), ...some('auditLog', ['view']),
-  ],
-
-  LEAD_TRAINER: [
-    ...some('training', ['view', 'create', 'update', 'manage', 'assign']),
-    ...all('student'), ...all('assessment'),
-    ...some('voucher', ['view', 'assign']), ...some('certificate', ['view', 'create']),
-    ...some('attendance', ['view', 'update']), ...some('report', ['view', 'export', 'create']),
-    ...some('dashboard', ['view']), ...some('announcement', ['view', 'create']),
-    ...some('chat', ['view', 'create']),
-  ],
-
-  PROJECT_SUPERVISOR: [
-    ...some('project', ['view', 'create', 'update', 'manage', 'assign']),
-    ...all('task'), ...some('workSession', ['view']),
-    ...some('employee', ['view']), ...some('report', ['view', 'export', 'create']),
-    ...some('dashboard', ['view']), ...some('expense', ['view', 'approve']),
-    ...some('chat', ['view', 'create']), ...some('announcement', ['view', 'create']),
-  ],
-
-  TRAINER: [
-    ...some('training', ['view']), ...some('student', ['view', 'update']),
-    ...some('assessment', ['view', 'create', 'update']), ...some('attendance', ['view', 'update']),
-    ...some('certificate', ['view']), ...some('report', ['view', 'create']),
-    ...some('dashboard', ['view']), ...some('chat', ['view', 'create']),
-    ...some('workSession', ['view', 'create', 'update']),
-  ],
-
-  ASSISTANT_TRAINER: [
-    ...some('training', ['view']), ...some('student', ['view']),
-    ...some('assessment', ['view', 'update']), ...some('attendance', ['view', 'update']),
-    ...some('dashboard', ['view']), ...some('chat', ['view', 'create']),
-    ...some('workSession', ['view', 'create', 'update']),
-  ],
-
-  MARKETING_EXECUTIVE: [
-    ...some('dashboard', ['view']), ...some('project', ['view']),
-    ...some('expense', ['view', 'create']), ...some('report', ['view']),
-    ...some('chat', ['view', 'create']), ...some('announcement', ['view']),
-    ...some('workSession', ['view', 'create', 'update']),
-  ],
+  ADMIN: '*',
+  CEO: '*',
+  MANAGER: '*',
 
   EMPLOYEE: [
     ...some('dashboard', ['view']),
     ...some('attendance', ['view', 'create', 'update']), ...some('workSession', ['view', 'create', 'update']),
     ...some('leave', ['view', 'create']), ...some('task', ['view', 'update']),
-    ...some('expense', ['view', 'create']), ...some('calendar', ['view']),
+    ...some('expense', ['view', 'create']), ...some('travel', ['view', 'create']),
+    ...some('calendar', ['view']), ...some('training', ['view']),
     ...some('chat', ['view', 'create']), ...some('report', ['view']),
-    ...some('announcement', ['view']),
-  ],
-
-  INTERN: [
-    ...some('dashboard', ['view']),
-    ...some('attendance', ['view', 'create', 'update']), ...some('workSession', ['view', 'create', 'update']),
-    ...some('leave', ['view', 'create']), ...some('task', ['view', 'update']),
-    ...some('calendar', ['view']), ...some('chat', ['view', 'create']),
-    ...some('announcement', ['view']),
+    ...some('announcement', ['view']), ...some('notification', ['view']),
   ],
 };

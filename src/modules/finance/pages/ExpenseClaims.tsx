@@ -8,12 +8,14 @@ import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { usePermissions } from '../../../shared/permissions/react';
 import type { ExpenseClaim, TravelRequest } from '../finance.repository';
 
 export function ExpenseClaims() {
   const { expenseClaims, travelRequests, createExpenseClaim, approveExpenseClaim, createTravelRequest, loading } = useFinance();
   const { toast } = useNotifications();
   const { user } = useAuth();
+  const { can } = usePermissions();
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [travelOpen, setTravelOpen] = useState(false);
@@ -70,7 +72,7 @@ export function ExpenseClaims() {
       <span className={`kvj-badge kvj-badge--${c.status === 'approved' ? 'success' : 'neutral'}`}>{c.status}</span>
     )},
     { key: 'action', header: 'Actions', render: (c) => (
-      c.status === 'submitted' && (user?.role === 'OPERATIONS_MANAGER' || user?.role === 'SUPER_ADMIN') ? (
+      c.status === 'submitted' && can('expense', 'approve') ? (
         <Button size="sm" onClick={() => handleApproveClaim(c.id)}>Approve</Button>
       ) : null
     )},

@@ -162,7 +162,7 @@ export const businessRules = {
   // ✅ CONFIRMED: Managers can add/update public holidays (as in the current app),
   //   alongside Admin/CEO. Holidays drive the attendance calendar & "Holiday" rows.
   holidays: {
-    managedByRoles: ['SUPER_ADMIN', 'CEO', 'OPERATIONS_MANAGER'], // ✅ Manager can add/update
+    managedByRoles: ['ADMIN', 'CEO', 'MANAGER'], // ✅ Admin/CEO/Manager can add/update
     holidayWorkedTracked: true,   // "Holiday Worked" appears in the attendance report
   },
 

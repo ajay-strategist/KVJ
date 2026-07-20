@@ -3,6 +3,7 @@ import { container } from '../../../core/registry';
 import { LEAVE_SERVICE_TOKEN } from '../leave.service';
 import type { LeaveRecord } from '../leave.repository';
 import { useAuth } from '../../auth/AuthProvider';
+import { can } from '../../../shared/permissions/permission-engine';
 
 export function useLeave() {
   const service = useMemo(() => container.resolve(LEAVE_SERVICE_TOKEN), []);
@@ -26,7 +27,7 @@ export function useLeave() {
   }, [service, user]);
 
   const fetchPendingApprovals = useCallback(async () => {
-    if (!principal || (principal.role !== 'HR' && principal.role !== 'SUPER_ADMIN' && principal.role !== 'CEO' && principal.role !== 'PROJECT_SUPERVISOR' && principal.role !== 'OPERATIONS_MANAGER')) return;
+    if (!can(principal, 'leave', 'approve')) return;
     setLoading(true);
     const res = await service.listPendingApprovals();
     if (res.ok) {
