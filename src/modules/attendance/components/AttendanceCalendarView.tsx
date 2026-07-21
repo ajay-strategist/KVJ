@@ -26,11 +26,15 @@ export interface CalendarDayDetail {
 export interface AttendanceCalendarViewProps {
   days: CalendarDayDetail[];
   selectedEmployeeName: string;
+  showTopSummaries?: boolean;
+  showBottomSummaries?: boolean;
 }
 
 export function AttendanceCalendarView({
   days,
   selectedEmployeeName,
+  showTopSummaries = true,
+  showBottomSummaries = true,
 }: AttendanceCalendarViewProps) {
   const [selectedDay, setSelectedDay] = useState<CalendarDayDetail | null>(null);
   const [selectedFY, setSelectedFY] = useState('FY 2026-27');
@@ -95,8 +99,9 @@ export function AttendanceCalendarView({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Top Section: Shared Monthly & Financial Year Summaries */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-        {/* Monthly Summary */}
+      {showTopSummaries && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          {/* Monthly Summary */}
         <Card>
           <SectionHeader title={`Monthly Summary — ${selectedEmployeeName}`} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
@@ -161,6 +166,7 @@ export function AttendanceCalendarView({
           </div>
         </Card>
       </div>
+      )}
 
       {/* Main Core Full-Width Calendar View Grid (Grouped Multiple Sessions) */}
       {days.length > 0 && (
@@ -287,55 +293,57 @@ export function AttendanceCalendarView({
       )}
 
       {/* Bottom Section: Organization-wise Average Duration & Class Supervision Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* Organization vs Avg Duration */}
-        <Card>
-          <SectionHeader title="Organization vs Avg Duration" />
-          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '6px 0' }}>Organization</th>
-                <th style={{ textAlign: 'right' }}>Avg Duration (hr)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orgBreakdown.map((row) => (
-                <tr key={row.organization} style={{ borderBottom: '1px dashed var(--border)' }}>
-                  <td style={{ padding: '6px 0' }}>{row.organization}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.avgDuration} hrs</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-
-        {/* Class & Supervision Summary */}
-        <Card>
-          <SectionHeader title="Class & Supervision Training Summary" />
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
+      {showBottomSummaries && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {/* Organization vs Avg Duration */}
+          <Card>
+            <SectionHeader title="Organization vs Avg Duration" />
+            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: 'var(--bg-sunken)', color: 'var(--text-primary)' }}>
-                  <th style={{ padding: 6 }}>Institution</th>
-                  <th style={{ padding: 6, textAlign: 'center' }}>Physical Classes</th>
-                  <th style={{ padding: 6, textAlign: 'center' }}>Online Classes</th>
-                  <th style={{ padding: 6, textAlign: 'center' }}>Total Duration</th>
+                <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '6px 0' }}>Organization</th>
+                  <th style={{ textAlign: 'right' }}>Avg Duration (hr)</th>
                 </tr>
               </thead>
               <tbody>
-                {classSupervisionSummary.map((c) => (
-                  <tr key={c.institution} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: 6, fontWeight: 600 }}>{c.institution}</td>
-                    <td style={{ padding: 6, textAlign: 'center' }}>{c.physicalClasses}</td>
-                    <td style={{ padding: 6, textAlign: 'center' }}>{c.onlineClasses}</td>
-                    <td style={{ padding: 6, textAlign: 'center', fontWeight: 700, color: 'var(--brand)' }}>{c.totalPhysicalDuration} hrs</td>
+                {orgBreakdown.map((row) => (
+                  <tr key={row.organization} style={{ borderBottom: '1px dashed var(--border)' }}>
+                    <td style={{ padding: '6px 0' }}>{row.organization}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.avgDuration} hrs</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </Card>
-      </div>
+          </Card>
+
+          {/* Class & Supervision Training Summary */}
+          <Card>
+            <SectionHeader title="Class & Supervision Training Summary" />
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-sunken)', color: 'var(--text-primary)' }}>
+                    <th style={{ padding: 6 }}>Institution</th>
+                    <th style={{ padding: 6, textAlign: 'center' }}>Physical Classes</th>
+                    <th style={{ padding: 6, textAlign: 'center' }}>Online Classes</th>
+                    <th style={{ padding: 6, textAlign: 'center' }}>Total Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {classSupervisionSummary.map((c) => (
+                    <tr key={c.institution} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: 6, fontWeight: 600 }}>{c.institution}</td>
+                      <td style={{ padding: 6, textAlign: 'center' }}>{c.physicalClasses}</td>
+                      <td style={{ padding: 6, textAlign: 'center' }}>{c.onlineClasses}</td>
+                      <td style={{ padding: 6, textAlign: 'center', fontWeight: 700, color: 'var(--brand)' }}>{c.totalPhysicalDuration} hrs</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

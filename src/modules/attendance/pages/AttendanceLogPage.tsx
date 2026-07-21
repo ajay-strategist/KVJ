@@ -200,9 +200,11 @@ export function AttendanceLogPage() {
       label: '📊 Table View',
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Top Monthly & FY Summaries */}
+          {/* Top Monthly & FY Summaries ONLY */}
           <AttendanceCalendarView
-            days={[]} // Renders top summaries and bottom tables around Attendance Details Log
+            days={[]}
+            showTopSummaries={true}
+            showBottomSummaries={false}
             selectedEmployeeName={selectedEmployeeDisplay}
           />
 
@@ -293,6 +295,14 @@ export function AttendanceLogPage() {
               </table>
             </div>
           </Card>
+
+          {/* Bottom Summaries ONLY: Organization vs Avg Duration & Class Supervision Summary */}
+          <AttendanceCalendarView
+            days={[]}
+            showTopSummaries={false}
+            showBottomSummaries={true}
+            selectedEmployeeName={selectedEmployeeDisplay}
+          />
         </div>
       ),
     },
