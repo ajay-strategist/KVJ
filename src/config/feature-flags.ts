@@ -46,6 +46,17 @@ export const featureFlags = {
     assets: false,
     budgets: false,
     payroll: false,
+    // Absorbed into Batches → Training Details (students, session attendance and
+    // assessments live inside a training, not as separate top-level pages).
+    studentLifecycle: false,
+    sessionAttendance: false,
+    assessments: false,
+    // Absorbed into Projects & Tasks (two tabs).
+    clientsMaster: false,
+    projectCatalog: false,
+    resourceScheduler: false,
+    taskBoard: false,
+    timesheets: false,
   },
   // Integrations
   integrations: {

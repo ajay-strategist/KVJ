@@ -31,16 +31,18 @@ export const NAV_TREE: NavItem[] = [
   { id: 'approvals', label: 'Approvals Queue', path: '/app/approvals', icon: 'CheckSquare', permission: ['leave', 'approve'] },
   { id: 'training-courses', label: 'Courses Catalog', path: '/app/training/courses', icon: 'BookOpen', permission: ['training', 'view'], module: 'training' },
   { id: 'training-batches', label: 'Batches', path: '/app/training/batches', icon: 'Layers', permission: ['training', 'view'], module: 'training' },
-  { id: 'training-students', label: 'Student Lifecycle', path: '/app/training/students', icon: 'GraduationCap', permission: ['training', 'view'], module: 'training' },
-  { id: 'training-attendance', label: 'Session Attendance', path: '/app/training/attendance', icon: 'CheckSquare', permission: ['training', 'view'], module: 'training' },
-  { id: 'training-assessments', label: 'Assessments & Vouchers', path: '/app/training/assessments', icon: 'Award', permission: ['training', 'view'], module: 'training' },
+  { id: 'training-students', label: 'Student Lifecycle', path: '/app/training/students', icon: 'GraduationCap', permission: ['training', 'view'], module: 'training', page: 'studentLifecycle' },
+  { id: 'training-attendance', label: 'Session Attendance', path: '/app/training/attendance', icon: 'CheckSquare', permission: ['training', 'view'], module: 'training', page: 'sessionAttendance' },
+  { id: 'training-assessments', label: 'Assessments & Vouchers', path: '/app/training/assessments', icon: 'Award', permission: ['training', 'view'], module: 'training', page: 'assessments' },
 
+  // Projects & Tasks — one entry, two tabs (Projects | Tasks).
+  { id: 'projects-tasks', label: 'Projects & Tasks', path: '/app/projects', icon: 'FolderKanban', permission: ['project', 'view'], module: 'project' },
 
-  { id: 'project-clients', label: 'Clients Master', path: '/app/project/clients', icon: 'Briefcase', permission: ['project', 'view'], module: 'project' },
-  { id: 'project-list', label: 'Project Catalog', path: '/app/project/list', icon: 'FolderKanban', permission: ['project', 'view'], module: 'project' },
-  { id: 'project-resources', label: 'Resource Scheduler', path: '/app/project/resources', icon: 'CalendarDays', permission: ['project', 'view'], module: 'project' },
-  { id: 'project-tasks', label: 'Task Board', path: '/app/project/tasks', icon: 'Trello', permission: ['project', 'view'], module: 'project' },
-  { id: 'project-timesheets', label: 'Timesheets Tracker', path: '/app/project/timesheets', icon: 'Clock', permission: ['project', 'view'], module: 'project' },
+  { id: 'project-clients', label: 'Clients Master', path: '/app/project/clients', icon: 'Briefcase', permission: ['project', 'view'], module: 'project', page: 'clientsMaster' },
+  { id: 'project-list', label: 'Project Catalog', path: '/app/project/list', icon: 'FolderKanban', permission: ['project', 'view'], module: 'project', page: 'projectCatalog' },
+  { id: 'project-resources', label: 'Resource Scheduler', path: '/app/project/resources', icon: 'CalendarDays', permission: ['project', 'view'], module: 'project', page: 'resourceScheduler' },
+  { id: 'project-tasks', label: 'Task Board', path: '/app/project/tasks', icon: 'Trello', permission: ['project', 'view'], module: 'project', page: 'taskBoard' },
+  { id: 'project-timesheets', label: 'Timesheets Tracker', path: '/app/project/timesheets', icon: 'Clock', permission: ['project', 'view'], module: 'project', page: 'timesheets' },
 
   { id: 'finance-expenses', label: 'Expenses & Travel', path: '/app/finance/expenses', icon: 'Receipt', permission: ['expense', 'view'], module: 'finance' },
   { id: 'finance-procurement', label: 'Procurement Board', path: '/app/finance/procurement', icon: 'ShoppingCart', permission: ['expense', 'view'], module: 'finance', page: 'procurement' },

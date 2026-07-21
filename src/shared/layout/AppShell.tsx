@@ -6,7 +6,7 @@
  * Contains NO business logic — modules render into {children}.
  */
 
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { visibleNav, useNavPrefs } from '../navigation/navigation';
 import { usePermissions } from '../permissions/react';
@@ -63,7 +63,20 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
   );
 }
 
+/**
+ * True once we are already inside an AppShell. Pages each wrap themselves in
+ * <AppShell>, so composing them as tabs would otherwise nest a whole second
+ * sidebar + top bar. Nested shells render their children straight through.
+ */
+const InsideShellContext = createContext(false);
+
 export function AppShell({ children }: { children: ReactNode }) {
+  const alreadyInsideShell = useContext(InsideShellContext);
+  if (alreadyInsideShell) return <>{children}</>;
+  return <AppShellFrame>{children}</AppShellFrame>;
+}
+
+function AppShellFrame({ children }: { children: ReactNode }) {
   const device = useDevice();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -75,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const width = collapsed && !isMobile ? 72 : 260;
 
   return (
+    <InsideShellContext.Provider value={true}>
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
       {showSidebar && (
         <aside style={{
@@ -110,6 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+    </InsideShellContext.Provider>
   );
 }
 
