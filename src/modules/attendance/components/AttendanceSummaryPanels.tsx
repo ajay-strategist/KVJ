@@ -28,6 +28,7 @@ export function AttendanceSummaryPanels({
   const [holidayOpen, setHolidayOpen] = useState(false);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [activeFilterPreset, setActiveFilterPreset] = useState('current_month');
+  const [selectedEmployee, setSelectedEmployee] = useState(employeeName);
 
   // Excel mock aggregated stats (matching screenshot specs)
   const stats = {
@@ -66,17 +67,24 @@ export function AttendanceSummaryPanels({
     let end = '2026-06-30';
     if (preset === 'last_month') { start = '2026-05-01'; end = '2026-05-31'; }
     else if (preset === 'last_1_year') { start = '2025-06-01'; end = '2026-05-31'; }
-    if (onFilterChange) onFilterChange({ startDate: start, endDate: end, filterPreset: preset });
+    if (onFilterChange) onFilterChange({ startDate: start, endDate: end, filterPreset: preset, employeeId: selectedEmployee });
   };
 
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+
+  const employeeList = [
+    { id: 'emp1', name: 'Linto George' },
+    { id: 'emp2', name: 'Ajay Kumar' },
+    { id: 'emp3', name: 'Anju V' },
+    { id: 'emp4', name: 'Sankar M' },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Filtering Toolbar */}
       <Card>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Date Range:</span>
             {[
               { id: 'current_month', label: 'Current Month' },
@@ -93,6 +101,30 @@ export function AttendanceSummaryPanels({
                 {p.label}
               </Button>
             ))}
+
+            {isManagement ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Employee:</span>
+                <select
+                  className="kvj-select"
+                  value={selectedEmployee}
+                  onChange={(e) => {
+                    setSelectedEmployee(e.target.value);
+                    if (onFilterChange) onFilterChange({ startDate, endDate, filterPreset: activeFilterPreset, employeeId: e.target.value });
+                  }}
+                  style={{ padding: '4px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 150 }}
+                >
+                  <option value="All Employees">All Employees</option>
+                  {employeeList.map((e) => (
+                    <option key={e.id} value={e.name}>{e.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--brand)', marginLeft: 12 }}>
+                👤 Employee: {employeeName}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
