@@ -51,6 +51,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   const { toast } = useNotifications();
   const [clockInOpen, setClockInOpen] = useState(false);
   const [breakOpen, setBreakOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
 
   // GPS & Location state
   const [locationStr, setLocationStr] = useState<string>('Detecting location...');
@@ -221,26 +222,45 @@ export const AttendancePanel = memo(function AttendancePanel({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             {currentStatus === 'clocked_out' && (
-              <button
-                type="button"
-                className="kvj-btn"
-                disabled={loading}
-                onClick={() => setClockInOpen(true)}
-                style={{
-                  background: 'var(--status-success)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  fontWeight: '600',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  boxShadow: 'var(--e1)',
-                }}
-              >
-                Clock In (Office / Training)
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="kvj-btn"
+                  disabled={loading}
+                  onClick={() => setClockInOpen(true)}
+                  style={{
+                    background: 'var(--status-success)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    fontWeight: '600',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    boxShadow: 'var(--e1)',
+                  }}
+                >
+                  Clock In (Office / Training)
+                </button>
+
+                <button
+                  type="button"
+                  className="kvj-btn"
+                  onClick={() => setClaimOpen(true)}
+                  style={{
+                    background: 'var(--bg-surface)',
+                    color: 'var(--brand)',
+                    border: '1px solid var(--brand)',
+                    padding: '10px 20px',
+                    fontWeight: '600',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  📋 Submit Attendance
+                </button>
+              </>
             )}
 
             {currentStatus === 'present' && (
@@ -344,6 +364,49 @@ export const AttendancePanel = memo(function AttendancePanel({
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setClockInOpen(false)}>Cancel</Button>
             <Button type="submit">Clock In Now</Button>
+          </div>
+        </Form>
+      </Drawer>
+
+      {/* Submit / Claim Attendance Drawer */}
+      <Drawer open={claimOpen} onClose={() => setClaimOpen(false)} title="Submit / Claim Attendance Request">
+        <Form
+          initial={{
+            date: new Date().toISOString().slice(0, 10),
+            location: 'Christ 3BBA Data Analytics B1',
+            startTime: '08:30 AM',
+            endTime: '05:00 PM',
+            notes: '',
+          }}
+          onSubmit={(values) => {
+            toast({
+              variant: 'success',
+              title: 'Attendance Request Submitted',
+              message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Manager/Admin review.`,
+            });
+            if (onActivityLog) {
+              onActivityLog(`Submitted attendance claim for ${values.date} (${values.location})`, 'success');
+            }
+            setClaimOpen(false);
+          }}
+        >
+          <TextField name="date" label="Attendance Date" placeholder="YYYY-MM-DD" />
+          <SelectField
+            name="location"
+            label="Location (Training Batch)"
+            options={[
+              { value: 'Office Work', label: 'Office Work' },
+              { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
+              { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
+              { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
+            ]}
+          />
+          <TextField name="startTime" label="Start Time" placeholder="08:30 AM" />
+          <TextField name="endTime" label="End Time" placeholder="05:00 PM" />
+          <TextField name="notes" label="Reason / Notes (Optional)" placeholder="Emergency, system delay, or missed clock-in..." />
+          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button variant="secondary" type="button" onClick={() => setClaimOpen(false)}>Cancel</Button>
+            <Button type="submit">Submit for Review</Button>
           </div>
         </Form>
       </Drawer>
