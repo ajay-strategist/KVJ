@@ -1,208 +1,201 @@
 /* =============================================================================
-   KVJ Analytics — Ultra-Premium Clean & Futuristic Design Tokens
-   Clean, dot-free multi-layer radial mesh gradients, glassmorphism & depth.
+   Apple VisionOS & Fortune 500 Enterprise SaaS Design Tokens System
+   Tailored per Apple / Stripe / Vercel / Linear / VisionOS specification.
    ============================================================================= */
 
 :root,
 [data-theme='light'] {
-  /* Brand & Accent */
-  --brand: #4F46E5;            /* Indigo-600 */
-  --brand-hover: #4338CA;
+  /* Accents */
+  --brand: #3B82F6;            /* Primary Apple Blue */
+  --brand-hover: #2563EB;
   --brand-contrast: #FFFFFF;
-  --accent: #0284C7;           /* Sky Blue-600 */
+  --accent: #8B5CF6;           /* Secondary Violet */
 
-  /* Ultra-Clean Premium Light Canvas: Silky Smooth Gradient Mesh (No Dots/Noise) */
+  /* Light Theme Surfaces */
+  --bg-app: #FAFBFF;
+  --bg-surface: rgba(255, 255, 255, 0.65);
+  --bg-panel: #FFFFFF;
+  --bg-sunken: rgba(244, 246, 255, 0.75);
+  --bg-hover: rgba(59, 130, 246, 0.08);
+
+  /* Light Gradients Mesh */
   --app-canvas:
-    radial-gradient(1400px 700px at 10% -10%, rgba(99, 102, 241, 0.09), transparent 70%),
-    radial-gradient(1200px 600px at 90% 110%, rgba(14, 165, 233, 0.08), transparent 65%),
-    radial-gradient(800px 400px at 50% 50%, rgba(168, 85, 247, 0.04), transparent 60%),
-    linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 50%, #E2E8F0 100%);
+    radial-gradient(1200px 600px at 15% 5%, #E9F7FF, transparent 65%),
+    radial-gradient(1000px 500px at 85% 95%, #F4ECFF, transparent 60%),
+    radial-gradient(800px 400px at 50% 50%, #E8FFF5, transparent 55%),
+    linear-gradient(180deg, #FAFBFF 0%, #F3F6FD 100%);
 
-  /* Surfaces — Glassmorphism Overlay */
-  --bg-app: #F8FAFC;
-  --bg-surface: rgba(255, 255, 255, 0.88);
-  --bg-panel: rgba(255, 255, 255, 0.96);
-  --bg-sunken: rgba(241, 245, 249, 0.85);
-  --bg-hover: rgba(79, 70, 229, 0.06);
-
-  /* Hairline Borders & Glass Shadows */
-  --border: rgba(226, 232, 240, 0.9);
-  --border-strong: rgba(203, 213, 225, 1);
+  /* Borders & Glass Effects */
+  --border: rgba(226, 232, 240, 0.85);
+  --border-strong: rgba(203, 213, 225, 0.95);
+  --glass-blur: 25px;
+  --glass-border: 1px solid rgba(255, 255, 255, 0.75);
+  --glow-ambient: rgba(120, 160, 255, 0.15);
 
   /* Typography */
   --text-primary: #0F172A;
   --text-secondary: #334155;
   --text-muted: #64748B;
 
-  /* Status Badges */
-  --status-success: #059669;  --status-success-bg: #ECFDF5;
-  --status-warning: #D97706;  --status-warning-bg: #FFFBEB;
-  --status-danger:  #DC2626;  --status-danger-bg:  #FEF2F2;
-  --status-info:    #7C3AED;  --status-info-bg:    #F5F3FF;
-  --status-progress:#2563EB;  --status-progress-bg:#EFF6FF;
-  --status-neutral: #64748B;  --status-neutral-bg: #F1F5F9;
+  /* Status Colors */
+  --status-success: #10B981;  --status-success-bg: rgba(16, 185, 129, 0.12);
+  --status-warning: #F59E0B;  --status-warning-bg: rgba(245, 158, 11, 0.12);
+  --status-danger:  #EF4444;  --status-danger-bg:  rgba(239, 68, 68, 0.12);
+  --status-info:    #06B6D4;  --status-info-bg:    rgba(6, 182, 212, 0.12);
+  --status-progress:#3B82F6;  --status-progress-bg:rgba(59, 130, 246, 0.12);
+  --status-neutral: #64748B;  --status-neutral-bg: rgba(100, 116, 139, 0.10);
 
-  --focus-ring: rgba(79, 70, 229, 0.45);
+  --focus-ring: rgba(59, 130, 246, 0.45);
 
-  /* Soft Ambient Elevation */
-  --e1: 0 4px 14px 0 rgba(79, 70, 229, 0.06), 0 1px 3px 0 rgba(0, 0, 0, 0.04);
-  --e2: 0 10px 25px -3px rgba(79, 70, 229, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --e3: 0 20px 35px -5px rgba(79, 70, 229, 0.18), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  --e4: 0 30px 60px -12px rgba(79, 70, 229, 0.25);
+  /* Soft Glass Shadows */
+  --e1: 0 8px 25px -4px rgba(0, 0, 0, 0.04), 0 0 1px 0 rgba(59, 130, 246, 0.12);
+  --e2: 0 15px 45px 0 rgba(0, 0, 0, 0.08), 0 0 15px 0 rgba(120, 160, 255, 0.15);
+  --e3: 0 25px 60px -10px rgba(0, 0, 0, 0.12), 0 0 25px 0 rgba(120, 160, 255, 0.20);
+  --e4: 0 40px 90px -15px rgba(0, 0, 0, 0.18), 0 0 40px 0 rgba(120, 160, 255, 0.25);
 
   color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --brand: #6366F1;            /* Electric Indigo */
-  --brand-hover: #818CF8;
-  --brand-contrast: #0B0F19;
-  --accent: #38BDF8;           /* Neon Sky Blue */
+  --brand: #3B82F6;            /* Primary Apple Blue */
+  --brand-hover: #60A5FA;
+  --brand-contrast: #070B14;
+  --accent: #8B5CF6;           /* Secondary Violet */
 
-  /* Ultra-Clean Deep Space Canvas: Smooth Radial Mesh (No Dots/Noise) */
+  /* Dark Theme Surfaces */
+  --bg-app: #070B14;
+  --bg-surface: rgba(20, 28, 45, 0.55);
+  --bg-panel: #0E1422;
+  --bg-sunken: rgba(10, 16, 28, 0.75);
+  --bg-hover: rgba(59, 130, 246, 0.15);
+
+  /* Dark Gradients Mesh (Midnight / Aurora Blue / Purple Night) */
   --app-canvas:
-    radial-gradient(1400px 700px at 10% -10%, rgba(99, 102, 241, 0.16), transparent 70%),
-    radial-gradient(1200px 600px at 90% 110%, rgba(14, 165, 233, 0.12), transparent 65%),
-    radial-gradient(900px 450px at 50% 45%, rgba(168, 85, 247, 0.06), transparent 60%),
-    linear-gradient(180deg, #0B0F19 0%, #0F172A 50%, #080D1A 100%);
+    radial-gradient(1300px 650px at 15% -5%, #081B38, transparent 65%),
+    radial-gradient(1100px 550px at 85% 105%, #221B38, transparent 60%),
+    radial-gradient(900px 450px at 50% 45%, #081423, transparent 55%),
+    linear-gradient(180deg, #070B14 0%, #0D1A2E 100%);
 
-  /* Translucent Cyber-Glass Surfaces */
-  --bg-app: #0B0F19;
-  --bg-surface: rgba(17, 24, 39, 0.78);
-  --bg-panel: rgba(30, 41, 59, 0.85);
-  --bg-sunken: rgba(11, 15, 25, 0.75);
-  --bg-hover: rgba(99, 102, 241, 0.15);
-
-  /* Neon Glowing Borders */
-  --border: rgba(99, 102, 241, 0.22);
-  --border-strong: rgba(139, 92, 246, 0.45);
+  /* Borders & Glass Effects */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --glass-blur: 30px;
+  --glass-border: 1px solid rgba(255, 255, 255, 0.10);
+  --glow-ambient: rgba(90, 150, 255, 0.18);
 
   --text-primary: #F8FAFC;
   --text-secondary: #CBD5E1;
   --text-muted: #94A3B8;
 
-  --status-success: #34D399;  --status-success-bg: rgba(16, 185, 129, 0.18);
-  --status-warning: #FBBF24;  --status-warning-bg: rgba(245, 158, 11, 0.18);
-  --status-danger:  #F87171;  --status-danger-bg:  rgba(239, 68, 68, 0.18);
-  --status-info:    #C084FC;  --status-info-bg:    rgba(192, 132, 252, 0.18);
-  --status-progress:#60A5FA;  --status-progress-bg:rgba(96, 165, 250, 0.18);
-  --status-neutral: #94A3B8;  --status-neutral-bg: rgba(148, 163, 184, 0.16);
+  --status-success: #10B981;  --status-success-bg: rgba(16, 185, 129, 0.16);
+  --status-warning: #F59E0B;  --status-warning-bg: rgba(245, 158, 11, 0.16);
+  --status-danger:  #EF4444;  --status-danger-bg:  rgba(239, 68, 68, 0.16);
+  --status-info:    #06B6D4;  --status-info-bg:    rgba(6, 182, 212, 0.16);
+  --status-progress:#3B82F6;  --status-progress-bg:rgba(59, 130, 246, 0.16);
+  --status-neutral: #94A3B8;  --status-neutral-bg: rgba(148, 163, 184, 0.14);
 
-  --focus-ring: rgba(99, 102, 241, 0.60);
+  --focus-ring: rgba(59, 130, 246, 0.60);
 
-  /* Cyber Glow Elevation */
-  --e1: 0 4px 20px 0 rgba(0, 0, 0, 0.5), 0 0 1px 0 rgba(99, 102, 241, 0.3);
-  --e2: 0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px 0 rgba(99, 102, 241, 0.25);
-  --e3: 0 20px 45px -8px rgba(0, 0, 0, 0.7), 0 0 25px 0 rgba(139, 92, 246, 0.3);
-  --e4: 0 35px 75px -15px rgba(0, 0, 0, 0.8), 0 0 40px 0 rgba(139, 92, 246, 0.4);
+  /* Deep Glass Shadows */
+  --e1: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 1px rgba(255, 255, 255, 0.1);
+  --e2: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 20px rgba(90, 150, 255, 0.18);
+  --e3: 0 30px 70px rgba(0, 0, 0, 0.55), 0 0 30px rgba(90, 150, 255, 0.25);
+  --e4: 0 45px 100px rgba(0, 0, 0, 0.70), 0 0 45px rgba(90, 150, 255, 0.35);
 
   color-scheme: dark;
 }
 
-/* =============================================================================
-   COCKPIT HUD (DARK)
-   ============================================================================= */
+/* Cockpit Theme Aliases */
 [data-theme='hud'] {
-  --brand: #38BDF8;            /* Cyan Sky */
-  --brand-hover: #7DD3FC;
-  --brand-contrast: #04131B;
-  --accent: #F97316;           /* Sunset Amber */
-
+  --brand: #06B6D4;
+  --brand-hover: #22D3EE;
+  --brand-contrast: #070B14;
+  --accent: #8B5CF6;
+  --bg-app: #070B14;
+  --bg-surface: rgba(20, 28, 45, 0.65);
+  --bg-panel: #0E1422;
+  --bg-sunken: rgba(10, 16, 28, 0.85);
+  --bg-hover: rgba(6, 182, 212, 0.15);
   --app-canvas:
-    radial-gradient(1400px 700px at 10% -10%, rgba(56, 189, 248, 0.14), transparent 65%),
-    radial-gradient(1100px 550px at 90% 110%, rgba(249, 115, 22, 0.09), transparent 60%),
-    linear-gradient(180deg, #0A1723 0%, #07121B 55%, #050C13 100%);
-
-  --bg-app: #07121B;
-  --bg-surface: rgba(120, 200, 226, .08);
-  --bg-panel: rgba(120, 200, 226, .12);
-  --bg-sunken: rgba(3, 10, 16, .75);
-  --bg-hover: rgba(56, 189, 248, .16);
-
-  --border: rgba(56, 189, 248, .32);
-  --border-strong: rgba(56, 189, 248, .58);
-
-  --text-primary: #E6F4FA;
-  --text-secondary: #9FBACB;
-  --text-muted: #6E8CA1;
-
-  --status-success: #4ADE80;  --status-success-bg: rgba(74, 222, 128, .16);
-  --status-warning: #F97316;  --status-warning-bg: rgba(249, 115, 22, .18);
-  --status-danger:  #FF6B6B;  --status-danger-bg:  rgba(255, 107, 107, .18);
-  --status-info:    #38BDF8;  --status-info-bg:    rgba(56, 189, 248, .18);
-  --status-progress:#F97316;  --status-progress-bg:rgba(249, 115, 22, .18);
-  --status-neutral: #8FA9BC;  --status-neutral-bg: rgba(143, 169, 188, .16);
-
-  --focus-ring: rgba(56, 189, 248, .65);
-
-  --e1: 0 0 0 1px rgba(56, 189, 248, .12), 0 4px 15px rgba(0, 0, 0, .5);
-  --e2: 0 0 0 1px rgba(56, 189, 248, .18), 0 12px 35px rgba(0, 0, 0, .58);
-  --e3: 0 0 0 1px rgba(56, 189, 248, .24), 0 20px 50px rgba(0, 0, 0, .65);
-  --e4: 0 0 0 1px rgba(56, 189, 248, .30), 0 35px 80px rgba(0, 0, 0, .72);
-
+    radial-gradient(1300px 650px at 15% -5%, #081B38, transparent 65%),
+    radial-gradient(1100px 550px at 85% 105%, #221B38, transparent 60%),
+    linear-gradient(180deg, #070B14 0%, #0D1A2E 100%);
+  --border: rgba(6, 182, 212, 0.25);
+  --border-strong: rgba(6, 182, 212, 0.5);
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --status-success: #10B981;  --status-success-bg: rgba(16, 185, 129, 0.16);
+  --status-warning: #F59E0B;  --status-warning-bg: rgba(245, 158, 11, 0.16);
+  --status-danger:  #EF4444;  --status-danger-bg:  rgba(239, 68, 68, 0.16);
+  --status-info:    #06B6D4;  --status-info-bg:    rgba(6, 182, 212, 0.16);
+  --status-progress:#3B82F6;  --status-progress-bg:rgba(59, 130, 246, 0.16);
+  --status-neutral: #94A3B8;  --status-neutral-bg: rgba(148, 163, 184, 0.14);
+  --focus-ring: rgba(6, 182, 212, 0.6);
+  --e1: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 1px rgba(6, 182, 212, 0.2);
+  --e2: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 20px rgba(6, 182, 212, 0.25);
+  --e3: 0 30px 70px rgba(0, 0, 0, 0.55), 0 0 30px rgba(6, 182, 212, 0.35);
+  --e4: 0 45px 100px rgba(0, 0, 0, 0.70);
   color-scheme: dark;
 }
 
-/* =============================================================================
-   COCKPIT HUD (LIGHT)
-   ============================================================================= */
 [data-theme='hud-light'] {
   --brand: #0284C7;
   --brand-hover: #0369A1;
   --brand-contrast: #FFFFFF;
-  --accent: #EA580C;
-
+  --accent: #8B5CF6;
+  --bg-app: #FAFBFF;
+  --bg-surface: rgba(255, 255, 255, 0.75);
+  --bg-panel: #FFFFFF;
+  --bg-sunken: rgba(244, 246, 255, 0.85);
+  --bg-hover: rgba(2, 132, 199, 0.10);
   --app-canvas:
-    radial-gradient(1400px 700px at 10% -10%, rgba(2, 132, 199, .14), transparent 65%),
-    radial-gradient(1100px 550px at 90% 110%, rgba(234, 88, 12, .10), transparent 60%),
-    linear-gradient(180deg, #F0F7FB 0%, #E6F0F6 55%, #DEEAF2 100%);
-
-  --bg-app: #EAF2F8;
-  --bg-surface: rgba(255, 255, 255, 0.88);
-  --bg-panel: rgba(255, 255, 255, 0.96);
-  --bg-sunken: rgba(215, 230, 242, 0.80);
-  --bg-hover: rgba(2, 132, 199, 0.14);
-
-  --border: rgba(2, 132, 199, 0.38);
-  --border-strong: rgba(2, 132, 199, 0.65);
-
+    radial-gradient(1200px 600px at 15% 5%, #E9F7FF, transparent 65%),
+    radial-gradient(1000px 500px at 85% 95%, #F4ECFF, transparent 60%),
+    linear-gradient(180deg, #FAFBFF 0%, #F3F6FD 100%);
+  --border: rgba(2, 132, 199, 0.25);
+  --border-strong: rgba(2, 132, 199, 0.5);
   --text-primary: #0F172A;
   --text-secondary: #334155;
   --text-muted: #64748B;
-
-  --status-success: #16A34A;  --status-success-bg: rgba(22, 163, 74, 0.18);
-  --status-warning: #D97706;  --status-warning-bg: rgba(217, 119, 6, 0.18);
-  --status-danger:  #DC2626;  --status-danger-bg:  rgba(220, 38, 38, 0.18);
-  --status-info:    #0284C7;  --status-info-bg:    rgba(2, 132, 199, 0.18);
-  --status-progress:#EA580C;  --status-progress-bg:rgba(234, 88, 12, 0.18);
-  --status-neutral: #64748B;  --status-neutral-bg: rgba(100, 116, 139, 0.16);
-
-  --focus-ring: rgba(2, 132, 199, 0.60);
-
-  --e1: 0 0 0 1px rgba(2, 132, 199, 0.18), 0 4px 12px rgba(15, 23, 42, .09);
-  --e2: 0 0 0 1px rgba(2, 132, 199, 0.22), 0 10px 28px rgba(15, 23, 42, .13);
-  --e3: 0 0 0 1px rgba(2, 132, 199, 0.26), 0 20px 42px rgba(15, 23, 42, .17);
-  --e4: 0 0 0 1px rgba(2, 132, 199, 0.30), 0 30px 65px rgba(15, 23, 42, .22);
-
+  --status-success: #10B981;  --status-success-bg: rgba(16, 185, 129, 0.12);
+  --status-warning: #F59E0B;  --status-warning-bg: rgba(245, 158, 11, 0.12);
+  --status-danger:  #EF4444;  --status-danger-bg:  rgba(239, 68, 68, 0.12);
+  --status-info:    #06B6D4;  --status-info-bg:    rgba(6, 182, 212, 0.12);
+  --status-progress:#0284C7;  --status-progress-bg:rgba(2, 132, 199, 0.12);
+  --status-neutral: #64748B;  --status-neutral-bg: rgba(100, 116, 139, 0.10);
+  --focus-ring: rgba(2, 132, 199, 0.45);
+  --e1: 0 8px 25px -4px rgba(0, 0, 0, 0.04), 0 0 1px 0 rgba(2, 132, 199, 0.12);
+  --e2: 0 15px 45px 0 rgba(0, 0, 0, 0.08), 0 0 15px 0 rgba(2, 132, 199, 0.15);
+  --e3: 0 25px 60px -10px rgba(0, 0, 0, 0.12);
+  --e4: 0 40px 90px -15px rgba(0, 0, 0, 0.18);
   color-scheme: light;
 }
 
-/* Theme-Independent Tokens */
+/* Theme-Independent Specs */
 :root {
-  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
-  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
-  --space-12: 48px; --space-16: 64px; --space-20: 80px;
+  /* Spacing Grid (8pt Grid) */
+  --space-1: 8px;   --space-2: 16px;  --space-3: 24px; --space-4: 32px;
+  --space-5: 40px;  --space-6: 48px;  --space-8: 64px; --space-10: 80px;
 
-  --radius-xs: 6px; --radius-sm: 8px; --radius-md: 12px;
-  --radius-lg: 16px; --radius-xl: 20px; --radius-2xl: 24px; --radius-pill: 9999px;
+  /* Apple Glass Component Radius Specs */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;   /* Buttons: 16px */
+  --radius-lg: 18px;   /* Inputs: 18px */
+  --radius-xl: 24px;   /* Cards: 24px */
+  --radius-2xl: 28px;  /* Dialogs / Drawers: 28px */
+  --radius-pill: 9999px;
 
-  --font-ui: 'Inter', -apple-system, system-ui, sans-serif;
-  --font-report: 'Fraunces', Georgia, serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* Typography: SF Pro Display */
+  --font-ui: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  --font-report: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter', serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
 
-  --dur-instant: 80ms; --dur-fast: 150ms; --dur-base: 240ms; --dur-slow: 350ms;
-  --ease-standard: cubic-bezier(.16, 1, .3, 1);
-  --ease-emphasized: cubic-bezier(.34, 1.56, .64, 1);
+  /* Animations & Motion */
+  --dur-instant: 100ms; --dur-fast: 180ms; --dur-base: 300ms; --dur-slow: 450ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-emphasized: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --z-sticky: 100; --z-dropdown: 1000; --z-drawer: 1100;
   --z-modal: 1200; --z-toast: 1300; --z-tooltip: 1400;

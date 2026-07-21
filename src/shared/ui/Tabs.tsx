@@ -27,11 +27,17 @@ export function Tabs({ items, defaultTabId, onChange, className = '' }: TabsProp
         className="kvj-tabs-list"
         role="tablist"
         style={{
-          display: 'flex',
-          borderBottom: '1px solid var(--border)',
-          marginBottom: 16,
+          display: 'inline-flex',
+          gap: 6,
+          padding: 6,
+          background: 'var(--bg-sunken)',
+          border: 'var(--glass-border, 1px solid var(--border))',
+          borderRadius: 'var(--radius-lg)', /* 18px */
+          marginBottom: 20,
           overflowX: 'auto',
           scrollbarWidth: 'none',
+          backdropFilter: 'blur(16px)',
+          boxShadow: 'var(--e1)',
         }}
       >
         {items.map((tab) => {
@@ -43,16 +49,19 @@ export function Tabs({ items, defaultTabId, onChange, className = '' }: TabsProp
               aria-selected={isActive}
               onClick={() => handleTabClick(tab.id)}
               style={{
-                padding: '10px 16px',
-                border: 'none',
-                background: 'none',
-                borderBottom: isActive ? '2px solid var(--brand)' : '2px solid transparent',
+                padding: '9px 18px',
+                border: isActive ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
+                borderRadius: 'var(--radius-md)', /* 16px */
+                background: isActive
+                  ? 'linear-gradient(135deg, var(--bg-surface), rgba(59, 130, 246, 0.12))'
+                  : 'transparent',
                 color: isActive ? 'var(--brand)' : 'var(--text-secondary)',
-                fontWeight: isActive ? 600 : 500,
+                fontWeight: isActive ? 700 : 500,
                 cursor: 'pointer',
-                fontSize: 14,
+                fontSize: 13.5,
                 whiteSpace: 'nowrap',
-                transition: 'all var(--dur-fast) var(--ease-standard)',
+                boxShadow: isActive ? '0 4px 14px rgba(59, 130, 246, 0.15)' : 'none',
+                transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
               {tab.label}
@@ -66,4 +75,5 @@ export function Tabs({ items, defaultTabId, onChange, className = '' }: TabsProp
     </div>
   );
 }
+
 export default Tabs;

@@ -92,33 +92,47 @@ function AppShellFrame({ children }: { children: ReactNode }) {
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
       {showSidebar && (
         <aside style={{
-          width, flexShrink: 0, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)',
-          display: 'flex', flexDirection: 'column', position: isMobile ? 'fixed' : 'sticky', top: 0, height: '100vh', zIndex: 1100,
+          width,
+          flexShrink: 0,
+          background: 'var(--bg-surface)',
+          border: 'var(--glass-border, 1px solid var(--border))',
+          borderRadius: 'var(--radius-xl)',
+          backdropFilter: 'blur(var(--glass-blur, 25px))',
+          WebkitBackdropFilter: 'blur(var(--glass-blur, 25px))',
+          boxShadow: 'var(--e2)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: isMobile ? 'fixed' : 'sticky',
+          top: isMobile ? 0 : 16,
+          height: isMobile ? '100vh' : 'calc(100vh - 32px)',
+          margin: isMobile ? 0 : '16px 0 16px 16px',
+          zIndex: 1100,
           transition: 'width var(--dur-base) var(--ease-emphasized)',
+          overflow: 'hidden',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg, var(--brand), var(--accent))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700 }}>K</span>
-            {(!collapsed || isMobile) && <span style={{ fontWeight: 700, fontSize: 15 }}>{appConfig.app.name}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 20px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ width: 34, height: 34, borderRadius: 12, background: 'linear-gradient(135deg, var(--brand), var(--accent))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 16, boxShadow: '0 4px 12px rgba(59, 130, 246, 0.35)' }}>K</span>
+            {(!collapsed || isMobile) && <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>{appConfig.app.name}</span>}
           </div>
-          <nav style={{ flex: 1, overflowY: 'auto', padding: 10 }}>
+          <nav style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
             {items.map((item) => (
               <NavLink key={item.id} to={item.path} icon={item.icon} label={item.label} collapsed={collapsed && !isMobile} onNavigate={() => { pushRecent(item.id); setMobileOpen(false); }} />
             ))}
           </nav>
           {!isMobile && (
             <button onClick={() => setCollapsed((c) => !c)} aria-label="Toggle sidebar"
-              style={{ margin: 10, padding: 8, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-sunken)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              style={{ margin: 12, padding: 10, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-sunken)', color: 'var(--text-secondary)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
               <Icon name={collapsed ? 'ChevronRight' : 'ChevronLeft'} size={16} />
             </button>
           )}
         </aside>
       )}
 
-      {isMobile && mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.5)', zIndex: 1050 }} />}
+      {isMobile && mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.5)', backdropFilter: 'blur(8px)', zIndex: 1050 }} />}
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <TopBar onMenu={() => setMobileOpen(true)} isMobile={isMobile} />
-        <main style={{ flex: 1, padding: isMobile ? 16 : 32, maxWidth: 1440, width: '100%', margin: '0 auto' }}>
+        <main style={{ flex: 1, padding: isMobile ? 16 : '24px 32px 40px 32px', maxWidth: 1440, width: '100%', margin: '0 auto' }}>
           <Breadcrumbs />
           {children}
         </main>
@@ -133,9 +147,20 @@ function NavLink({ to, icon, label, collapsed, onNavigate }: { to: string; icon:
   const active = pathname === to || (to !== '/app' && pathname.startsWith(to));
   return (
     <Link to={to} onClick={onNavigate} title={collapsed ? label : undefined} style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--radius-md)',
-      color: active ? 'var(--brand)' : 'var(--text-secondary)', background: active ? 'var(--status-progress-bg)' : 'transparent',
-      textDecoration: 'none', fontSize: 14, fontWeight: active ? 600 : 500, marginBottom: 2,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '11px 14px',
+      borderRadius: 'var(--radius-md)',
+      color: active ? 'var(--brand)' : 'var(--text-secondary)',
+      background: active ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.14), rgba(139, 92, 246, 0.14))' : 'transparent',
+      border: active ? '1px solid rgba(59, 130, 246, 0.25)' : '1px solid transparent',
+      boxShadow: active ? '0 4px 14px rgba(59, 130, 246, 0.12)' : 'none',
+      textDecoration: 'none',
+      fontSize: 13.5,
+      fontWeight: active ? 700 : 500,
+      marginBottom: 4,
+      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
     }}>
       <Icon name={icon} /> {!collapsed && <span>{label}</span>}
     </Link>
@@ -152,17 +177,20 @@ function TopBar({ onMenu, isMobile }: { onMenu: () => void; isMobile: boolean })
   return (
     <header style={{
       position: 'sticky',
-      top: 0,
+      top: 16,
+      margin: isMobile ? '8px 16px 0 16px' : '16px 32px 0 32px',
       zIndex: 100,
-      height: 60,
+      height: 64,
       display: 'flex',
       alignItems: 'center',
       gap: 12,
-      padding: '0 16px',
+      padding: '0 20px',
       background: 'var(--bg-surface)',
-      borderBottom: '1px solid var(--border)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
+      border: 'var(--glass-border, 1px solid var(--border))',
+      borderRadius: 'var(--radius-xl)',
+      backdropFilter: 'blur(var(--glass-blur, 25px))',
+      WebkitBackdropFilter: 'blur(var(--glass-blur, 25px))',
+      boxShadow: 'var(--e2)',
     }}>
       {isMobile && <button onClick={onMenu} aria-label="Menu" style={iconBtn}><Icon name="Menu" /></button>}
       <button onClick={() => setOpen(true)} style={{ flex: 1, maxWidth: 420, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-sunken)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>
