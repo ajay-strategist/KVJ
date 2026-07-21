@@ -23,7 +23,7 @@ const ShowcasePage = lazy(() => import('./pages/ShowcasePage').then((m) => ({ de
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const EmployeeDirectory = lazy(() => import('../modules/employee/pages/EmployeeDirectory').then((m) => ({ default: m.EmployeeDirectory })));
 const EmployeeProfile = lazy(() => import('../modules/employee/pages/EmployeeProfile').then((m) => ({ default: m.EmployeeProfile })));
-const AttendanceHistory = lazy(() => import('../modules/attendance/pages/AttendanceHistory').then((m) => ({ default: m.AttendanceHistory })));
+const AttendanceLogPage = lazy(() => import('../modules/attendance/pages/AttendanceLogPage').then((m) => ({ default: m.AttendanceLogPage })));
 const LeaveBoard = lazy(() => import('../modules/leave/pages/LeaveBoard').then((m) => ({ default: m.LeaveBoard })));
 const ApprovalsQueue = lazy(() => import('../modules/attendance/pages/ApprovalsQueue').then((m) => ({ default: m.ApprovalsQueue })));
 
@@ -81,7 +81,7 @@ export function AppRouter() {
           <Route path="/app/workspace/ceo" element={<ProtectedRoute><RoleWorkspacePage role="ceo" /></ProtectedRoute>} />
           <Route path="/app/employees" element={<ProtectedRoute resource="employee" action="view"><EmployeeDirectory /></ProtectedRoute>} />
           <Route path="/app/employees/:id" element={<ProtectedRoute resource="employee" action="view"><EmployeeProfile /></ProtectedRoute>} />
-          <Route path="/app/attendance" element={<ProtectedRoute resource="attendance" action="view"><AttendanceHistory /></ProtectedRoute>} />
+          <Route path="/app/attendance" element={<ProtectedRoute resource="attendance" action="view"><AttendanceLogPage /></ProtectedRoute>} />
           <Route path="/app/leave" element={<ProtectedRoute resource="leave" action="view"><LeaveBoard /></ProtectedRoute>} />
           <Route path="/app/approvals" element={<ProtectedRoute resource="leave" action="approve"><ApprovalsQueue /></ProtectedRoute>} />
           <Route path="/app/showcase" element={<ProtectedRoute><ShowcasePage /></ProtectedRoute>} />
