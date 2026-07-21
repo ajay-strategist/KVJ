@@ -152,78 +152,80 @@ export function AttendanceCalendarView({
       </div>
 
       {/* Main Core Full-Width Calendar View */}
-      <Card>
-        <SectionHeader title={`Monthly Attendance Calendar Grid — ${selectedEmployeeName}`} />
+      {days.length > 0 && (
+        <Card>
+          <SectionHeader title={`Monthly Attendance Calendar Grid — ${selectedEmployeeName}`} />
 
-        {/* Days of week header */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, marginBottom: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--text-muted)' }}>
-          {daysOfWeek.map((d) => (
-            <div key={d} style={{ padding: '4px 0' }}>{d}</div>
-          ))}
-        </div>
+          {/* Days of week header */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, marginBottom: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--text-muted)' }}>
+            {daysOfWeek.map((d) => (
+              <div key={d} style={{ padding: '4px 0' }}>{d}</div>
+            ))}
+          </div>
 
-        {/* Calendar Days Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
-          {days.map((d, i) => {
-            const styles = getStatusColor(d.status);
-            return (
-              <div
-                key={i}
-                onClick={() => setSelectedDay(d)}
-                style={{
-                  gridColumnStart: i === 0 ? 2 : undefined, // Monday start for Day 1
-                  background: styles.bg,
-                  border: `1.5px solid ${styles.border}`,
-                  borderRadius: 'var(--radius-sm)',
-                  padding: 8,
-                  minHeight: 110,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: styles.text }}>{d.dateNum}</span>
-                    <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>{d.dayName}</span>
+          {/* Calendar Days Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+            {days.map((d, i) => {
+              const styles = getStatusColor(d.status);
+              return (
+                <div
+                  key={i}
+                  onClick={() => setSelectedDay(d)}
+                  style={{
+                    gridColumnStart: i === 0 ? 2 : undefined, // Monday start for Day 1
+                    background: styles.bg,
+                    border: `1.5px solid ${styles.border}`,
+                    borderRadius: 'var(--radius-sm)',
+                    padding: 8,
+                    minHeight: 110,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: styles.text }}>{d.dateNum}</span>
+                      <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>{d.dayName}</span>
+                    </div>
+
+                    {d.location && (
+                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        📍 {d.location}
+                      </div>
+                    )}
+
+                    {/* Employee Timeline below each date */}
+                    {d.startTime && d.endTime && (
+                      <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                        🕒 {d.startTime} - {d.endTime}
+                      </div>
+                    )}
+
+                    {d.tasks && d.tasks.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {d.tasks.slice(0, 2).map((t, idx) => (
+                          <div key={idx} style={{ fontSize: 9, color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            ✓ {t.title}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {d.location && (
-                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                      📍 {d.location}
-                    </div>
-                  )}
-
-                  {/* Employee Timeline below each date */}
-                  {d.startTime && d.endTime && (
-                    <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                      🕒 {d.startTime} - {d.endTime}
-                    </div>
-                  )}
-
-                  {d.tasks && d.tasks.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {d.tasks.slice(0, 2).map((t, idx) => (
-                        <div key={idx} style={{ fontSize: 9, color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                          ✓ {t.title}
-                        </div>
-                      ))}
+                  {d.hoursWorked && (
+                    <div style={{ fontSize: 10, fontWeight: 700, color: styles.text, textAlign: 'right', marginTop: 4 }}>
+                      ⏱ {d.hoursWorked}
                     </div>
                   )}
                 </div>
-
-                {d.hoursWorked && (
-                  <div style={{ fontSize: 10, fontWeight: 700, color: styles.text, textAlign: 'right', marginTop: 4 }}>
-                    ⏱ {d.hoursWorked}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Selected Day Popout Details */}
       {selectedDay && (
