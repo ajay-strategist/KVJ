@@ -5,15 +5,14 @@ import { PageHeader, Card, SectionHeader, StatCard, QuickActionCard, Badge, Time
 import { useAuth } from '../../../modules/auth/AuthProvider';
 import { ROLES } from '../../../shared/permissions/roles';
 import { mock } from '../../../shared/mock/factories';
-import { BarChart, LineChart } from '../../widgets/demo-widgets';
+import { LineChart } from '../../widgets/demo-widgets';
 import { useAttendance } from '../../../modules/attendance/hooks/useAttendance';
 import type { AttendanceRecord, WorkSessionType } from '../../../modules/attendance/attendance.repository';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, SelectField, TextField } from '../../../shared/forms/form';
-import { businessRules } from '../../../config/business-rules';
 
 function Greeting() {
   const { user } = useAuth();
@@ -28,54 +27,6 @@ const statusMap = {
   clocked_out: { label: 'Clocked Out', tone: 'neutral' as const },
   absent: { label: 'Absent', tone: 'danger' as const },
 };
-
-/** My Day — default employee workspace. */
-interface AttendanceStatsProps {
-  record: AttendanceRecord | null;
-}
-
-export const AttendanceStats = memo(function AttendanceStats({ record }: AttendanceStatsProps) {
-  const currentStatus = (record?.status ?? 'clocked_out') as keyof typeof statusMap;
-  const statusInfo = statusMap[currentStatus];
-
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (currentStatus === 'present' || currentStatus === 'on_break') {
-      const timer = setInterval(() => { setNow(Date.now()); }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [currentStatus]);
-
-  const completedBreakMs = (record?.breaks ?? []).reduce((sum: number, b: any) => {
-    if (b.endTime) return sum + (new Date(b.endTime).getTime() - new Date(b.startTime).getTime());
-    return sum;
-  }, 0);
-
-  const completedSessionMs = (record?.sessions ?? []).reduce((sum: number, s: any) => {
-    if (s.clockOut) return sum + (new Date(s.clockOut).getTime() - new Date(s.clockIn).getTime());
-    return sum;
-  }, 0);
-
-  const activeSession = record?.sessions?.find((s: any) => !s.clockOut);
-  const activeSessionMs = activeSession ? (now - new Date(activeSession.clockIn).getTime()) : 0;
-
-  const activeBreak = record?.breaks?.find((b: any) => !b.endTime);
-  const activeBreakMs = activeBreak ? (now - new Date(activeBreak.startTime).getTime()) : 0;
-
-  const totalWorkMs = completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs;
-  const activeHours = (Math.max(0, totalWorkMs) / 3600000).toFixed(1);
-
-  return (
-    <>
-      <StatCard label="Attendance Status" value={statusInfo.label} tone={statusInfo.tone} icon="●" />
-      <StatCard label="Hours Worked Today" value={`${activeHours} hrs`} icon="◷" />
-      <StatCard label="Tasks Due" value="3" tone="warning" icon="◧" />
-      <StatCard label="Hours this Month" value="168 hrs" tone="info" icon="⌛" />
-      <StatCard label="Attendance %" value="96.2%" tone="success" icon="📈" />
-    </>
-  );
-});
 
 interface AttendancePanelProps {
   record: AttendanceRecord | null;
@@ -159,7 +110,6 @@ export const AttendancePanel = memo(function AttendancePanel({
   const activeBreakMs = activeBreak ? (now - new Date(activeBreak.startTime).getTime()) : 0;
 
   const totalWorkMs = completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs;
-  const totalBreakMs = completedBreakMs + activeBreakMs;
 
   const handleClockInSubmit = useCallback(async (values: Record<string, unknown>) => {
     const mode = values.mode as string;
@@ -406,16 +356,27 @@ export const AttendancePanel = memo(function AttendancePanel({
   );
 });
 
-export const TaskWidget = memo(function TaskWidget() {
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: 'Today', priority: 'High', active: false, secondsToday: 5400 },
-    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: 'Today', priority: 'Critical', active: false, secondsToday: 3600 },
-    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: 'Tomorrow', priority: 'Normal', active: false, secondsToday: 0 },
-  ]);
+export const TaskWidget = memo(function TaskWidget({
+  tasks,
+  setTasks,
+  onTaskStart,
+}: {
+  tasks: Array<{ id: string; title: string; project: string; due: string; priority: string; active: boolean; secondsToday: number }>;
+  setTasks: React.Dispatch<React.SetStateAction<any[]>>;
+  onTaskStart: (taskTitle: string) => void;
+}) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const toggleTaskTimer = (id: string) => {
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: !t.active } : { ...t, active: false }))
+      prev.map((t) => {
+        if (t.id === id) {
+          const nextActive = !t.active;
+          if (nextActive) onTaskStart(t.title);
+          return { ...t, active: nextActive };
+        }
+        return { ...t, active: false };
+      })
     );
   };
 
@@ -426,7 +387,7 @@ export const TaskWidget = memo(function TaskWidget() {
       );
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [setTasks]);
 
   const formatSec = (sec: number) => {
     const h = Math.floor(sec / 3600);
@@ -435,15 +396,49 @@ export const TaskWidget = memo(function TaskWidget() {
     return `${h}h ${m}m ${s}s`;
   };
 
+  const handleDragStart = (idx: number) => {
+    setDraggedIndex(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIdx) return;
+    const updated = [...tasks];
+    const [moved] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIdx, 0, moved);
+    setDraggedIndex(targetIdx);
+    setTasks(updated);
+  };
+
   return (
     <Card>
-      <SectionHeader title="Today's Tasks with Timeline & Timers" />
-      {tasks.map((t) => (
-        <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{t.title}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              {t.project} · Due: {t.due} · Logged Today: <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{formatSec(t.secondsToday)}</span>
+      <SectionHeader title="Today's Tasks (Drag & Drop Reorder)" />
+      {tasks.map((t, idx) => (
+        <div
+          key={t.id}
+          draggable
+          onDragStart={() => handleDragStart(idx)}
+          onDragOver={(e) => handleDragOver(e, idx)}
+          onDragEnd={() => setDraggedIndex(null)}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 10px',
+            borderBottom: '1px solid var(--border)',
+            background: draggedIndex === idx ? 'var(--bg-hover)' : 'transparent',
+            borderRadius: 'var(--radius-xs)',
+            cursor: 'grab',
+            transition: 'background 0.15s ease',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16, color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{t.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                {t.project} · Due: {t.due} · Logged Today: <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{formatSec(t.secondsToday)}</span>
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -463,23 +458,52 @@ export const TaskWidget = memo(function TaskWidget() {
 });
 
 export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
-  const events = [
-    { id: 'e1', date: 'Jul 22 (Tomorrow)', title: 'Christ College Batch 2 Power BI Session', type: 'Training' },
-    { id: 'e2', date: 'Jul 23 (Thu)', title: 'Monthly Expense Approval Deadline', type: 'Finance' },
-    { id: 'e3', date: 'Jul 24 (Fri)', title: 'Rajagiri College Marketing Presentation', type: 'Marketing' },
+  const [selectedDay, setSelectedDay] = useState<number>(0);
+
+  const upcoming7Days = [
+    { day: 'Day 1 (Today)', events: [{ id: 'e1', time: '10:00 AM', title: 'Power BI Session - Christ 3BBA', type: 'Training' }] },
+    { day: 'Day 2 (Tomorrow)', events: [{ id: 'e2', time: '11:30 AM', title: 'Monthly Expense Approval Deadline', type: 'Finance' }] },
+    { day: 'Day 3 (Thu)', events: [{ id: 'e3', time: '02:00 PM', title: 'Rajagiri College Marketing Presentation', type: 'Marketing' }] },
+    { day: 'Day 4 (Fri)', events: [{ id: 'e4', time: '09:30 AM', title: 'Client Requirement Sync - Apex Analytics', type: 'Projects' }] },
+    { day: 'Day 5 (Sat)', events: [{ id: 'e5', time: '04:00 PM', title: 'Weekly Sprint & Progress Standup', type: 'Office' }] },
+    { day: 'Day 6 (Sun)', events: [{ id: 'e6', time: 'Off Day', title: 'Sunday Weekly Rest', type: 'Holiday' }] },
+    { day: 'Day 7 (Mon)', events: [{ id: 'e7', time: '10:00 AM', title: 'New Training Batch Orientation (Vimala College)', type: 'Training' }] },
   ];
 
   return (
     <Card>
-      <SectionHeader title="Upcoming Events & Tasks (Next 3 Days)" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {events.map((e) => (
-          <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
+      <SectionHeader title="Upcoming Events & Tasks (7-Day View)" />
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 12 }}>
+        {upcoming7Days.map((d, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setSelectedDay(i)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: selectedDay === i ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: selectedDay === i ? 'var(--brand)' : 'var(--bg-sunken)',
+              color: selectedDay === i ? 'white' : 'var(--text-primary)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {d.day}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {upcoming7Days[selectedDay].events.map((e) => (
+          <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{e.date}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>🕒 {e.time}</div>
             </div>
-            <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Finance' ? 'warning' : 'success'}>{e.type}</Badge>
+            <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Finance' ? 'warning' : e.type === 'Marketing' ? 'progress' : 'success'}>{e.type}</Badge>
           </div>
         ))}
       </div>
@@ -487,25 +511,25 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
   );
 });
 
-export const TimelineWidget = memo(function TimelineWidget() {
+export const TimelineWidget = memo(function TimelineWidget({
+  entries,
+}: {
+  entries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>;
+}) {
   return (
     <Card>
       <SectionHeader title="Timeline" />
-      <Timeline entries={[
-        { id: '1', title: 'Clocked in (Office)', time: '08:30 AM', tone: 'success' },
-        { id: '2', title: 'Power BI Session Started', time: '10:00 AM', tone: 'progress' },
-        { id: '3', title: 'Assessment Review', time: '02:00 PM', tone: 'info' },
-      ]} />
+      <Timeline entries={entries} />
     </Card>
   );
 });
 
 export const AnnouncementWidget = memo(function AnnouncementWidget() {
   return (
-    <Card>
-      <SectionHeader title="Announcements" />
-      <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-        📢 <strong>Company Announcement:</strong> Training Calendar updated for Q3. Please review your assigned batches under Batches ➔ Training Calendar.
+    <Card style={{ borderLeft: '4px solid var(--accent)' }}>
+      <SectionHeader title="Announcements Board" />
+      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+        📢 <strong>Company Notice:</strong> Training Calendar updated for Q3. Please review your assigned batches under Batches ➔ Training Calendar.
       </div>
     </Card>
   );
@@ -515,6 +539,26 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
 export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak } = useAttendance();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const [tasks, setTasks] = useState([
+    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: 'Today', priority: 'High', active: false, secondsToday: 5400 },
+    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: 'Today', priority: 'Critical', active: false, secondsToday: 3600 },
+    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: 'Tomorrow', priority: 'Normal', active: false, secondsToday: 0 },
+  ]);
+
+  const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([
+    { id: '1', title: 'Clocked in (Office)', time: '08:30 AM', tone: 'success' },
+    { id: '2', title: 'Power BI Session Started', time: '10:00 AM', tone: 'progress' },
+    { id: '3', title: 'Assessment Review', time: '02:00 PM', tone: 'info' },
+  ]);
+
+  const handleTaskStart = (taskTitle: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setTimelineEntries((prev) => [
+      { id: String(Date.now()), title: `Started: ${taskTitle}`, time: timeStr, tone: 'progress' },
+      ...prev,
+    ]);
+  };
 
   useEffect(() => {
     if (!loading) {
@@ -532,35 +576,50 @@ export function MyDayPage() {
 
   return (
     <AppShell>
-      <WorkspaceShell role="employee" regions={{
-        greeting: <Greeting />,
-        quickActions: <>
+      <Greeting />
+
+      {/* Single Row: Quick Actions on Left, Metrics on Right */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 12 }}>
           <QuickActionCard icon="✓" label="Add Task" />
           <QuickActionCard icon="₹" label="Submit Expense" />
           <QuickActionCard icon="🗓" label="Request Leave" />
-        </>,
-        stats: <AttendanceStats record={record} />,
-        primary: <>
-          <AttendancePanel
-            record={record}
-            loading={loading}
-            clockIn={clockIn}
-            clockOut={clockOut}
-            startBreak={startBreak}
-            endBreak={endBreak}
-          />
-          <TaskWidget />
-          <UpcomingEventsWidget />
-        </>,
-        side: <>
-          <TimelineWidget />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <StatCard label="Tasks Due" value="3" tone="warning" icon="◧" />
+          <StatCard label="Hours of this Month" value="168 hrs" tone="info" icon="⌛" />
+          <StatCard label="Attendance %" value="96.2%" tone="success" icon="📈" />
+        </div>
+      </div>
+
+      <AttendancePanel
+        record={record}
+        loading={loading}
+        clockIn={clockIn}
+        clockOut={clockOut}
+        startBreak={startBreak}
+        endBreak={endBreak}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16, marginTop: 16 }}>
+        {/* Left Column: Timeline */}
+        <div>
+          <TimelineWidget entries={timelineEntries} />
+        </div>
+
+        {/* Right Column: Announcements (top) + Task List (bottom) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AnnouncementWidget />
-        </>,
-      }} />
+          <TaskWidget tasks={tasks} setTasks={setTasks} onTaskStart={handleTaskStart} />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <UpcomingEventsWidget />
+      </div>
     </AppShell>
   );
 }
-
 
 /** Supervisor / Manager / CEO demo workspaces (same shell, different widgets). */
 export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'employee'> }) {

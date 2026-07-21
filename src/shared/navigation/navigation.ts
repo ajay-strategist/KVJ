@@ -24,7 +24,6 @@ export interface NavItem {
 /** The full navigation tree. Items are filtered by permission + feature flag. */
 export const NAV_TREE: NavItem[] = [
   { id: 'my-day', label: 'My Day', path: '/app', icon: 'Home' },
-  { id: 'dashboard', label: 'Dashboard', path: '/app/dashboard', icon: 'LayoutDashboard', permission: ['dashboard', 'view'] },
   { id: 'employees', label: 'Employees', path: '/app/employees', icon: 'Users', permission: ['employee', 'view'], module: 'employee' },
   { id: 'attendance', label: 'Attendance', path: '/app/attendance', icon: 'Clock', permission: ['attendance', 'view'], module: 'attendance' },
   { id: 'leave', label: 'Leave', path: '/app/leave', icon: 'CalendarDays', permission: ['leave', 'view'], module: 'leave' },
