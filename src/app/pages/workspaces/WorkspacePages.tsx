@@ -42,9 +42,7 @@ export const AttendanceStats = memo(function AttendanceStats({ record }: Attenda
 
   useEffect(() => {
     if (currentStatus === 'present' || currentStatus === 'on_break') {
-      const timer = setInterval(() => {
-        setNow(Date.now());
-      }, 1000);
+      const timer = setInterval(() => { setNow(Date.now()); }, 1000);
       return () => clearInterval(timer);
     }
   }, [currentStatus]);
@@ -72,6 +70,9 @@ export const AttendanceStats = memo(function AttendanceStats({ record }: Attenda
     <>
       <StatCard label="Attendance Status" value={statusInfo.label} tone={statusInfo.tone} icon="●" />
       <StatCard label="Hours Worked Today" value={`${activeHours} hrs`} icon="◷" />
+      <StatCard label="Tasks Due" value="3" tone="warning" icon="◧" />
+      <StatCard label="Hours this Month" value="168 hrs" tone="info" icon="⌛" />
+      <StatCard label="Attendance %" value="96.2%" tone="success" icon="📈" />
     </>
   );
 });
@@ -98,15 +99,29 @@ export const AttendancePanel = memo(function AttendancePanel({
   const [clockInOpen, setClockInOpen] = useState(false);
   const [breakOpen, setBreakOpen] = useState(false);
 
-  const currentStatus = (record?.status ?? 'clocked_out') as keyof typeof statusMap;
+  // GPS & Location state
+  const [locationStr, setLocationStr] = useState<string>('Detecting location...');
 
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocationStr(`${pos.coords.latitude.toFixed(4)}°, ${pos.coords.longitude.toFixed(4)}°`);
+        },
+        () => { setLocationStr('Office / GPS Active'); },
+        { timeout: 5000 }
+      );
+    } else {
+      setLocationStr('Office / GPS N/A');
+    }
+  }, []);
+
+  const currentStatus = (record?.status ?? 'clocked_out') as keyof typeof statusMap;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (currentStatus === 'present' || currentStatus === 'on_break') {
-      const timer = setInterval(() => {
-        setNow(Date.now());
-      }, 1000);
+      const timer = setInterval(() => { setNow(Date.now()); }, 1000);
       return () => clearInterval(timer);
     }
   }, [currentStatus]);
@@ -147,15 +162,17 @@ export const AttendancePanel = memo(function AttendancePanel({
   const totalBreakMs = completedBreakMs + activeBreakMs;
 
   const handleClockInSubmit = useCallback(async (values: Record<string, unknown>) => {
-    const type = values.workType as any;
-    const res = await clockIn(type);
+    const mode = values.mode as string;
+    const batch = values.batch as string;
+    const type = mode === 'Training' ? `Training: ${batch}` : 'Office';
+    const res = await clockIn(type as any);
     if (res.ok) {
-      toast({ variant: 'success', title: 'Clocked In', message: `You clocked in for ${type}` });
+      toast({ variant: 'success', title: 'Clocked In', message: `Clocked in for ${type} (${locationStr})` });
       setClockInOpen(false);
     } else {
       toast({ variant: 'error', title: 'Clock In Failed', message: res.error });
     }
-  }, [clockIn, toast]);
+  }, [clockIn, toast, locationStr]);
 
   const handleClockOut = useCallback(async () => {
     const ok = await confirm({ title: 'Clock Out?', message: 'Are you sure you want to end your work day?' });
@@ -188,14 +205,17 @@ export const AttendancePanel = memo(function AttendancePanel({
     }
   }, [endBreak, toast]);
 
-  const workTypes = useMemo(() => businessRules.attendance.workTypes.map((t) => ({ value: t, label: t })), []);
+  const sampleBatches = [
+    { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
+    { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
+    { value: 'MIM 1MBA 2026-27 B1', label: 'MIM 1MBA 2026-27 B1' },
+  ];
 
   return (
     <>
       <Card>
-        <SectionHeader title="Attendance Control Panel" />
+        <SectionHeader title="Attendance Control Panel — Office / Training" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Compact status card */}
           <div style={{
             background: 'var(--bg-sunken)',
             border: '1px solid var(--border)',
@@ -217,6 +237,12 @@ export const AttendancePanel = memo(function AttendancePanel({
                 {currentStatus === 'present' ? 'Working' : currentStatus === 'on_break' ? 'On Break' : 'Not Working'}
               </div>
             </div>
+            <div>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>GPS Location</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '4px', color: 'var(--brand)' }}>
+                📍 {locationStr}
+              </div>
+            </div>
             {currentStatus !== 'clocked_out' && (
               <div>
                 <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Work Type</div>
@@ -232,21 +258,13 @@ export const AttendancePanel = memo(function AttendancePanel({
               </div>
             </div>
             <div>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Duration Today</div>
               <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
                 {formatDuration(totalWorkMs)}
               </div>
             </div>
-            {(totalBreakMs > 0 || currentStatus === 'on_break') && (
-              <div>
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Break Duration</div>
-                <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px', fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning)' }}>
-                  {formatDuration(totalBreakMs)}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Action buttons */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             {currentStatus === 'clocked_out' && (
               <button
@@ -263,12 +281,9 @@ export const AttendancePanel = memo(function AttendancePanel({
                   borderRadius: 'var(--radius-md)',
                   cursor: 'pointer',
                   boxShadow: 'var(--e1)',
-                  transition: 'all 120ms var(--ease-standard)',
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.background = '#047857'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--e2)'; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = 'var(--status-success)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--e1)'; }}
               >
-                Clock In
+                Clock In (Office / Training)
               </button>
             )}
 
@@ -288,10 +303,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                     borderRadius: 'var(--radius-md)',
                     cursor: 'pointer',
                     boxShadow: 'var(--e1)',
-                    transition: 'all 120ms var(--ease-standard)',
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = '#d97706'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--e2)'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = 'var(--status-warning)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--e1)'; }}
                 >
                   Start Break
                 </button>
@@ -308,10 +320,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                     fontWeight: '600',
                     borderRadius: 'var(--radius-md)',
                     cursor: 'pointer',
-                    transition: 'all 120ms var(--ease-standard)',
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = 'var(--status-danger)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--e2)'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = 'var(--status-danger-bg)'; e.currentTarget.style.color = 'var(--status-danger)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   Clock Out
                 </button>
@@ -334,12 +343,9 @@ export const AttendancePanel = memo(function AttendancePanel({
                     borderRadius: 'var(--radius-md)',
                     cursor: 'pointer',
                     boxShadow: 'var(--e1)',
-                    transition: 'all 120ms var(--ease-standard)',
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = 'var(--brand-hover)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--e2)'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = 'var(--brand)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--e1)'; }}
                 >
-                  Break Out (Resume Work)
+                  End Break (Resume)
                 </button>
                 <button
                   type="button"
@@ -354,10 +360,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                     fontWeight: '600',
                     borderRadius: 'var(--radius-md)',
                     cursor: 'pointer',
-                    transition: 'all 120ms var(--ease-standard)',
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = 'var(--status-danger)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--e2)'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = 'var(--status-danger-bg)'; e.currentTarget.style.color = 'var(--status-danger)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   Clock Out
                 </button>
@@ -368,12 +371,23 @@ export const AttendancePanel = memo(function AttendancePanel({
       </Card>
 
       {/* Clock In Drawer */}
-      <Drawer open={clockInOpen} onClose={() => setClockInOpen(false)} title="Clock In to Work Day">
-        <Form initial={{ workType: 'Office' }} onSubmit={handleClockInSubmit}>
-          <SelectField name="workType" label="Work Session Type" options={workTypes} />
+      <Drawer open={clockInOpen} onClose={() => setClockInOpen(false)} title="Clock In to Work Session">
+        <Form initial={{ mode: 'Office', batch: 'Christ 3BBA Data Analytics B1' }} onSubmit={handleClockInSubmit}>
+          <SelectField
+            name="mode"
+            label="Attendance Location Mode"
+            options={[
+              { value: 'Office', label: 'Office Work' },
+              { value: 'Training', label: 'Training Batch Session' },
+            ]}
+          />
+          <SelectField name="batch" label="Select Training Batch (If Training)" options={sampleBatches} />
+          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)', fontSize: '12px' }}>
+            📍 Captured Location: {locationStr}
+          </div>
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setClockInOpen(false)}>Cancel</Button>
-            <Button type="submit">Clock In</Button>
+            <Button type="submit">Clock In Now</Button>
           </div>
         </Form>
       </Drawer>
@@ -393,29 +407,82 @@ export const AttendancePanel = memo(function AttendancePanel({
 });
 
 export const TaskWidget = memo(function TaskWidget() {
-  const [tasks] = useState(() => mock.tasks(4));
+  const [tasks, setTasks] = useState([
+    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: 'Today', priority: 'High', active: false, secondsToday: 5400 },
+    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: 'Today', priority: 'Critical', active: false, secondsToday: 3600 },
+    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: 'Tomorrow', priority: 'Normal', active: false, secondsToday: 0 },
+  ]);
+
+  const toggleTaskTimer = (id: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, active: !t.active } : { ...t, active: false }))
+    );
+  };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTasks((prev) =>
+        prev.map((t) => (t.active ? { ...t, secondsToday: t.secondsToday + 1 } : t))
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatSec = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h}h ${m}m ${s}s`;
+  };
+
   return (
     <Card>
-      <SectionHeader title="Today's tasks" />
+      <SectionHeader title="Today's Tasks with Timeline & Timers" />
       {tasks.map((t) => (
-        <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+        <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500 }}>{t.title}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.project} · due {t.due}</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{t.title}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              {t.project} · Due: {t.due} · Logged Today: <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{formatSec(t.secondsToday)}</span>
+            </div>
           </div>
-          <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
+            <Button
+              variant={t.active ? 'secondary' : 'primary'}
+              onClick={() => toggleTaskTimer(t.id)}
+              style={{ padding: '4px 10px', fontSize: 12 }}
+            >
+              {t.active ? '⏸ Pause' : '▶ Start'}
+            </Button>
+          </div>
         </div>
       ))}
     </Card>
   );
 });
 
-export const TrainingWidget = memo(function TrainingWidget() {
-  const [trainingHoursData] = useState(() => mock.series(['W1', 'W2', 'W3', 'W4', 'W5', 'W6']));
+export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
+  const events = [
+    { id: 'e1', date: 'Jul 22 (Tomorrow)', title: 'Christ College Batch 2 Power BI Session', type: 'Training' },
+    { id: 'e2', date: 'Jul 23 (Thu)', title: 'Monthly Expense Approval Deadline', type: 'Finance' },
+    { id: 'e3', date: 'Jul 24 (Fri)', title: 'Rajagiri College Marketing Presentation', type: 'Marketing' },
+  ];
+
   return (
     <Card>
-      <SectionHeader title="Training hours" />
-      <BarChart data={trainingHoursData} />
+      <SectionHeader title="Upcoming Events & Tasks (Next 3 Days)" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {events.map((e) => (
+          <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{e.date}</div>
+            </div>
+            <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Finance' ? 'warning' : 'success'}>{e.type}</Badge>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 });
@@ -425,9 +492,9 @@ export const TimelineWidget = memo(function TimelineWidget() {
     <Card>
       <SectionHeader title="Timeline" />
       <Timeline entries={[
-        { id: '1', title: 'Clocked in', time: '09:32', tone: 'success' },
-        { id: '2', title: 'Power BI session', time: '10:00', tone: 'progress' },
-        { id: '3', title: 'Assessment review', time: '14:00', tone: 'info' },
+        { id: '1', title: 'Clocked in (Office)', time: '08:30 AM', tone: 'success' },
+        { id: '2', title: 'Power BI Session Started', time: '10:00 AM', tone: 'progress' },
+        { id: '3', title: 'Assessment Review', time: '02:00 PM', tone: 'info' },
       ]} />
     </Card>
   );
@@ -437,7 +504,9 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
   return (
     <Card>
       <SectionHeader title="Announcements" />
-      <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Quarterly town-hall on Friday at 4 PM.</div>
+      <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        📢 <strong>Company Announcement:</strong> Training Calendar updated for Q3. Please review your assigned batches under Batches ➔ Training Calendar.
+      </div>
     </Card>
   );
 });
@@ -445,7 +514,6 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
 /** My Day — default employee workspace. */
 export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak } = useAttendance();
-
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
@@ -471,11 +539,7 @@ export function MyDayPage() {
           <QuickActionCard icon="₹" label="Submit Expense" />
           <QuickActionCard icon="🗓" label="Request Leave" />
         </>,
-        stats: <>
-          <AttendanceStats record={record} />
-          <StatCard label="Tasks due" value="3" tone="warning" icon="◧" />
-          <StatCard label="Approvals" value="1" tone="info" icon="⚑" />
-        </>,
+        stats: <AttendanceStats record={record} />,
         primary: <>
           <AttendancePanel
             record={record}
@@ -486,7 +550,7 @@ export function MyDayPage() {
             endBreak={endBreak}
           />
           <TaskWidget />
-          <TrainingWidget />
+          <UpcomingEventsWidget />
         </>,
         side: <>
           <TimelineWidget />

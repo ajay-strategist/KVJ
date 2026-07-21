@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Button } from '../../../shared/ui/components';
+import { PageHeader, Button, Card, SectionHeader } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useTraining } from '../hooks/useTraining';
 import Drawer from '../../../shared/ui/Drawer';
@@ -56,12 +56,31 @@ export function BatchManagement() {
     return c ? c.title : 'Unknown';
   };
 
+  const pipelineSteps = [
+    'Initial Works', 'Photos', 'Training', 'Videos', 'Feedback',
+    'Students Uploaded', 'Mock Test', 'Final Exam', 'Retest',
+    'Report', 'Invoice', 'Payment', 'Retest Amount',
+    'Certificate Printed', 'Certificate Delivered', 'Certificate Delivered Date'
+  ];
+
   const columns: Column<Batch>[] = [
-    { key: 'code', header: 'Batch Code', sortable: true, accessor: (b) => b.code },
-    { key: 'course', header: 'Course', render: (b) => courseTitle(b.courseId) },
-    { key: 'trainer', header: 'Assigned Trainer', render: (b) => trainerName(b.trainerId) },
+    { key: 'code', header: 'College / Batch', sortable: true, render: (b) => <div><strong>{b.code}</strong><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{courseTitle(b.courseId)}</div></div> },
+    { key: 'trainer', header: 'Assigned Trainer & Manager', render: (b) => <div><div>👨‍🏫 {trainerName(b.trainerId)}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>👔 Manager: Operations</div></div> },
     { key: 'dates', header: 'Schedules', render: (b) => `${b.startDate} to ${b.endDate}` },
-    { key: 'capacity', header: 'Capacity', accessor: (b) => String(b.capacity) },
+    { key: 'marketing', header: 'Marketing Converted', render: () => <span className="kvj-badge kvj-badge--success">Yes (Converted)</span> },
+    { key: 'expense', header: 'Total Expense', render: () => <strong>₹ 4,806.00</strong> },
+    { key: 'completion', header: 'Completion %', render: () => <div style={{ fontWeight: 700, color: 'var(--brand)' }}>56%</div> },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: () => (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Button size="sm" variant="secondary" onClick={() => alert('Sending session report to college coordinators...')}>
+            ✉️ Send Report
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   const courseOptions = courses.map((c) => ({ value: c.id, label: `${c.code} - ${c.title}` }));
@@ -70,29 +89,62 @@ export function BatchManagement() {
   return (
     <AppShell>
       <PageHeader
-        title="Batch Scheduling"
-        subtitle="Schedule new classes, assign venues, resources, and trainers"
-        actions={<Button onClick={() => setOpen(true)}>Schedule Batch</Button>}
+        title="Training Details & End-to-End Pipeline"
+        subtitle="16-step process checklist, marketing conversion tracking, and coordinator communication"
+        actions={<Button onClick={() => setOpen(true)}>Schedule New Training Batch</Button>}
       />
+
+      <Card style={{ marginBottom: 16 }}>
+        <SectionHeader title="Active Process Pipelines Overview (Marketing ➔ Certificate Delivery)" />
+        <div style={{ overflowX: 'auto', marginTop: 10 }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#0F4C81', color: 'white', textAlign: 'left' }}>
+                <th style={{ padding: 8 }}>College / Program</th>
+                {pipelineSteps.map((step) => (
+                  <th key={step} style={{ padding: 8, fontSize: 11, whiteSpace: 'nowrap' }}>{step}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: 8, fontWeight: 600 }}>Christ Irinjalakkuda - BCOM Self (Data Analytics)</td>
+                {pipelineSteps.map((step, idx) => (
+                  <td key={step} style={{ padding: 8, textAlign: 'center' }}>
+                    {idx < 7 ? '✅ Yes' : idx === 7 ? '⏳ Pending' : '—'}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: 8, fontWeight: 600 }}>Vimala College - 2 BCA (Excel Expert)</td>
+                {pipelineSteps.map((step, idx) => (
+                  <td key={step} style={{ padding: 8, textAlign: 'center' }}>
+                    {idx < 4 ? '✅ Yes' : '—'}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <DataTable columns={columns} rows={batches} rowKey={(b) => b.id} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Schedule New Training Batch">
         <Form initial={{ capacity: 30 }} onSubmit={handleCreateSubmit}>
           <SelectField name="courseId" label="Course Catalog" options={courseOptions} />
-          <TextField name="code" label="Batch Code Identifier" placeholder="e.g. KVJ-BATCH-2026-A" />
+          <TextField name="code" label="Batch Code Identifier" placeholder="e.g. Christ Irinjalakkuda - BCOM Self Batch 1" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <DatePickerField name="startDate" label="Start Date" />
             <DatePickerField name="endDate" label="End Date" />
           </div>
-          <SelectField name="trainerId" label="Assign Trainer" options={[{ value: '', label: 'Unassigned' }, ...trainerOptions]} />
+          <SelectField name="trainerId" label="Assign Lead Trainer" options={[{ value: '', label: 'Unassigned' }, ...trainerOptions]} />
+          <TextField name="coordinators" label="College Coordinators (Emails, comma separated)" placeholder="coordinator1@christ.edu, coordinator2@christ.edu" />
           <TextField name="capacity" label="Maximum Seat Capacity" />
-          <TextField name="venue" label="Physical Venue Location (Optional)" />
-          <TextField name="onlineLink" label="Online Meeting Link (Optional)" />
 
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit">Schedule Batch</Button>
+            <Button type="submit">Schedule & Send Confirmation Email</Button>
           </div>
         </Form>
       </Drawer>

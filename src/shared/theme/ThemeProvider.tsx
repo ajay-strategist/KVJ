@@ -8,17 +8,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { eventBus } from '../../core/event-bus';
 
-export type ThemeMode = 'light' | 'dark' | 'hud' | 'system';
-export type ResolvedTheme = 'light' | 'dark' | 'hud';
+export type ThemeMode = 'light' | 'dark' | 'hud' | 'hud-light' | 'system';
+export type ResolvedTheme = 'light' | 'dark' | 'hud' | 'hud-light';
 
 /** Cycle order used by the top-bar quick toggle. */
-export const THEME_CYCLE: ResolvedTheme[] = ['light', 'dark', 'hud'];
+export const THEME_CYCLE: ResolvedTheme[] = ['light', 'dark', 'hud', 'hud-light'];
 
 /** Human labels for the theme picker. */
 export const THEME_LABELS: Record<ThemeMode, string> = {
   light: 'Light',
   dark: 'Dark',
-  hud: 'Cockpit',
+  hud: 'Cockpit Dark',
+  'hud-light': 'Cockpit Light',
   system: 'System',
 };
 
@@ -54,7 +55,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const resolved = resolve(next);
     document.documentElement.setAttribute('data-theme', resolved);
     setTheme(resolved);
-    eventBus.emit('theme.changed', { theme: resolved });
+    eventBus.emit('theme.changed', { theme: resolved as any });
   }, []);
 
   const setMode = useCallback((next: ThemeMode) => {

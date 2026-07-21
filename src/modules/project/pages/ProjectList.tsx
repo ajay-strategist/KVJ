@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Button } from '../../../shared/ui/components';
+import { PageHeader, Button, Card, SectionHeader } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useProject } from '../hooks/useProject';
 import Drawer from '../../../shared/ui/Drawer';
@@ -57,15 +57,19 @@ export function ProjectList() {
     return c ? c.name : 'Independent';
   };
 
+  const sampleWorkLogs = [
+    { date: '21/07/26', task: 'Supabase Database Schema Setup', description: 'Wired migrations for roles and feature updates', supervisor: 'Manager (Operations)', reviewStatus: 'Under Review', currentStatus: 'In Progress', duration: '3h 30m' },
+    { date: '20/07/26', task: 'AppShell Icon Performance Fix', description: 'Replaced font icons with inline SVGs', supervisor: 'CEO', reviewStatus: 'Approved', currentStatus: 'Completed', duration: '2h 15m' },
+    { date: '19/07/26', task: 'ERP Module Refactoring', description: 'Updated state management and router definitions', supervisor: 'Manager (Operations)', reviewStatus: 'Approved', currentStatus: 'Completed', duration: '5h 00m' },
+  ];
+
   const columns: Column<Project>[] = [
-    { key: 'code', header: 'Code', sortable: true, accessor: (p) => p.code },
+    { key: 'code', header: 'Code & Client', sortable: true, render: (p) => <div><strong>{p.code}</strong><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Client: {clientName(p.clientId)}</div></div> },
     { key: 'title', header: 'Project Title', sortable: true, accessor: (p) => p.title },
-    { key: 'client', header: 'Client', render: (p) => clientName(p.clientId) },
+    { key: 'supervisor', header: 'Supervisor', render: () => <span>Manager (Operations)</span> },
+    { key: 'hours', header: 'Hours (Total / Logged)', render: (p) => <strong>{p.estimatedHours || 120}h / 42h</strong> },
     { key: 'status', header: 'Status', render: (p) => (
       <span className={`kvj-badge kvj-badge--${p.status === 'execution' ? 'success' : 'neutral'}`}>{p.status}</span>
-    )},
-    { key: 'priority', header: 'Priority', render: (p) => (
-      <span style={{ fontWeight: 600, textTransform: 'capitalize', color: p.priority === 'critical' ? 'var(--status-danger)' : 'var(--text-primary)' }}>{p.priority}</span>
     )},
     { key: 'action', header: 'Actions', render: (p) => (
       <Button size="sm" variant="secondary" onClick={() => { setSelectedProjectId(p.id); setMilestoneOpen(true); }}>
@@ -79,45 +83,65 @@ export function ProjectList() {
   return (
     <AppShell>
       <PageHeader
-        title="Project Catalog"
-        subtitle="Manage master project files, milestones, and deliverables"
-        actions={<Button onClick={() => setProjectOpen(true)}>Create Project</Button>}
+        title="Project Catalog & Work Logs"
+        subtitle="Manage client projects, supervisor assignments, total hours, and review status"
+        actions={<Button onClick={() => setProjectOpen(true)}>Create Master Project</Button>}
       />
 
       <DataTable columns={columns} rows={projects} rowKey={(p) => p.id} loading={loading} />
+
+      {/* Tabular Work Log section (Newest to Oldest) */}
+      <Card style={{ marginTop: 24 }}>
+        <SectionHeader title="Project Work Log (Newest to Oldest)" />
+        <div style={{ overflowX: 'auto', marginTop: 12 }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: 8 }}>Date</th>
+                <th style={{ padding: 8 }}>Task</th>
+                <th style={{ padding: 8 }}>Description</th>
+                <th style={{ padding: 8 }}>Supervisor</th>
+                <th style={{ padding: 8 }}>Review Status</th>
+                <th style={{ padding: 8 }}>Current Status</th>
+                <th style={{ padding: 8 }}>Duration</th>
+                <th style={{ padding: 8 }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleWorkLogs.map((wl, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8, fontWeight: 600 }}>{wl.date}</td>
+                  <td style={{ padding: 8, fontWeight: 600 }}>{wl.task}</td>
+                  <td style={{ padding: 8, color: 'var(--text-secondary)' }}>{wl.description}</td>
+                  <td style={{ padding: 8 }}>{wl.supervisor}</td>
+                  <td style={{ padding: 8 }}>
+                    <span className={`kvj-badge kvj-badge--${wl.reviewStatus === 'Approved' ? 'success' : 'warning'}`}>
+                      {wl.reviewStatus}
+                    </span>
+                  </td>
+                  <td style={{ padding: 8 }}>{wl.currentStatus}</td>
+                  <td style={{ padding: 8, fontWeight: 600 }}>{wl.duration}</td>
+                  <td style={{ padding: 8 }}>
+                    {wl.reviewStatus === 'Under Review' && (
+                      <Button size="sm" onClick={() => alert('Marked task officially completed by Manager/CEO!')}>
+                        Approve Completion
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <Drawer open={projectOpen} onClose={() => setProjectOpen(false)} title="Create Master Project">
         <Form initial={{ status: 'initiation', priority: 'medium' }} onSubmit={handleCreateSubmit}>
           <TextField name="title" label="Project Title" />
           <TextField name="code" label="Project Code" placeholder="e.g. KVJ-PROJ-ABC" />
-          <SelectField name="clientId" label="Assign Client (Optional)" options={[{ value: '', label: 'None (Independent)' }, ...clientOptions]} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <TextField name="category" label="Category" placeholder="e.g. Software development" />
-            <TextField name="type" label="Contract Type" placeholder="e.g. Fixed Price" />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <SelectField
-              name="status"
-              label="Status"
-              options={[
-                { value: 'initiation', label: 'Initiation' },
-                { value: 'planning', label: 'Planning' },
-                { value: 'execution', label: 'Execution' },
-                { value: 'closure', label: 'Closure' },
-              ]}
-            />
-            <SelectField
-              name="priority"
-              label="Priority"
-              options={[
-                { value: 'low', label: 'Low' },
-                { value: 'medium', label: 'Medium' },
-                { value: 'high', label: 'High' },
-                { value: 'critical', label: 'Critical' },
-              ]}
-            />
-          </div>
-          <TextField name="estimatedHours" label="Estimated Hours" placeholder="e.g. 120" />
+          <SelectField name="clientId" label="Assign Client" options={[{ value: '', label: 'None (Independent)' }, ...clientOptions]} />
+          <TextField name="estimatedHours" label="Total Estimated Project Hours" placeholder="e.g. 120" />
+          <TextField name="supervisor" label="Assign Project Supervisor" placeholder="Manager (Operations)" />
 
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setProjectOpen(false)}>Cancel</Button>

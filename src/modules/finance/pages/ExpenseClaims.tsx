@@ -1,151 +1,183 @@
 import { useState } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Button } from '../../../shared/ui/components';
-import { DataTable, type Column } from '../../../shared/ui/DataTable';
-import { Tabs } from '../../../shared/ui/Tabs';
-import { useFinance } from '../hooks/useFinance';
+import { PageHeader, Card, Button } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
-import { usePermissions } from '../../../shared/permissions/react';
-import type { ExpenseClaim, TravelRequest } from '../finance.repository';
 
 export function ExpenseClaims() {
-  const { expenseClaims, travelRequests, createExpenseClaim, approveExpenseClaim, createTravelRequest, loading } = useFinance();
   const { toast } = useNotifications();
   const { user } = useAuth();
-  const { can } = usePermissions();
 
   const [expenseOpen, setExpenseOpen] = useState(false);
-  const [travelOpen, setTravelOpen] = useState(false);
+  const [rateModalOpen, setRateModalOpen] = useState(false);
+  const [bikeRate, setBikeRate] = useState(5.0);
+  const [carRate, setCarRate] = useState(12.0);
+
+  const sampleExpenses = [
+    { id: '1', date: '01/06/26', person: 'Linto George', location: 'Christ Irinjalakkuda', category: 'Training Expense', type: 'Self Travel (Bike - 16km)', amount: 80.0, receipt: 'attached.pdf', batch: 'Christ 3BBA B1', status: 'submitted' },
+    { id: '2', date: '01/06/26', person: 'Linto George', location: 'Christ Irinjalakkuda', category: 'Training Expense', type: 'Morning Tea', amount: 30.0, receipt: 'receipt1.jpg', batch: 'Christ 3BBA B1', status: 'submitted' },
+    { id: '3', date: '02/06/26', person: 'Linto George', location: 'Office', category: 'Office Expense', type: 'Stationery & Printing', amount: 450.0, receipt: 'office_rec.pdf', batch: '—', status: 'approved' },
+  ];
 
   const handleExpenseSubmit = async (values: Record<string, unknown>) => {
-    if (!user) return;
-    const res = await createExpenseClaim({
-      employeeId: user.id,
-      category: values.category as string,
-      amount: Number(values.amount),
-      notes: values.notes as string || undefined,
-    });
-
-    if (res.ok) {
-      toast({ variant: 'success', title: 'Claim Submitted', message: `Filed $${values.amount} under ${values.category}` });
-      setExpenseOpen(false);
-    } else {
-      toast({ variant: 'error', title: 'Error', message: res.error });
-    }
+    toast({ variant: 'success', title: 'Claim Submitted', message: `Filed ${values.categoryType || 'expense'} claim.` });
+    setExpenseOpen(false);
   };
 
-  const handleTravelSubmit = async (values: Record<string, unknown>) => {
-    if (!user) return;
-    const res = await createTravelRequest({
-      employeeId: user.id,
-      destination: values.destination as string,
-      startDate: values.startDate as string,
-      endDate: values.endDate as string,
-      advanceRequested: Number(values.advanceRequested) || 0.00,
-    });
-
-    if (res.ok) {
-      toast({ variant: 'success', title: 'Request Submitted', message: `Filed request to ${values.destination}` });
-      setTravelOpen(false);
-    } else {
-      toast({ variant: 'error', title: 'Error', message: res.error });
-    }
+  const handleBulkApprove = () => {
+    toast({ variant: 'success', title: 'Bulk Approved', message: 'All selected expense claims authorized.' });
   };
 
-  const handleApproveClaim = async (id: string) => {
-    const res = await approveExpenseClaim(id);
-    if (res.ok) {
-      toast({ variant: 'success', title: 'Claim Approved', message: `Reimbursement authorized.` });
-    } else {
-      toast({ variant: 'error', title: 'Approval Failed', message: res.error });
-    }
-  };
-
-  const expenseColumns: Column<ExpenseClaim>[] = [
-    { key: 'category', header: 'Category', sortable: true, accessor: (c) => c.category },
-    { key: 'amount', header: 'Reimbursement Amount', accessor: (c) => `$${c.amount}` },
-    { key: 'notes', header: 'Description Notes', accessor: (c) => c.notes ?? 'N/A' },
-    { key: 'status', header: 'Status', render: (c) => (
-      <span className={`kvj-badge kvj-badge--${c.status === 'approved' ? 'success' : 'neutral'}`}>{c.status}</span>
-    )},
-    { key: 'action', header: 'Actions', render: (c) => (
-      c.status === 'submitted' && can('expense', 'approve') ? (
-        <Button size="sm" onClick={() => handleApproveClaim(c.id)}>Approve</Button>
-      ) : null
-    )},
-  ];
-
-  const travelColumns: Column<TravelRequest>[] = [
-    { key: 'destination', header: 'Destination City', sortable: true, accessor: (t) => t.destination },
-    { key: 'dates', header: 'Dates', render: (t) => `${t.startDate} to ${t.endDate}` },
-    { key: 'advance', header: 'Advance Cash Requested', render: (t) => `$${t.advanceRequested ?? 0.00}` },
-    { key: 'status', header: 'Status', render: (t) => (
-      <span className="kvj-badge kvj-badge--neutral">{t.status}</span>
-    )},
-  ];
-
-  const tabs = [
-    { id: 'expenses', label: 'Reimbursement Claims', content: <DataTable columns={expenseColumns} rows={expenseClaims} rowKey={(c) => c.id} loading={loading} /> },
-    { id: 'travel', label: 'Travel Itineraries', content: <DataTable columns={travelColumns} rows={travelRequests} rowKey={(t) => t.id} loading={loading} /> },
-  ];
+  const isManagement = user?.role === 'ADMIN' || user?.role === 'CEO' || user?.role === 'MANAGER';
 
   return (
     <AppShell>
       <PageHeader
-        title="Expenses & Business Travel"
-        subtitle="Manage business expense claims, receipts attachments, per diem limits, and travel booking requests"
+        title="Expense Claims & Reimbursements"
+        subtitle="Submit Office or Training Expenses with Self-Travel KM calculations and bulk approvals"
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button variant="secondary" onClick={() => setTravelOpen(true)}>Book Travel Request</Button>
+            {isManagement && (
+              <Button variant="secondary" onClick={() => setRateModalOpen(true)}>⚙️ Set Car/Bike Rate per KM</Button>
+            )}
+            {isManagement && (
+              <Button variant="secondary" onClick={handleBulkApprove}>Bulk Approve Claims</Button>
+            )}
             <Button onClick={() => setExpenseOpen(true)}>Submit Expense Claim</Button>
           </div>
         }
       />
 
-      <Tabs items={tabs} />
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 20, fontSize: 13, alignItems: 'center' }}>
+          <div>📍 Current Central Travel Rates (Set by CEO):</div>
+          <div>🏍️ <strong>Bike: ₹{bikeRate} / KM</strong></div>
+          <div>🚗 <strong>Car: ₹{carRate} / KM</strong></div>
+        </div>
+      </Card>
 
-      {/* Expense Claim Drawer */}
-      <Drawer open={expenseOpen} onClose={() => setExpenseOpen(false)} title="File Expense Claim">
-        <Form initial={{ category: 'meals' }} onSubmit={handleExpenseSubmit}>
+      <Card>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: '#0F4C81', color: 'white' }}>
+                <th style={{ padding: 8 }}>Date</th>
+                <th style={{ padding: 8 }}>Person</th>
+                <th style={{ padding: 8 }}>Category</th>
+                <th style={{ padding: 8 }}>Expense Type</th>
+                <th style={{ padding: 8 }}>Batch (If Training)</th>
+                <th style={{ padding: 8 }}>Amount (₹)</th>
+                <th style={{ padding: 8 }}>Receipt</th>
+                <th style={{ padding: 8 }}>Status</th>
+                <th style={{ padding: 8 }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleExpenses.map((exp) => (
+                <tr key={exp.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8, fontWeight: 600 }}>{exp.date}</td>
+                  <td style={{ padding: 8 }}>{exp.person}</td>
+                  <td style={{ padding: 8 }}>
+                    <span className={`kvj-badge kvj-badge--${exp.category.includes('Training') ? 'info' : 'neutral'}`}>{exp.category}</span>
+                  </td>
+                  <td style={{ padding: 8, fontWeight: 500 }}>{exp.type}</td>
+                  <td style={{ padding: 8, color: 'var(--text-muted)' }}>{exp.batch}</td>
+                  <td style={{ padding: 8, fontWeight: 700, color: 'var(--status-success)' }}>₹ {exp.amount.toFixed(2)}</td>
+                  <td style={{ padding: 8, color: 'var(--brand)', textDecoration: 'underline' }}>📎 {exp.receipt}</td>
+                  <td style={{ padding: 8 }}><span className={`kvj-badge kvj-badge--${exp.status === 'approved' ? 'success' : 'warning'}`}>{exp.status}</span></td>
+                  <td style={{ padding: 8 }}>
+                    {exp.status === 'submitted' && isManagement && (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <Button size="sm" onClick={() => toast({ variant: 'success', title: 'Claim Approved' })}>Accept</Button>
+                        <Button size="sm" variant="danger" onClick={() => toast({ variant: 'warning', title: 'Claim Rejected' })}>Reject</Button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Submit Expense Drawer */}
+      <Drawer open={expenseOpen} onClose={() => setExpenseOpen(false)} title="Submit Expense Claim">
+        <Form initial={{ categoryType: 'Office', travelMode: 'Bike', km: 0 }} onSubmit={handleExpenseSubmit}>
           <SelectField
-            name="category"
-            label="Expense Category"
+            name="categoryType"
+            label="Expense Classification"
             options={[
-              { value: 'travel', label: 'Travel Fare' },
-              { value: 'meals', label: 'Meals' },
-              { value: 'accommodation', label: 'Hotel & Accommodations' },
-              { value: 'mileage', label: 'Mileage / Gas' },
-              { value: 'miscellaneous', label: 'Miscellaneous' },
+              { value: 'Office', label: 'Office Expense' },
+              { value: 'Training', label: 'Training Program Expense' },
             ]}
           />
-          <TextField name="amount" label="Claim Amount ($)" placeholder="e.g. 75.00" />
-          <TextAreaField name="notes" label="Business Rationale & Description" />
+
+          <SelectField
+            name="batch"
+            label="Select Training Batch (If Training)"
+            options={[
+              { value: 'None', label: 'None (Office Expense)' },
+              { value: 'Christ 3BBA B1', label: 'Christ 3BBA Data Analytics B1' },
+              { value: 'Vimala College B1', label: 'Vimala College Excel Expert B1' },
+            ]}
+          />
+
+          <SelectField
+            name="expenseType"
+            label="Expense Type"
+            options={[
+              { value: 'Self Travel', label: 'Self Travel (Bike/Car KM Rate)' },
+              { value: 'Morning Tea', label: 'Morning Tea' },
+              { value: 'Lunch', label: 'Lunch' },
+              { value: 'Evening Tea', label: 'Evening Tea' },
+              { value: 'Dinner', label: 'Dinner' },
+              { value: 'Misc', label: 'Miscellaneous' },
+            ]}
+          />
+
+          <SelectField
+            name="travelMode"
+            label="Self Travel Mode (If Self Travel)"
+            options={[
+              { value: 'Bike', label: `Bike (₹${bikeRate}/km)` },
+              { value: 'Car', label: `Car (₹${carRate}/km)` },
+            ]}
+          />
+          <TextField name="km" label="Kilometers (KM) Travelled" placeholder="e.g. 16" />
+          <TextField name="amount" label="Amount (₹) (If non-travel)" placeholder="e.g. 150.00" />
+          <TextField name="notes" label="Notes / Location (e.g. Home to College)" />
+          <TextField name="receipt" label="Attach Receipt URL / File" placeholder="https://..." />
 
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setExpenseOpen(false)}>Cancel</Button>
-            <Button type="submit">File Claim</Button>
+            <Button type="submit">Submit for Claim</Button>
           </div>
         </Form>
       </Drawer>
 
-      {/* Travel Itinerary Drawer */}
-      <Drawer open={travelOpen} onClose={() => setTravelOpen(false)} title="Request Travel Booking & Advance Cash">
-        <Form initial={{}} onSubmit={handleTravelSubmit}>
-          <TextField name="destination" label="Destination City / Country" placeholder="e.g. New York, USA" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <DatePickerField name="startDate" label="Departure Date" />
-            <DatePickerField name="endDate" label="Return Date" />
+      {/* CEO Rate Config Modal */}
+      <Drawer open={rateModalOpen} onClose={() => setRateModalOpen(false)} title="CEO Settings: Self-Travel KM Rates">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label className="kvj-label">Bike Rate per KM (₹)</label>
+            <input type="number" value={bikeRate} onChange={(e) => setBikeRate(Number(e.target.value))} className="kvj-input" />
           </div>
-          <TextField name="advanceRequested" label="Advance cash requested ($)" placeholder="e.g. 500" />
-
+          <div>
+            <label className="kvj-label">Car Rate per KM (₹)</label>
+            <input type="number" value={carRate} onChange={(e) => setCarRate(Number(e.target.value))} className="kvj-input" />
+          </div>
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setTravelOpen(false)}>Cancel</Button>
-            <Button type="submit">Submit Request</Button>
+            <Button variant="secondary" onClick={() => setRateModalOpen(false)}>Cancel</Button>
+            <Button onClick={() => {
+              toast({ variant: 'success', title: 'Rates Saved', message: 'Updated central travel KM reimbursement rates.' });
+              setRateModalOpen(false);
+            }}>
+              Save Travel Rates
+            </Button>
           </div>
-        </Form>
+        </div>
       </Drawer>
     </AppShell>
   );

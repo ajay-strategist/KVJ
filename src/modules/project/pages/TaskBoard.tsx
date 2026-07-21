@@ -58,13 +58,58 @@ export function TaskBoard() {
   const projectOptions = projects.map((p) => ({ value: p.id, label: p.title }));
   const employeeOptions = employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` }));
 
+  const [workLogOpen, setWorkLogOpen] = useState(false);
+
+  const sampleTaskLogs = [
+    { date: '21/07/26', task: 'Monthly GST Filing', description: 'Office Task (Recurring 21st)', project: 'Internal Admin', supervisor: 'CEO', reviewStatus: 'Approved', currentStatus: 'Completed', duration: '2h 00m' },
+    { date: '21/07/26', task: 'Server Log Maintenance', description: 'Office Task (Single Day)', project: 'IT Infrastructure', supervisor: 'Manager (Operations)', reviewStatus: 'Approved', currentStatus: 'Completed', duration: '1h 30m' },
+  ];
+
   return (
     <AppShell>
       <PageHeader
-        title="Project Task Board"
-        subtitle="Manage sprint tasks, Kanban swimlanes, and assignees"
-        actions={<Button onClick={() => setOpen(true)}>Create Task</Button>}
+        title="Project & Office Task Board"
+        subtitle="Manage sprint tasks, single-day / recurring office tasks, and work logs"
+        actions={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="secondary" onClick={() => setWorkLogOpen(true)}>📋 View Work Log</Button>
+            <Button onClick={() => setOpen(true)}>Create Task</Button>
+          </div>
+        }
       />
+
+      <Drawer open={workLogOpen} onClose={() => setWorkLogOpen(false)} title="Task Work Log (Tabular View)">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: 8 }}>Date</th>
+                <th style={{ padding: 8 }}>Task</th>
+                <th style={{ padding: 8 }}>Description</th>
+                <th style={{ padding: 8 }}>Project</th>
+                <th style={{ padding: 8 }}>Supervisor</th>
+                <th style={{ padding: 8 }}>Review Status</th>
+                <th style={{ padding: 8 }}>Current Status</th>
+                <th style={{ padding: 8 }}>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleTaskLogs.map((tl, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8, fontWeight: 600 }}>{tl.date}</td>
+                  <td style={{ padding: 8, fontWeight: 600 }}>{tl.task}</td>
+                  <td style={{ padding: 8 }}>{tl.description}</td>
+                  <td style={{ padding: 8 }}>{tl.project}</td>
+                  <td style={{ padding: 8 }}>{tl.supervisor}</td>
+                  <td style={{ padding: 8 }}><span className="kvj-badge kvj-badge--success">{tl.reviewStatus}</span></td>
+                  <td style={{ padding: 8 }}>{tl.currentStatus}</td>
+                  <td style={{ padding: 8, fontWeight: 600 }}>{tl.duration}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Drawer>
 
       <div style={{ maxWidth: 320, marginBottom: 24 }}>
         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Filter by Project</label>

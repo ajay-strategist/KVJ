@@ -143,6 +143,48 @@
   color-scheme: dark;
 }
 
+/* COCKPIT LIGHT — high-contrast frosted glass light theme with HUD indicators */
+[data-theme='hud-light'] {
+  --brand: #0284C7;
+  --brand-hover: #0369A1;
+  --brand-contrast: #FFFFFF;
+  --accent: #EA580C;
+
+  --app-canvas:
+    radial-gradient(1200px 620px at 12% -12%, rgba(2, 132, 199, .15), transparent 60%),
+    radial-gradient(900px 520px at 92% -4%, rgba(234, 88, 12, .12), transparent 55%),
+    linear-gradient(180deg, #F0F7FB 0%, #E6F0F6 55%, #DEEAF2 100%);
+
+  --bg-app: #EAF2F8;
+  --bg-surface: rgba(255, 255, 255, 0.75);
+  --bg-panel: rgba(255, 255, 255, 0.88);
+  --bg-sunken: rgba(215, 230, 242, 0.65);
+  --bg-hover: rgba(2, 132, 199, 0.08);
+
+  --border: rgba(2, 132, 199, 0.28);
+  --border-strong: rgba(2, 132, 199, 0.52);
+
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+
+  --status-success: #16A34A;  --status-success-bg: rgba(22, 163, 74, 0.12);
+  --status-warning: #D97706;  --status-warning-bg: rgba(217, 119, 6, 0.14);
+  --status-danger:  #DC2626;  --status-danger-bg:  rgba(220, 38, 38, 0.14);
+  --status-info:    #0284C7;  --status-info-bg:    rgba(2, 132, 199, 0.14);
+  --status-progress:#EA580C;  --status-progress-bg:rgba(234, 88, 12, 0.14);
+  --status-neutral: #64748B;  --status-neutral-bg: rgba(100, 116, 139, 0.12);
+
+  --focus-ring: rgba(2, 132, 199, 0.45);
+
+  --e1: 0 0 0 1px rgba(2, 132, 199, 0.12), 0 2px 8px rgba(15, 23, 42, .06);
+  --e2: 0 0 0 1px rgba(2, 132, 199, 0.16), 0 8px 24px rgba(15, 23, 42, .09);
+  --e3: 0 0 0 1px rgba(2, 132, 199, 0.20), 0 16px 36px rgba(15, 23, 42, .13);
+  --e4: 0 0 0 1px rgba(2, 132, 199, 0.24), 0 26px 56px rgba(15, 23, 42, .17);
+
+  color-scheme: light;
+}
+
 /* Theme-independent scales -------------------------------------------------- */
 :root {
   /* Spacing (4px grid) */
