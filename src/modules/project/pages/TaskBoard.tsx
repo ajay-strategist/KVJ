@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PageHeader, Card, Button, SectionHeader, Badge } from '../../../shared/ui/components';
+import { PageHeader, Card, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -38,7 +38,6 @@ export function TaskBoard() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
-  const [taskLogOpen, setTaskLogOpen] = useState(false);
   const [timeEntryOpen, setTimeEntryOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
 
@@ -128,7 +127,6 @@ export function TaskBoard() {
     if (dateWindowFilter === 'today') {
       if (t.dueDate !== todayStr) return false;
     } else if (dateWindowFilter === 'next_3_days') {
-      // 2026-07-21 to 2026-07-24 inclusive
       const d = new Date(t.dueDate);
       const start = new Date('2026-07-21');
       const end = new Date('2026-07-24');
@@ -215,28 +213,42 @@ export function TaskBoard() {
     toast({ variant: 'success', title: 'Entry Approved', message: 'Work log entry approved.' });
   };
 
+  const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr).length;
+  const totalHoursSum = tasksList.reduce((acc, t) => acc + t.totalHoursWorked, 0);
+
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <PageHeader
-        title="Tasks Panel & Daily Time Entries"
-        subtitle="Track office and project tasks, supervisor/assignee daily time entries, and role-based work logs"
-        actions={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Button variant="secondary" onClick={() => setTaskLogOpen(true)}>
-              📋 Task Work Log
-            </Button>
-            <Button onClick={() => setCreateTaskOpen(true)}>Create Task</Button>
-          </div>
-        }
+        title="Tasks Dashboard & Daily Time Entries"
+        subtitle="Track office and project tasks, supervisor & assignee time entries, and due date schedules"
+        actions={<Button onClick={() => setCreateTaskOpen(true)}>➕ Create Task</Button>}
       />
 
+      {/* Modern Top KPI Dashboard Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks In View</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
+        </Card>
+
+        <Card style={{ borderLeft: '4px solid var(--status-danger)', padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due Today</div>
+        </Card>
+
+        <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)} hrs</div>
+        </Card>
+      </div>
+
       {/* Filters & Sorting Control Bar */}
-      <Card style={{ marginBottom: 20, padding: 14 }}>
+      <Card style={{ padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             {/* Category Filter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>🏷 Task Type:</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>🏷 Task Type:</span>
               <select
                 className="kvj-select"
                 value={categoryFilter}
@@ -251,7 +263,7 @@ export function TaskBoard() {
 
             {/* Date Window Filter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>📅 Date Window:</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>📅 Date Window:</span>
               <select
                 className="kvj-select"
                 value={dateWindowFilter}
@@ -266,7 +278,7 @@ export function TaskBoard() {
 
             {/* Due Date Sort Order */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>⏳ Sort by Due Date:</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>⏳ Sort by Due Date:</span>
               <button
                 type="button"
                 className="kvj-button"
@@ -377,54 +389,6 @@ export function TaskBoard() {
           </Card>
         ))}
       </div>
-
-      {/* Task Work Log Drawer Modal (Role-Based Work Logs & Hours Worked) */}
-      <Drawer open={taskLogOpen} onClose={() => setTaskLogOpen(false)} title="Role-Based Task Work Log">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Comprehensive audit log of all logged daily time entries, differentiating between <strong>Assignee</strong> and <strong>Supervisor</strong> roles.
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: 8 }}>Date</th>
-                  <th style={{ padding: 8 }}>Task Name</th>
-                  <th style={{ padding: 8 }}>Employee / Logged By</th>
-                  <th style={{ padding: 8 }}>Role</th>
-                  <th style={{ padding: 8 }}>Description</th>
-                  <th style={{ padding: 8, textAlign: 'right' }}>Hours Worked</th>
-                  <th style={{ padding: 8 }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasksList.flatMap((t) =>
-                  t.dailyTimeEntries.map((e) => (
-                    <tr key={e.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: 8, fontWeight: 600 }}>{e.date}</td>
-                      <td style={{ padding: 8, fontWeight: 600 }}>{t.name}</td>
-                      <td style={{ padding: 8 }}>{e.loggedByName}</td>
-                      <td style={{ padding: 8 }}>
-                        <Badge tone={e.loggedByRole === 'Supervisor' ? 'info' : 'neutral'}>
-                          {e.loggedByRole}
-                        </Badge>
-                      </td>
-                      <td style={{ padding: 8 }}>{e.description}</td>
-                      <td style={{ padding: 8, textAlign: 'right', fontWeight: 700, color: 'var(--brand)' }}>{e.durationHrs} hrs</td>
-                      <td style={{ padding: 8 }}>
-                        <Badge tone={e.status === 'Approved' ? 'success' : 'warning'}>
-                          {e.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </Drawer>
 
       {/* Log Daily Time Entry Modal */}
       {selectedTask && (

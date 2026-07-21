@@ -235,6 +235,26 @@ export function ProjectList() {
         }
       />
 
+      {/* Top KPI Dashboard Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Projects In View</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{filteredProjects.length} Projects</div>
+        </Card>
+
+        <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Member Hours</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {filteredProjects.reduce((acc, p) => acc + p.totalHours, 0).toFixed(1)} hrs</div>
+        </Card>
+
+        <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
+            {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
+          </div>
+        </Card>
+      </div>
+
       {/* Filter Control Bar */}
       <Card style={{ marginBottom: 20, padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
