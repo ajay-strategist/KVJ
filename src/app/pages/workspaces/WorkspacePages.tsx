@@ -368,7 +368,6 @@ export interface TaskItem {
   project: string;
   due: string;
   priority: string;
-  progress: number;
   active: boolean;
   underReview?: boolean;
   secondsToday: number;
@@ -377,16 +376,12 @@ export interface TaskItem {
 export const TaskWidget = memo(function TaskWidget({
   tasks,
   setTasks,
-  onTaskStart,
-  onTaskPause,
-  onTaskEnd,
+  onToggleTask,
   onSubmitReview,
 }: {
   tasks: TaskItem[];
   setTasks: React.Dispatch<React.SetStateAction<TaskItem[]>>;
-  onTaskStart: (id: string, taskTitle: string) => void;
-  onTaskPause: (id: string, taskTitle: string) => void;
-  onTaskEnd: (id: string, taskTitle: string) => void;
+  onToggleTask: (id: string, taskTitle: string, currentActive: boolean) => void;
   onSubmitReview: (id: string, taskTitle: string) => void;
 }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -444,7 +439,7 @@ export const TaskWidget = memo(function TaskWidget({
               gap: 10,
             }}
           >
-            {/* Task Header & Details (No bottom line separator between tasks) */}
+            {/* Task Details Header — No blue progress bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
@@ -461,61 +456,39 @@ export const TaskWidget = memo(function TaskWidget({
               </div>
             </div>
 
-            {/* Total Hours Worked & Progress Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
-                <div style={{ width: `${t.progress}%`, height: '100%', background: t.underReview ? 'var(--status-success)' : 'var(--brand)', transition: 'width 0.3s ease' }} />
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{t.progress}% Complete</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
-                ⏱ Total Hours Worked: {formatSec(t.secondsToday)}
+            {/* Display "Hours " instead of Total Hours Worked & progress bar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+                ⏱ Hours: {formatSec(t.secondsToday)}
               </span>
-            </div>
 
-            {/* Action Buttons: Start, Pause, End, Submit Review */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
-              {!t.underReview && (
-                <>
-                  <Button
-                    variant={t.active ? 'secondary' : 'primary'}
-                    onClick={() => onTaskStart(t.id, t.title)}
-                    disabled={t.active}
-                    style={{ padding: '4px 10px', fontSize: 12 }}
-                  >
-                    ▶ Start
-                  </Button>
+              {/* Action Buttons: Single Toggle Button (Start / Pause) & Submit */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!t.underReview && (
+                  <>
+                    <Button
+                      variant={t.active ? 'secondary' : 'primary'}
+                      onClick={() => onToggleTask(t.id, t.title, t.active)}
+                      style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                    >
+                      {t.active ? '⏸ Pause' : '▶ Start'}
+                    </Button>
 
-                  <Button
-                    variant="secondary"
-                    onClick={() => onTaskPause(t.id, t.title)}
-                    disabled={!t.active}
-                    style={{ padding: '4px 10px', fontSize: 12 }}
-                  >
-                    ⏸ Pause
-                  </Button>
+                    <Button
+                      onClick={() => onSubmitReview(t.id, t.title)}
+                      style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                    >
+                      📩 Submit
+                    </Button>
+                  </>
+                )}
 
-                  <Button
-                    variant="secondary"
-                    onClick={() => onTaskEnd(t.id, t.title)}
-                    style={{ padding: '4px 10px', fontSize: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
-                  >
-                    ⏹ End
-                  </Button>
-
-                  <Button
-                    onClick={() => onSubmitReview(t.id, t.title)}
-                    style={{ padding: '4px 10px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
-                  >
-                    📩 Submit Review
-                  </Button>
-                </>
-              )}
-
-              {t.underReview && (
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
-                  ✓ Submitted for Manager/CEO Approval
-                </span>
-              )}
+                {t.underReview && (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
+                    ✓ Submitted for Manager Approval
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -602,8 +575,8 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
   );
 });
 
-/** Resized Stat Pill matching quick action button height */
-function CompactStatPill({ label, value, tone = 'neutral', icon }: { label: string; value: string; tone?: 'success' | 'warning' | 'info' | 'danger' | 'neutral'; icon?: string }) {
+/** Resized Stat Pill matching exact height (64px) & style of QuickActionCard */
+function ResizedStatPill({ label, value, tone = 'neutral', icon }: { label: string; value: string; tone?: 'success' | 'warning' | 'info' | 'danger' | 'neutral'; icon?: string }) {
   const colorMap = {
     success: 'var(--status-success)',
     warning: 'var(--status-warning)',
@@ -612,22 +585,23 @@ function CompactStatPill({ label, value, tone = 'neutral', icon }: { label: stri
     neutral: 'var(--brand)',
   };
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      padding: '8px 12px',
-      background: 'var(--bg-surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)',
-      height: 52,
-    }}>
-      {icon && <span style={{ fontSize: 18, color: colorMap[tone] }}>{icon}</span>}
-      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{label}</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>{value}</span>
+    <div className="kvj-card" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', height: 66 }}>
+      {icon && <span className={`kvj-badge kvj-badge--${tone}`} style={{ width: 32, height: 32, borderRadius: 10, justifyContent: 'center', padding: 0, flexShrink: 0, fontSize: 16 }}>{icon}</span>}
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{label}</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
       </div>
     </div>
+  );
+}
+
+/** Resized QuickAction matching exact height (66px) */
+function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
+  return (
+    <button onClick={onClick} className="kvj-card kvj-card--hover" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', border: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-primary)', height: 66, width: '100%' }}>
+      <span className="kvj-badge kvj-badge--progress" style={{ width: 32, height: 32, borderRadius: 10, justifyContent: 'center', padding: 0, flexShrink: 0, fontSize: 16 }}>{icon}</span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
+    </button>
   );
 }
 
@@ -638,9 +612,9 @@ export function MyDayPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const [tasks, setTasks] = useState<TaskItem[]>([
-    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: '21/07/2026', priority: 'High', progress: 65, active: false, secondsToday: 5400 },
-    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: '21/07/2026', priority: 'Critical', progress: 40, active: false, secondsToday: 3600 },
-    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: '22/07/2026', priority: 'Normal', progress: 10, active: false, secondsToday: 0 },
+    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: '21/07/2026', priority: 'High', active: false, secondsToday: 5400 },
+    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: '21/07/2026', priority: 'Critical', active: false, secondsToday: 3600 },
+    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: '22/07/2026', priority: 'Normal', active: false, secondsToday: 0 },
   ]);
 
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([
@@ -657,43 +631,30 @@ export function MyDayPage() {
     ]);
   };
 
-  const handleTaskStart = (id: string, taskTitle: string) => {
+  const handleToggleTask = (id: string, taskTitle: string, currentActive: boolean) => {
+    const nextActive = !currentActive;
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: true, underReview: false } : { ...t, active: false }))
+      prev.map((t) => (t.id === id ? { ...t, active: nextActive } : { ...t, active: false }))
     );
-    handleActivityLog(`Started Task: ${taskTitle}`, 'progress');
-  };
-
-  const handleTaskPause = (id: string, taskTitle: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: false } : t))
-    );
-    handleActivityLog(`Paused Task: ${taskTitle}`, 'neutral');
-  };
-
-  const handleTaskEnd = (id: string, taskTitle: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: false } : t))
-    );
-    handleActivityLog(`Ended Task Work Session: ${taskTitle}`, 'info');
+    handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
   };
 
   const handleSubmitReview = (id: string, taskTitle: string) => {
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: false, underReview: true, progress: 100 } : t))
+      prev.map((t) => (t.id === id ? { ...t, active: false, underReview: true } : t))
     );
     toast({
       variant: 'success',
-      title: 'Review Requested',
-      message: `Task '${taskTitle}' submitted for Manager/CEO completion review.`,
+      title: 'Routed to Manager Review',
+      message: `Task '${taskTitle}' submitted for Manager completion approval.`,
     });
     addNotification({
-      title: 'Task Review Submitted',
-      message: `'${taskTitle}' submitted by employee for completion approval.`,
+      title: 'Task Submitted for Review',
+      message: `'${taskTitle}' routed to Manager for completion approval.`,
       category: 'task',
       priority: 'high',
     });
-    handleActivityLog(`Submitted for Review: ${taskTitle}`, 'success');
+    handleActivityLog(`Submitted for Manager Review: ${taskTitle}`, 'success');
   };
 
   useEffect(() => {
@@ -714,14 +675,14 @@ export function MyDayPage() {
     <AppShell>
       <Greeting />
 
-      {/* Single Row: Quick Actions + Resized Compact Metrics Aligned Together in 6 Equal Columns */}
+      {/* Single Row: Quick Actions + Resized Metrics Aligned Together in 6 Equal Columns matching 66px Height */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-        <QuickActionCard icon="✓" label="Add Task" />
-        <QuickActionCard icon="₹" label="Submit Expense" />
-        <QuickActionCard icon="🗓" label="Request Leave" />
-        <CompactStatPill label="Tasks Due" value="3" tone="warning" icon="◧" />
-        <CompactStatPill label="Hours this Month" value="168 hrs" tone="info" icon="⌛" />
-        <CompactStatPill label="Attendance %" value="96.2%" tone="success" icon="📈" />
+        <ResizedQuickAction icon="✓" label="Add Task" />
+        <ResizedQuickAction icon="₹" label="Submit Expense" />
+        <ResizedQuickAction icon="🗓" label="Request Leave" />
+        <ResizedStatPill label="Tasks Due" value="3" tone="warning" icon="◧" />
+        <ResizedStatPill label="Hours this Month" value="168 hrs" tone="info" icon="⌛" />
+        <ResizedStatPill label="Attendance %" value="96.2%" tone="success" icon="📈" />
       </div>
 
       <AttendancePanel
@@ -734,30 +695,27 @@ export function MyDayPage() {
         onActivityLog={handleActivityLog}
       />
 
-      {/* Main Layout: Today's Tasks & Timeline on LEFT (stacked), Announcements on RIGHT */}
+      {/* Main Layout:
+          LEFT column: Today's Tasks + Upcoming Events (width auto matching left column)
+          RIGHT column: Announcements Dashboard + Daily Activity Timeline (flowing down on right) */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginTop: 16 }}>
-        {/* Left Column: Today's Tasks + Timeline below it */}
+        {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <TaskWidget
             tasks={tasks}
             setTasks={setTasks}
-            onTaskStart={handleTaskStart}
-            onTaskPause={handleTaskPause}
-            onTaskEnd={handleTaskEnd}
+            onToggleTask={handleToggleTask}
             onSubmitReview={handleSubmitReview}
           />
 
-          <TimelineWidget entries={timelineEntries} />
+          <UpcomingEventsWidget />
         </div>
 
-        {/* Right Column: Announcements Dashboard */}
+        {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AnnouncementWidget />
+          <TimelineWidget entries={timelineEntries} />
         </div>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <UpcomingEventsWidget />
       </div>
     </AppShell>
   );
