@@ -150,20 +150,49 @@ function TopBar({ onMenu, isMobile }: { onMenu: () => void; isMobile: boolean })
   const [notifOpen, setNotifOpen] = useState(false);
 
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 100, height: 60, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+    <header style={{
+      position: 'sticky',
+      top: 0,
+      zIndex: 100,
+      height: 60,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '0 16px',
+      background: 'var(--bg-surface)',
+      borderBottom: '1px solid var(--border)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+    }}>
       {isMobile && <button onClick={onMenu} aria-label="Menu" style={iconBtn}><Icon name="Menu" /></button>}
       <button onClick={() => setOpen(true)} style={{ flex: 1, maxWidth: 420, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-sunken)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>
         <Icon name="Search" size={16} /> <span>Search or ⌘K…</span>
       </button>
       <div style={{ flex: 1 }} />
+
+      {/* Futuristic Theme Switcher Pill */}
       <button
         onClick={toggle}
         aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}
-        title={`Theme: ${THEME_LABELS[theme]}`}
-        className="kvj-icon-btn"
-        style={iconBtn}
+        title={`Click to switch theme (Current: ${THEME_LABELS[theme]})`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '6px 12px',
+          borderRadius: 'var(--radius-pill)',
+          border: '1px solid var(--border)',
+          background: 'var(--bg-sunken)',
+          color: 'var(--text-primary)',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 700,
+          boxShadow: 'var(--e1)',
+          transition: 'all 0.2s ease',
+        }}
       >
-        <Icon name={theme === 'light' ? 'Moon' : theme === 'dark' ? 'Gauge' : 'Sun'} size={18} />
+        <Icon name={theme === 'light' ? 'Sun' : theme === 'dark' ? 'Moon' : 'Gauge'} size={15} />
+        {!isMobile && <span>{THEME_LABELS[theme]} Mode</span>}
       </button>
       <button onClick={() => setNotifOpen((o) => !o)} aria-label="Notifications" style={{ ...iconBtn, position: 'relative' }}>
         <Icon name="Bell" size={18} />
