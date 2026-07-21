@@ -89,7 +89,9 @@ export function AppRouter() {
 
           {/* Training Platform */}
           <Route path="/app/training/courses" element={<ProtectedRoute resource="training" action="view"><CourseList /></ProtectedRoute>} />
-          <Route path="/app/training/batches" element={<ProtectedRoute resource="training" action="view"><BatchesPage /></ProtectedRoute>} />
+          <Route path="/app/training/batches" element={<ProtectedRoute resource="training" action="view"><BatchesPage defaultTab="details" /></ProtectedRoute>} />
+          <Route path="/app/training/details" element={<ProtectedRoute resource="training" action="view"><BatchesPage defaultTab="details" /></ProtectedRoute>} />
+          <Route path="/app/training/calendar" element={<ProtectedRoute resource="training" action="view"><BatchesPage defaultTab="calendar" /></ProtectedRoute>} />
           <Route path="/app/training/students" element={<ProtectedRoute resource="training" action="view"><StudentLifecycle /></ProtectedRoute>} />
           <Route path="/app/training/attendance" element={<ProtectedRoute resource="training" action="view"><StudentAttendance /></ProtectedRoute>} />
           <Route path="/app/training/assessments" element={<ProtectedRoute resource="training" action="view"><AssessmentBoard /></ProtectedRoute>} />
