@@ -1,6 +1,6 @@
 /* =============================================================================
-   KVJ Analytics — Futuristic & Premium Design Tokens (Light + Dark + HUD)
-   Single source of truth for color, surfaces, glassmorphism, depth & motion.
+   KVJ Analytics — Ultra-Premium Clean & Futuristic Design Tokens
+   Clean, dot-free multi-layer radial mesh gradients, glassmorphism & depth.
    ============================================================================= */
 
 :root,
@@ -9,20 +9,20 @@
   --brand: #4F46E5;            /* Indigo-600 */
   --brand-hover: #4338CA;
   --brand-contrast: #FFFFFF;
-  --accent: #06B6D4;           /* Cyan-500 */
+  --accent: #0284C7;           /* Sky Blue-600 */
 
-  /* Futuristic Light Canvas with Abstract High-Tech Pattern & Glowing Orbs */
+  /* Ultra-Clean Premium Light Canvas: Silky Smooth Gradient Mesh (No Dots/Noise) */
   --app-canvas:
-    radial-gradient(1200px 600px at 15% 10%, rgba(99, 102, 241, 0.12), transparent 70%),
-    radial-gradient(1000px 500px at 85% 90%, rgba(6, 182, 212, 0.10), transparent 65%),
-    url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234f46e5' fill-opacity='0.035'%3E%3Cpath d='M50 50h-4v4h-2v-4h-4v-2h4v-4h2v4h4v2zm0-40h-4v4h-2v-4h-4v-2h4v-4h2v4h4v2zM10 50H6v4H4v-4H0v-2h4v-4h2v4h4v2zm0-40H6v4H4v-4H0v-2h4v-4h2v4h4v2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(1400px 700px at 10% -10%, rgba(99, 102, 241, 0.09), transparent 70%),
+    radial-gradient(1200px 600px at 90% 110%, rgba(14, 165, 233, 0.08), transparent 65%),
+    radial-gradient(800px 400px at 50% 50%, rgba(168, 85, 247, 0.04), transparent 60%),
     linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 50%, #E2E8F0 100%);
 
-  /* Surfaces — Frosted Glassmorphism Overlay */
+  /* Surfaces — Glassmorphism Overlay */
   --bg-app: #F8FAFC;
-  --bg-surface: rgba(255, 255, 255, 0.85);
-  --bg-panel: rgba(255, 255, 255, 0.95);
-  --bg-sunken: rgba(241, 245, 249, 0.80);
+  --bg-surface: rgba(255, 255, 255, 0.88);
+  --bg-panel: rgba(255, 255, 255, 0.96);
+  --bg-sunken: rgba(241, 245, 249, 0.85);
   --bg-hover: rgba(79, 70, 229, 0.06);
 
   /* Hairline Borders & Glass Shadows */
@@ -44,7 +44,7 @@
 
   --focus-ring: rgba(79, 70, 229, 0.45);
 
-  /* Soft Ambient Glow Elevation */
+  /* Soft Ambient Elevation */
   --e1: 0 4px 14px 0 rgba(79, 70, 229, 0.06), 0 1px 3px 0 rgba(0, 0, 0, 0.04);
   --e2: 0 10px 25px -3px rgba(79, 70, 229, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --e3: 0 20px 35px -5px rgba(79, 70, 229, 0.18), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -57,21 +57,20 @@
   --brand: #6366F1;            /* Electric Indigo */
   --brand-hover: #818CF8;
   --brand-contrast: #0B0F19;
-  --accent: #22D3EE;           /* Neon Cyan */
+  --accent: #38BDF8;           /* Neon Sky Blue */
 
-  /* Cyberpunk Deep Space Canvas with Pulsing Ambient Orbs & Geometric Mesh */
+  /* Ultra-Clean Deep Space Canvas: Smooth Radial Mesh (No Dots/Noise) */
   --app-canvas:
-    radial-gradient(1200px 650px at 10% -10%, rgba(139, 92, 246, 0.22), transparent 65%),
-    radial-gradient(1000px 550px at 90% 100%, rgba(59, 130, 246, 0.18), transparent 60%),
-    radial-gradient(800px 400px at 50% 50%, rgba(236, 72, 153, 0.08), transparent 50%),
-    url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%238b5cf6' fill-opacity='0.05'%3E%3Cpath d='M50 50h-4v4h-2v-4h-4v-2h4v-4h2v4h4v2zm0-40h-4v4h-2v-4h-4v-2h4v-4h2v4h4v2zM10 50H6v4H4v-4H0v-2h4v-4h2v4h4v2zm0-40H6v4H4v-4H0v-2h4v-4h2v4h4v2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(1400px 700px at 10% -10%, rgba(99, 102, 241, 0.16), transparent 70%),
+    radial-gradient(1200px 600px at 90% 110%, rgba(14, 165, 233, 0.12), transparent 65%),
+    radial-gradient(900px 450px at 50% 45%, rgba(168, 85, 247, 0.06), transparent 60%),
     linear-gradient(180deg, #0B0F19 0%, #0F172A 50%, #080D1A 100%);
 
   /* Translucent Cyber-Glass Surfaces */
   --bg-app: #0B0F19;
-  --bg-surface: rgba(17, 24, 39, 0.75);
-  --bg-panel: rgba(30, 41, 59, 0.82);
-  --bg-sunken: rgba(11, 15, 25, 0.70);
+  --bg-surface: rgba(17, 24, 39, 0.78);
+  --bg-panel: rgba(30, 41, 59, 0.85);
+  --bg-sunken: rgba(11, 15, 25, 0.75);
   --bg-hover: rgba(99, 102, 241, 0.15);
 
   /* Neon Glowing Borders */
@@ -104,43 +103,42 @@
    COCKPIT HUD (DARK)
    ============================================================================= */
 [data-theme='hud'] {
-  --brand: #5FD3E8;            /* Ice-cyan */
-  --brand-hover: #8AE3F2;
+  --brand: #38BDF8;            /* Cyan Sky */
+  --brand-hover: #7DD3FC;
   --brand-contrast: #04131B;
-  --accent: #FFA033;           /* Amber */
+  --accent: #F97316;           /* Sunset Amber */
 
   --app-canvas:
-    radial-gradient(1200px 620px at 12% -12%, rgba(95, 211, 232, .18), transparent 60%),
-    radial-gradient(900px 520px at 92% -4%, rgba(255, 160, 51, .14), transparent 55%),
-    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.62 0H60v5.38L54.62 0zM0 54.62V60h5.38L0 54.62zM60 54.62V60h-5.38L60 54.62zM0 5.38V0h5.38L0 5.38z' fill='%235fd3e8' fill-opacity='0.06' fill-rule='evenodd'/%3E%3C/svg%3E"),
+    radial-gradient(1400px 700px at 10% -10%, rgba(56, 189, 248, 0.14), transparent 65%),
+    radial-gradient(1100px 550px at 90% 110%, rgba(249, 115, 22, 0.09), transparent 60%),
     linear-gradient(180deg, #0A1723 0%, #07121B 55%, #050C13 100%);
 
   --bg-app: #07121B;
   --bg-surface: rgba(120, 200, 226, .08);
   --bg-panel: rgba(120, 200, 226, .12);
   --bg-sunken: rgba(3, 10, 16, .75);
-  --bg-hover: rgba(95, 211, 232, .16);
+  --bg-hover: rgba(56, 189, 248, .16);
 
-  --border: rgba(95, 211, 232, .32);
-  --border-strong: rgba(95, 211, 232, .58);
+  --border: rgba(56, 189, 248, .32);
+  --border-strong: rgba(56, 189, 248, .58);
 
   --text-primary: #E6F4FA;
   --text-secondary: #9FBACB;
   --text-muted: #6E8CA1;
 
   --status-success: #4ADE80;  --status-success-bg: rgba(74, 222, 128, .16);
-  --status-warning: #FFA033;  --status-warning-bg: rgba(255, 160, 51, .18);
+  --status-warning: #F97316;  --status-warning-bg: rgba(249, 115, 22, .18);
   --status-danger:  #FF6B6B;  --status-danger-bg:  rgba(255, 107, 107, .18);
-  --status-info:    #5FD3E8;  --status-info-bg:    rgba(95, 211, 232, .18);
-  --status-progress:#FFA033;  --status-progress-bg:rgba(255, 160, 51, .18);
+  --status-info:    #38BDF8;  --status-info-bg:    rgba(56, 189, 248, .18);
+  --status-progress:#F97316;  --status-progress-bg:rgba(249, 115, 22, .18);
   --status-neutral: #8FA9BC;  --status-neutral-bg: rgba(143, 169, 188, .16);
 
-  --focus-ring: rgba(95, 211, 232, .65);
+  --focus-ring: rgba(56, 189, 248, .65);
 
-  --e1: 0 0 0 1px rgba(95, 211, 232, .12), 0 4px 15px rgba(0, 0, 0, .5);
-  --e2: 0 0 0 1px rgba(95, 211, 232, .18), 0 12px 35px rgba(0, 0, 0, .58);
-  --e3: 0 0 0 1px rgba(95, 211, 232, .24), 0 20px 50px rgba(0, 0, 0, .65);
-  --e4: 0 0 0 1px rgba(95, 211, 232, .30), 0 35px 80px rgba(0, 0, 0, .72);
+  --e1: 0 0 0 1px rgba(56, 189, 248, .12), 0 4px 15px rgba(0, 0, 0, .5);
+  --e2: 0 0 0 1px rgba(56, 189, 248, .18), 0 12px 35px rgba(0, 0, 0, .58);
+  --e3: 0 0 0 1px rgba(56, 189, 248, .24), 0 20px 50px rgba(0, 0, 0, .65);
+  --e4: 0 0 0 1px rgba(56, 189, 248, .30), 0 35px 80px rgba(0, 0, 0, .72);
 
   color-scheme: dark;
 }
@@ -155,9 +153,8 @@
   --accent: #EA580C;
 
   --app-canvas:
-    radial-gradient(1200px 620px at 12% -12%, rgba(2, 132, 199, .22), transparent 60%),
-    radial-gradient(900px 520px at 92% -4%, rgba(234, 88, 12, .18), transparent 55%),
-    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.62 0H60v5.38L54.62 0zM0 54.62V60h5.38L0 54.62zM60 54.62V60h-5.38L60 54.62zM0 5.38V0h5.38L0 5.38z' fill='%230284c7' fill-opacity='0.06' fill-rule='evenodd'/%3E%3C/svg%3E"),
+    radial-gradient(1400px 700px at 10% -10%, rgba(2, 132, 199, .14), transparent 65%),
+    radial-gradient(1100px 550px at 90% 110%, rgba(234, 88, 12, .10), transparent 60%),
     linear-gradient(180deg, #F0F7FB 0%, #E6F0F6 55%, #DEEAF2 100%);
 
   --bg-app: #EAF2F8;
