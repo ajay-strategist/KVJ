@@ -13,6 +13,7 @@ import { AppRouter } from './app/router';
 import { initTheme } from './shared/theme/ThemeProvider';
 import { bootstrap } from './app/bootstrap';
 import './shared/design-system/tokens.css';
+import './shared/design-system/theme-hud.css';
 import './app/global.css';
 
 bootstrap(); // initialize DI registry

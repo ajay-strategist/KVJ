@@ -8,14 +8,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { eventBus } from '../../core/event-bus';
 
-export type ThemeMode = 'light' | 'dark' | 'system';
-export type ResolvedTheme = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark' | 'hud' | 'system';
+export type ResolvedTheme = 'light' | 'dark' | 'hud';
+
+/** Cycle order used by the top-bar quick toggle. */
+export const THEME_CYCLE: ResolvedTheme[] = ['light', 'dark', 'hud'];
+
+/** Human labels for the theme picker. */
+export const THEME_LABELS: Record<ThemeMode, string> = {
+  light: 'Light',
+  dark: 'Dark',
+  hud: 'Cockpit',
+  system: 'System',
+};
 
 interface ThemeContextValue {
   mode: ThemeMode;          // user preference
   theme: ResolvedTheme;     // effective theme after resolving 'system'
   setMode: (mode: ThemeMode) => void;
-  toggle: () => void;       // quick light <-> dark
+  toggle: () => void;       // cycles Light → Dark → Cockpit
 }
 
 const STORAGE_KEY = 'kvj.theme';
@@ -25,7 +36,8 @@ function systemPrefersDark(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 }
 function resolve(mode: ThemeMode): ResolvedTheme {
-  return mode === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : mode;
+  if (mode === 'system') return systemPrefersDark() ? 'dark' : 'light';
+  return mode; // 'light' | 'dark' | 'hud' apply directly
 }
 
 /** Boot-time application of the stored theme (call before React renders to avoid flash). */
@@ -51,7 +63,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     apply(next);
   }, [apply]);
 
-  const toggle = useCallback(() => setMode(theme === 'dark' ? 'light' : 'dark'), [theme, setMode]);
+  // Quick toggle cycles through the three concrete themes (System stays a
+  // deliberate choice made in Settings).
+  const toggle = useCallback(() => {
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length];
+    setMode(next);
+  }, [theme, setMode]);
 
   // React to OS theme changes while in 'system' mode.
   useEffect(() => {

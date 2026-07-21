@@ -49,7 +49,7 @@ export function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr', background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
+    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', placeItems: 'center', padding: 24 }}>
         <div style={{ width: 'min(400px, 100%)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>

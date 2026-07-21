@@ -89,6 +89,60 @@
   color-scheme: dark;
 }
 
+/* =============================================================================
+   COCKPIT — a glass-instrument / heads-up-display theme.
+   Reference: aviation HUD overlays. Two instrument accents only: ice-cyan for
+   structure and framing, amber for the live/critical readout. Surfaces are
+   translucent glass over an atmospheric canvas, so panels read as instrument
+   plates floating over sky rather than as flat cards.
+   ============================================================================= */
+[data-theme='hud'] {
+  /* Instrument accents */
+  --brand: #5FD3E8;            /* ice-cyan: structure, labels, framing */
+  --brand-hover: #8AE3F2;
+  --brand-contrast: #04131B;
+  --accent: #FFA033;           /* amber: the live readout */
+
+  /* Atmospheric canvas painted behind full-screen surfaces */
+  --app-canvas:
+    radial-gradient(1200px 620px at 12% -12%, rgba(95, 211, 232, .12), transparent 60%),
+    radial-gradient(900px 520px at 92% -4%, rgba(255, 160, 51, .08), transparent 55%),
+    linear-gradient(180deg, #0A1723 0%, #07121B 55%, #050C13 100%);
+
+  /* Surfaces — glass, not solid fills */
+  --bg-app: #07121B;
+  --bg-surface: rgba(120, 200, 226, .055);
+  --bg-panel: rgba(120, 200, 226, .085);
+  --bg-sunken: rgba(3, 10, 16, .55);
+  --bg-hover: rgba(95, 211, 232, .10);
+
+  /* Hairline instrument framing */
+  --border: rgba(95, 211, 232, .22);
+  --border-strong: rgba(95, 211, 232, .46);
+
+  --text-primary: #E6F4FA;
+  --text-secondary: #9FBACB;
+  --text-muted: #6E8CA1;
+
+  /* Status — amber carries "in progress", green is the all-clear */
+  --status-success: #4ADE80;  --status-success-bg: rgba(74, 222, 128, .12);
+  --status-warning: #FFA033;  --status-warning-bg: rgba(255, 160, 51, .14);
+  --status-danger:  #FF6B6B;  --status-danger-bg:  rgba(255, 107, 107, .14);
+  --status-info:    #5FD3E8;  --status-info-bg:    rgba(95, 211, 232, .14);
+  --status-progress:#FFA033;  --status-progress-bg:rgba(255, 160, 51, .14);
+  --status-neutral: #8FA9BC;  --status-neutral-bg: rgba(143, 169, 188, .12);
+
+  --focus-ring: rgba(95, 211, 232, .55);
+
+  /* Elevation reads as glow + depth rather than drop shadow */
+  --e1: 0 0 0 1px rgba(95, 211, 232, .06), 0 2px 10px rgba(0, 0, 0, .45);
+  --e2: 0 0 0 1px rgba(95, 211, 232, .08), 0 10px 30px rgba(0, 0, 0, .5);
+  --e3: 0 0 0 1px rgba(95, 211, 232, .10), 0 18px 44px rgba(0, 0, 0, .55);
+  --e4: 0 0 0 1px rgba(95, 211, 232, .12), 0 30px 70px rgba(0, 0, 0, .62);
+
+  color-scheme: dark;
+}
+
 /* Theme-independent scales -------------------------------------------------- */
 :root {
   /* Spacing (4px grid) */

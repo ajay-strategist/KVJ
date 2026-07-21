@@ -1,0 +1,156 @@
+/* =============================================================================
+   COCKPIT theme — chrome layer.
+   Everything here is scoped to [data-theme='hud'] so Light and Dark are
+   untouched. Tokens live in tokens.css; this file adds the physical character
+   the tokens can't express: glass, instrument framing, and readout typography.
+
+   Signature: instrument corner brackets on every panel. That is the one bold
+   move — the rest stays quiet so an all-day ops tool remains readable.
+   ============================================================================= */
+
+/* Atmospheric canvas behind full-screen surfaces. */
+[data-theme='hud'] body {
+  background: var(--app-canvas);
+  background-attachment: fixed;
+}
+
+/* ── Instrument plates ─────────────────────────────────────────────────────── */
+[data-theme='hud'] .kvj-card {
+  position: relative;
+  border-radius: 4px;                     /* plates are near-rectangular */
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: var(--e1);
+}
+
+/* Corner brackets — the signature. Two diagonal corners, not four: enough to
+   read as instrument framing without ringing every panel in chrome. */
+[data-theme='hud'] .kvj-card::before,
+[data-theme='hud'] .kvj-card::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: .75;
+}
+[data-theme='hud'] .kvj-card::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--brand);
+  border-left: 2px solid var(--brand);
+}
+[data-theme='hud'] .kvj-card::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--brand);
+  border-right: 2px solid var(--brand);
+}
+
+[data-theme='hud'] .kvj-card--hover:hover {
+  box-shadow: var(--e2);
+  border-color: var(--border-strong);
+}
+
+/* ── Shell surfaces read as glass over the canvas ──────────────────────────── */
+[data-theme='hud'] aside,
+[data-theme='hud'] header {
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* ── Readout typography ────────────────────────────────────────────────────── */
+/* Micro-labels and column headers use the instrument vernacular: small, upper,
+   widely tracked, cyan. */
+[data-theme='hud'] .kvj-table th,
+[data-theme='hud'] .kvj-label {
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+/* Numbers are instrument readouts: never reflow, always align. */
+[data-theme='hud'] .kvj-table td,
+[data-theme='hud'] .kvj-num,
+[data-theme='hud'] .kvj-badge {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme='hud'] .kvj-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+/* ── Controls ──────────────────────────────────────────────────────────────── */
+[data-theme='hud'] .kvj-btn--primary {
+  background: var(--brand);
+  color: var(--brand-contrast);
+  border: 1px solid transparent;
+  box-shadow: 0 0 18px rgba(95, 211, 232, .28);
+}
+[data-theme='hud'] .kvj-btn--primary:hover {
+  background: var(--brand-hover);
+  box-shadow: 0 0 24px rgba(95, 211, 232, .42);
+}
+
+[data-theme='hud'] .kvj-btn--secondary,
+[data-theme='hud'] .kvj-icon-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+[data-theme='hud'] .kvj-btn--secondary:hover,
+[data-theme='hud'] .kvj-icon-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+[data-theme='hud'] .kvj-input,
+[data-theme='hud'] .kvj-select,
+[data-theme='hud'] textarea {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 4px;
+}
+[data-theme='hud'] .kvj-input:focus,
+[data-theme='hud'] .kvj-select:focus,
+[data-theme='hud'] textarea:focus {
+  border-color: var(--brand);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* Badges get a hairline so they read as status chips on glass. */
+[data-theme='hud'] .kvj-badge {
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 11px;
+}
+
+/* Keyboard focus stays obvious against the glass. */
+[data-theme='hud'] :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+[data-theme='hud'] .kvj-skeleton {
+  background: linear-gradient(90deg, rgba(95, 211, 232, .06), rgba(95, 211, 232, .14), rgba(95, 211, 232, .06));
+}
+
+/* Glass is expensive and can wash out on unsupported engines — fall back to a
+   solid plate rather than an unreadable transparent one. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme='hud'] .kvj-card,
+  [data-theme='hud'] aside,
+  [data-theme='hud'] header {
+    background: #0E1D2A;
+  }
+}

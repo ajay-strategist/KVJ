@@ -23,7 +23,7 @@ export interface AppEventMap {
   'app.ready': void;
   'auth.login': { userId: string; role: string };
   'auth.logout': { userId: string };
-  'theme.changed': { theme: 'light' | 'dark' };
+  'theme.changed': { theme: 'light' | 'dark' | 'hud' };
 }
 
 export type EventName = keyof AppEventMap;

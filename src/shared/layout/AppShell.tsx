@@ -11,7 +11,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { visibleNav, useNavPrefs } from '../navigation/navigation';
 import { usePermissions } from '../permissions/react';
 import { useAuth } from '../../modules/auth/AuthProvider';
-import { useTheme } from '../theme/ThemeProvider';
+import { useTheme, THEME_LABELS } from '../theme/ThemeProvider';
 import { useNotifications } from '../notifications/NotificationProvider';
 import { useCommandPalette } from '../search/CommandPaletteProvider';
 import { useDevice } from '../hooks/responsive';
@@ -41,6 +41,7 @@ const ICON_PATHS: Record<string, string> = {
   Briefcase: 'M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2',
   Trello: 'M3 3h18v18H3zM7 7h4v10H7zM13 7h4v6h-4z',
   Megaphone: 'M3 11v2a1 1 0 0 0 1 1h3l7 4V6l-7 4H4a1 1 0 0 0-1 1zM18 9a3 3 0 0 1 0 6',
+  Gauge: 'M12 21a9 9 0 1 0-9-9M3 12h2M12 21a9 9 0 0 0 9-9h-2M12 12l4.5-4.5',
   ChevronLeft: 'M15 18l-6-6 6-6',
   ChevronRight: 'M9 18l6-6-6-6',
   Menu: 'M3 6h18M3 12h18M3 18h18',
@@ -74,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const width = collapsed && !isMobile ? 72 : 260;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-app)', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
       {showSidebar && (
         <aside style={{
           width, flexShrink: 0, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)',
@@ -138,7 +139,15 @@ function TopBar({ onMenu, isMobile }: { onMenu: () => void; isMobile: boolean })
         <Icon name="Search" size={16} /> <span>Search or ⌘K…</span>
       </button>
       <div style={{ flex: 1 }} />
-      <button onClick={toggle} aria-label="Toggle theme" style={iconBtn}><Icon name={theme === 'dark' ? 'Sun' : 'Moon'} size={18} /></button>
+      <button
+        onClick={toggle}
+        aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}
+        title={`Theme: ${THEME_LABELS[theme]}`}
+        className="kvj-icon-btn"
+        style={iconBtn}
+      >
+        <Icon name={theme === 'light' ? 'Moon' : theme === 'dark' ? 'Gauge' : 'Sun'} size={18} />
+      </button>
       <button aria-label="Notifications" style={{ ...iconBtn, position: 'relative' }}>
         <Icon name="Bell" size={18} />
         {unreadCount > 0 && <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: 'var(--status-danger)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{unreadCount}</span>}
