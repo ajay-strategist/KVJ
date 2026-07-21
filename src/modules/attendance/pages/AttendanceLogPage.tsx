@@ -25,7 +25,7 @@ export function AttendanceLogPage() {
   // Expense tab state (bulk approval)
   const [expenseRows, setExpenseRows] = useState([
     { id: '1', date: '01/06/2026', employee: 'Linto George', category: 'Morning & Evening Tea', batch: 'Christ 3BBA Data Analytics B1', amount: 80.0, status: 'Approved' },
-    { id: '2', date: '02/06/2026', employee: 'Linto George', category: 'Lunch & Refreshments', batch: 'Christ 3BBA Data Analytics B1', amount: 150.0, status: 'Approved' },
+    { id: '2', date: '01/06/2026', employee: 'Linto George', category: 'Lunch & Refreshments', batch: 'SB College MBA Batch 1', amount: 150.0, status: 'Approved' },
     { id: '3', date: '05/06/2026', employee: 'Linto George', category: 'Self Travel (Bike/Car)', batch: 'Christ 3BBA Data Analytics B1', amount: 120.0, status: 'Approved' },
     { id: '4', date: '24/06/2026', employee: 'Linto George', category: 'Self Travel (Bike/Car)', batch: 'Vimala College Batch 2', amount: 450.0, status: 'Pending Approval' },
     { id: '5', date: '25/06/2026', employee: 'Linto George', category: 'Self Travel (Bike/Car)', batch: 'Nehru College Batch 1', amount: 200.0, status: 'Pending Approval' },
@@ -87,13 +87,15 @@ export function AttendanceLogPage() {
     setSelectedExpenses({});
   };
 
-  // Excel-style tabular rows
+  // Table View rows: Multiple training entries for single employee listed as separate rows!
   const tableRows = [
-    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '₹ 80.00', note: '', break: '', tasks: ['Power BI Syllabus Unit 1', 'Assessment Setup'] },
+    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '12:00 PM', duration: '3:30:00', expenses: '₹ 80.00', note: '', break: '', tasks: ['Power BI Syllabus Unit 1', 'Assessment Setup'] },
+    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'SB College', type: 'Training', mode: 'Offline', start: '01:30 PM', end: '05:00 PM', duration: '3:30:00', expenses: '₹ 70.00', note: '', break: '', tasks: ['MBA Batch 1 Orientation & Intro'] },
     { date: '02/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '₹ 150.00', note: '', break: '', tasks: ['DAX Expressions Lab', 'Student Practice Guidance'] },
     { date: '03/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Desktop Installation Sync'] },
     { date: '04/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Data Modeling & Star Schema'] },
-    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '₹ 120.00', note: '', break: '', tasks: ['Weekly Batch Test Evaluation'] },
+    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '01:00 PM', duration: '4:30:00', expenses: '₹ 120.00', note: '', break: '', tasks: ['Weekly Batch Test Evaluation'] },
+    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Vimala College', type: 'Supervision', mode: 'Offline', start: '02:00 PM', end: '05:00 PM', duration: '3:00:00', expenses: '', note: '', break: '', tasks: ['Lab Supervision Session'] },
     { date: '06/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Visualizations & Dashboard Layout'] },
     { date: '07/06/26', name: 'Linto George', holiday: 'Sunday', org: '', type: 'Holiday', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
     { date: '08/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Gateway Configuration'] },
@@ -104,19 +106,19 @@ export function AttendanceLogPage() {
     { date: '26/06/26', name: 'Linto George', holiday: '', org: 'Office', type: 'Work', mode: '', start: '09:49 AM', end: '05:31 PM', duration: '7:42:12', expenses: '', note: 'Late', break: '0.73', tasks: ['Internal Operations & Voucher Review'] },
   ];
 
-  // Calendar Days mapping
+  // Calendar Days mapping: Grouping multiple training sessions together in single date tiles!
   const calendarDays: CalendarDayDetail[] = Array.from({ length: 30 }, (_, i) => {
     const dayNum = i + 1;
-    const dayOfWeekIdx = (i + 1) % 7;
+    const dayOfWeekIdx = (1 + i) % 7;
     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
 
     let status: 'present' | 'absent' | 'leave' | 'holiday' = 'present';
     let location = 'Office';
     let startTime: string | undefined = '08:30 AM';
     let endTime: string | undefined = '05:00 PM';
+    let sessions: any[] | undefined = undefined;
     let tasks: Array<{ title: string; duration: string }> = [
       { title: 'Power BI Session', duration: '3.0h' },
-      { title: 'Data Analytics Review', duration: '2.5h' },
     ];
     let hoursWorked = '8h 30m';
     let expenses = '₹ 150.00';
@@ -129,6 +131,24 @@ export function AttendanceLogPage() {
       tasks = [];
       hoursWorked = '';
       expenses = '';
+    } else if (dayNum === 1) {
+      // Day 1 has grouped multiple training sessions!
+      status = 'present';
+      sessions = [
+        { location: 'Christ Irinjalakkuda', type: 'Training', startTime: '08:30 AM', endTime: '12:00 PM', tasks: [{ title: 'Power BI Syllabus Unit 1', duration: '3.5h' }] },
+        { location: 'SB College', type: 'Training', startTime: '01:30 PM', endTime: '05:00 PM', tasks: [{ title: 'MBA Batch 1 Orientation', duration: '3.5h' }] },
+      ];
+      hoursWorked = '7h 00m';
+      expenses = '₹ 150.00';
+    } else if (dayNum === 5) {
+      // Day 5 has grouped training + supervision sessions!
+      status = 'present';
+      sessions = [
+        { location: 'Christ Irinjalakkuda', type: 'Training', startTime: '08:30 AM', endTime: '01:00 PM', tasks: [{ title: 'Weekly Batch Test Evaluation', duration: '4.5h' }] },
+        { location: 'Vimala College', type: 'Supervision', startTime: '02:00 PM', endTime: '05:00 PM', tasks: [{ title: 'Lab Supervision Session', duration: '3.0h' }] },
+      ];
+      hoursWorked = '7h 30m';
+      expenses = '₹ 120.00';
     } else if (dayNum === 13) {
       status = 'leave';
       location = '';
@@ -155,6 +175,7 @@ export function AttendanceLogPage() {
       location,
       startTime,
       endTime,
+      sessions,
       tasks,
       hoursWorked,
       expenses,
@@ -179,12 +200,13 @@ export function AttendanceLogPage() {
       label: '📊 Table View',
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Replaced Top Summaries */}
+          {/* Top Monthly & FY Summaries */}
           <AttendanceCalendarView
-            days={[]} // Hide grid, renders top & bottom summaries
+            days={[]} // Renders top summaries and bottom tables around Attendance Details Log
             selectedEmployeeName={selectedEmployeeDisplay}
           />
 
+          {/* Table View Grid showing multiple training entries as separate rows */}
           <Card>
             <SectionHeader title={`Attendance Details Log — ${selectedEmployeeDisplay}`} />
             <div style={{ overflowX: 'auto' }}>
@@ -235,7 +257,7 @@ export function AttendanceLogPage() {
                           <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.org}</td>
                           <td style={{ padding: '8px 10px' }}>
                             {r.type && (
-                              <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Marketing' ? 'warning' : r.type === 'Leave' ? 'danger' : 'neutral'}>
+                              <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : r.type === 'Leave' ? 'danger' : 'neutral'}>
                                 {r.type}
                               </Badge>
                             )}
@@ -254,7 +276,7 @@ export function AttendanceLogPage() {
                           <tr key={`exp-${i}`} style={{ background: 'var(--bg-sunken)' }}>
                             <td colSpan={13} style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
                               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 4 }}>
-                                📋 Completed Tasks for {r.date}:
+                                📋 Completed Tasks for {r.date} ({r.org}):
                               </div>
                               <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: 'var(--text-primary)' }}>
                                 {r.tasks.map((taskStr, tIdx) => (

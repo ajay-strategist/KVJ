@@ -1,15 +1,24 @@
 import { useState } from 'react';
 import { Card, SectionHeader, Badge } from '../../../shared/ui/components';
 
+export interface SessionEntry {
+  location: string;
+  type: string;
+  startTime: string;
+  endTime: string;
+  tasks: Array<{ title: string; duration: string }>;
+}
+
 export interface CalendarDayDetail {
   dateNum: number;
   dayName: string;
   fullDate: string;
   status: 'present' | 'absent' | 'leave' | 'holiday';
-  location: string;
+  sessions?: SessionEntry[]; // Grouped multiple training entries for a single day
+  location?: string;
   startTime?: string;
   endTime?: string;
-  tasks: Array<{ title: string; duration: string }>;
+  tasks?: Array<{ title: string; duration: string }>;
   hoursWorked: string;
   expenses: string;
 }
@@ -74,11 +83,13 @@ export function AttendanceCalendarView({
     { organization: 'Office', avgDuration: 7.7 },
     { organization: 'Nehru College', avgDuration: 8.0 },
     { organization: 'Christ Irinjalakkuda', avgDuration: 8.5 },
+    { organization: 'SB College', avgDuration: 3.5 },
   ];
 
   const classSupervisionSummary = [
     { institution: 'Christ Irinjalakkuda', physicalClasses: 22, physicalSupervision: 0, totalPhysical: 22, onlineClasses: 0, physicalClassDuration: 187, physicalSupervisionDuration: 0, totalPhysicalDuration: 187, onlineDuration: 0 },
     { institution: 'Vimala College', physicalClasses: 4, physicalSupervision: 0, totalPhysical: 4, onlineClasses: 0, physicalClassDuration: 20, physicalSupervisionDuration: 0, totalPhysicalDuration: 20, onlineDuration: 0 },
+    { institution: 'SB College', physicalClasses: 3, physicalSupervision: 0, totalPhysical: 3, onlineClasses: 0, physicalClassDuration: 15, physicalSupervisionDuration: 0, totalPhysicalDuration: 15, onlineDuration: 0 },
   ];
 
   return (
@@ -151,7 +162,7 @@ export function AttendanceCalendarView({
         </Card>
       </div>
 
-      {/* Main Core Full-Width Calendar View */}
+      {/* Main Core Full-Width Calendar View Grid (Grouped Multiple Sessions) */}
       {days.length > 0 && (
         <Card>
           <SectionHeader title={`Monthly Attendance Calendar Grid — ${selectedEmployeeName}`} />
@@ -177,7 +188,7 @@ export function AttendanceCalendarView({
                     border: `1.5px solid ${styles.border}`,
                     borderRadius: 'var(--radius-sm)',
                     padding: 8,
-                    minHeight: 110,
+                    minHeight: 115,
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -191,22 +202,39 @@ export function AttendanceCalendarView({
                       <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>{d.dayName}</span>
                     </div>
 
-                    {d.location && (
-                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        📍 {d.location}
+                    {/* Grouped Multiple Sessions or Single Session */}
+                    {d.sessions && d.sessions.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
+                        {d.sessions.map((s, sIdx) => (
+                          <div key={sIdx} style={{ fontSize: 9.5, lineHeight: 1.25, background: 'var(--bg-surface)', padding: '2px 4px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--brand)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                              📍 {s.location}
+                            </div>
+                            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+                              🕒 {s.startTime} - {s.endTime}
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <>
+                        {d.location && (
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            📍 {d.location}
+                          </div>
+                        )}
+
+                        {d.startTime && d.endTime && (
+                          <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                            🕒 {d.startTime} - {d.endTime}
+                          </div>
+                        )}
+                      </>
                     )}
 
-                    {/* Employee Timeline below each date */}
-                    {d.startTime && d.endTime && (
-                      <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                        🕒 {d.startTime} - {d.endTime}
-                      </div>
-                    )}
-
-                    {d.tasks && d.tasks.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {d.tasks.slice(0, 2).map((t, idx) => (
+                    {d.tasks && d.tasks.length > 0 && !d.sessions && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
+                        {d.tasks.slice(0, 1).map((t, idx) => (
                           <div key={idx} style={{ fontSize: 9, color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                             ✓ {t.title}
                           </div>
@@ -233,21 +261,27 @@ export function AttendanceCalendarView({
           <SectionHeader title={`Details: ${selectedDay.fullDate}`} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
             <div><strong>Status:</strong> <Badge tone={selectedDay.status === 'present' ? 'success' : selectedDay.status === 'holiday' ? 'danger' : 'warning'}>{selectedDay.status.toUpperCase()}</Badge></div>
-            <div><strong>Location:</strong> {selectedDay.location || 'N/A'}</div>
-            <div><strong>Timeline:</strong> {selectedDay.startTime && selectedDay.endTime ? `${selectedDay.startTime} - ${selectedDay.endTime}` : 'N/A'}</div>
-            <div><strong>Hours Worked:</strong> {selectedDay.hoursWorked || 'N/A'}</div>
-            <div>
-              <strong>Completed Tasks:</strong>
-              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                {selectedDay.tasks.length > 0 ? (
-                  selectedDay.tasks.map((t, idx) => (
-                    <li key={idx}>{t.title} ({t.duration})</li>
-                  ))
-                ) : (
-                  <li style={{ color: 'var(--text-muted)' }}>No tasks recorded</li>
-                )}
-              </ul>
-            </div>
+
+            {selectedDay.sessions && selectedDay.sessions.length > 0 ? (
+              <div>
+                <strong>Grouped Training Sessions ({selectedDay.sessions.length}):</strong>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                  {selectedDay.sessions.map((s, idx) => (
+                    <div key={idx} style={{ padding: '6px 10px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)', fontSize: 12 }}>
+                      <div>📍 <strong>{s.location}</strong> ({s.type})</div>
+                      <div>🕒 Time: {s.startTime} - {s.endTime}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div><strong>Location:</strong> {selectedDay.location || 'N/A'}</div>
+                <div><strong>Timeline:</strong> {selectedDay.startTime && selectedDay.endTime ? `${selectedDay.startTime} - ${selectedDay.endTime}` : 'N/A'}</div>
+              </>
+            )}
+
+            <div><strong>Total Hours Worked:</strong> {selectedDay.hoursWorked || 'N/A'}</div>
           </div>
         </Card>
       )}
