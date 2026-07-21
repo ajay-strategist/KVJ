@@ -16,6 +16,8 @@ export interface NavItem {
   icon: string;               // lucide icon name (resolved in the Sidebar)
   permission?: [Resource, Action];
   module?: keyof FeatureFlags['modules'];
+  /** Finer-grained gate than `module` (see featureFlags.pages). */
+  page?: keyof FeatureFlags['pages'];
   children?: NavItem[];
 }
 
@@ -41,20 +43,20 @@ export const NAV_TREE: NavItem[] = [
   { id: 'project-timesheets', label: 'Timesheets Tracker', path: '/app/project/timesheets', icon: 'Clock', permission: ['project', 'view'], module: 'project' },
 
   { id: 'finance-expenses', label: 'Expenses & Travel', path: '/app/finance/expenses', icon: 'Receipt', permission: ['expense', 'view'], module: 'finance' },
-  { id: 'finance-procurement', label: 'Procurement Board', path: '/app/finance/procurement', icon: 'ShoppingCart', permission: ['expense', 'view'], module: 'finance' },
-  { id: 'finance-assets', label: 'Asset Inventory', path: '/app/finance/assets', icon: 'Package', permission: ['expense', 'view'], module: 'finance' },
-  { id: 'finance-budgets', label: 'Budgets Console', path: '/app/finance/budgets', icon: 'Calculator', permission: ['expense', 'view'], module: 'finance' },
-  { id: 'finance-payroll', label: 'Payroll Prep', path: '/app/finance/payroll', icon: 'Coins', permission: ['expense', 'view'], module: 'finance' },
+  { id: 'finance-procurement', label: 'Procurement Board', path: '/app/finance/procurement', icon: 'ShoppingCart', permission: ['expense', 'view'], module: 'finance', page: 'procurement' },
+  { id: 'finance-assets', label: 'Asset Inventory', path: '/app/finance/assets', icon: 'Package', permission: ['expense', 'view'], module: 'finance', page: 'assets' },
+  { id: 'finance-budgets', label: 'Budgets Console', path: '/app/finance/budgets', icon: 'Calculator', permission: ['expense', 'view'], module: 'finance', page: 'budgets' },
+  { id: 'finance-payroll', label: 'Payroll Prep', path: '/app/finance/payroll', icon: 'Coins', permission: ['expense', 'view'], module: 'finance', page: 'payroll' },
 
-  { id: 'comm-chat', label: 'Chat Rooms', path: '/app/communication/chat', icon: 'MessageSquare', permission: ['chat', 'view'], module: 'communication' },
-  { id: 'comm-announcements', label: 'Announcements Board', path: '/app/communication/announcements', icon: 'Megaphone', permission: ['chat', 'view'], module: 'communication' },
-  { id: 'comm-emails', label: 'Email Center', path: '/app/communication/emails', icon: 'Mail', permission: ['chat', 'view'], module: 'communication' },
-  { id: 'comm-reminders', label: 'Reminders Center', path: '/app/communication/reminders', icon: 'Bell', permission: ['chat', 'view'], module: 'communication' },
+  { id: 'comm-chat', label: 'Chat Rooms', path: '/app/communication/chat', icon: 'MessageSquare', permission: ['chat', 'view'], module: 'communication', page: 'chat' },
+  { id: 'comm-announcements', label: 'Announcements Board', path: '/app/communication/announcements', icon: 'Megaphone', permission: ['chat', 'view'], module: 'communication', page: 'announcements' },
+  { id: 'comm-emails', label: 'Email Center', path: '/app/communication/emails', icon: 'Mail', permission: ['chat', 'view'], module: 'communication', page: 'emailCenter' },
+  { id: 'comm-reminders', label: 'Reminders Center', path: '/app/communication/reminders', icon: 'Bell', permission: ['chat', 'view'], module: 'communication', page: 'reminders' },
 
-  { id: 'analytics-exec', label: 'Executive Console', path: '/app/analytics/executive', icon: 'BarChart3', permission: ['analytics', 'view'], module: 'analytics' },
-  { id: 'analytics-builder', label: 'Report Builder', path: '/app/analytics/builder', icon: 'LayoutGrid', permission: ['analytics', 'view'], module: 'analytics' },
-  { id: 'analytics-kpis', label: 'KPI Registry', path: '/app/analytics/kpis', icon: 'LineChart', permission: ['analytics', 'view'], module: 'analytics' },
-  { id: 'analytics-powerbi', label: 'Power BI Gateway', path: '/app/analytics/powerbi', icon: 'Cpu', permission: ['analytics', 'view'], module: 'analytics' },
+  { id: 'analytics-exec', label: 'Executive Console', path: '/app/analytics/executive', icon: 'BarChart3', permission: ['analytics', 'view'], module: 'analytics', page: 'executiveConsole' },
+  { id: 'analytics-builder', label: 'Report Builder', path: '/app/analytics/builder', icon: 'LayoutGrid', permission: ['analytics', 'view'], module: 'analytics', page: 'reportBuilder' },
+  { id: 'analytics-kpis', label: 'KPI Registry', path: '/app/analytics/kpis', icon: 'LineChart', permission: ['analytics', 'view'], module: 'analytics', page: 'kpiRegistry' },
+  { id: 'analytics-powerbi', label: 'Power BI Gateway', path: '/app/analytics/powerbi', icon: 'Cpu', permission: ['analytics', 'view'], module: 'analytics', page: 'powerBiGateway' },
 
   { id: 'settings', label: 'Settings', path: '/app/settings', icon: 'Settings', permission: ['settings', 'view'] },
 ];
@@ -63,6 +65,7 @@ export const NAV_TREE: NavItem[] = [
 export function visibleNav(canFn: (r: Resource, a: Action) => boolean): NavItem[] {
   const keep = (item: NavItem): boolean => {
     if (item.module && !featureFlags.modules[item.module]) return false;
+    if (item.page && !featureFlags.pages[item.page]) return false;
     if (item.permission && !canFn(item.permission[0], item.permission[1])) return false;
     return true;
   };

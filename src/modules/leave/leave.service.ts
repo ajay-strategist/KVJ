@@ -40,20 +40,15 @@ export class LeaveService implements ILeaveService {
     medicalCertUrl?: string
   ): Promise<Result<LeaveRecord>> {
     try {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const diffDays = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
+      // Only the two confirmed leave types are accepted.
+      if (!(businessRules.leave.types as readonly string[]).includes(leaveType)) {
+        return Err(AppError.validation(`Invalid leave type. Allowed: ${businessRules.leave.types.join(', ')}.`));
+      }
 
-      // Rule validation: Medical cert requirement
-      if (
-        leaveType === 'Sick' &&
-        diffDays >= businessRules.leave.medicalCertRequiredAfterDays &&
-        !medicalCertUrl
-      ) {
+      // Medical Leave ALWAYS requires a medical certificate.
+      if (leaveType === businessRules.leave.medicalCertRequiredFor && !medicalCertUrl) {
         return Err(
-          AppError.validation(
-            `A medical certificate is required for Sick Leave of ${businessRules.leave.medicalCertRequiredAfterDays} or more days.`
-          )
+          AppError.validation('A medical certificate must be attached for Medical Leave.')
         );
       }
 

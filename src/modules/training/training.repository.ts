@@ -23,14 +23,13 @@ export interface Student extends Entity {
   customFields?: Record<string, any>;
 }
 
+/**
+ * A course in the catalog. Category / Type / Duration / Description were
+ * removed per confirmed scope — the catalog is just the course identity.
+ */
 export interface Course extends Entity {
   title: string;
   code: string;
-  category: TrainingCategory;
-  type: TrainingType;
-  durationWeeks: number;
-  description?: string;
-  syllabus?: string[];
 }
 
 export interface Batch extends Entity {

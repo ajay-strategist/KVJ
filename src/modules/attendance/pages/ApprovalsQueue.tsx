@@ -98,6 +98,53 @@ export function ApprovalsQueue() {
     }
   };
 
+  /** Inline Accept/Reject straight from the queue row (no drawer needed). */
+  const handleDecideLeave = async (rec: LeaveRecord, decision: 'accept' | 'reject') => {
+    const accept = decision === 'accept';
+    const ok = await confirm({
+      title: accept ? 'Accept Request?' : 'Reject Request?',
+      message: `Are you sure you want to ${accept ? 'accept' : 'reject'} this leave request?`,
+    });
+    if (!ok) return;
+
+    const res = accept ? await approveLeave(rec.id) : await rejectLeave(rec.id);
+    if (res.ok) {
+      toast({
+        variant: accept ? 'success' : 'warning',
+        title: accept ? 'Leave Accepted' : 'Leave Rejected',
+      });
+      refreshPending();
+    } else {
+      toast({ variant: 'error', title: 'Action Failed', message: res.error });
+    }
+  };
+
+  /** Inline Accept/Reject for a missed-clock-in (attendance correction) request. */
+  const handleDecideCorrection = async (rec: any, decision: 'accept' | 'reject') => {
+    const accept = decision === 'accept';
+    const ok = await confirm({
+      title: accept ? 'Accept Correction?' : 'Reject Correction?',
+      message: accept
+        ? "This will back-fill the employee's attendance record."
+        : 'Are you sure you want to reject this correction request?',
+    });
+    if (!ok) return;
+
+    if (!accept) {
+      setCorrections((prev) => prev.filter((c) => c.id !== rec.id));
+      toast({ variant: 'warning', title: 'Correction Rejected' });
+      return;
+    }
+
+    const res = await attService.approveCorrection(rec.id, { id: user!.id, role: user!.role });
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Correction Accepted' });
+      setCorrections((prev) => prev.filter((c) => c.id !== rec.id));
+    } else {
+      toast({ variant: 'error', title: 'Approval Failed', message: res.error.message });
+    }
+  };
+
   const leaveColumns: Column<LeaveRecord>[] = [
     {
       key: 'employee',
@@ -118,6 +165,16 @@ export function ApprovalsQueue() {
       key: 'reason',
       header: 'Reason',
       accessor: (r) => r.reason,
+    },
+    {
+      key: 'actions',
+      header: 'Action',
+      render: (r) => (
+        <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" onClick={() => handleDecideLeave(r, 'accept')}>Accept</Button>
+          <Button size="sm" variant="danger" onClick={() => handleDecideLeave(r, 'reject')}>Reject</Button>
+        </div>
+      ),
     },
   ];
 
@@ -146,6 +203,16 @@ export function ApprovalsQueue() {
       key: 'reason',
       header: 'Reason',
       accessor: (r) => r.reason,
+    },
+    {
+      key: 'actions',
+      header: 'Action',
+      render: (r) => (
+        <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" onClick={() => handleDecideCorrection(r, 'accept')}>Accept</Button>
+          <Button size="sm" variant="danger" onClick={() => handleDecideCorrection(r, 'reject')}>Reject</Button>
+        </div>
+      ),
     },
   ];
 

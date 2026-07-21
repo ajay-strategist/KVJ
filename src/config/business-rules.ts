@@ -34,7 +34,10 @@ export const businessRules = {
     lateAndBreakApplyTo: ['Office'],      // ✅ CONFIRMED — only Office/Work days
     classUsesOrganisationTiming: true,    // ✅ CONFIRMED — Class days follow the org's fixed timing
     autoClockOutAt: '23:59',              // safety net: close dangling sessions at day end
-    workTypes: ['Office', 'Training', 'Marketing', 'Meeting', 'Work From Home', 'Client Visit', 'Other'],
+    // ✅ CONFIRMED — three work types only. 'Training' requires selecting the
+    // allocated batch (the batch supplies the college/Organization on the log).
+    // Log shows these as Class/Work = Training / Marketing / Work (Office).
+    workTypes: ['Office', 'Training', 'Marketing'],
   },
 
   // ── Leave ─────────────────────────────────────────────────────────────────
@@ -48,11 +51,11 @@ export const businessRules = {
     skipStepIfRequesterHoldsRole: true,           // ✅ CONFIRMED (manager → CEO)
     trackBalances: true,
     salaryImpact: false,                          // ✅ CONFIRMED — no payroll/LOP calc
-    entitlements: {                               // ⚠️ CONFIRM annual days per type (informational)
-      Casual: 12, Sick: 8, Earned: 15, Compensatory: 0,
-      Maternity: 182, Paternity: 15, LossOfPay: 0, WorkFromHome: 0,
-    } as Record<string, number>,
-    medicalCertRequiredAfterDays: 2,      // ⚠️ CONFIRM
+
+    // ✅ CONFIRMED — exactly TWO leave types.
+    types: ['Leave', 'Medical Leave'] as const,
+    /** Medical Leave always requires a medical certificate attachment. */
+    medicalCertRequiredFor: 'Medical Leave',
   },
 
   // ── Training: student eligibility ─────────────────────────────────────────
