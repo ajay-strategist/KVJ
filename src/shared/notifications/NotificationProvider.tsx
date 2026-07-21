@@ -50,6 +50,7 @@ interface NotificationContextValue {
   grouped: Record<NotificationCategory, NotificationItem[]>;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  addNotification: (n: { title: string; message?: string; category: NotificationCategory; priority?: NotificationPriority; recipientUserId?: string }) => void;
   toasts: Toast[];
   toast: (t: Omit<Toast, 'id'>) => void;
   dismissToast: (id: string) => void;
@@ -58,10 +59,6 @@ interface NotificationContextValue {
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 const uid = () => Math.random().toString(36).slice(2);
 
-/** Module-level default so the service identity is stable across renders.
- * (A `service = new MockNotificationService()` default parameter would create a
- * fresh instance every render, re-triggering the [service] effect below in an
- * infinite setItems loop that starves the whole app of commits.) */
 const defaultNotificationService = new MockNotificationService();
 
 export function NotificationProvider({ children, service = defaultNotificationService }: { children: ReactNode; service?: INotificationService }) {
@@ -72,6 +69,19 @@ export function NotificationProvider({ children, service = defaultNotificationSe
 
   const markRead = useCallback((id: string) => setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n))), []);
   const markAllRead = useCallback(() => setItems((prev) => prev.map((n) => ({ ...n, read: true }))), []);
+
+  const addNotification = useCallback((n: { title: string; message?: string; category: NotificationCategory; priority?: NotificationPriority; recipientUserId?: string }) => {
+    const newItem: NotificationItem = {
+      id: uid(),
+      title: n.title,
+      message: n.message,
+      category: n.category,
+      priority: n.priority || 'normal',
+      read: false,
+      createdAt: Date.now(),
+    };
+    setItems((prev) => [newItem, ...prev]);
+  }, []);
 
   const dismissToast = useCallback((id: string) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
   const toast = useCallback((t: Omit<Toast, 'id'>) => {
@@ -87,9 +97,9 @@ export function NotificationProvider({ children, service = defaultNotificationSe
     }, {} as Record<NotificationCategory, NotificationItem[]>);
     return {
       items, unreadCount: items.filter((n) => !n.read).length, grouped,
-      markRead, markAllRead, toasts, toast, dismissToast,
+      markRead, markAllRead, addNotification, toasts, toast, dismissToast,
     };
-  }, [items, toasts, markRead, markAllRead, toast, dismissToast]);
+  }, [items, toasts, markRead, markAllRead, addNotification, toast, dismissToast]);
 
   return (
     <NotificationContext.Provider value={value}>

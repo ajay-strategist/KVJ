@@ -35,6 +35,7 @@ interface AttendancePanelProps {
   clockOut: () => Promise<any>;
   startBreak: (reason?: string) => Promise<any>;
   endBreak: () => Promise<any>;
+  onActivityLog?: (title: string, tone?: 'success' | 'progress' | 'info' | 'neutral') => void;
 }
 
 export const AttendancePanel = memo(function AttendancePanel({
@@ -44,6 +45,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   clockOut,
   startBreak,
   endBreak,
+  onActivityLog,
 }: AttendancePanelProps) {
   const { confirm } = useDialog();
   const { toast } = useNotifications();
@@ -118,11 +120,12 @@ export const AttendancePanel = memo(function AttendancePanel({
     const res = await clockIn(type as any);
     if (res.ok) {
       toast({ variant: 'success', title: 'Clocked In', message: `Clocked in for ${type} (${locationStr})` });
+      if (onActivityLog) onActivityLog(`Clocked in for ${type} (${locationStr})`, 'success');
       setClockInOpen(false);
     } else {
       toast({ variant: 'error', title: 'Clock In Failed', message: res.error });
     }
-  }, [clockIn, toast, locationStr]);
+  }, [clockIn, toast, locationStr, onActivityLog]);
 
   const handleClockOut = useCallback(async () => {
     const ok = await confirm({ title: 'Clock Out?', message: 'Are you sure you want to end your work day?' });
@@ -130,30 +133,33 @@ export const AttendancePanel = memo(function AttendancePanel({
     const res = await clockOut();
     if (res.ok) {
       toast({ variant: 'success', title: 'Clocked Out', message: 'You have successfully clocked out.' });
+      if (onActivityLog) onActivityLog('Clocked out work session', 'neutral');
     } else {
       toast({ variant: 'error', title: 'Clock Out Failed', message: res.error });
     }
-  }, [confirm, clockOut, toast]);
+  }, [confirm, clockOut, toast, onActivityLog]);
 
   const handleStartBreakSubmit = useCallback(async (values: Record<string, unknown>) => {
     const reason = values.reason as string;
     const res = await startBreak(reason);
     if (res.ok) {
       toast({ variant: 'info', title: 'On Break', message: reason ? `Reason: ${reason}` : 'Enjoy your break.' });
+      if (onActivityLog) onActivityLog(`Started break: ${reason || 'Break'}`, 'info');
       setBreakOpen(false);
     } else {
       toast({ variant: 'error', title: 'Break Failed', message: res.error });
     }
-  }, [startBreak, toast]);
+  }, [startBreak, toast, onActivityLog]);
 
   const handleEndBreak = useCallback(async () => {
     const res = await endBreak();
     if (res.ok) {
       toast({ variant: 'success', title: 'Back to Work', message: 'Work session resumed.' });
+      if (onActivityLog) onActivityLog('Resumed work session after break', 'progress');
     } else {
       toast({ variant: 'error', title: 'End Break Failed', message: res.error });
     }
-  }, [endBreak, toast]);
+  }, [endBreak, toast, onActivityLog]);
 
   const sampleBatches = [
     { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
@@ -372,34 +378,18 @@ export const TaskWidget = memo(function TaskWidget({
   tasks,
   setTasks,
   onTaskStart,
+  onTaskPause,
   onTaskEnd,
+  onSubmitReview,
 }: {
   tasks: TaskItem[];
   setTasks: React.Dispatch<React.SetStateAction<TaskItem[]>>;
-  onTaskStart: (taskTitle: string) => void;
-  onTaskEnd: (taskTitle: string) => void;
+  onTaskStart: (id: string, taskTitle: string) => void;
+  onTaskPause: (id: string, taskTitle: string) => void;
+  onTaskEnd: (id: string, taskTitle: string) => void;
+  onSubmitReview: (id: string, taskTitle: string) => void;
 }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-
-  const startTask = (id: string, title: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: true, underReview: false } : { ...t, active: false }))
-    );
-    onTaskStart(title);
-  };
-
-  const pauseTask = (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: false } : t))
-    );
-  };
-
-  const endTask = (id: string, title: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: false, underReview: true, progress: 100 } : t))
-    );
-    onTaskEnd(title);
-  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -454,13 +444,14 @@ export const TaskWidget = memo(function TaskWidget({
               gap: 10,
             }}
           >
+            {/* Task Header & Details (No bottom line separator between tasks) */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{t.title}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                    📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong> · 📅 Due: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong>
+                    📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong> · 📅 Due Date: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong>
                   </div>
                 </div>
               </div>
@@ -470,35 +461,60 @@ export const TaskWidget = memo(function TaskWidget({
               </div>
             </div>
 
-            {/* Progress Bar & Logged Time */}
+            {/* Total Hours Worked & Progress Bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
                 <div style={{ width: `${t.progress}%`, height: '100%', background: t.underReview ? 'var(--status-success)' : 'var(--brand)', transition: 'width 0.3s ease' }} />
               </div>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{t.progress}% Complete</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>⏱ {formatSec(t.secondsToday)}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+                ⏱ Total Hours Worked: {formatSec(t.secondsToday)}
+              </span>
             </div>
 
-            {/* Actions: Start, Pause, End */}
+            {/* Action Buttons: Start, Pause, End, Submit Review */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
               {!t.underReview && (
                 <>
-                  {t.active ? (
-                    <Button variant="secondary" onClick={() => pauseTask(t.id)} style={{ padding: '4px 12px', fontSize: 12 }}>
-                      ⏸ Pause
-                    </Button>
-                  ) : (
-                    <Button onClick={() => startTask(t.id, t.title)} style={{ padding: '4px 12px', fontSize: 12 }}>
-                      ▶ Start
-                    </Button>
-                  )}
-                  <Button variant="secondary" onClick={() => endTask(t.id, t.title)} style={{ padding: '4px 12px', fontSize: 12, background: 'var(--status-success-bg)', color: 'var(--status-success)', borderColor: 'var(--status-success)' }}>
-                    ✓ End (Submit Review)
+                  <Button
+                    variant={t.active ? 'secondary' : 'primary'}
+                    onClick={() => onTaskStart(t.id, t.title)}
+                    disabled={t.active}
+                    style={{ padding: '4px 10px', fontSize: 12 }}
+                  >
+                    ▶ Start
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    onClick={() => onTaskPause(t.id, t.title)}
+                    disabled={!t.active}
+                    style={{ padding: '4px 10px', fontSize: 12 }}
+                  >
+                    ⏸ Pause
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    onClick={() => onTaskEnd(t.id, t.title)}
+                    style={{ padding: '4px 10px', fontSize: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
+                  >
+                    ⏹ End
+                  </Button>
+
+                  <Button
+                    onClick={() => onSubmitReview(t.id, t.title)}
+                    style={{ padding: '4px 10px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                  >
+                    📩 Submit Review
                   </Button>
                 </>
               )}
+
               {t.underReview && (
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>✓ Submitted for Manager/CEO Approval</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
+                  ✓ Submitted for Manager/CEO Approval
+                </span>
               )}
             </div>
           </div>
@@ -586,10 +602,39 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
   );
 });
 
+/** Resized Stat Pill matching quick action button height */
+function CompactStatPill({ label, value, tone = 'neutral', icon }: { label: string; value: string; tone?: 'success' | 'warning' | 'info' | 'danger' | 'neutral'; icon?: string }) {
+  const colorMap = {
+    success: 'var(--status-success)',
+    warning: 'var(--status-warning)',
+    info: 'var(--status-info)',
+    danger: 'var(--status-danger)',
+    neutral: 'var(--brand)',
+  };
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '8px 12px',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+      height: 52,
+    }}>
+      {icon && <span style={{ fontSize: 18, color: colorMap[tone] }}>{icon}</span>}
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>{value}</span>
+      </div>
+    </div>
+  );
+}
+
 /** My Day — default employee workspace. */
 export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak } = useAttendance();
-  const { toast } = useNotifications();
+  const { toast, addNotification } = useNotifications();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const [tasks, setTasks] = useState<TaskItem[]>([
@@ -604,25 +649,51 @@ export function MyDayPage() {
     { id: '3', title: 'Assessment Review', time: '02:00 PM', tone: 'info' },
   ]);
 
-  const handleTaskStart = (taskTitle: string) => {
+  const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setTimelineEntries((prev) => [
-      { id: String(Date.now()), title: `Started: ${taskTitle}`, time: timeStr, tone: 'progress' },
+      { id: String(Date.now()), title, time: timeStr, tone },
       ...prev,
     ]);
   };
 
-  const handleTaskEnd = (taskTitle: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const handleTaskStart = (id: string, taskTitle: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, active: true, underReview: false } : { ...t, active: false }))
+    );
+    handleActivityLog(`Started Task: ${taskTitle}`, 'progress');
+  };
+
+  const handleTaskPause = (id: string, taskTitle: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, active: false } : t))
+    );
+    handleActivityLog(`Paused Task: ${taskTitle}`, 'neutral');
+  };
+
+  const handleTaskEnd = (id: string, taskTitle: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, active: false } : t))
+    );
+    handleActivityLog(`Ended Task Work Session: ${taskTitle}`, 'info');
+  };
+
+  const handleSubmitReview = (id: string, taskTitle: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, active: false, underReview: true, progress: 100 } : t))
+    );
     toast({
       variant: 'success',
       title: 'Review Requested',
       message: `Task '${taskTitle}' submitted for Manager/CEO completion review.`,
     });
-    setTimelineEntries((prev) => [
-      { id: String(Date.now()), title: `Ended & Sent for Review: ${taskTitle}`, time: timeStr, tone: 'success' },
-      ...prev,
-    ]);
+    addNotification({
+      title: 'Task Review Submitted',
+      message: `'${taskTitle}' submitted by employee for completion approval.`,
+      category: 'task',
+      priority: 'high',
+    });
+    handleActivityLog(`Submitted for Review: ${taskTitle}`, 'success');
   };
 
   useEffect(() => {
@@ -643,18 +714,14 @@ export function MyDayPage() {
     <AppShell>
       <Greeting />
 
-      {/* Single Row: Quick Actions on Left, Metrics on Right */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <QuickActionCard icon="✓" label="Add Task" />
-          <QuickActionCard icon="₹" label="Submit Expense" />
-          <QuickActionCard icon="🗓" label="Request Leave" />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          <StatCard label="Tasks Due" value="3" tone="warning" icon="◧" />
-          <StatCard label="Hours of this Month" value="168 hrs" tone="info" icon="⌛" />
-          <StatCard label="Attendance %" value="96.2%" tone="success" icon="📈" />
-        </div>
+      {/* Single Row: Quick Actions + Resized Compact Metrics Aligned Together in 6 Equal Columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, alignItems: 'center', marginBottom: 20 }}>
+        <QuickActionCard icon="✓" label="Add Task" />
+        <QuickActionCard icon="₹" label="Submit Expense" />
+        <QuickActionCard icon="🗓" label="Request Leave" />
+        <CompactStatPill label="Tasks Due" value="3" tone="warning" icon="◧" />
+        <CompactStatPill label="Hours this Month" value="168 hrs" tone="info" icon="⌛" />
+        <CompactStatPill label="Attendance %" value="96.2%" tone="success" icon="📈" />
       </div>
 
       <AttendancePanel
@@ -664,24 +731,28 @@ export function MyDayPage() {
         clockOut={clockOut}
         startBreak={startBreak}
         endBreak={endBreak}
+        onActivityLog={handleActivityLog}
       />
 
-      {/* Main Layout: Today's Tasks on LEFT, Announcements + Timeline on RIGHT */}
+      {/* Main Layout: Today's Tasks & Timeline on LEFT (stacked), Announcements on RIGHT */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginTop: 16 }}>
-        {/* Left Column: Today's Tasks */}
-        <div>
+        {/* Left Column: Today's Tasks + Timeline below it */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <TaskWidget
             tasks={tasks}
             setTasks={setTasks}
             onTaskStart={handleTaskStart}
+            onTaskPause={handleTaskPause}
             onTaskEnd={handleTaskEnd}
+            onSubmitReview={handleSubmitReview}
           />
+
+          <TimelineWidget entries={timelineEntries} />
         </div>
 
-        {/* Right Column: Announcements Dashboard (top) + Timeline (bottom) */}
+        {/* Right Column: Announcements Dashboard */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AnnouncementWidget />
-          <TimelineWidget entries={timelineEntries} />
         </div>
       </div>
 

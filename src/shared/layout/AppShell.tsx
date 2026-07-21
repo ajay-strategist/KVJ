@@ -144,9 +144,11 @@ function NavLink({ to, icon, label, collapsed, onNavigate }: { to: string; icon:
 
 function TopBar({ onMenu, isMobile }: { onMenu: () => void; isMobile: boolean }) {
   const { theme, toggle } = useTheme();
-  const { unreadCount } = useNotifications();
+  const { items, unreadCount, markRead, markAllRead } = useNotifications();
   const { setOpen } = useCommandPalette();
   const { user, logout } = useAuth();
+  const [notifOpen, setNotifOpen] = useState(false);
+
   return (
     <header style={{ position: 'sticky', top: 0, zIndex: 100, height: 60, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
       {isMobile && <button onClick={onMenu} aria-label="Menu" style={iconBtn}><Icon name="Menu" /></button>}
@@ -163,7 +165,7 @@ function TopBar({ onMenu, isMobile }: { onMenu: () => void; isMobile: boolean })
       >
         <Icon name={theme === 'light' ? 'Moon' : theme === 'dark' ? 'Gauge' : 'Sun'} size={18} />
       </button>
-      <button aria-label="Notifications" style={{ ...iconBtn, position: 'relative' }}>
+      <button onClick={() => setNotifOpen((o) => !o)} aria-label="Notifications" style={{ ...iconBtn, position: 'relative' }}>
         <Icon name="Bell" size={18} />
         {unreadCount > 0 && <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: 'var(--status-danger)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{unreadCount}</span>}
       </button>
@@ -172,6 +174,58 @@ function TopBar({ onMenu, isMobile }: { onMenu: () => void; isMobile: boolean })
         {!isMobile && user && <div style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13, fontWeight: 600 }}>{user.fullName}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user.role}</div></div>}
         <button onClick={logout} aria-label="Log out" style={iconBtn}><Icon name="LogOut" size={16} /></button>
       </div>
+
+      {/* Notifications Panel Popover */}
+      {notifOpen && (
+        <div style={{
+          position: 'absolute',
+          top: 64,
+          right: 16,
+          width: 340,
+          maxHeight: 480,
+          background: 'var(--bg-panel)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--e3)',
+          zIndex: 1200,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-sunken)' }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>Notifications ({unreadCount} unread)</span>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mark all read</button>
+            )}
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {items.length === 0 ? (
+              <div style={{ padding: 20, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>No notifications right now</div>
+            ) : (
+              items.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => markRead(item.id)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-xs)',
+                    background: item.read ? 'transparent' : 'var(--bg-hover)',
+                    borderLeft: item.read ? 'none' : '3px solid var(--brand)',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: item.read ? 500 : 700, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{item.title}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{item.category}</span>
+                  </div>
+                  {item.message && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{item.message}</div>}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
