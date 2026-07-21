@@ -356,28 +356,49 @@ export const AttendancePanel = memo(function AttendancePanel({
   );
 });
 
+export interface TaskItem {
+  id: string;
+  title: string;
+  project: string;
+  due: string;
+  priority: string;
+  progress: number;
+  active: boolean;
+  underReview?: boolean;
+  secondsToday: number;
+}
+
 export const TaskWidget = memo(function TaskWidget({
   tasks,
   setTasks,
   onTaskStart,
+  onTaskEnd,
 }: {
-  tasks: Array<{ id: string; title: string; project: string; due: string; priority: string; active: boolean; secondsToday: number }>;
-  setTasks: React.Dispatch<React.SetStateAction<any[]>>;
+  tasks: TaskItem[];
+  setTasks: React.Dispatch<React.SetStateAction<TaskItem[]>>;
   onTaskStart: (taskTitle: string) => void;
+  onTaskEnd: (taskTitle: string) => void;
 }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  const toggleTaskTimer = (id: string) => {
+  const startTask = (id: string, title: string) => {
     setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === id) {
-          const nextActive = !t.active;
-          if (nextActive) onTaskStart(t.title);
-          return { ...t, active: nextActive };
-        }
-        return { ...t, active: false };
-      })
+      prev.map((t) => (t.id === id ? { ...t, active: true, underReview: false } : { ...t, active: false }))
     );
+    onTaskStart(title);
+  };
+
+  const pauseTask = (id: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, active: false } : t))
+    );
+  };
+
+  const endTask = (id: string, title: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, active: false, underReview: true, progress: 100 } : t))
+    );
+    onTaskEnd(title);
   };
 
   useEffect(() => {
@@ -413,46 +434,76 @@ export const TaskWidget = memo(function TaskWidget({
   return (
     <Card>
       <SectionHeader title="Today's Tasks (Drag & Drop Reorder)" />
-      {tasks.map((t, idx) => (
-        <div
-          key={t.id}
-          draggable
-          onDragStart={() => handleDragStart(idx)}
-          onDragOver={(e) => handleDragOver(e, idx)}
-          onDragEnd={() => setDraggedIndex(null)}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '12px 10px',
-            borderBottom: '1px solid var(--border)',
-            background: draggedIndex === idx ? 'var(--bg-hover)' : 'transparent',
-            borderRadius: 'var(--radius-xs)',
-            cursor: 'grab',
-            transition: 'background 0.15s ease',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 16, color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{t.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                {t.project} · Due: {t.due} · Logged Today: <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{formatSec(t.secondsToday)}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {tasks.map((t, idx) => (
+          <div
+            key={t.id}
+            draggable
+            onDragStart={() => handleDragStart(idx)}
+            onDragOver={(e) => handleDragOver(e, idx)}
+            onDragEnd={() => setDraggedIndex(null)}
+            style={{
+              padding: 14,
+              border: '1px solid var(--border)',
+              background: draggedIndex === idx ? 'var(--bg-hover)' : 'var(--bg-sunken)',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'grab',
+              transition: 'background 0.15s ease',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{t.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                    📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong> · 📅 Due: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
+                {t.underReview && <Badge tone="info">Under Review</Badge>}
               </div>
             </div>
+
+            {/* Progress Bar & Logged Time */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ width: `${t.progress}%`, height: '100%', background: t.underReview ? 'var(--status-success)' : 'var(--brand)', transition: 'width 0.3s ease' }} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{t.progress}% Complete</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>⏱ {formatSec(t.secondsToday)}</span>
+            </div>
+
+            {/* Actions: Start, Pause, End */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              {!t.underReview && (
+                <>
+                  {t.active ? (
+                    <Button variant="secondary" onClick={() => pauseTask(t.id)} style={{ padding: '4px 12px', fontSize: 12 }}>
+                      ⏸ Pause
+                    </Button>
+                  ) : (
+                    <Button onClick={() => startTask(t.id, t.title)} style={{ padding: '4px 12px', fontSize: 12 }}>
+                      ▶ Start
+                    </Button>
+                  )}
+                  <Button variant="secondary" onClick={() => endTask(t.id, t.title)} style={{ padding: '4px 12px', fontSize: 12, background: 'var(--status-success-bg)', color: 'var(--status-success)', borderColor: 'var(--status-success)' }}>
+                    ✓ End (Submit Review)
+                  </Button>
+                </>
+              )}
+              {t.underReview && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>✓ Submitted for Manager/CEO Approval</span>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
-            <Button
-              variant={t.active ? 'secondary' : 'primary'}
-              onClick={() => toggleTaskTimer(t.id)}
-              style={{ padding: '4px 10px', fontSize: 12 }}
-            >
-              {t.active ? '⏸ Pause' : '▶ Start'}
-            </Button>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </Card>
   );
 });
@@ -518,7 +569,7 @@ export const TimelineWidget = memo(function TimelineWidget({
 }) {
   return (
     <Card>
-      <SectionHeader title="Timeline" />
+      <SectionHeader title="Daily Activity Timeline (Clock In → Clock Out)" />
       <Timeline entries={entries} />
     </Card>
   );
@@ -527,7 +578,7 @@ export const TimelineWidget = memo(function TimelineWidget({
 export const AnnouncementWidget = memo(function AnnouncementWidget() {
   return (
     <Card style={{ borderLeft: '4px solid var(--accent)' }}>
-      <SectionHeader title="Announcements Board" />
+      <SectionHeader title="Announcements Dashboard" />
       <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
         📢 <strong>Company Notice:</strong> Training Calendar updated for Q3. Please review your assigned batches under Batches ➔ Training Calendar.
       </div>
@@ -538,16 +589,17 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
 /** My Day — default employee workspace. */
 export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak } = useAttendance();
+  const { toast } = useNotifications();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: 'Today', priority: 'High', active: false, secondsToday: 5400 },
-    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: 'Today', priority: 'Critical', active: false, secondsToday: 3600 },
-    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: 'Tomorrow', priority: 'Normal', active: false, secondsToday: 0 },
+  const [tasks, setTasks] = useState<TaskItem[]>([
+    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: '21/07/2026', priority: 'High', progress: 65, active: false, secondsToday: 5400 },
+    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: '21/07/2026', priority: 'Critical', progress: 40, active: false, secondsToday: 3600 },
+    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: '22/07/2026', priority: 'Normal', progress: 10, active: false, secondsToday: 0 },
   ]);
 
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([
-    { id: '1', title: 'Clocked in (Office)', time: '08:30 AM', tone: 'success' },
+    { id: '1', title: 'Clocked in (Office - GPS Verified)', time: '08:30 AM', tone: 'success' },
     { id: '2', title: 'Power BI Session Started', time: '10:00 AM', tone: 'progress' },
     { id: '3', title: 'Assessment Review', time: '02:00 PM', tone: 'info' },
   ]);
@@ -556,6 +608,19 @@ export function MyDayPage() {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setTimelineEntries((prev) => [
       { id: String(Date.now()), title: `Started: ${taskTitle}`, time: timeStr, tone: 'progress' },
+      ...prev,
+    ]);
+  };
+
+  const handleTaskEnd = (taskTitle: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    toast({
+      variant: 'success',
+      title: 'Review Requested',
+      message: `Task '${taskTitle}' submitted for Manager/CEO completion review.`,
+    });
+    setTimelineEntries((prev) => [
+      { id: String(Date.now()), title: `Ended & Sent for Review: ${taskTitle}`, time: timeStr, tone: 'success' },
       ...prev,
     ]);
   };
@@ -601,16 +666,22 @@ export function MyDayPage() {
         endBreak={endBreak}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16, marginTop: 16 }}>
-        {/* Left Column: Timeline */}
+      {/* Main Layout: Today's Tasks on LEFT, Announcements + Timeline on RIGHT */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginTop: 16 }}>
+        {/* Left Column: Today's Tasks */}
         <div>
-          <TimelineWidget entries={timelineEntries} />
+          <TaskWidget
+            tasks={tasks}
+            setTasks={setTasks}
+            onTaskStart={handleTaskStart}
+            onTaskEnd={handleTaskEnd}
+          />
         </div>
 
-        {/* Right Column: Announcements (top) + Task List (bottom) */}
+        {/* Right Column: Announcements Dashboard (top) + Timeline (bottom) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AnnouncementWidget />
-          <TaskWidget tasks={tasks} setTasks={setTasks} onTaskStart={handleTaskStart} />
+          <TimelineWidget entries={timelineEntries} />
         </div>
       </div>
 
