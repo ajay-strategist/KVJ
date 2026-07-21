@@ -171,6 +171,7 @@ export function AttendanceCalendarView({
                 key={i}
                 onClick={() => setSelectedDay(d)}
                 style={{
+                  gridColumnStart: i === 0 ? 2 : undefined, // Monday start for Day 1
                   background: styles.bg,
                   border: `1.5px solid ${styles.border}`,
                   borderRadius: 'var(--radius-sm)',

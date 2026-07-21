@@ -367,89 +367,92 @@ export function AttendanceLogPage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* 1. Global Consolidated Filter Panel */}
-        <Card>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Filters:</span>
+        <Card style={{ padding: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Top Row: Presets + Custom Date Pickers + Submit Button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>⚡ Filters:</span>
 
-              <Button
-                variant={activeFilterPreset === 'current_month' ? 'primary' : 'secondary'}
-                onClick={() => handleFilterPreset('current_month')}
-                style={{ padding: '6px 14px', fontSize: 12 }}
-              >
-                Current Month
-              </Button>
-              <Button
-                variant={activeFilterPreset === 'last_month' ? 'primary' : 'secondary'}
-                onClick={() => handleFilterPreset('last_month')}
-                style={{ padding: '6px 14px', fontSize: 12 }}
-              >
-                Last Month
-              </Button>
-              <Button
-                variant={activeFilterPreset === 'last_1_year' ? 'primary' : 'secondary'}
-                onClick={() => handleFilterPreset('last_1_year')}
-                style={{ padding: '6px 14px', fontSize: 12 }}
-              >
-                Last 1 Year (Excl. Current)
-              </Button>
-              <Button
-                variant={activeFilterPreset === 'custom' ? 'primary' : 'secondary'}
-                onClick={() => handleFilterPreset('custom')}
-                style={{ padding: '6px 14px', fontSize: 12 }}
-              >
-                Custom Range
-              </Button>
+                <Button
+                  variant={activeFilterPreset === 'current_month' ? 'primary' : 'secondary'}
+                  onClick={() => handleFilterPreset('current_month')}
+                  style={{ padding: '6px 14px', fontSize: 12 }}
+                >
+                  Current Month
+                </Button>
+                <Button
+                  variant={activeFilterPreset === 'last_month' ? 'primary' : 'secondary'}
+                  onClick={() => handleFilterPreset('last_month')}
+                  style={{ padding: '6px 14px', fontSize: 12 }}
+                >
+                  Last Month
+                </Button>
+                <Button
+                  variant={activeFilterPreset === 'last_1_year' ? 'primary' : 'secondary'}
+                  onClick={() => handleFilterPreset('last_1_year')}
+                  style={{ padding: '6px 14px', fontSize: 12 }}
+                >
+                  Last 1 Year (Excl. Current)
+                </Button>
+                <Button
+                  variant={activeFilterPreset === 'custom' ? 'primary' : 'secondary'}
+                  onClick={() => handleFilterPreset('custom')}
+                  style={{ padding: '6px 14px', fontSize: 12 }}
+                >
+                  Custom Range
+                </Button>
 
-              {/* Custom Date Range Pickers */}
-              {activeFilterPreset === 'custom' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="date"
-                    className="kvj-input"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    style={{ padding: '4px 8px', fontSize: 12 }}
-                  />
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
-                  <input
-                    type="date"
-                    className="kvj-input"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    style={{ padding: '4px 8px', fontSize: 12 }}
-                  />
-                </div>
-              )}
-
-              {/* Employee Selection Dropdown */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Employee:</span>
-                {isManagement ? (
-                  <select
-                    className="kvj-select"
-                    value={selectedEmployee}
-                    onChange={(e) => setSelectedEmployee(e.target.value)}
-                    style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
-                  >
-                    <option value={user?.fullName || 'Linto George'}>Me ({user?.fullName || 'Personal'})</option>
-                    <option value="All Employees">All Employees (Manager Access)</option>
-                    {employeeList.filter((e) => e !== user?.fullName).map((e) => (
-                      <option key={e} value={e}>{e}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
-                    👤 {user?.fullName || 'Linto George'}
-                  </span>
+                {/* Custom Date Range Pickers */}
+                {activeFilterPreset === 'custom' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-sunken)', padding: '4px 8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
+                    <input
+                      type="date"
+                      className="kvj-input"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      style={{ padding: '2px 6px', fontSize: 12 }}
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>to</span>
+                    <input
+                      type="date"
+                      className="kvj-input"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      style={{ padding: '2px 6px', fontSize: 12 }}
+                    />
+                  </div>
                 )}
               </div>
+
+              {/* Action Button: Far Right Submit Attendance */}
+              <Button onClick={() => setSubmitDrawerOpen(true)} style={{ padding: '6px 16px', fontSize: 12 }}>
+                📋 Submit Attendance
+              </Button>
             </div>
 
-            {/* Action Button: Far Right Submit Attendance */}
-            <Button onClick={() => setSubmitDrawerOpen(true)} style={{ padding: '8px 16px', fontSize: 13 }}>
-              📋 Submit Attendance
-            </Button>
+            {/* Bottom Row: Employee Selection */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px dashed var(--border)', paddingTop: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Employee Scope:</span>
+              {isManagement ? (
+                <select
+                  className="kvj-select"
+                  value={selectedEmployee}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 200 }}
+                >
+                  <option value={user?.fullName || 'Linto George'}>Me ({user?.fullName || 'Personal'})</option>
+                  <option value="All Employees">All Employees (Manager Access)</option>
+                  {employeeList.filter((e) => e !== user?.fullName).map((e) => (
+                    <option key={e} value={e}>{e}</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
+                  👤 {user?.fullName || 'Linto George'}
+                </span>
+              )}
+            </div>
           </div>
         </Card>
 
