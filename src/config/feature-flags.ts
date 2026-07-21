@@ -49,9 +49,29 @@ export const featureFlags = {
   },
   // Integrations
   integrations: {
-    supabase: false, // Phase 2
+    supabase: false, // master switch — must be on for ANY module to use Supabase
     googleDrive: false,
     powerBi: false,
+  },
+
+  /**
+   * Per-module Supabase cutover. A module may only be switched on once its
+   * tables actually exist in the database, otherwise every query fails with
+   * "table not found". This lets us migrate module-by-module instead of
+   * flipping the whole app at once.
+   *
+   * Covered by supabase/migrations today: employee, attendance, leave.
+   * The rest still need their schema written.
+   */
+  supabaseModules: {
+    employee: false,
+    attendance: false,
+    leave: false,
+    training: false,
+    project: false,
+    finance: false,
+    communication: false,
+    analytics: false,
   },
 } as const;
 
@@ -65,4 +85,13 @@ export function isModuleEnabled(key: keyof FeatureFlags['modules']): boolean {
 /** Page-level gate used by the nav engine. */
 export function isPageEnabled(key: keyof FeatureFlags['pages']): boolean {
   return featureFlags.pages[key];
+}
+
+/**
+ * True when a module should resolve its Supabase repositories instead of the
+ * mock ones. Requires BOTH the master integration switch and that module's
+ * own cutover flag, so a half-migrated database can never take the app down.
+ */
+export function usesSupabase(key: keyof FeatureFlags['supabaseModules']): boolean {
+  return featureFlags.integrations.supabase && featureFlags.supabaseModules[key];
 }
