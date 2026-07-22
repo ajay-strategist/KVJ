@@ -110,7 +110,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
           transition: 'width var(--dur-base) var(--ease-emphasized)',
           overflow: 'hidden',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed && !isMobile ? 'center' : 'flex-start', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
             <img src="/logo.png" alt="KVJ Logo" style={{ height: 36, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
           </div>
           <nav style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
