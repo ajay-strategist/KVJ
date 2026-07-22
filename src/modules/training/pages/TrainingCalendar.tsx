@@ -139,6 +139,8 @@ export function TrainingCalendar() {
     return arr;
   }, [year, month, daysCount, holidays]);
 
+  const isPerformanceMode = (dateRows?.length || 0) > 1000 || trainers.length > 100;
+
   // Conflict Engine Check
   const checkConflicts = (dayNum: number, trainerId: string, sList: ScheduleSession[]): { conflicted: boolean; reason: string } => {
     if (sList.length < 2) return { conflicted: false, reason: '' };
@@ -225,7 +227,7 @@ export function TrainingCalendar() {
         }
         .matrix-cell-hover .add-schedule-btn {
           opacity: 0.15;
-          transition: opacity 0.2s ease;
+          transition: ${isPerformanceMode ? 'none' : 'opacity 0.2s ease'};
         }
         .matrix-cell-hover:hover .add-schedule-btn {
           opacity: 1 !important;
@@ -486,12 +488,12 @@ export function TrainingCalendar() {
                                         background: 'var(--bg-surface)',
                                         padding: '8px 12px',
                                         borderRadius: 6,
-                                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
+                                        boxShadow: isPerformanceMode ? 'none' : '0 2px 6px rgba(0, 0, 0, 0.05)',
                                         cursor: 'pointer',
                                         fontSize: 12,
-                                        transition: 'transform 0.2s ease',
+                                        transition: isPerformanceMode ? 'none' : 'transform 0.2s ease',
                                       }}
-                                      className="kvj-card--hover"
+                                      className={isPerformanceMode ? '' : 'kvj-card--hover'}
                                     >
                                       <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{sess.name}</div>
                                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
