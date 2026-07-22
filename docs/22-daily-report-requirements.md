@@ -103,9 +103,51 @@ finalExam: {
 ```
 Plus `AssessmentRecord.passMarkPercent?: number` as the per-assessment override.
 
-⚠️ **`Course.passPercentage` (seeded 70) is now ambiguous** — it duplicates the
-final-exam mark and conflicts with the per-assessment override. **Decision
-needed:** repurpose it explicitly as the final-exam pass mark, or remove it.
+### 3.2b ✅ Final-exam pass mark comes from the Course Catalog — CROSS-CHECKED
+
+`Course.passPercentage` **is** the final-exam pass mark, and it is **per course**,
+editable in the Course Catalog (field "Pass % Criteria", default **70%**,
+displayed as `Pass Criteria: 🎯 70% (70 marks)` alongside `maxMarks`).
+
+So the resolved hierarchy is:
+
+| Pass mark | Source | Default | Editable by |
+|---|---|---|---|
+| Assessment (mock/other) | `AssessmentRecord.passMarkPercent` → falls back to `businessRules.eligibility.defaultAssessmentPassPercent` | **84%** | Trainer, per assessment |
+| **Final exam** | **`Course.passPercentage`** (Course Catalog) | **70%** | Course Catalog, per course |
+| Max marks | `Course.maxMarks` | 100 | Course Catalog, per course |
+
+Do **not** hardcode 70 — read it from the course, per course.
+
+### 3.2c 🔴 CRITICAL — none of the configured pass marks are actually wired up
+
+The cross-check found that **every configured pass mark is dead config**, while
+three *different* hardcoded thresholds run the real logic:
+
+| # | Location | Value | Problem |
+|---|---|---|---|
+| 1 | `business-rules.ts:69` `eligibility.passMarkPercent = 84` | 84% | **Never read by any code.** Appears only in its own definition + a comment. |
+| 2 | `Course.passPercentage` (Course Catalog) | 70% | **Never read by any logic.** Only written/displayed in `CourseList.tsx`. A setting that does nothing. |
+| 3 | `training.service.ts:159` `claimVoucher()` | **50%** — `marksObtained >= maxMarks * 0.5` | The **only** real pass/fail gate in the service layer. Matches *no* confirmed rule. |
+| 4 | `StudentTrackingTab.tsx:33` | `const PASS_MARK = 84` | Rule duplicated in a component instead of read from config. |
+| 5 | `BatchManagement.tsx:419` | `attendanceThreshold = 84` | An **attendance** threshold of 84%, colliding conceptually with the 84% *assessment* pass mark and the new 75% attendance warning. Likely a conflation. |
+
+**Consequences**
+- A trainer editing "Pass % Criteria" in the Course Catalog changes **nothing**.
+- Voucher eligibility currently passes anyone above **50%** — far more permissive
+  than the confirmed 84%.
+- The same rule is expressed in three places, so they will keep drifting.
+
+**Required before the report is built** — the report's eligibility figures are
+only trustworthy once this is fixed:
+1. Resolve pass marks through **one** helper (in `daily-report.selectors.ts` or a
+   shared `eligibility.ts`), never inline.
+2. Replace the hardcoded `* 0.5` in `claimVoucher()` with that helper.
+3. Delete `PASS_MARK` from `StudentTrackingTab` and read config instead.
+4. Rename `business-rules.eligibility.passMarkPercent` →
+   `defaultAssessmentPassPercent` so it cannot be mistaken for the final-exam mark.
+5. Clarify `attendanceThreshold = 84` — is it meant to be the 75% attendance
+   warning, or something else?
 
 ### 3.3 🟠 Final exam is external — no in-app pass/fail
 `finalExam.conductedExternally = true`, `inAppExamGate = false`. The report may
@@ -382,22 +424,24 @@ Phase 6 needs the backend.
 ## 11. Open questions
 
 **Answered** — attendance is reporting-only with a 75% red threshold (§3.1);
-pass marks are per-assessment, 84% default and trainer-overridable, final exam
-70% (§3.2); certificates are external and batch-level only (§3.4).
+pass marks are per-assessment, 84% default and trainer-overridable (§3.2); the
+final-exam mark comes from the **Course Catalog**, per course, default 70%
+(§3.2b); certificates are external and batch-level only (§3.4).
 
 **Still open:**
-1. **`Course.passPercentage` (seeded 70)** — repurpose as the final-exam pass
-   mark, or remove it? It currently duplicates/conflicts with the new
-   per-assessment override. (§3.2)
-2. **Where does the trainer set an assessment's pass %?** It needs a UI in the
+1. **Confirm the 50% voucher gate is a bug**, not an intentional separate rule.
+   `claimVoucher()` currently passes anyone above 50%. (§3.2c)
+2. **`attendanceThreshold = 84`** in `BatchManagement.tsx` — is this meant to be
+   the 75% attendance warning, or a distinct rule? (§3.2c)
+3. **Where does the trainer set an assessment's pass %?** It needs a UI in the
    assessment configuration, and the value must be **audited** — changing it
    silently changes who is eligible.
-3. **Date-wise attendance %** — confirm this is the **batch** attendance % per
+4. **Date-wise attendance %** — confirm this is the **batch** attendance % per
    session date (not per-student per-date). (§4)
-4. Drop or add schema for: session number, time-out, training hours, early
+5. Drop or add schema for: session number, time-out, training hours, early
    check-outs, attachments? (§4)
-5. PDF engine: `@react-pdf/renderer` or print CSS? (§8)
-6. Report language: English only, or bilingual for colleges?
-7. Retention: how long are generated reports kept, and can a coordinator
+6. PDF engine: `@react-pdf/renderer` or print CSS? (§8)
+7. Report language: English only, or bilingual for colleges?
+8. Retention: how long are generated reports kept, and can a coordinator
    re-download an old version?
-8. Can a **Coordinator** generate this report, or trainers/managers only? (FR-8)
+9. Can a **Coordinator** generate this report, or trainers/managers only? (FR-8)
