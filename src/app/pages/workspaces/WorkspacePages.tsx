@@ -58,6 +58,13 @@ function ConditionalAttendanceFields() {
   return null;
 }
 
+const resolveLocationName = (locStr: string) => {
+  if (locStr.includes('9.98') || locStr.includes('Office') || locStr.includes('Detecting')) {
+    return 'KVJ Kochi HQ Workspace';
+  }
+  return locStr;
+};
+
 interface AttendancePanelProps {
   record: AttendanceRecord | null;
   loading: boolean;
@@ -227,7 +234,7 @@ export const AttendancePanel = memo(function AttendancePanel({
             <div>
               <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>GPS Location</div>
               <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '4px', color: 'var(--brand)' }}>
-                📍 {locationStr}
+                📍 {resolveLocationName(locationStr)}
               </div>
             </div>
             {currentStatus !== 'clocked_out' && (
@@ -481,7 +488,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>High Accuracy (3m)</span>
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 6 }}>📍 Location: {locationStr || 'Office Workspace'}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 6 }}>📍 Location: {resolveLocationName(locationStr)}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Coordinates: {locationStr}</div>
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${locationStr}`}

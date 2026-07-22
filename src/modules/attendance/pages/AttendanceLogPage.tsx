@@ -89,21 +89,21 @@ export function AttendanceLogPage() {
 
   // Table View rows: Multiple training entries for single employee listed as separate rows!
   const tableRows = [
-    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '12:00 PM', duration: '3:30:00', expenses: '₹ 80.00', note: '', break: '', tasks: ['Power BI Syllabus Unit 1', 'Assessment Setup'] },
-    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'SB College', type: 'Training', mode: 'Offline', start: '01:30 PM', end: '05:00 PM', duration: '3:30:00', expenses: '₹ 70.00', note: '', break: '', tasks: ['MBA Batch 1 Orientation & Intro'] },
-    { date: '02/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '₹ 150.00', note: '', break: '', tasks: ['DAX Expressions Lab', 'Student Practice Guidance'] },
-    { date: '03/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Desktop Installation Sync'] },
-    { date: '04/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Data Modeling & Star Schema'] },
-    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '01:00 PM', duration: '4:30:00', expenses: '₹ 120.00', note: '', break: '', tasks: ['Weekly Batch Test Evaluation'] },
-    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Vimala College', type: 'Supervision', mode: 'Offline', start: '02:00 PM', end: '05:00 PM', duration: '3:00:00', expenses: '', note: '', break: '', tasks: ['Lab Supervision Session'] },
-    { date: '06/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Visualizations & Dashboard Layout'] },
-    { date: '07/06/26', name: 'Linto George', holiday: 'Sunday', org: '', type: 'Holiday', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
-    { date: '08/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Gateway Configuration'] },
-    { date: '13/06/26', name: 'Linto George', holiday: '', org: '', type: 'Leave', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
-    { date: '14/06/26', name: 'Linto George', holiday: 'Sunday', org: '', type: 'Holiday', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
-    { date: '24/06/26', name: 'Linto George', holiday: '', org: 'Vimala College', type: 'Marketing', mode: 'Offline', start: '10:00 AM', end: '03:00 PM', duration: '5:00:00', expenses: '₹ 450.00', note: '', break: '', tasks: ['Principal Meeting & Campus Seminar'] },
-    { date: '25/06/26', name: 'Linto George', holiday: '', org: 'Nehru College', type: 'Marketing', mode: 'Offline', start: '09:00 AM', end: '05:00 PM', duration: '8:00:00', expenses: '₹ 200.00', note: '', break: '', tasks: ['Career Guidance Workshop'] },
-    { date: '26/06/26', name: 'Linto George', holiday: '', org: 'Office', type: 'Work', mode: '', start: '09:49 AM', end: '05:31 PM', duration: '7:42:12', expenses: '', note: 'Late', break: '0.73', tasks: ['Internal Operations & Voucher Review'] },
+    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '12:00 PM', duration: '3:30:00', expenses: '₹ 80.00', note: '', break: '', tasks: ['Power BI Syllabus Unit 1', 'Assessment Setup'] },
+    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'SB College', location: 'SB College', type: 'Training', mode: 'Offline', start: '01:30 PM', end: '05:00 PM', duration: '3:30:00', expenses: '₹ 70.00', note: '', break: '', tasks: ['MBA Batch 1 Orientation & Intro'] },
+    { date: '02/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '₹ 150.00', note: '', break: '', tasks: ['DAX Expressions Lab', 'Student Practice Guidance'] },
+    { date: '03/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Desktop Installation Sync'] },
+    { date: '04/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Data Modeling & Star Schema'] },
+    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '01:00 PM', duration: '4:30:00', expenses: '₹ 120.00', note: '', break: '', tasks: ['Weekly Batch Test Evaluation'] },
+    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Vimala College', location: 'Vimala College', type: 'Supervision', mode: 'Offline', start: '02:00 PM', end: '05:00 PM', duration: '3:00:00', expenses: '', note: '', break: '', tasks: ['Lab Supervision Session'] },
+    { date: '06/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Visualizations & Dashboard Layout'] },
+    { date: '07/06/26', name: 'Linto George', holiday: 'Sunday', org: '', location: '', type: 'Holiday', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
+    { date: '08/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Gateway Configuration'] },
+    { date: '13/06/26', name: 'Linto George', holiday: '', org: '', location: '', type: 'Leave', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
+    { date: '14/06/26', name: 'Linto George', holiday: 'Sunday', org: '', location: '', type: 'Holiday', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
+    { date: '24/06/26', name: 'Linto George', holiday: '', org: 'Vimala College', location: 'Vimala College', type: 'Marketing', mode: 'Offline', start: '10:00 AM', end: '03:00 PM', duration: '5:00:00', expenses: '₹ 450.00', note: '', break: '', tasks: ['Principal Meeting & Campus Seminar'] },
+    { date: '25/06/26', name: 'Linto George', holiday: '', org: 'Nehru College', location: 'Nehru College', type: 'Marketing', mode: 'Offline', start: '09:00 AM', end: '05:00 PM', duration: '8:00:00', expenses: '₹ 200.00', note: '', break: '', tasks: ['Career Guidance Workshop'] },
+    { date: '26/06/26', name: 'Linto George', holiday: '', org: 'Office', location: 'KVJ Kochi HQ', type: 'Work', mode: '', start: '09:49 AM', end: '05:31 PM', duration: '7:42:12', expenses: '', note: 'Late', break: '0.73', tasks: ['Internal Operations & Voucher Review'] },
   ];
 
   // Calendar Days mapping: Grouping multiple training sessions together in single date tiles!
@@ -220,6 +220,7 @@ export function AttendanceLogPage() {
                     <th style={{ padding: '8px 10px' }}>Name</th>
                     <th style={{ padding: '8px 10px' }}>Holiday</th>
                     <th style={{ padding: '8px 10px' }}>Organization</th>
+                    <th style={{ padding: '8px 10px' }}>Location</th>
                     <th style={{ padding: '8px 10px' }}>Class / Work</th>
                     <th style={{ padding: '8px 10px' }}>Mode</th>
                     <th style={{ padding: '8px 10px' }}>Start Time</th>
@@ -257,6 +258,7 @@ export function AttendanceLogPage() {
                           <td style={{ padding: '8px 10px' }}>{r.name}</td>
                           <td style={{ padding: '8px 10px' }}>{r.holiday}</td>
                           <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.org}</td>
+                          <td style={{ padding: '8px 10px', fontWeight: 500, color: 'var(--brand)' }}>{r.location || '-'}</td>
                           <td style={{ padding: '8px 10px' }}>
                             {r.type && (
                               <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : r.type === 'Leave' ? 'danger' : 'neutral'}>
@@ -273,18 +275,54 @@ export function AttendanceLogPage() {
                           <td style={{ padding: '8px 10px' }}>{r.break}</td>
                         </tr>
 
-                        {/* View Tasks Expanded Sub-row */}
-                        {isExpanded && r.tasks && r.tasks.length > 0 && (
+                        {/* View Tasks & Location Details Expanded Sub-row */}
+                        {isExpanded && (
                           <tr key={`exp-${i}`} style={{ background: 'var(--bg-sunken)' }}>
-                            <td colSpan={13} style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 4 }}>
-                                📋 Completed Tasks for {r.date} ({r.org}):
+                            <td colSpan={14} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                                
+                                {/* Left: Completed Tasks */}
+                                <div>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 6 }}>
+                                    📋 Completed Tasks ({r.org || 'Office'}):
+                                  </div>
+                                  {r.tasks && r.tasks.length > 0 ? (
+                                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                                      {r.tasks.map((taskStr, tIdx) => (
+                                        <li key={tIdx}>{taskStr}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No tasks logged.</span>
+                                  )}
+                                </div>
+
+                                {/* Right: Multiple GPS Logins History */}
+                                <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 6 }}>
+                                    📍 GPS Clock In History (Multiple Logins):
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                                    {r.type === 'Training' || r.type === 'Work' || r.type === 'Marketing' ? (
+                                      <>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border)' }}>
+                                          <span>⏱ <strong>{r.start}</strong> (Clock In 1)</span>
+                                          <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>📍 KVJ Kochi HQ Workspace (9.9841°, 76.2745°)</span>
+                                        </div>
+                                        {r.org && (
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                                            <span>⏱ <strong>01:30 PM</strong> (Clock In 2)</span>
+                                            <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>📍 {r.org} Campus (9.9240°, 76.3120°)</span>
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span style={{ color: 'var(--text-muted)' }}>No location logs for off-duty days.</span>
+                                    )}
+                                  </div>
+                                </div>
+
                               </div>
-                              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: 'var(--text-primary)' }}>
-                                {r.tasks.map((taskStr, tIdx) => (
-                                  <li key={tIdx}>{taskStr}</li>
-                                ))}
-                              </ul>
                             </td>
                           </tr>
                         )}

@@ -48,7 +48,8 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
         onClick={(e) => e.stopPropagation()}
         style={{
           width: widthMap[size],
-          height: '100%',
+          height: '100vh',
+          maxHeight: '100vh',
           backgroundColor: 'var(--bg-surface)',
           color: 'var(--text-primary)',
           boxShadow: 'var(--e4)',
@@ -87,7 +88,7 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>{children}</div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20, minHeight: 0 }}>{children}</div>
 
         {/* Footer */}
         {footer && (
