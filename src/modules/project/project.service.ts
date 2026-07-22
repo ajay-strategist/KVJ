@@ -1,4 +1,5 @@
 import { container, createToken } from '../../core/registry';
+import { todayISO } from '../../shared/utils/date';
 import { AppError, Err, Ok, type Result } from '../../core/result';
 import type { Actor, UUID } from '../../core/types';
 import {
@@ -80,7 +81,7 @@ export class ProjectService implements IProjectService {
         role,
         capacityPercentage: capacity,
         status: 'active',
-        startDate: new Date().toISOString().split('T')[0]
+        startDate: todayISO()
       }, actor);
 
       await this.activity.log('project', projectId, actor, 'assign', `Allocated resource to project: role ${role}`);

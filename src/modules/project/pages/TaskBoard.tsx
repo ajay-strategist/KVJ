@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PageHeader, Card, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { usePermissions } from '../../../shared/permissions/react';
+import { todayISO, addDaysISO } from '../../../shared/utils/date';
 
 export interface TaskItem {
   id: string;
@@ -30,8 +32,10 @@ export function TaskBoard() {
   const { user } = useAuth();
   const { toast } = useNotifications();
 
-  const userRole = user?.role || 'EMPLOYEE';
-  const isSupervisorRole = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  // Approval rights come from the central permission engine, not a hardcoded
+  // role list — a task only truly completes when a Manager/CEO approves it.
+  const { can } = usePermissions();
+  const isSupervisorRole = can('task', 'approve');
 
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Task' | 'Project Task'>('all');
   const [dateWindowFilter, setDateWindowFilter] = useState<'next_3_days' | 'today' | 'all'>('next_3_days');
@@ -41,8 +45,10 @@ export function TaskBoard() {
   const [timeEntryOpen, setTimeEntryOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
 
-  // Today is 2026-07-21
-  const todayStr = '2026-07-21';
+  // Real today, in local time — was hardcoded to '2026-07-21', so the "(Today)"
+  // marker, the Due Today count and the date-window filter all pointed at a
+  // fixed past date and drifted further every day.
+  const todayStr = useMemo(() => todayISO(), []);
 
   // Sample Rich Tasks
   const [tasksList, setTasksList] = useState<TaskItem[]>([
@@ -119,29 +125,28 @@ export function TaskBoard() {
     },
   ]);
 
-  // Filtering & Sorting
-  const filteredTasks = tasksList.filter((t) => {
-    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+  // Filtering & Sorting. The window is relative to today — it was pinned to
+  // 2026-07-21..2026-07-24, so "Next 3 Days" never moved.
+  const windowEnd = useMemo(() => addDaysISO(3), []);
 
-    // Date window filter: Current day and next 3 days
-    if (dateWindowFilter === 'today') {
-      if (t.dueDate !== todayStr) return false;
-    } else if (dateWindowFilter === 'next_3_days') {
-      const d = new Date(t.dueDate);
-      const start = new Date('2026-07-21');
-      const end = new Date('2026-07-24');
-      if (d < start || d > end) return false;
-    }
+  const sortedTasks = useMemo(() => {
+    const filtered = tasksList.filter((t) => {
+      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
 
-    return true;
-  });
+      if (dateWindowFilter === 'today') {
+        if (t.dueDate !== todayStr) return false;
+      } else if (dateWindowFilter === 'next_3_days') {
+        // ISO dates compare correctly as strings, avoiding timezone parsing.
+        if (t.dueDate < todayStr || t.dueDate > windowEnd) return false;
+      }
 
-  // Sort tasks by Due Date
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
-    const da = new Date(a.dueDate).getTime();
-    const db = new Date(b.dueDate).getTime();
-    return sortOrder === 'asc' ? da - db : db - da;
-  });
+      return true;
+    });
+
+    return filtered.sort((a, b) =>
+      sortOrder === 'asc' ? a.dueDate.localeCompare(b.dueDate) : b.dueDate.localeCompare(a.dueDate),
+    );
+  }, [tasksList, categoryFilter, dateWindowFilter, sortOrder, todayStr, windowEnd]);
 
   const handleCreateTask = (values: Record<string, unknown>) => {
     const newTask: TaskItem = {

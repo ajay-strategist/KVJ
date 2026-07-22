@@ -7,6 +7,7 @@ import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { toLocalISODate } from '../../../shared/utils/date';
 
 // Views List
 type ActiveView =
@@ -52,19 +53,6 @@ interface HolidayItem {
 /** Fixed widths for the three frozen (sticky) columns, in px. */
 const FROZEN = { date: 124, day: 64, holiday: 150 } as const;
 
-/**
- * Format a Date as YYYY-MM-DD in LOCAL time.
- * `toISOString()` converts to UTC first, so for any timezone ahead of UTC
- * (Asia/Kolkata is UTC+5:30) local midnight rolls back to the previous day —
- * which shifted every row in the matrix by one day and dropped the last day
- * of the month entirely.
- */
-function toLocalISODate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 export function TrainingCalendar() {
   const { batches, courses } = useTraining();

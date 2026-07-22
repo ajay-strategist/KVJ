@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PageHeader, Card, SectionHeader, Badge, Button } from '../../../shared/ui/components';
 import { useAuth } from '../../auth/AuthProvider';
+import { usePermissions } from '../../../shared/permissions/react';
 
 export interface WorklogRecord {
   id: string;
@@ -18,8 +19,9 @@ export interface WorklogRecord {
 
 export function TaskWorklogView() {
   const { user } = useAuth();
-  const userRole = user?.role || 'EMPLOYEE';
-  const isSupervisor = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  // Approval rights via the central permission engine, not a hardcoded role list.
+  const { can } = usePermissions();
+  const isSupervisor = can('task', 'approve');
 
   const [filterRole, setFilterRole] = useState<'all' | 'Assignee' | 'Supervisor'>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | 'Office Task' | 'Project Task'>('all');

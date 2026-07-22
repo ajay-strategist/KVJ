@@ -1,4 +1,5 @@
 import { container, createToken } from '../../core/registry';
+import { todayISO } from '../../shared/utils/date';
 import { AppError, Err, Ok, type Result } from '../../core/result';
 import type { Actor, GeoPoint, UUID, DateRange } from '../../core/types';
 import { eventBus } from '../../core/event-bus';
@@ -24,7 +25,7 @@ export interface IAttendanceService {
 
 export const ATTENDANCE_SERVICE_TOKEN = createToken<IAttendanceService>('AttendanceService');
 
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => todayISO();
 const nowIso = () => new Date().toISOString();
 
 export class AttendanceService implements IAttendanceService {

@@ -1,4 +1,5 @@
 import { container, createToken } from '../../core/registry';
+import { toLocalISODate } from '../../shared/utils/date';
 import { AppError, Err, Ok, type Result } from '../../core/result';
 import type { Actor, UUID } from '../../core/types';
 import {
@@ -167,7 +168,7 @@ export class TrainingService implements ITrainingService {
       const voucher = await this.voucherRepo.create({
         enrollmentId,
         voucherCode: `VOUCH-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        expiryDate: expiry.toISOString().split('T')[0],
+        expiryDate: toLocalISODate(expiry),
         approvedBy: actor.id,
         approvedAt: new Date().toISOString()
       }, actor);

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { todayISO } from '../../../shared/utils/date';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
@@ -80,7 +81,7 @@ export function TimesheetTracker() {
       <DataTable columns={columns} rows={timesheets} rowKey={(t) => t.id} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Log Work Session Hours">
-        <Form initial={{ billable: 'true', workDate: new Date().toISOString().split('T')[0] }} onSubmit={handleLogSubmit}>
+        <Form initial={{ billable: 'true', workDate: todayISO() }} onSubmit={handleLogSubmit}>
           <SelectField name="projectId" label="Select Project" options={projectOptions} />
           <DatePickerField name="workDate" label="Work Date" />
           <TextField name="hoursLogged" label="Hours Spent" placeholder="e.g. 8" />

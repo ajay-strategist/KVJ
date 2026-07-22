@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { todayISO } from '../../../shared/utils/date';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, Button } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
@@ -13,7 +14,7 @@ export function StudentAttendance() {
   const { toast } = useNotifications();
 
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sessionDate, setSessionDate] = useState(todayISO());
   const [attendanceStatuses, setAttendanceStatuses] = useState<Record<string, 'present' | 'absent' | 'late' | 'leave'>>({});
 
   const batchStudents = enrollments
