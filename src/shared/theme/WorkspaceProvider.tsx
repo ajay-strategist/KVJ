@@ -150,7 +150,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     let finalOpacity = baseOpacity;
     let finalBlur = glassBlur;
     let finalSpeed = animationSpeed;
-    let finalRadius = cornerRadius;
+    const finalRadius = cornerRadius;
 
     if (viewMode === 'Focus') {
       // Focus mode: maximize content opacity (98%) and dim backgrounds

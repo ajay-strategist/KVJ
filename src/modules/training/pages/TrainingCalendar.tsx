@@ -49,15 +49,33 @@ interface HolidayItem {
   date: string; // YYYY-MM-DD
 }
 
+/** Fixed widths for the three frozen (sticky) columns, in px. */
+const FROZEN = { date: 124, day: 64, holiday: 150 } as const;
+
+/**
+ * Format a Date as YYYY-MM-DD in LOCAL time.
+ * `toISOString()` converts to UTC first, so for any timezone ahead of UTC
+ * (Asia/Kolkata is UTC+5:30) local midnight rolls back to the previous day —
+ * which shifted every row in the matrix by one day and dropped the last day
+ * of the month entirely.
+ */
+function toLocalISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function TrainingCalendar() {
   const { batches, courses } = useTraining();
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>('matrix');
-  const [selectedDateCursor, setSelectedDateCursor] = useState(() => new Date('2026-07-22'));
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTrainerFilter, setSelectedTrainerFilter] = useState('all');
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
+  // Open on the CURRENT month rather than a hardcoded date.
+  const [selectedDateCursor, setSelectedDateCursor] = useState(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), 1);
+  });
 
   // Inspector States
   const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null);
@@ -101,12 +119,39 @@ export function TrainingCalendar() {
 
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((res) => {
-      if (res.ok) {
-        setTrainers(res.value);
-        if (res.value.length > 0) {
-          setSelectedTrainerForView(res.value[0].id);
+      if (!res.ok || res.value.length === 0) return;
+      const list = res.value;
+      setTrainers(list);
+      setSelectedTrainerForView(list[0].id);
+
+      // The seeded demo sessions/leaves were keyed to placeholder ids
+      // ('emp-1', 'emp-2') that match no real employee, so every cell rendered
+      // empty while the KPI cards still claimed sessions and conflicts existed.
+      // Re-key them onto the trainers that actually loaded.
+      const [t1, t2] = [list[0].id, list[1]?.id ?? list[0].id];
+      const today = new Date();
+      const d = today.getDate();
+      const tomorrow = new Date(today.getFullYear(), today.getMonth(), d + 1);
+
+      setSessions((prev) => {
+        const remapped: Record<string, ScheduleSession[]> = {};
+        for (const [key, val] of Object.entries(prev)) {
+          const [dayPart, idPart] = key.split('_');
+          const owner = idPart === 'emp-1' ? t1 : idPart === 'emp-2' ? t2 : idPart;
+          // Anchor the demo data to today/tomorrow so it is actually visible.
+          const day = dayPart === '22' ? d : tomorrow.getDate();
+          remapped[`${day}_${owner}`] = val;
         }
-      }
+        return remapped;
+      });
+
+      setLeaves((prev) =>
+        prev.map((l) => ({
+          ...l,
+          trainerId: l.trainerId === 'emp-1' ? t1 : l.trainerId === 'emp-2' ? t2 : l.trainerId,
+          date: l.date === '2026-07-22' ? toLocalISODate(today) : toLocalISODate(tomorrow),
+        })),
+      );
     });
   }, []);
 
@@ -122,27 +167,30 @@ export function TrainingCalendar() {
   const daysCount = new Date(year, month + 1, 0).getDate();
   const monthName = selectedDateCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
+  /** Today, resolved once per mount — used to highlight the real current row. */
+  const todayStr = useMemo(() => toLocalISODate(new Date()), []);
+
   const dateRows = useMemo(() => {
+    // Index holidays once instead of scanning the list for every day.
+    const holidayByDate = new Map(holidays.map((h) => [h.date, h]));
     const arr = [];
     for (let i = 1; i <= daysCount; i++) {
       const dateObj = new Date(year, month, i);
-      const dateStr = dateObj.toISOString().split('T')[0];
-      const holiday = holidays.find((h) => h.date === dateStr);
+      const dateStr = toLocalISODate(dateObj);
       arr.push({
         dateNum: i,
         dateStr,
         dayName: dateObj.toLocaleDateString(undefined, { weekday: 'short' }),
         isSunday: dateObj.getDay() === 0,
-        holiday,
+        holiday: holidayByDate.get(dateStr),
+        isToday: dateStr === todayStr,
       });
     }
     return arr;
-  }, [year, month, daysCount, holidays]);
-
-  const isPerformanceMode = (dateRows?.length || 0) > 1000 || trainers.length > 100;
+  }, [year, month, daysCount, holidays, todayStr]);
 
   // Conflict Engine Check
-  const checkConflicts = (dayNum: number, trainerId: string, sList: ScheduleSession[]): { conflicted: boolean; reason: string } => {
+  const checkConflicts = (sList: ScheduleSession[]): { conflicted: boolean; reason: string } => {
     if (sList.length < 2) return { conflicted: false, reason: '' };
     // Check overlapping timings
     for (let i = 0; i < sList.length; i++) {
@@ -169,6 +217,58 @@ export function TrainingCalendar() {
     }
     return { conflicted: false, reason: '' };
   };
+
+  /**
+   * Precompute every matrix cell ONCE per data change.
+   *
+   * Previously each of the ~186 cells ran the O(n²) conflict scan and a full
+   * `leaves.filter()` on every single render — including renders triggered by
+   * unrelated state such as switching view tabs — which produced a measured
+   * 79ms long task (well past the 50ms responsiveness budget).
+   */
+  const cellData = useMemo(() => {
+    const leavesByTrainerDate = new Map<string, LeaveRequest[]>();
+    for (const l of leaves) {
+      const k = `${l.trainerId}_${l.date}`;
+      const list = leavesByTrainerDate.get(k);
+      if (list) list.push(l);
+      else leavesByTrainerDate.set(k, [l]);
+    }
+
+    const map = new Map<string, { sList: ScheduleSession[]; trainerLeaves: LeaveRequest[]; conflicted: boolean; reason: string }>();
+    for (const r of dateRows) {
+      for (const t of trainers) {
+        const key = `${r.dateNum}_${t.id}`;
+        const sList = sessions[key] || [];
+        const trainerLeaves = leavesByTrainerDate.get(`${t.id}_${r.dateStr}`) || [];
+        const { conflicted, reason } = checkConflicts(sList);
+        map.set(key, { sList, trainerLeaves, conflicted, reason });
+      }
+    }
+    return map;
+    // checkConflicts is a pure local helper with no captured state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRows, trainers, sessions, leaves]);
+
+  /** Live KPI figures for the visible month (were previously hardcoded). */
+  const kpis = useMemo(() => {
+    let sessionsToday = 0;
+    let conflicts = 0;
+    for (const [, v] of cellData) {
+      if (v.conflicted) conflicts++;
+    }
+    for (const t of trainers) {
+      const todayRow = dateRows.find((r) => r.isToday);
+      if (todayRow) sessionsToday += (sessions[`${todayRow.dateNum}_${t.id}`] || []).length;
+    }
+    const onLeaveToday = leaves.filter((l) => l.date === todayStr && l.status === 'Approved').length;
+    return {
+      sessionsToday,
+      conflicts,
+      availableTrainers: Math.max(0, trainers.length - onLeaveToday),
+      pendingLeaves: leaves.filter((l) => l.status === 'Pending').length,
+    };
+  }, [cellData, dateRows, trainers, sessions, leaves, todayStr]);
 
   const handleCreateSession = (dayNum: number, trainerId: string) => {
     const key = `${dayNum}_${trainerId}`;
@@ -227,7 +327,7 @@ export function TrainingCalendar() {
         }
         .matrix-cell-hover .add-schedule-btn {
           opacity: 0.15;
-          transition: ${isPerformanceMode ? 'none' : 'opacity 0.2s ease'};
+          transition: opacity 0.2s ease;
         }
         .matrix-cell-hover:hover .add-schedule-btn {
           opacity: 1 !important;
@@ -266,7 +366,15 @@ export function TrainingCalendar() {
             >
               ↪️ Redo
             </Button>
-            <Button onClick={() => handleCreateSession(22, 'emp-1')}>
+            <Button
+              disabled={trainers.length === 0}
+              onClick={() => {
+                // Allocate to today for the first trainer, instead of the
+                // previously hardcoded day 22 / non-existent 'emp-1'.
+                const todayRow = dateRows.find((r) => r.isToday) ?? dateRows[0];
+                if (todayRow && trainers[0]) handleCreateSession(todayRow.dateNum, trainers[0].id);
+              }}
+            >
               ➕ Assign Schedule
             </Button>
           </div>
@@ -321,24 +429,26 @@ export function TrainingCalendar() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
         <Card style={{ padding: 14, borderLeft: '4px solid var(--brand)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>TODAY'S TRAININGS</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>3 Sessions</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>
+            {kpis.sessionsToday} {kpis.sessionsToday === 1 ? 'Session' : 'Sessions'}
+          </div>
         </Card>
         <Card style={{ padding: 14, borderLeft: '4px solid var(--status-success)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>AVAILABLE TRAINERS</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
-            {trainers.length - leaves.filter((l) => l.date === '2026-07-22' && l.status === 'Approved').length} Available
+            {kpis.availableTrainers} Available
           </div>
         </Card>
         <Card style={{ padding: 14, borderLeft: '4px solid var(--status-warning)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>PENDING LEAVES</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-warning)', marginTop: 4 }}>
-            {leaves.filter((l) => l.status === 'Pending').length} Requests
+            {kpis.pendingLeaves} {kpis.pendingLeaves === 1 ? 'Request' : 'Requests'}
           </div>
         </Card>
         <Card style={{ padding: 14, borderLeft: '4px solid var(--status-danger)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>SCHEDULE CONFLICTS</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>
-            1 Overlap Conflict
+            {kpis.conflicts} {kpis.conflicts === 1 ? 'Overlap Conflict' : 'Overlap Conflicts'}
           </div>
         </Card>
       </div>
@@ -351,13 +461,20 @@ export function TrainingCalendar() {
           {/* RESOURCE MATRIX VIEW */}
           {activeView === 'matrix' && (
             <Card style={{ padding: 0, overflow: 'hidden' }}>
-              <div className="matrix-scroll-container" style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
+              {/* Viewport-relative height: a fixed 600px wasted space on large
+                  screens and forced a second round of scrolling inside an
+                  already-scrolled page. */}
+              <div className="matrix-scroll-container" style={{ overflowX: 'auto', maxHeight: 'clamp(420px, calc(100vh - 260px), 900px)', overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }} className="kvj-table">
                   <thead>
                     <tr style={{ background: 'var(--bg-sunken)', position: 'sticky', top: 0, zIndex: 10 }}>
-                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: 'var(--bg-sunken)', zIndex: 30, minWidth: 100 }}>Date</th>
-                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 100, background: 'var(--bg-sunken)', zIndex: 30, minWidth: 60 }}>Day</th>
-                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 160, background: 'var(--bg-sunken)', zIndex: 30, minWidth: 140 }}>Holiday Status</th>
+                      {/* Frozen columns. Widths are FIXED (not minWidth) so the
+                          sticky `left` offsets below always line up — with
+                          minWidth the date text wrapped and the columns drifted
+                          out of alignment while scrolling horizontally. */}
+                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: 'var(--bg-sunken)', zIndex: 30, width: FROZEN.date, minWidth: FROZEN.date, whiteSpace: 'nowrap' }}>Date</th>
+                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: FROZEN.date, background: 'var(--bg-sunken)', zIndex: 30, width: FROZEN.day, minWidth: FROZEN.day, whiteSpace: 'nowrap' }}>Day</th>
+                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: FROZEN.date + FROZEN.day, background: 'var(--bg-sunken)', zIndex: 30, width: FROZEN.holiday, minWidth: FROZEN.holiday, whiteSpace: 'nowrap' }}>Holiday Status</th>
                       {trainers.map((t) => (
                         <th key={t.id} style={{ padding: 12, minWidth: 260, borderRight: '1px solid var(--border)', textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-sunken)' }}>
                           👤 {t.firstName} {t.lastName}
@@ -367,7 +484,7 @@ export function TrainingCalendar() {
                   </thead>
                   <tbody>
                     {dateRows.map((r) => {
-                      const isTodayRow = r.dateNum === 22;
+                      const isTodayRow = r.isToday;
                       const rowTint = r.holiday
                         ? 'rgba(239, 68, 68, 0.08)'
                         : r.isSunday
@@ -382,17 +499,17 @@ export function TrainingCalendar() {
                         <tr key={r.dateStr} style={{ background: rowTint }}>
                           
                           {/* Frozen Date Column */}
-                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: cellBg, zIndex: 2, fontWeight: isTodayRow ? 700 : 500 }}>
+                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: cellBg, zIndex: 2, fontWeight: isTodayRow ? 700 : 500, width: FROZEN.date, minWidth: FROZEN.date, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                             {r.dateStr}
                           </td>
-                          
+
                           {/* Frozen Day Column */}
-                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 100, background: cellBg, zIndex: 2 }}>
+                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: FROZEN.date, background: cellBg, zIndex: 2, width: FROZEN.day, minWidth: FROZEN.day, whiteSpace: 'nowrap' }}>
                             {r.dayName}
                           </td>
 
                           {/* Frozen Holiday / Status Badge Column */}
-                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 160, background: cellBg, zIndex: 2 }}>
+                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: FROZEN.date + FROZEN.day, background: cellBg, zIndex: 2, width: FROZEN.holiday, minWidth: FROZEN.holiday }}>
                             {r.holiday && (
                               <Badge tone="danger">{r.holiday.name}</Badge>
                             )}
@@ -404,9 +521,8 @@ export function TrainingCalendar() {
                           {/* Trainer Cells */}
                           {trainers.map((t) => {
                             const key = `${r.dateNum}_${t.id}`;
-                            const sList = sessions[key] || [];
-                            const trainerLeaves = leaves.filter((l) => l.trainerId === t.id && l.date === r.dateStr);
-                            const { conflicted, reason } = checkConflicts(r.dateNum, t.id, sList);
+                            const { sList, trainerLeaves, conflicted, reason } =
+                              cellData.get(key) ?? { sList: [], trainerLeaves: [], conflicted: false, reason: '' };
 
                             return (
                               <td
@@ -488,12 +604,12 @@ export function TrainingCalendar() {
                                         background: 'var(--bg-surface)',
                                         padding: '8px 12px',
                                         borderRadius: 6,
-                                        boxShadow: isPerformanceMode ? 'none' : '0 2px 6px rgba(0, 0, 0, 0.05)',
+                                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
                                         cursor: 'pointer',
                                         fontSize: 12,
-                                        transition: isPerformanceMode ? 'none' : 'transform 0.2s ease',
+                                        transition: 'transform 0.2s ease',
                                       }}
-                                      className={isPerformanceMode ? '' : 'kvj-card--hover'}
+                                      className="kvj-card--hover"
                                     >
                                       <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{sess.name}</div>
                                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -548,7 +664,6 @@ export function TrainingCalendar() {
                   </div>
                 ))}
                 {dateRows.map((r) => {
-                  const sCount = Object.values(sessions).flatMap(x => x).filter((sess) => sess.id !== 'none').length; // Mock count
                   return (
                     <div
                       key={r.dateStr}

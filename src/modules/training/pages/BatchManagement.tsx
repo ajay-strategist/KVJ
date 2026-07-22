@@ -235,7 +235,13 @@ export function BatchManagement() {
               🏢 College: <strong>{activeBatch?.code || 'Christ College'}</strong> · Coordinator: <strong>Sr. Coordinator Dept.</strong> · Trainer: <strong>{activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'Linto George'}</strong>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-              📅 Schedule: <strong>{activeBatch?.startDate} to {activeBatch?.endDate}</strong> · Status: <strong>Preparation stage</strong>
+              📅 Schedule:{' '}
+              <strong>
+                {activeBatch?.startDate && activeBatch?.endDate
+                  ? `${activeBatch.startDate} to ${activeBatch.endDate}`
+                  : 'Not scheduled yet'}
+              </strong>{' '}
+              · Status: <strong>Preparation stage</strong>
             </div>
           </div>
 
