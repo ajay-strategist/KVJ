@@ -110,9 +110,9 @@ function AppShellFrame({ children }: { children: ReactNode }) {
           transition: 'width var(--dur-base) var(--ease-emphasized)',
           overflow: 'hidden',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 20px', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ width: 34, height: 34, borderRadius: 12, background: 'linear-gradient(135deg, var(--brand), var(--accent))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 16, boxShadow: '0 4px 12px rgba(59, 130, 246, 0.35)' }}>K</span>
-            {(!collapsed || isMobile) && <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>{appConfig.app.name}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+            <img src="/logo.png" alt="KVJ Logo" style={{ height: 38, width: 'auto', objectFit: 'contain', borderRadius: 'var(--radius-md, 12px)' }} />
+            {(!collapsed || isMobile) && <span style={{ fontWeight: 800, fontSize: 14.5, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, var(--text-primary), var(--brand))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{appConfig.app.name}</span>}
           </div>
           <nav style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
             {items.map((item) => (

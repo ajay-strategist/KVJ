@@ -218,7 +218,7 @@ export function ProjectList() {
         <body>
           <div class="header">
             <div class="logo-container">
-              <span style="width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; display: grid; place-items: center; font-weight: 800; font-size: 15px;">K</span>
+              <img src="/logo.png" alt="KVJ Logo" style="height: 32px;" />
               <span class="logo-text">KVJ Analytics</span>
             </div>
             <div>
