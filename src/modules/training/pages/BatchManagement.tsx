@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { TrainingBatchCarousel, type BatchAction } from '../components/TrainingBatchCarousel';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Card, SectionHeader, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
@@ -187,6 +188,35 @@ export function BatchManagement() {
     setEmailComposerOpen(true);
   };
 
+  /**
+   * Quick actions on a carousel card. The card is made active first, then the
+   * action either opens the mail composer or jumps to the matching workspace
+   * section — everything stays on this page.
+   */
+  const handleCarouselAction = (batchId: string, action: BatchAction) => {
+    setSelectedBatchId(batchId);
+    switch (action.id) {
+      case 'daily':
+        handleOpenComposer('Daily Session Report', 'Dear Coordinator, Attached is the Daily Report...');
+        break;
+      case 'final':
+        handleOpenComposer('Final Course Completion Report', 'Attached is the final report...');
+        break;
+      case 'student':
+        setShowFullStudentReport(true);
+        break;
+      case 'attendance':
+        setActiveTab('attendance');
+        break;
+      case 'assessments':
+        setActiveTab('assessments');
+        break;
+      case 'documents':
+        setActiveTab('documents');
+        break;
+    }
+  };
+
   const assignVoucherId = (studentId: string, val: string) => {
     setStudents((prev) =>
       prev.map((s) =>
@@ -221,57 +251,16 @@ export function BatchManagement() {
 
   return (
     <AppShell>
-      {/* Top Header Card Workspace Details */}
-      <Card style={{ marginBottom: 20, padding: 20, borderLeft: '4px solid var(--brand)', background: 'var(--bg-panel)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>
-                {activeCourse ? activeCourse.title : 'Training Batch Overview'}
-              </h1>
-              <Badge tone="progress">Training Phase</Badge>
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-              🏢 College: <strong>{activeBatch?.code || 'Christ College'}</strong> · Coordinator: <strong>Sr. Coordinator Dept.</strong> · Trainer: <strong>{activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'Linto George'}</strong>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-              📅 Schedule:{' '}
-              <strong>
-                {activeBatch?.startDate && activeBatch?.endDate
-                  ? `${activeBatch.startDate} to ${activeBatch.endDate}`
-                  : 'Not scheduled yet'}
-              </strong>{' '}
-              · Status: <strong>Preparation stage</strong>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button size="sm" variant="secondary" onClick={() => handleOpenComposer('Daily Session Report', 'Dear Coordinator, Attached is the Daily Report...')}>
-              ✉️ Send Daily Report
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleOpenComposer('Student Details Registry', 'Attached are the student details...')}>
-              ✉️ Send Student Details
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleOpenComposer('Final Course Completion Report', 'Attached is the final report...')}>
-              ✉️ Send Final Report
-            </Button>
-            <Button size="sm" onClick={() => setShowFullStudentReport(true)}>
-              📋 Show Student Report (Full Workspace)
-            </Button>
-          </div>
-        </div>
-
-        {/* Training Progress Bar */}
-        <div style={{ marginTop: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-            <span>Workspace Completion Progress</span>
-            <span>68%</span>
-          </div>
-          <div style={{ width: '100%', height: 6, background: 'var(--bg-sunken)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ width: '68%', height: '100%', background: 'var(--brand)' }} />
-          </div>
-        </div>
-      </Card>
+      {/* Training Batch Overview Carousel — one card per assigned batch.
+          Selecting a card sets the active batch for every section below. */}
+      <TrainingBatchCarousel
+        batches={batches}
+        courses={courses}
+        trainers={trainers}
+        activeId={selectedBatchId}
+        onSelect={setSelectedBatchId}
+        onAction={handleCarouselAction}
+      />
 
       {/* Main Two-Column Content Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 280px', gap: 20, alignItems: 'start' }}>

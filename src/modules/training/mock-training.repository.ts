@@ -1,4 +1,5 @@
 import { MemoryRepository } from '../../core/repository';
+import { SEED_COURSES, SEED_BATCHES } from './training.seed';
 import type { UUID } from '../../core/types';
 import type {
   Student, IStudentRepository,
@@ -18,11 +19,11 @@ export class MockStudentRepository extends MemoryRepository<Student> implements 
 }
 
 export class MockCourseRepository extends MemoryRepository<Course> implements ICourseRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, SEED_COURSES); }
 }
 
 export class MockBatchRepository extends MemoryRepository<Batch> implements IBatchRepository {
-  constructor() { super({ defaultStatus: 'scheduled', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'scheduled', pageSize: 500 }, SEED_BATCHES); }
 }
 
 export class MockEnrollmentRepository extends MemoryRepository<Enrollment> implements IEnrollmentRepository {

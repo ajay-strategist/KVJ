@@ -32,6 +32,20 @@ export interface Course extends Entity {
   code: string;
 }
 
+/** Lifecycle phase of a training batch, shown as a coloured badge. */
+export type TrainingPhase =
+  | 'Preparation'
+  | 'Scheduled'
+  | 'In Progress'
+  | 'Assessment'
+  | 'Feedback'
+  | 'Certificate'
+  | 'Completed';
+
+export const TRAINING_PHASES: TrainingPhase[] = [
+  'Preparation', 'Scheduled', 'In Progress', 'Assessment', 'Feedback', 'Certificate', 'Completed',
+];
+
 export interface Batch extends Entity {
   courseId: UUID;
   code: string;
@@ -41,6 +55,17 @@ export interface Batch extends Entity {
   capacity: number;
   venue?: string;
   onlineLink?: string;
+
+  // Training-record fields surfaced on the batch overview carousel.
+  // Optional so existing records and create flows keep compiling.
+  trainingName?: string;
+  college?: string;
+  academicYear?: string;   // e.g. "2026-2027"
+  batchNo?: string;        // e.g. "Batch 2"
+  coordinator?: string;
+  phase?: TrainingPhase;
+  completedTasks?: number;
+  totalTasks?: number;
 }
 
 export interface Enrollment extends Entity {
