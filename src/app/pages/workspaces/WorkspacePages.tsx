@@ -389,12 +389,6 @@ export const AttendancePanel = memo(function AttendancePanel({
         onClose={() => setClockInOpen(false)}
         title="Attendance Clock In"
         size="md"
-        footer={
-          <div style={{ display: 'flex', gap: 10, width: '100%', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => setClockInOpen(false)}>Cancel</Button>
-            <Button onClick={handleCustomClockInSubmit}>Clock In Now</Button>
-          </div>
-        }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', marginTop: -10, marginBottom: 6 }}>
@@ -513,6 +507,23 @@ export const AttendancePanel = memo(function AttendancePanel({
                 <div>Trainer: <strong>Linto George</strong></div>
               </div>
             </div>
+          </div>
+
+          {/* Action Buttons inside Drawer Body */}
+          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+            <Button
+              variant="secondary"
+              onClick={() => setClockInOpen(false)}
+              style={{ flex: 1, padding: '10px 0' }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCustomClockInSubmit}
+              style={{ flex: 2, padding: '10px 0', background: 'var(--status-success)', color: '#fff', border: 'none', fontWeight: '600' }}
+            >
+              Confirm Clock In
+            </Button>
           </div>
         </div>
       </Drawer>
