@@ -330,11 +330,11 @@ export function TrainingCalendar() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }} className="kvj-table">
                   <thead>
                     <tr style={{ background: 'var(--bg-sunken)', position: 'sticky', top: 0, zIndex: 10 }}>
-                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: 'var(--bg-sunken)', zIndex: 20, minWidth: 100 }}>Date</th>
-                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 100, background: 'var(--bg-sunken)', zIndex: 20, minWidth: 60 }}>Day</th>
-                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', minWidth: 140 }}>Holiday Status</th>
+                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: 'var(--bg-sunken)', zIndex: 30, minWidth: 100 }}>Date</th>
+                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 100, background: 'var(--bg-sunken)', zIndex: 30, minWidth: 60 }}>Day</th>
+                      <th style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 160, background: 'var(--bg-sunken)', zIndex: 30, minWidth: 140 }}>Holiday Status</th>
                       {trainers.map((t) => (
-                        <th key={t.id} style={{ padding: 12, minWidth: 260, borderRight: '1px solid var(--border)', textAlign: 'center' }}>
+                        <th key={t.id} style={{ padding: 12, minWidth: 260, borderRight: '1px solid var(--border)', textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-sunken)' }}>
                           👤 {t.firstName} {t.lastName}
                         </th>
                       ))}
@@ -351,21 +351,23 @@ export function TrainingCalendar() {
                         ? 'rgba(99, 102, 241, 0.08)'
                         : 'transparent';
 
+                      const cellBg = rowTint !== 'transparent' ? rowTint : 'var(--bg-surface)';
+
                       return (
                         <tr key={r.dateStr} style={{ background: rowTint }}>
                           
                           {/* Frozen Date Column */}
-                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: r.holiday ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-surface)', zIndex: 2, fontWeight: isTodayRow ? 700 : 500 }}>
+                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 0, background: cellBg, zIndex: 2, fontWeight: isTodayRow ? 700 : 500 }}>
                             {r.dateStr}
                           </td>
                           
                           {/* Frozen Day Column */}
-                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 100, background: 'var(--bg-surface)', zIndex: 2 }}>
+                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 100, background: cellBg, zIndex: 2 }}>
                             {r.dayName}
                           </td>
 
-                          {/* Holiday / Status Badge */}
-                          <td style={{ padding: 12, borderRight: '1px solid var(--border)' }}>
+                          {/* Frozen Holiday / Status Badge Column */}
+                          <td style={{ padding: 12, borderRight: '1px solid var(--border)', position: 'sticky', left: 160, background: cellBg, zIndex: 2 }}>
                             {r.holiday && (
                               <Badge tone="danger">{r.holiday.name}</Badge>
                             )}
