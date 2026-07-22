@@ -110,9 +110,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
           transition: 'width var(--dur-base) var(--ease-emphasized)',
           overflow: 'hidden',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
-            <img src="/logo.png" alt="KVJ Logo" style={{ height: 38, width: 'auto', objectFit: 'contain', borderRadius: 'var(--radius-md, 12px)' }} />
-            {(!collapsed || isMobile) && <span style={{ fontWeight: 800, fontSize: 14.5, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, var(--text-primary), var(--brand))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{appConfig.app.name}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed && !isMobile ? 'center' : 'flex-start', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+            <img src="/logo.png" alt="KVJ Logo" style={{ height: 36, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
           </div>
           <nav style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
             {items.map((item) => (
