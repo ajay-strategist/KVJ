@@ -34,6 +34,7 @@ export function SettingsPage() {
     shadowSoftness,
     animationSpeed,
     activePreset,
+    viewMode,
     setWallpaper,
     setGlassOpacity,
     setGlassBlur,
@@ -41,6 +42,7 @@ export function SettingsPage() {
     setCornerRadius,
     setShadowSoftness,
     setAnimationSpeed,
+    setViewMode,
     loadPreset,
   } = useWorkspace();
 
@@ -81,6 +83,38 @@ export function SettingsPage() {
                     }}
                   >
                     {key}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Workspace View Modes */}
+          <Card>
+            <SectionHeader title="🔍 Workspace Optimization Modes" />
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Switch workspace optimization mode to protect eyes, enhance readability, or scale elements for presentations.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+              {(['Standard', 'Focus', 'Presentation', 'Executive'] as const).map((modeOption) => {
+                const isActive = viewMode === modeOption;
+                return (
+                  <button
+                    key={modeOption}
+                    onClick={() => setViewMode(modeOption)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: isActive ? 'linear-gradient(135deg, var(--brand), var(--accent))' : 'var(--bg-sunken)',
+                      color: isActive ? '#fff' : 'var(--text-primary)',
+                      border: isActive ? '1px solid rgba(255,255,255,0.25)' : '1px solid var(--border)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {modeOption}
                   </button>
                 );
               })}

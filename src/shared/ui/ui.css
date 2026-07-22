@@ -53,7 +53,7 @@ main {
 }
 
 .kvj-card__body {
-  padding: var(--space-3); /* 24px */
+  padding: calc(var(--space-3) * var(--spacing-scale-modifier, 1)); /* Responsive Apple Spacing */
 }
 
 /* Buttons — 16px Radius with Gradient Glow & Glass */
@@ -63,7 +63,7 @@ main {
   justify-content: center;
   gap: 8px;
   font-family: var(--font-ui);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale-modifier, 1));
   font-weight: 600;
   line-height: 1;
   border-radius: var(--radius-md); /* 16px */
@@ -156,7 +156,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale-modifier, 1));
   font-weight: 700;
   padding: 4px 12px;
   border-radius: var(--radius-pill);
@@ -183,13 +183,13 @@ main {
   box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
 }
 
-/* Glass Inputs — 18px Radius */
+/* Glass Inputs — 18px Radius (Form protected background applied) */
 .kvj-input, .kvj-textarea, .kvj-select {
   width: 100%;
   font-family: var(--font-ui);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale-modifier, 1));
   color: var(--text-primary);
-  background: var(--bg-sunken);
+  background: var(--bg-form, var(--bg-sunken));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg); /* 18px */
   padding: 11px 16px;
@@ -211,7 +211,7 @@ main {
 }
 
 .kvj-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale-modifier, 1));
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -237,12 +237,12 @@ main {
   100% { transform: translateX(100%); }
 }
 
-/* Premium Enterprise Tables — Floating Glass Rows */
+/* Premium Enterprise Tables — Floating Glass Rows (Protected Table Surface applied) */
 .kvj-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale-modifier, 1));
 }
 
 .kvj-table thead th {
@@ -250,7 +250,7 @@ main {
   top: 0;
   z-index: 1;
   text-align: left;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale-modifier, 1));
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--text-muted);
@@ -263,7 +263,7 @@ main {
 .kvj-table tbody td {
   padding: 14px 18px;
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: var(--bg-table, var(--bg-surface));
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
