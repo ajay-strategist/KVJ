@@ -377,30 +377,28 @@ export function ProjectList() {
         }
       />
 
-      {/* Top KPI Dashboard Cards — Aligned to Left */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16, minWidth: 220, flex: '0 1 auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
-        </Card>
+      {/* Top Row: KPI Cards Left & Status Filter Right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        
+        {/* Left Side: KPI Cards */}
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', flex: '1 1 auto' }}>
+          <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16, minWidth: 200, flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
+          </Card>
 
-        <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16, minWidth: 220, flex: '0 1 auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
-            {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
-          </div>
-        </Card>
-      </div>
+          <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16, minWidth: 200, flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
+              {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
+            </div>
+          </Card>
+        </div>
 
-      {/* Filter Control Bar: Checkbox Status Filter on Right */}
-      <Card style={{ marginBottom: 20, padding: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-            Showing {filteredProjects.length} of {projectsList.length} Projects
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Status Filter:</span>
+        {/* Right Side: Status Filter (Right of Overall Task Completion) */}
+        <Card style={{ padding: 16, minWidth: 420, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Status Filter:</span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {(['Not Started', 'In Progress', 'Completed'] as const).map((status) => (
                 <label
@@ -409,7 +407,7 @@ export function ProjectList() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
                     color: 'var(--text-secondary)',
@@ -425,8 +423,11 @@ export function ProjectList() {
               ))}
             </div>
           </div>
-        </div>
-      </Card>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>
+            Showing {filteredProjects.length}/{projectsList.length}
+          </span>
+        </Card>
+      </div>
 
       {/* Main View Display: Card View OR Table View */}
       {viewMode === 'card' ? (
