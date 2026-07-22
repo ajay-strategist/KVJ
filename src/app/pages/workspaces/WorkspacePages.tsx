@@ -52,6 +52,8 @@ export const AttendancePanel = memo(function AttendancePanel({
   const [clockInOpen, setClockInOpen] = useState(false);
   const [breakOpen, setBreakOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
+  const [selectedMode, setSelectedMode] = useState('Office');
+  const [selectedBatch, setSelectedBatch] = useState('Christ 3BBA Data Analytics B1');
 
   // GPS & Location state
   const [locationStr, setLocationStr] = useState<string>('Detecting location...');
@@ -114,10 +116,8 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   const totalWorkMs = completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs;
 
-  const handleClockInSubmit = useCallback(async (values: Record<string, unknown>) => {
-    const mode = values.mode as string;
-    const batch = values.batch as string;
-    const type = mode === 'Training' ? `Training: ${batch}` : 'Office';
+  const handleCustomClockInSubmit = useCallback(async () => {
+    const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : 'Office';
     const res = await clockIn(type as any);
     if (res.ok) {
       toast({ variant: 'success', title: 'Clocked In', message: `Clocked in for ${type} (${locationStr})` });
@@ -126,7 +126,7 @@ export const AttendancePanel = memo(function AttendancePanel({
     } else {
       toast({ variant: 'error', title: 'Clock In Failed', message: res.error });
     }
-  }, [clockIn, toast, locationStr, onActivityLog]);
+  }, [clockIn, selectedMode, selectedBatch, toast, locationStr, onActivityLog]);
 
   const handleClockOut = useCallback(async () => {
     const ok = await confirm({ title: 'Clock Out?', message: 'Are you sure you want to end your work day?' });
@@ -347,25 +347,137 @@ export const AttendancePanel = memo(function AttendancePanel({
       </Card>
 
       {/* Clock In Drawer */}
-      <Drawer open={clockInOpen} onClose={() => setClockInOpen(false)} title="Clock In to Work Session">
-        <Form initial={{ mode: 'Office', batch: 'Christ 3BBA Data Analytics B1' }} onSubmit={handleClockInSubmit}>
-          <SelectField
-            name="mode"
-            label="Attendance Location Mode"
-            options={[
-              { value: 'Office', label: 'Office Work' },
-              { value: 'Training', label: 'Training Batch Session' },
-            ]}
-          />
-          <SelectField name="batch" label="Select Training Batch (If Training)" options={sampleBatches} />
-          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)', fontSize: '12px' }}>
-            📍 Captured Location: {locationStr}
+      <Drawer
+        open={clockInOpen}
+        onClose={() => setClockInOpen(false)}
+        title="Attendance Clock In"
+        size="md"
+        footer={
+          <div style={{ display: 'flex', gap: 10, width: '100%', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setClockInOpen(false)}>Cancel</Button>
+            <Button onClick={handleCustomClockInSubmit}>Clock In Now</Button>
           </div>
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setClockInOpen(false)}>Cancel</Button>
-            <Button type="submit">Clock In Now</Button>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', marginTop: -10, marginBottom: 6 }}>
+            Verify your attendance details before clocking in.
+          </p>
+
+          {/* Group 1: Attendance Mode selectable cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Attendance Location Mode</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { value: 'Office', label: 'Office', icon: '🏢' },
+                { value: 'Training', label: 'Training', icon: '👨‍🏫' },
+                { value: 'Remote', label: 'Remote', icon: '🏠' },
+                { value: 'Travel', label: 'Travel', icon: '🚗' },
+              ].map((m) => {
+                const active = selectedMode === m.value;
+                return (
+                  <div
+                    key={m.value}
+                    onClick={() => setSelectedMode(m.value)}
+                    style={{
+                      border: active ? '2px solid var(--brand)' : '1px solid var(--border)',
+                      background: active ? 'var(--bg-sunken)' : 'var(--bg-surface)',
+                      borderRadius: 10,
+                      padding: 12,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      fontWeight: 600,
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{m.icon}</span>
+                    <span>{m.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </Form>
+
+          {/* Group 2: Training Batch Selector */}
+          {selectedMode === 'Training' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Select Training Batch</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
+                {[
+                  { id: 'b1', name: 'Christ 3BBA Data Analytics B1', college: 'Christ College', course: 'Data Analytics', time: '10:00 AM - 01:00 PM', students: 48, trainer: 'Linto George' },
+                  { id: 'b2', name: 'SB College MBA Batch 1', college: 'SB College', course: 'Advanced Excel', time: '02:00 PM - 05:00 PM', students: 35, trainer: 'Unassigned' },
+                  { id: 'b3', name: 'MIM 1MBA 2026-27 B1', college: 'MIM Campus', course: 'Power BI', time: '09:00 AM - 12:00 PM', students: 42, trainer: 'Linto George' }
+                ].map((b) => {
+                  const active = selectedBatch === b.name;
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => setSelectedBatch(b.name)}
+                      style={{
+                        border: active ? '2px solid var(--brand)' : '1px solid var(--border)',
+                        background: active ? 'var(--bg-sunken)' : 'var(--bg-surface)',
+                        borderRadius: 8,
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>{b.name}</span>
+                        <Badge tone={active ? 'success' : 'neutral'}>{b.course}</Badge>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                        <span>🏫 {b.college}</span>
+                        <span>👥 {b.students} Students</span>
+                        <span>🕒 {b.time}</span>
+                        <span>👤 {b.trainer}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Group 3: GPS Verification Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>GPS Verification</span>
+            <div style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  🟢 GPS Status: Verified
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>High Accuracy (3m)</span>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 6 }}>📍 Location: {locationStr || 'Office Workspace'}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Coordinates: {locationStr}</div>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${locationStr}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'underline', display: 'inline-block', marginTop: 6 }}
+              >
+                View on Google Maps ↗
+              </a>
+            </div>
+          </div>
+
+          {/* Group 4: Pre-Clock In Summary Card */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Clock In Summary</span>
+            <div style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.15)', borderRadius: 8, padding: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
+                <div>Attendance Type: <strong>{selectedMode}</strong></div>
+                <div>GPS Status: <strong style={{ color: 'var(--status-success)' }}>Verified</strong></div>
+                <div style={{ gridColumn: 'span 2' }}>Selected Batch: <strong>{selectedMode === 'Training' ? selectedBatch : 'N/A - Office Work'}</strong></div>
+                <div>Current Time: <strong>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></div>
+                <div>Trainer: <strong>Linto George</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </Drawer>
 
       {/* Submit / Claim Attendance Drawer */}
@@ -482,6 +594,15 @@ export const TaskWidget = memo(function TaskWidget({
   return (
     <Card>
       <SectionHeader title="Today's Tasks (Drag & Drop Reorder)" />
+      <style>{`
+        .task-card-hover {
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .task-card-hover:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+        }
+      `}</style>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {tasks.map((t, idx) => (
           <div
@@ -490,16 +611,17 @@ export const TaskWidget = memo(function TaskWidget({
             onDragStart={() => handleDragStart(idx)}
             onDragOver={(e) => handleDragOver(e, idx)}
             onDragEnd={() => setDraggedIndex(null)}
+            className="task-card-hover"
             style={{
-              padding: 14,
+              padding: 16,
               border: '1px solid var(--border)',
-              background: draggedIndex === idx ? 'var(--bg-hover)' : 'var(--bg-sunken)',
-              borderRadius: 'var(--radius-md)',
+              background: draggedIndex === idx ? 'var(--bg-hover)' : 'var(--bg-surface)',
+              borderRadius: 10,
               cursor: 'grab',
-              transition: 'background 0.15s ease',
               display: 'flex',
               flexDirection: 'column',
-              gap: 10,
+              gap: 12,
+              boxShadow: 'var(--e1)',
             }}
           >
             {/* Task Details Header — No blue progress bar */}
@@ -508,8 +630,10 @@ export const TaskWidget = memo(function TaskWidget({
                 <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{t.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                    📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong> · 📅 Due Date: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong></span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• 📅 Due: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong></span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• ⏳ Time Left: <strong style={{ color: 'var(--status-warning)' }}>{t.id === '1' ? '2 hrs left' : t.id === '2' ? '1 day left' : '3 days left'}</strong></span>
                   </div>
                 </div>
               </div>
@@ -628,11 +752,84 @@ export const TimelineWidget = memo(function TimelineWidget({
 });
 
 export const AnnouncementWidget = memo(function AnnouncementWidget() {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const announcements = [
+    {
+      id: 'a1',
+      title: 'Q3 Training Calendar & Batch Schedule Release',
+      category: 'Schedule',
+      priority: 'High',
+      pinned: true,
+      content: 'The Training Calendar for Q3 has been finalized and uploaded. Please review your assigned batches under Batches -> Training Calendar. Any conflict or leave adjustments must be submitted to the college coordinator at least 48 hours prior.',
+      date: 'Today'
+    },
+    {
+      id: 'a2',
+      title: 'System Maintenance Window: Sunday',
+      category: 'IT Support',
+      priority: 'Normal',
+      pinned: false,
+      content: 'The primary database server will undergo scheduled security patching and maintenance on Sunday, July 26th between 02:00 AM and 05:00 AM. Access to the Attendance and Trainer scheduling portals will be temporarily offline during this period.',
+      date: 'Yesterday'
+    }
+  ];
+
   return (
-    <Card style={{ borderLeft: '4px solid var(--accent)' }}>
-      <SectionHeader title="Announcements Dashboard" />
-      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-        📢 <strong>Company Notice:</strong> Training Calendar updated for Q3. Please review your assigned batches under Batches ➔ Training Calendar.
+    <Card>
+      <SectionHeader title="Announcements & Notices" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {announcements.map((a) => {
+          const isExpanded = expandedId === a.id;
+          const tone = a.priority === 'High' ? 'danger' : 'neutral';
+          
+          return (
+            <div
+              key={a.id}
+              style={{
+                borderLeft: `4px solid ${a.priority === 'High' ? 'var(--status-danger)' : 'var(--brand)'}`,
+                background: 'var(--bg-sunken)',
+                padding: '12px 14px',
+                borderRadius: '0 8px 8px 0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {a.pinned && <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}>📌 Pinned</span>}
+                  <Badge tone={tone}>{a.category}</Badge>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.date}</span>
+              </div>
+
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{a.title}</div>
+              
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isExpanded ? a.content : `${a.content.slice(0, 95)}...`}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--brand)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  padding: 0,
+                  marginTop: 2,
+                }}
+              >
+                {isExpanded ? 'Read Less ▲' : 'Read More ▼'}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
@@ -681,9 +878,9 @@ export function MyDayPage() {
   ]);
 
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([
-    { id: '1', title: 'Clocked in (Office - GPS Verified)', time: '08:30 AM', tone: 'success' },
-    { id: '2', title: 'Power BI Session Started', time: '10:00 AM', tone: 'progress' },
-    { id: '3', title: 'Assessment Review', time: '02:00 PM', tone: 'info' },
+    { id: '1', title: '🟢 Clocked in (Office - GPS Verified)', time: '08:30 AM', tone: 'success' },
+    { id: '2', title: '⚡ Power BI Session Started', time: '10:00 AM', tone: 'progress' },
+    { id: '3', title: '📝 Assessment Review', time: '02:00 PM', tone: 'info' },
   ]);
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {

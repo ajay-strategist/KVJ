@@ -36,7 +36,8 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(2, 6, 23, 0.5)',
+        backgroundColor: 'rgba(15, 23, 42, 0.18)',
+        backdropFilter: 'blur(4px)',
         zIndex: 1100,
         display: 'flex',
         justifyContent: 'flex-end',
