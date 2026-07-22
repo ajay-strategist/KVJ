@@ -7,6 +7,7 @@
 
 import { type ReactNode } from 'react';
 import { ThemeProvider } from '../shared/theme/ThemeProvider';
+import { WorkspaceProvider } from '../shared/theme/WorkspaceProvider';
 import { ConfigProvider } from '../shared/config/ConfigProvider';
 import { AuthProvider } from '../modules/auth/AuthProvider';
 import { NotificationProvider } from '../shared/notifications/NotificationProvider';
@@ -23,15 +24,17 @@ import '../shared/ui/ui.css';
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
-      <ConfigProvider>
-        <AuthProvider>
-          <NotificationProvider>
-            <DialogProvider>
-              <CommandPaletteProvider>{children}</CommandPaletteProvider>
-            </DialogProvider>
-          </NotificationProvider>
-        </AuthProvider>
-      </ConfigProvider>
+      <WorkspaceProvider>
+        <ConfigProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <DialogProvider>
+                <CommandPaletteProvider>{children}</CommandPaletteProvider>
+              </DialogProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </ConfigProvider>
+      </WorkspaceProvider>
     </ThemeProvider>
   );
 }
