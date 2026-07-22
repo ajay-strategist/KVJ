@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Card, SectionHeader, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import Drawer from '../../../shared/ui/Drawer';
@@ -12,7 +11,7 @@ export interface ProjectCardData {
   title: string;
   client: string;
   supervisor: string;
-  status: 'Active' | 'In Progress' | 'Completed';
+  status: 'Not Started' | 'In Progress' | 'Completed';
   members: Array<{ name: string; hours: number }>;
   totalHours: number;
   tasksTotal: number;
@@ -24,8 +23,9 @@ export function ProjectList() {
   const { toast } = useNotifications();
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'Active' | 'In Progress' | 'Completed'>('all');
-  const [hideCompleted, setHideCompleted] = useState(true);
+  
+  // Status checkboxes filter state. Default: Not Started & In Progress checked, Completed unchecked
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Not Started', 'In Progress']);
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
@@ -57,7 +57,7 @@ export function ProjectList() {
       title: 'Enterprise ERP Attendance & Payroll Sync',
       client: 'Vimala College',
       supervisor: 'CEO',
-      status: 'Active',
+      status: 'Not Started',
       members: [
         { name: 'Linto George', hours: 18.0 },
         { name: 'Sankar M', hours: 14.0 },
@@ -101,12 +101,13 @@ export function ProjectList() {
     },
   ]);
 
-  // Filter logic: Completed projects hidden by default or filtered
-  const filteredProjects = projectsList.filter((p) => {
-    if (hideCompleted && p.status === 'Completed') return false;
-    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
-    return true;
-  });
+  // Filter based on selected checkboxes
+  const filteredProjects = projectsList.filter((p) => selectedStatuses.includes(p.status));
+
+  // Count active projects (Not Started + In Progress)
+  const activeProjectsCount = projectsList.filter(
+    (p) => p.status === 'Not Started' || p.status === 'In Progress'
+  ).length;
 
   const handleCreateProject = (values: Record<string, unknown>) => {
     const newProj: ProjectCardData = {
@@ -115,7 +116,7 @@ export function ProjectList() {
       title: values.title as string,
       client: (values.client as string) || 'Independent',
       supervisor: (values.supervisor as string) || 'Manager (Operations)',
-      status: (values.status as any) || 'Active',
+      status: (values.status as any) || 'Not Started',
       members: [
         { name: 'Linto George', hours: 0 },
         { name: 'Ajay Kumar', hours: 0 },
@@ -145,6 +146,12 @@ export function ProjectList() {
       message: `Task "${values.title}" added to project ${selectedProject.code}.`,
     });
     setAddTaskOpen(false);
+  };
+
+  const toggleStatusFilter = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
   };
 
   const tableColumns: Column<ProjectCardData>[] = [
@@ -235,19 +242,14 @@ export function ProjectList() {
         }
       />
 
-      {/* Top KPI Dashboard Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
-        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Projects In View</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{filteredProjects.length} Projects</div>
+      {/* Top KPI Dashboard Cards — Aligned to Left */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16, minWidth: 220, flex: '0 1 auto' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
         </Card>
 
-        <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Member Hours</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {filteredProjects.reduce((acc, p) => acc + p.totalHours, 0).toFixed(1)} hrs</div>
-        </Card>
-
-        <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16 }}>
+        <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16, minWidth: 220, flex: '0 1 auto' }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
             {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
@@ -255,36 +257,39 @@ export function ProjectList() {
         </Card>
       </div>
 
-      {/* Filter Control Bar */}
+      {/* Filter Control Bar: Checkbox Status Filter on Right */}
       <Card style={{ marginBottom: 20, padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Status Filter:</span>
-            <select
-              className="kvj-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, borderRadius: 'var(--radius-xs)', minWidth: 150 }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-            </select>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                checked={hideCompleted}
-                onChange={(e) => setHideCompleted(e.target.checked)}
-              />
-              🚫 Hide Completed Projects
-            </label>
-          </div>
-
           <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
             Showing {filteredProjects.length} of {projectsList.length} Projects
           </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Status Filter:</span>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {(['Not Started', 'In Progress', 'Completed'] as const).map((status) => (
+                <label
+                  key={status}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStatuses.includes(status)}
+                    onChange={() => toggleStatusFilter(status)}
+                  />
+                  {status}
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -426,7 +431,7 @@ export function ProjectList() {
 
       {/* Create Project Modal */}
       <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create Master Project">
-        <Form initial={{ status: 'Active', supervisor: 'Manager (Operations)' }} onSubmit={handleCreateProject}>
+        <Form initial={{ status: 'Not Started', supervisor: 'Manager (Operations)' }} onSubmit={handleCreateProject}>
           <TextField name="title" label="Project Name / Title" placeholder="e.g. Supabase Multi-Tenant Analytics" />
           <TextField name="code" label="Project Code" placeholder="e.g. KVJ-PROJ-105" />
           <TextField name="client" label="Client Name" placeholder="e.g. Christ University" />
@@ -443,7 +448,7 @@ export function ProjectList() {
             name="status"
             label="Initial Status"
             options={[
-              { value: 'Active', label: 'Active' },
+              { value: 'Not Started', label: 'Not Started' },
               { value: 'In Progress', label: 'In Progress' },
               { value: 'Completed', label: 'Completed' },
             ]}
