@@ -1,57 +1,143 @@
 import { useState, useEffect } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Card, SectionHeader, Badge } from '../../../shared/ui/components';
-import { useTraining } from '../hooks/useTraining';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, DatePickerField } from '../../../shared/forms/form';
-import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
-import type { Batch } from '../training.repository';
 import type { Employee } from '../../employee/employee.repository';
+import { useTraining } from '../hooks/useTraining';
+import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 
-interface BatchPipelineDetails {
-  initialWorks: boolean;
-  photos: boolean;
-  training: boolean;
-  videos: boolean;
-  feedback: boolean;
-  certificateDeliveryDate: string;
-  signedReceiptUploaded: boolean;
-  coordinatorEmail: string;
+// Workspace Navigation Tabs
+type WorkspaceTab =
+  | 'overview'
+  | 'pipeline'
+  | 'students'
+  | 'attendance'
+  | 'assessments'
+  | 'certificates'
+  | 'communication'
+  | 'documents'
+  | 'timeline';
+
+interface ChecklistItem {
+  id: string;
+  task: string;
+  checked: boolean;
+  assigned: string;
+  dueDate: string;
+  priority: 'High' | 'Medium' | 'Low';
+  commentsCount: number;
 }
 
-interface StudentReportItem {
+interface StudentRecord {
   id: string;
   name: string;
-  email: string;
+  photo: string;
   phone: string;
+  email: string;
+  college: string;
+  department: string;
   attendancePct: number;
-  mockTestScore: number;
-  finalExamScore: number;
+  attendanceStatus: 'Regular' | 'Irregular' | 'Critical';
+  ass1: number;
+  ass2: number;
+  ass3: number;
+  project: number;
+  finalExam: number;
+  overallScore: number;
   voucherId: string;
+  voucherStatus: 'Assigned' | 'Unassigned' | 'Expired';
+  certificateStatus: 'Generated' | 'Printed' | 'Dispatched' | 'Delivered' | 'Received';
 }
 
-const initialMockStudents: StudentReportItem[] = [
-  { id: 's1', name: 'Albin Joseph', email: 'albin.joseph@student.edu', phone: '+91 98765 43210', attendancePct: 88, mockTestScore: 78, finalExamScore: 82, voucherId: 'VOUCH-CHRIST-01' },
-  { id: 's2', name: 'Merlin K Thomas', email: 'merlin.t@student.edu', phone: '+91 94455 66778', attendancePct: 82, mockTestScore: 65, finalExamScore: 0, voucherId: '' },
-  { id: 's3', name: 'Devanand P', email: 'devanand.p@student.edu', phone: '+91 88990 11223', attendancePct: 94, mockTestScore: 85, finalExamScore: 89, voucherId: 'VOUCH-CHRIST-02' },
-  { id: 's4', name: 'Riya Rose', email: 'riya.rose@student.edu', phone: '+91 77889 90011', attendancePct: 76, mockTestScore: 54, finalExamScore: 0, voucherId: '' },
-];
+interface EmailHistoryItem {
+  id: string;
+  to: string;
+  subject: string;
+  sentAt: string;
+  status: 'Delivered' | 'Pending' | 'Read';
+}
+
+interface DocumentItem {
+  id: string;
+  name: string;
+  category: 'Material' | 'Report' | 'Receipt' | 'Certificate';
+  uploadedAt: string;
+  size: string;
+}
 
 export function BatchManagement() {
-  const { batches, courses, createBatch, loading } = useTraining();
+  const { batches, courses } = useTraining();
   const { toast } = useNotifications();
-  const [open, setOpen] = useState(false);
   const [trainers, setTrainers] = useState<Employee[]>([]);
-
-  // Local state for pipeline data and student list per batch
-  const [pipelineMap, setPipelineMap] = useState<Record<string, BatchPipelineDetails>>({});
-  const [studentsMap, setStudentsMap] = useState<Record<string, StudentReportItem[]>>({});
   
-  // Selected batch for detailed checklist tracking and report view
+  // Batch selection
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
-  const [reportBatchId, setReportBatchId] = useState<string>('');
+  
+  // Tab control
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
+
+  // Full Page student table overlay
+  const [showFullStudentReport, setShowFullStudentReport] = useState(false);
+
+  // Email composer modal state
+  const [emailComposerOpen, setEmailComposerOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailTo, setEmailTo] = useState('coordinator@christcollege.edu');
+  const [emailBody, setEmailBody] = useState('');
+
+  // Checklist State per Stage
+  const [checklist, setChecklist] = useState<Record<string, ChecklistItem[]>>({
+    planning: [
+      { id: 'c-1', task: 'College Confirmation Form Signed', checked: true, assigned: 'Operations Manager', dueDate: '2026-07-15', priority: 'High', commentsCount: 1 },
+      { id: 'c-2', task: 'Trainer Assignment Completed', checked: true, assigned: 'Academic Head', dueDate: '2026-07-16', priority: 'High', commentsCount: 0 },
+    ],
+    prep: [
+      { id: 'c-3', task: 'Syllabus & Material Dispatched', checked: true, assigned: 'Materials Dept', dueDate: '2026-07-18', priority: 'Medium', commentsCount: 2 },
+      { id: 'c-4', task: 'Student Registry Uploaded', checked: true, assigned: 'Operations Executive', dueDate: '2026-07-20', priority: 'High', commentsCount: 0 },
+      { id: 'c-5', task: 'Projector & Lab Systems Checked', checked: false, assigned: 'Lead Trainer', dueDate: '2026-07-22', priority: 'Medium', commentsCount: 3 },
+    ],
+    training: [
+      { id: 'c-6', task: 'Day 1 Sessions Logged', checked: true, assigned: 'Lead Trainer', dueDate: '2026-07-22', priority: 'High', commentsCount: 0 },
+      { id: 'c-7', task: 'Feedback link shared with students', checked: false, assigned: 'Lead Trainer', dueDate: '2026-07-25', priority: 'Low', commentsCount: 1 },
+    ],
+  });
+
+  // Certificate tracker parameter state
+  const [certificateDeliveryDate, setCertificateDeliveryDate] = useState('2026-07-28');
+  const [certificateStatus, setCertificateStatus] = useState<'Generated' | 'Printed' | 'Dispatched' | 'Delivered' | 'Received'>('Printed');
+  const [courierName, setCourierName] = useState('DTDC Express');
+  const [trackingNumber, setTrackingNumber] = useState('DTDC-992019A');
+  const [signedReceiptUploaded, setSignedReceiptUploaded] = useState(false);
+
+  // Student list state
+  const [students, setStudents] = useState<StudentRecord[]>([
+    { id: 's-1', name: 'Albin Joseph', photo: '👨‍🎓', phone: '+91 98765 43210', email: 'albin.joseph@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 88, attendanceStatus: 'Regular', ass1: 85, ass2: 78, ass3: 90, project: 82, finalExam: 84, overallScore: 83.4, voucherId: 'VOUCH-CHRIST-101', voucherStatus: 'Assigned', certificateStatus: 'Printed' },
+    { id: 's-2', name: 'Merlin K Thomas', photo: '👩‍🎓', phone: '+91 94455 66778', email: 'merlin.t@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 82, attendanceStatus: 'Irregular', ass1: 72, ass2: 65, ass3: 80, project: 75, finalExam: 0, overallScore: 58.4, voucherId: '', voucherStatus: 'Unassigned', certificateStatus: 'Generated' },
+    { id: 's-3', name: 'Devanand P', photo: '👨‍🎓', phone: '+91 88990 11223', email: 'devanand.p@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 94, attendanceStatus: 'Regular', ass1: 92, ass2: 88, ass3: 95, project: 90, finalExam: 88, overallScore: 90.6, voucherId: 'VOUCH-CHRIST-102', voucherStatus: 'Assigned', certificateStatus: 'Printed' },
+    { id: 's-4', name: 'Riya Rose', photo: '👩‍🎓', phone: '+91 77889 90011', email: 'riya.rose@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 76, attendanceStatus: 'Critical', ass1: 60, ass2: 54, ass3: 68, project: 62, finalExam: 0, overallScore: 48.8, voucherId: '', voucherStatus: 'Unassigned', certificateStatus: 'Generated' },
+  ]);
+
+  // Email communications log
+  const [emailLogs, setEmailLogs] = useState<EmailHistoryItem[]>([
+    { id: 'e-1', to: 'coordinator@christcollege.edu', subject: 'Christ BCOM Batch 1 — Student Details', sentAt: '2026-07-20 09:30 AM', status: 'Read' },
+    { id: 'e-2', to: 'coordinator@christcollege.edu', subject: 'Christ BCOM Batch 1 — Daily Session Report (Day 1)', sentAt: '2026-07-21 05:00 PM', status: 'Delivered' }
+  ]);
+
+  // Uploaded documents
+  const [documents, setDocuments] = useState<DocumentItem[]>([
+    { id: 'd-1', name: 'Christ_BCOM_Student_Registry.xlsx', category: 'Material', uploadedAt: '2026-07-20', size: '24 KB' },
+    { id: 'd-2', name: 'Power_BI_Syllabus_Outline.pdf', category: 'Material', uploadedAt: '2026-07-18', size: '1.2 MB' },
+    { id: 'd-3', name: 'Christ_BCOM_Day1_Attendance.pdf', category: 'Report', uploadedAt: '2026-07-21', size: '120 KB' }
+  ]);
+
+  // Activity Timeline
+  const [timeline, setTimeline] = useState([
+    { id: 't-1', action: 'Daily Session Report Generated', user: 'Linto George', timestamp: '2026-07-21 05:00 PM' },
+    { id: 't-2', action: 'Signed Confirmation Form Uploaded', user: 'Admin Operations', timestamp: '2026-07-20 02:15 PM' },
+    { id: 't-3', action: 'Batch Scheduled & Coordinator Notified', user: 'Manager Operations', timestamp: '2026-07-15 11:30 AM' },
+  ]);
 
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((res) => {
@@ -59,432 +145,771 @@ export function BatchManagement() {
     });
   }, []);
 
-  // Initialize selected batch once batches list is loaded
   useEffect(() => {
     if (batches.length > 0 && !selectedBatchId) {
       setSelectedBatchId(batches[0].id);
     }
   }, [batches, selectedBatchId]);
 
-  const handleCreateSubmit = async (values: Record<string, unknown>) => {
-    const res = await createBatch({
-      courseId: values.courseId as string,
-      code: values.code as string,
-      capacity: Number(values.capacity),
-      startDate: values.startDate as string,
-      endDate: values.endDate as string,
-      trainerId: values.trainerId as string || undefined,
-      venue: values.venue as string || undefined,
-      onlineLink: values.onlineLink as string || undefined,
-    });
+  const activeBatch = batches.find((b) => b.id === selectedBatchId);
+  const activeCourse = activeBatch ? courses.find((c) => c.id === activeBatch.courseId) : null;
+  const activeTrainer = activeBatch ? trainers.find((t) => t.id === activeBatch.trainerId) : null;
 
-    if (res.ok) {
-      toast({ variant: 'success', title: 'Batch Scheduled', message: `Batch ${values.code} was scheduled.` });
-      setOpen(false);
-    } else {
-      toast({ variant: 'error', title: 'Error', message: res.error });
-    }
-  };
-
-  const getPipeline = (batchId: string): BatchPipelineDetails => {
-    return pipelineMap[batchId] || {
-      initialWorks: false,
-      photos: false,
-      training: true,
-      videos: false,
-      feedback: false,
-      certificateDeliveryDate: '',
-      signedReceiptUploaded: false,
-      coordinatorEmail: 'coordinator@college.edu',
-    };
-  };
-
-  const updatePipeline = (batchId: string, patch: Partial<BatchPipelineDetails>) => {
-    setPipelineMap((prev) => ({
-      ...prev,
-      [batchId]: { ...getPipeline(batchId), ...patch },
-    }));
-  };
-
-  const getStudentsList = (batchId: string): StudentReportItem[] => {
-    return studentsMap[batchId] || initialMockStudents;
-  };
-
-  const updateStudentVoucher = (batchId: string, studentId: string, voucherId: string) => {
-    const list = getStudentsList(batchId).map((s) =>
-      s.id === studentId ? { ...s, voucherId } : s
+  const handleToggleCheck = (stage: string, itemId: string) => {
+    const list = checklist[stage].map((item) =>
+      item.id === itemId ? { ...item, checked: !item.checked } : item
     );
-    setStudentsMap((prev) => ({
-      ...prev,
-      [batchId]: list,
-    }));
+    setChecklist((prev) => ({ ...prev, [stage]: list }));
+    toast({ variant: 'success', title: 'Task Updated', message: 'Checklist parameter updated.' });
   };
 
-  const sendEmailToCoordinator = (reportType: string, batchCode: string, email: string) => {
+  const handleSendEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newLog: EmailHistoryItem = {
+      id: `e-${Date.now()}`,
+      to: emailTo,
+      subject: emailSubject,
+      sentAt: 'Just Now',
+      status: 'Pending'
+    };
+    setEmailLogs([newLog, ...emailLogs]);
+    setEmailComposerOpen(false);
     toast({
       variant: 'success',
-      title: 'Email Sent Successfully',
-      message: `Dispatched ${reportType} for batch "${batchCode}" to college coordinator at ${email}.`,
+      title: 'Email Dispatched',
+      message: `Sent "${emailSubject}" to college coordinator at ${emailTo}.`,
     });
   };
 
-  const notifyTrainerVoucher = (studentName: string, voucherId: string, trainerId?: string) => {
-    const trainerObj = trainers.find((t) => t.id === trainerId);
-    const trainerNameStr = trainerObj ? `${trainerObj.firstName} ${trainerObj.lastName}` : 'Lead Trainer';
+  const handleOpenComposer = (subject: string, defaultBody: string) => {
+    setEmailSubject(subject);
+    setEmailBody(defaultBody);
+    setEmailComposerOpen(true);
+  };
+
+  const assignVoucherId = (studentId: string, val: string) => {
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.id === studentId
+          ? { ...s, voucherId: val, voucherStatus: val ? 'Assigned' : 'Unassigned' }
+          : s
+      )
+    );
+  };
+
+  const notifyTrainerVoucher = (studentName: string, voucherId: string) => {
+    const trainerNameStr = activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'Lead Trainer';
     toast({
       variant: 'success',
       title: 'Trainer Notified',
-      message: `Sent Voucher notification for ${studentName} (${voucherId || 'Pending'}) to ${trainerNameStr}.`,
+      message: `Voucher notification for "${studentName}" (${voucherId || 'Pending'}) dispatched to ${trainerNameStr}.`,
     });
   };
 
-  const courseTitle = (courseId: string) => {
-    return courses.find((c) => c.id === courseId)?.title || 'General Training';
+  const exportPDFReport = (reportType: string) => {
+    toast({
+      variant: 'success',
+      title: 'Report Downloaded',
+      message: `${reportType} downloaded as PDF successfully with official KVJ Analytics seal.`,
+    });
   };
 
-  const trainerName = (trainerId?: string) => {
-    const t = trainers.find((tr) => tr.id === trainerId);
-    return t ? `${t.firstName} ${t.lastName}` : 'Unassigned';
-  };
-
-  const selectedBatch = batches.find((b) => b.id === selectedBatchId);
-  const activePipeline = selectedBatch ? getPipeline(selectedBatch.id) : null;
+  // Calculating overall metrics
+  const eligibleCount = students.filter((s) => s.attendancePct >= 84).length;
+  const attendanceAvg = Math.round(students.reduce((acc, s) => acc + s.attendancePct, 0) / students.length);
+  const scoreAvg = Math.round(students.reduce((acc, s) => acc + s.overallScore, 0) / students.length);
 
   return (
     <AppShell>
-      <PageHeader
-        title="Training Details & End-to-End Pipeline"
-        subtitle="Manage batch checklists, upload signed receipts, email coordinator documents, and review exam eligibility."
-        actions={<Button onClick={() => setOpen(true)}>Schedule New Training Batch</Button>}
-      />
+      {/* Top Header Card Workspace Details */}
+      <Card style={{ marginBottom: 20, padding: 20, borderLeft: '4px solid var(--brand)', background: 'var(--bg-panel)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>
+                {activeCourse ? activeCourse.title : 'Training Batch Overview'}
+              </h1>
+              <Badge tone="progress">Training Phase</Badge>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+              🏢 College: <strong>{activeBatch?.code || 'Christ College'}</strong> · Coordinator: <strong>Sr. Coordinator Dept.</strong> · Trainer: <strong>{activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'Linto George'}</strong>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+              📅 Schedule: <strong>{activeBatch?.startDate} to {activeBatch?.endDate}</strong> · Status: <strong>Preparation stage</strong>
+            </div>
+          </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.3fr', gap: 24, alignItems: 'start' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button size="sm" variant="secondary" onClick={() => handleOpenComposer('Daily Session Report', 'Dear Coordinator, Attached is the Daily Report...')}>
+              ✉️ Send Daily Report
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleOpenComposer('Student Details Registry', 'Attached are the student details...')}>
+              ✉️ Send Student Details
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleOpenComposer('Final Course Completion Report', 'Attached is the final report...')}>
+              ✉️ Send Final Report
+            </Button>
+            <Button size="sm" onClick={() => setShowFullStudentReport(true)}>
+              📋 Show Student Report (Full Workspace)
+            </Button>
+          </div>
+        </div>
+
+        {/* Training Progress Bar */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+            <span>Workspace Completion Progress</span>
+            <span>68%</span>
+          </div>
+          <div style={{ width: '100%', height: 6, background: 'var(--bg-sunken)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: '68%', height: '100%', background: 'var(--brand)' }} />
+          </div>
+        </div>
+      </Card>
+
+      {/* Main Two-Column Content Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 280px', gap: 20, alignItems: 'start' }}>
         
-        {/* Left Side: Active Batches Grid */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionHeader title="📚 Active College Batches" />
-          {batches.map((b) => {
-            const isSelected = selectedBatchId === b.id;
-            const pipeline = getPipeline(b.id);
-            const checklistCount = [
-              pipeline.initialWorks,
-              pipeline.photos,
-              pipeline.training,
-              pipeline.videos,
-              pipeline.feedback
-            ].filter(Boolean).length;
-            const completionPct = Math.round((checklistCount / 5) * 100);
+        {/* Left Side: Navigation Sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {(
+            [
+              { id: 'overview', label: '📊 Overview Dashboard' },
+              { id: 'pipeline', label: '⚙️ Training Pipeline' },
+              { id: 'students', label: '👥 Student Records' },
+              { id: 'attendance', label: '📅 Attendance logs' },
+              { id: 'assessments', label: '📝 Assessments' },
+              { id: 'certificates', label: '📜 Certificates Delivery' },
+              { id: 'communication', label: '✉️ Communications Log' },
+              { id: 'documents', label: '📁 Document Center' },
+              { id: 'timeline', label: '🕒 Activity Timeline' },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                textAlign: 'left',
+                border: 'none',
+                borderRadius: 6,
+                background: activeTab === t.id ? 'var(--brand)' : 'transparent',
+                color: activeTab === t.id ? 'white' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-            return (
-              <div
-                key={b.id}
-                onClick={() => setSelectedBatchId(b.id)}
-                style={{
-                  cursor: 'pointer',
-                  transition: 'all 0.25s ease',
-                  transform: isSelected ? 'scale(1.01)' : 'none',
-                }}
-              >
-                <Card
-                  style={{
-                    borderLeft: isSelected ? '4px solid var(--brand)' : '1px solid var(--border)',
-                    background: isSelected ? 'var(--bg-panel)' : 'var(--bg-surface)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                    <div>
-                      <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{b.code}</h3>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {courseTitle(b.courseId)}
-                      </div>
-                    </div>
-                    <Badge tone={completionPct === 100 ? 'success' : 'progress'}>
-                      {completionPct}% Complete
-                    </Badge>
+        {/* Center: Content View Area */}
+        <div>
+          
+          {/* TAB 1: OVERVIEW DASHBOARD */}
+          {activeTab === 'overview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <SectionHeader title="Batch Overview Metrics" />
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <Card style={{ padding: 16 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>👥 Enrolled Students</h3>
+                  <div style={{ fontSize: 24, fontWeight: 800 }}>{students.length} Students</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Average attendance: <strong>{attendanceAvg}%</strong>
                   </div>
+                </Card>
 
-                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                  <div>📅 Schedule: <strong>{b.startDate} to {b.endDate}</strong></div>
-                  <div>👨‍🏫 Trainer: <strong>{trainerName(b.trainerId)}</strong></div>
-                </div>
-
-                {/* Progress bar */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ width: '100%', height: 6, background: 'var(--bg-sunken)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ width: `${completionPct}%`, height: '100%', background: 'var(--brand)', transition: 'width 0.3s ease' }} />
+                <Card style={{ padding: 16 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>🎯 Exam Eligibility</h3>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)' }}>
+                    {eligibleCount} / {students.length} Eligible
                   </div>
-                </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Requires at least <strong>84%</strong> attendance threshold.
+                  </div>
+                </Card>
 
-                {/* Batch Action Buttons */}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    style={{ flex: 1 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setReportBatchId(b.id);
-                    }}
-                  >
-                    📋 Show Student Report
-                  </Button>
-                  <div style={{ display: 'flex', gap: 4, width: '100%', marginTop: 6 }}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      style={{ flex: 1, fontSize: 11 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendEmailToCoordinator('Student Data', b.code, pipeline.coordinatorEmail);
-                      }}
-                    >
-                      ✉️ Send Student Data
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      style={{ flex: 1, fontSize: 11 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendEmailToCoordinator('Daily Reports', b.code, pipeline.coordinatorEmail);
-                      }}
-                    >
-                      ✉️ Send Daily Report
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      style={{ flex: 1, fontSize: 11 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendEmailToCoordinator('Final Reports', b.code, pipeline.coordinatorEmail);
-                      }}
-                    >
-                      ✉️ Send Final Report
-                    </Button>
+                <Card style={{ padding: 16 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>📜 Certificate Status</h3>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)' }}>{certificateStatus}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Tracking courier: <strong>{trackingNumber}</strong>
+                  </div>
+                </Card>
+
+                <Card style={{ padding: 16 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>📈 Average Performance Score</h3>
+                  <div style={{ fontSize: 24, fontWeight: 800 }}>{scoreAvg}%</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    From 3 assessments + project + final exam.
+                  </div>
+                </Card>
+              </div>
+
+              {/* Photo & Video quick previews */}
+              <Card style={{ padding: 16 }}>
+                <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>🖼️ Media Galleries</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div style={{ border: '1px dashed var(--border)', borderRadius: 6, padding: 12, textAlign: 'center' }}>
+                    <div style={{ fontSize: 20 }}>📸</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>Photos (3 Uploaded)</div>
+                  </div>
+                  <div style={{ border: '1px dashed var(--border)', borderRadius: 6, padding: 12, textAlign: 'center' }}>
+                    <div style={{ fontSize: 20 }}>🎥</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>Videos (1 Logged)</div>
                   </div>
                 </div>
               </Card>
             </div>
-            );
-          })}
-        </div>
+          )}
 
-        {/* Right Side: Customizable Checklist & Pipeline parameters */}
-        {selectedBatch && activePipeline && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <SectionHeader title={`⚙️ Pipeline Tracker: ${selectedBatch.code}`} />
-            
-            <Card style={{ padding: 20 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📋 Customizable Pipeline Checklist</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={activePipeline.initialWorks}
-                    onChange={(e) => updatePipeline(selectedBatch.id, { initialWorks: e.target.checked })}
-                  />
-                  <strong>Initial Works Checklist Completed</strong>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={activePipeline.photos}
-                    onChange={(e) => updatePipeline(selectedBatch.id, { photos: e.target.checked })}
-                  />
-                  <strong>Group Photos Uploaded & Verified</strong>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={activePipeline.training}
-                    onChange={(e) => updatePipeline(selectedBatch.id, { training: e.target.checked })}
-                  />
-                  <strong>Trainings Completed</strong>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={activePipeline.videos}
-                    onChange={(e) => updatePipeline(selectedBatch.id, { videos: e.target.checked })}
-                  />
-                  <strong>Video Recordings Archived</strong>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={activePipeline.feedback}
-                    onChange={(e) => updatePipeline(selectedBatch.id, { feedback: e.target.checked })}
-                  />
-                  <strong>Coordinator & Student Feedback Gathered</strong>
-                </label>
-
-              </div>
-            </Card>
-
-            {/* Delivery Dates and Receipt Upload */}
-            <Card style={{ padding: 20 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📜 Certificate Delivery & Signed Receipt</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                    Certificate Delivery Date
-                  </label>
-                  <input
-                    type="date"
-                    className="kvj-input"
-                    value={activePipeline.certificateDeliveryDate}
-                    onChange={(e) => updatePipeline(selectedBatch.id, { certificateDeliveryDate: e.target.value })}
-                  />
+          {/* TAB 2: TRAINING PIPELINE */}
+          {activeTab === 'pipeline' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <SectionHeader title="Operational Training Pipeline Stage Tracker" />
+              
+              {/* Planning Stage */}
+              <Card style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <strong style={{ fontSize: 14 }}>1. Planning Stage</strong>
+                  <Badge tone="success">100% Complete</Badge>
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {checklist.planning.map((item) => (
+                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={item.checked} onChange={() => handleToggleCheck('planning', item.id)} />
+                      <span>{item.task} (Assigned: <strong>{item.assigned}</strong>)</span>
+                    </label>
+                  ))}
+                </div>
+              </Card>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                    Signed Receipt Document
-                  </label>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => updatePipeline(selectedBatch.id, { signedReceiptUploaded: true })}
-                    >
-                      {activePipeline.signedReceiptUploaded ? '✅ Change Uploaded File' : '📤 Upload Signed Receipt'}
-                    </Button>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      {activePipeline.signedReceiptUploaded ? 'Receipt-christ-signed.pdf' : 'No file uploaded yet'}
-                    </span>
+              {/* Preparation Stage */}
+              <Card style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <strong style={{ fontSize: 14 }}>2. Preparation Stage</strong>
+                  <Badge tone="progress">66% Complete</Badge>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {checklist.prep.map((item) => (
+                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={item.checked} onChange={() => handleToggleCheck('prep', item.id)} />
+                      <span>{item.task} (Assigned: <strong>{item.assigned}</strong>)</span>
+                    </label>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Training Stage */}
+              <Card style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <strong style={{ fontSize: 14 }}>3. Training Stage</strong>
+                  <Badge tone="neutral">50% Complete</Badge>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {checklist.training.map((item) => (
+                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={item.checked} onChange={() => handleToggleCheck('training', item.id)} />
+                      <span>{item.task} (Assigned: <strong>{item.assigned}</strong>)</span>
+                    </label>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* TAB 3: STUDENT RECORDS */}
+          {activeTab === 'students' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <SectionHeader title="Students Enrolled Registry" />
+                <Button size="sm" onClick={() => setShowFullStudentReport(true)}>
+                  🔍 Full screen Workspace
+                </Button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {students.map((s) => (
+                  <Card key={s.id} style={{ padding: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 24 }}>{s.photo}</span>
+                        <div>
+                          <strong style={{ fontSize: 13.5 }}>{s.name}</strong>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.email} · {s.phone}</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Attendance</div>
+                          <strong style={{ fontSize: 12.5 }}>{s.attendancePct}%</strong>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Voucher Status</div>
+                          <Badge tone={s.voucherId ? 'success' : 'neutral'}>
+                            {s.voucherId ? 'Assigned' : 'Unassigned'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ATTENDANCE LOGS */}
+          {activeTab === 'attendance' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SectionHeader title="Daily Attendance Registry" />
+              <Card style={{ padding: 16 }}>
+                <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                      <th style={{ padding: 8 }}>Student</th>
+                      <th style={{ padding: 8 }}>Attendance Rate</th>
+                      <th style={{ padding: 8 }}>Action Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((s) => (
+                      <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: 8, fontWeight: 700 }}>{s.name}</td>
+                        <td style={{ padding: 8 }}>{s.attendancePct}%</td>
+                        <td style={{ padding: 8 }}>
+                          <Badge tone={s.attendancePct >= 84 ? 'success' : 'danger'}>
+                            {s.attendancePct >= 84 ? 'Eligible' : 'Not Eligible'}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </div>
+          )}
+
+          {/* TAB 5: ASSESSMENTS */}
+          {activeTab === 'assessments' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SectionHeader title="Student Assessment Grades" />
+              <Card style={{ padding: 16 }}>
+                <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                      <th style={{ padding: 8 }}>Student Name</th>
+                      <th style={{ padding: 8 }}>Ass 1</th>
+                      <th style={{ padding: 8 }}>Ass 2</th>
+                      <th style={{ padding: 8 }}>Ass 3</th>
+                      <th style={{ padding: 8 }}>Final Exam</th>
+                      <th style={{ padding: 8 }}>Overall Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((s) => (
+                      <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: 8, fontWeight: 700 }}>{s.name}</td>
+                        <td style={{ padding: 8 }}>{s.ass1}</td>
+                        <td style={{ padding: 8 }}>{s.ass2}</td>
+                        <td style={{ padding: 8 }}>{s.ass3}</td>
+                        <td style={{ padding: 8 }}>{s.finalExam || '—'}</td>
+                        <td style={{ padding: 8, fontWeight: 700 }}>{s.overallScore}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </div>
+          )}
+
+          {/* TAB 6: CERTIFICATE DELIVERY */}
+          {activeTab === 'certificates' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <SectionHeader title="📜 Certificate Logistics & Delivery tracking" />
+              
+              <Card style={{ padding: 18 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Logistics Delivery Status
+                      </label>
+                      <select
+                        className="kvj-select"
+                        value={certificateStatus}
+                        onChange={(e) => setCertificateStatus(e.target.value as any)}
+                      >
+                        <option value="Generated">Generated</option>
+                        <option value="Printed">Printed</option>
+                        <option value="Dispatched">Dispatched</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Received">Received</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Expected/Delivered Date
+                      </label>
+                      <input
+                        type="date"
+                        className="kvj-input"
+                        value={certificateDeliveryDate}
+                        onChange={(e) => setCertificateDeliveryDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Courier Name
+                      </label>
+                      <input
+                        type="text"
+                        className="kvj-input"
+                        value={courierName}
+                        onChange={(e) => setCourierName(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Tracking reference ID
+                      </label>
+                      <input
+                        type="text"
+                        className="kvj-input"
+                        value={trackingNumber}
+                        onChange={(e) => setTrackingNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                      Signed Courier Receipt Document
+                    </label>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setSignedReceiptUploaded(true);
+                          toast({ variant: 'success', title: 'Receipt Uploaded', message: 'Signed receipt has been linked successfully.' });
+                        }}
+                      >
+                        {signedReceiptUploaded ? '✅ Change Uploaded Document' : '📤 Upload Signed Receipt'}
+                      </Button>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        {signedReceiptUploaded ? 'receipt_christ_signed_co.pdf' : 'Pending upload'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+              </Card>
+            </div>
+          )}
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                    Coordinator Email Address
-                  </label>
-                  <input
-                    type="email"
-                    className="kvj-input"
-                    value={activePipeline.coordinatorEmail}
-                    onChange={(e) => updatePipeline(selectedBatch.id, { coordinatorEmail: e.target.value })}
-                    placeholder="coordinator@college.edu"
-                  />
-                </div>
-
+          {/* TAB 7: COMMUNICATIONS LOG */}
+          {activeTab === 'communication' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SectionHeader title="📧 Coordinator Communications & Email Logs" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {emailLogs.map((log) => (
+                  <Card key={log.id} style={{ padding: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{log.subject}</strong>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>To: {log.to} · Sent: {log.sentAt}</div>
+                      </div>
+                      <Badge tone={log.status === 'Read' ? 'success' : 'progress'}>
+                        {log.status}
+                      </Badge>
+                    </div>
+                  </Card>
+                ))}
               </div>
-            </Card>
+            </div>
+          )}
 
-          </div>
-        )}
+          {/* TAB 8: DOCUMENT CENTER */}
+          {activeTab === 'documents' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SectionHeader title="📁 Document Center & Material Archives" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {documents.map((doc) => (
+                  <Card key={doc.id} style={{ padding: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>📄 {doc.name}</strong>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Uploaded: {doc.uploadedAt} · Size: {doc.size}</div>
+                      </div>
+                      <Button size="sm" variant="secondary" onClick={() => toast({ variant: 'info', title: 'File Downloading', message: `Dispatched ${doc.name} to downloads.` })}>
+                        Download
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 9: ACTIVITY TIMELINE */}
+          {activeTab === 'timeline' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SectionHeader title="🕒 Activity Logs & Audit Timeline" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {timeline.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--brand)', marginTop: 4 }} />
+                    <div>
+                      <strong>{item.action}</strong>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                        Triggered by: {item.user} · Timestamp: {item.timestamp}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Right Sidebar: AI suggestions & Coordinator Notes */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          
+          <Card style={{ padding: 16, borderLeft: '4px solid var(--brand)', background: 'var(--bg-sunken)' }}>
+            <h3 style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', marginBottom: 8 }}>🤖 Workspace AI Assistant</h3>
+            <div style={{ fontSize: 11.5, lineHeight: 1.4 }}>
+              <div>💡 <strong>Attendance Warning:</strong> Merlin K Thomas & Riya Rose are below the required 84% pass threshold.</div>
+              <div style={{ marginTop: 8 }}>💡 <strong>Voucher Status:</strong> 2 students have unassigned exam voucher IDs. Suggest matching them now.</div>
+              <div style={{ marginTop: 8 }}>💡 <strong>Signed Receipt:</strong> Certificates are printed but receipt signature upload is pending.</div>
+            </div>
+          </Card>
+
+          <Card style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>📋 Coordinator Daily Remarks</h3>
+            <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+              "Lab systems checked. Day 1 training session started on time. Need to schedule retest for students failing initial mock quiz."
+            </p>
+          </Card>
+
+          <Card style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>📜 Quick Report Download</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Attendance Report')}>
+                📥 PDF Attendance Report
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Assessment Marks Grid')}>
+                📥 PDF Assessment Report
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Certificate Delivery Status')}>
+                📥 PDF Certificates Report
+              </Button>
+            </div>
+          </Card>
+
+        </div>
 
       </div>
 
-      {/* Show Student Report Drawer */}
-      {reportBatchId && (
+      {/* FULL PAGE STUDENT TABLE WORKSPACE OVERLAY */}
+      {showFullStudentReport && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'var(--bg-surface)',
+            zIndex: 2000,
+            overflowY: 'auto',
+            padding: 30,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 20,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>📊 Students Performance & Exam Eligibility Matrix</h2>
+              <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Attendance criteria requires a minimum threshold of <strong>84%</strong> to unlock Final Exam vouchers.
+              </p>
+            </div>
+            <Button onClick={() => setShowFullStudentReport(false)}>
+              Close Full Workspace
+            </Button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Full Registry List')}>
+              📄 Export Spreadsheet
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => alert('Printing student registry...')}>
+              🖨️ Print Matrix
+            </Button>
+          </div>
+
+          {/* Full Screen Table */}
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }} className="kvj-table">
+                <thead>
+                  <tr style={{ background: 'var(--bg-sunken)' }}>
+                    <th style={{ padding: 10, position: 'sticky', left: 0, background: 'var(--bg-sunken)', zIndex: 10, minWidth: 140 }}>Student Name</th>
+                    <th style={{ padding: 10 }}>Contact Info</th>
+                    <th style={{ padding: 10 }}>Attendance</th>
+                    <th style={{ padding: 10 }}>Exam Eligibility</th>
+                    <th style={{ padding: 10 }}>Ass 1</th>
+                    <th style={{ padding: 10 }}>Ass 2</th>
+                    <th style={{ padding: 10 }}>Ass 3</th>
+                    <th style={{ padding: 10 }}>Final Exam</th>
+                    <th style={{ padding: 10 }}>Overall Score</th>
+                    <th style={{ padding: 10, minWidth: 240 }}>Voucher ID Management</th>
+                    <th style={{ padding: 10 }}>Certificate status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s) => {
+                    const eligible = s.attendancePct >= 84;
+                    return (
+                      <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        
+                        {/* Frozen Name Column */}
+                        <td style={{ padding: 10, fontWeight: 700, position: 'sticky', left: 0, background: 'var(--bg-surface)', zIndex: 2 }}>
+                          {s.photo} {s.name}
+                        </td>
+
+                        <td style={{ padding: 10 }}>
+                          <div>{s.email}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.phone}</div>
+                        </td>
+
+                        <td style={{ padding: 10 }}>
+                          <strong style={{ color: eligible ? 'var(--status-success)' : 'var(--status-danger)' }}>
+                            {s.attendancePct}%
+                          </strong>
+                        </td>
+
+                        <td style={{ padding: 10 }}>
+                          <Badge tone={eligible ? 'success' : 'danger'}>
+                            {eligible ? 'Eligible' : 'Not Eligible'}
+                          </Badge>
+                          {!eligible && (
+                            <div style={{ fontSize: 10, color: 'var(--status-danger)', marginTop: 2 }}>
+                              Missing {84 - s.attendancePct}% (Requires ~2 sessions)
+                            </div>
+                          )}
+                        </td>
+
+                        <td style={{ padding: 10 }}>{s.ass1}</td>
+                        <td style={{ padding: 10 }}>{s.ass2}</td>
+                        <td style={{ padding: 10 }}>{s.ass3}</td>
+                        <td style={{ padding: 10 }}>{s.finalExam || '—'}</td>
+                        <td style={{ padding: 10, fontWeight: 700 }}>{s.overallScore}%</td>
+                        
+                        {/* Voucher ID Management Column */}
+                        <td style={{ padding: 10 }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              className="kvj-input"
+                              style={{ padding: '4px 8px', fontSize: 11, width: 140 }}
+                              value={s.voucherId}
+                              onChange={(e) => assignVoucherId(s.id, e.target.value)}
+                              placeholder="Assign Voucher ID"
+                            />
+                            <Button
+                              size="sm"
+                              style={{ padding: '4px 8px', fontSize: 10 }}
+                              onClick={() => notifyTrainerVoucher(s.name, s.voucherId)}
+                            >
+                              Notify
+                            </Button>
+                          </div>
+                        </td>
+
+                        <td style={{ padding: 10 }}>
+                          <Badge tone={s.certificateStatus === 'Printed' ? 'success' : 'info'}>
+                            {s.certificateStatus}
+                          </Badge>
+                        </td>
+
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* EMAIL COMPOSER MODAL */}
+      {emailComposerOpen && (
         <Drawer
           open={true}
-          onClose={() => setReportBatchId('')}
-          title={`Student Report — ${batches.find((b) => b.id === reportBatchId)?.code}`}
-          size="lg"
+          onClose={() => setEmailComposerOpen(false)}
+          title="📧 Send Professional Document to College Coordinator"
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: 0 }}>
-              Attendance eligibility requires a minimum threshold of <strong>84%</strong> to unlock the final exam.
-            </p>
-
-            <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                  <th style={{ padding: 10 }}>Student Info</th>
-                  <th style={{ padding: 10 }}>Attendance</th>
-                  <th style={{ padding: 10 }}>Mock / Final</th>
-                  <th style={{ padding: 10 }}>Exam Eligibility</th>
-                  <th style={{ padding: 10 }}>Voucher ID Management</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getStudentsList(reportBatchId).map((student) => {
-                  const isEligible = student.attendancePct >= 84;
-                  return (
-                    <tr key={student.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: 10 }}>
-                        <div style={{ fontWeight: 700 }}>{student.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{student.email} · {student.phone}</div>
-                      </td>
-                      <td style={{ padding: 10 }}>
-                        <strong style={{ color: isEligible ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                          {student.attendancePct}%
-                        </strong>
-                      </td>
-                      <td style={{ padding: 10 }}>
-                        <div>Mock: <strong>{student.mockTestScore}</strong></div>
-                        <div>Final: <strong>{student.finalExamScore || '—'}</strong></div>
-                      </td>
-                      <td style={{ padding: 10 }}>
-                        <Badge tone={isEligible ? 'success' : 'danger'}>
-                          {isEligible ? 'Eligible' : 'Not Eligible'}
-                        </Badge>
-                      </td>
-                      <td style={{ padding: 10 }}>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            className="kvj-input"
-                            style={{ padding: '4px 8px', fontSize: 11, width: 130 }}
-                            value={student.voucherId}
-                            onChange={(e) => updateStudentVoucher(reportBatchId, student.id, e.target.value)}
-                            placeholder="e.g. VOUCH-01"
-                          />
-                          <Button
-                            size="sm"
-                            style={{ padding: '4px 8px', fontSize: 10 }}
-                            onClick={() =>
-                              notifyTrainerVoucher(
-                                student.name,
-                                student.voucherId,
-                                batches.find((b) => b.id === reportBatchId)?.trainerId
-                              )
-                            }
-                          >
-                            Notify
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-              <Button onClick={() => setReportBatchId('')}>Close Report</Button>
+          <form onSubmit={handleSendEmail} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Recipient Coordinator Email
+              </label>
+              <input
+                type="email"
+                className="kvj-input"
+                required
+                value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)}
+              />
             </div>
-          </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Subject
+              </label>
+              <input
+                type="text"
+                className="kvj-input"
+                required
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Message Body
+              </label>
+              <textarea
+                className="kvj-input"
+                rows={6}
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+                placeholder="Type your message details here..."
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Button variant="secondary" type="button" onClick={() => setEmailComposerOpen(false)}>Cancel</Button>
+              <Button type="submit">Dispatch Email Report</Button>
+            </div>
+          </form>
         </Drawer>
       )}
 
-      {/* Create Batch Drawer */}
-      <Drawer open={open} onClose={() => setOpen(false)} title="Schedule New Training Batch">
-        <Form initial={{ capacity: 30 }} onSubmit={handleCreateSubmit}>
-          <SelectField name="courseId" label="Course Catalog" options={courses.map((c) => ({ value: c.id, label: `${c.code} - ${c.title}` }))} />
-          <TextField name="code" label="Batch Code Identifier" placeholder="e.g. Christ Irinjalakkuda - BCOM Self Batch 1" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <DatePickerField name="startDate" label="Start Date" />
-            <DatePickerField name="endDate" label="End Date" />
-          </div>
-          <SelectField name="trainerId" label="Assign Lead Trainer" options={[{ value: '', label: 'Unassigned' }, ...trainers.map((t) => ({ value: t.id, label: `${t.firstName} ${t.lastName} (${t.designation})` }))]} />
-          <TextField name="capacity" label="Maximum Seat Capacity" />
-
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit">Schedule & Send Confirmation Email</Button>
-          </div>
-        </Form>
-      </Drawer>
     </AppShell>
   );
 }
