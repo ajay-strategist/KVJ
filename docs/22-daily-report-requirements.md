@@ -64,35 +64,65 @@ placeholder body text. **No report is generated and nothing is attached.**
 These are the highest-value findings. The supplied draft contradicts rules KVJ
 has already signed off in `business-rules.ts`.
 
-### 3.1 🔴 Attendance must NOT gate eligibility
-The draft asks for "Final Exam Eligibility → Attendance Requirement" and
-"Eligibility by Attendance %".
+### 3.1 ✅ RESOLVED — attendance is reported, never an eligibility gate
+Confirmed: attendance is **tracked and reported in detail**, but it does **not**
+gate eligibility (`eligibility.attendanceGates = false` stands).
 
-Confirmed rule: `eligibility.attendanceGates = false` — *"attendance does NOT
-gate eligibility (it is tracked for reports only)."*
+Attendance reporting requirements:
+- Per-student **attendance %** column in Student Data.
+- A **date-wise attendance %** table (batch attendance % per session date).
+- Any date whose attendance % is **below 75%** renders in **red**.
+- A **date-wise absent-student list**.
 
-**Eligibility = scored ≥ pass mark in EVERY trainer-selected assessment. Nothing else.**
-→ Report may *show* attendance, but must never present it as an eligibility
-criterion. **Decision needed:** confirm attendance stays reporting-only.
+The 75% figure is a **visual warning threshold only** — it must never appear as
+an eligibility criterion. Store it as
+`businessRules.attendance.lowAttendanceWarnPercent = 75` so it is configurable.
 
-### 3.2 🔴 Two competing pass marks
-- `business-rules.eligibility.passMarkPercent = 84` (confirmed by KVJ)
-- `Course.passPercentage` (recently added, seeded at **70**)
+### 3.2 ✅ RESOLVED — pass marks are per-assessment and trainer-overridable
+Confirmed model:
 
-These disagree. A student at 75% is eligible under one and not the other.
-**Decision needed:** is the pass mark global (84%) or per-course? If per-course,
-`business-rules` must become the *default* and the course value the override —
-and the report must print which was applied.
+| Assessment kind | Pass mark | Editable |
+|---|---|---|
+| Mock Test / other assessments | **84%** (default) | ✅ trainer may change **per assessment** |
+| **Final Exam** | **70%** | fixed |
+
+If a trainer sets an assessment to 70%, that value is used **and final-exam
+eligibility recomputes from it**. So the pass mark is a property of the
+*assessment instance*, not a global constant.
+
+Required config change:
+```ts
+eligibility: {
+  defaultAssessmentPassPercent: 84,  // was passMarkPercent
+  ...
+},
+finalExam: {
+  passMarkPercent: 70,               // new
+  ...
+}
+```
+Plus `AssessmentRecord.passMarkPercent?: number` as the per-assessment override.
+
+⚠️ **`Course.passPercentage` (seeded 70) is now ambiguous** — it duplicates the
+final-exam mark and conflicts with the per-assessment override. **Decision
+needed:** repurpose it explicitly as the final-exam pass mark, or remove it.
 
 ### 3.3 🟠 Final exam is external — no in-app pass/fail
 `finalExam.conductedExternally = true`, `inAppExamGate = false`. The report may
 show a final-exam **mark entered externally**, but must not compute pass/fail
 from an in-app exam.
 
-### 3.4 🟠 Certificates are not generated in-app
-`certificate.generatedInApp = false` — the platform only tracks
-`printed / deliveredToCollege / deliveryDate / remarks`. The draft's
-"Certificates Delivered" KPI must read from that **status**, not imply generation.
+### 3.4 ✅ RESOLVED — certificates are external and tracked at BATCH level only
+Confirmed: certificates are generated **externally**, and KVJ tracks status for
+the **whole batch — not per student**.
+
+Consequences:
+- The report shows **one batch-level** certificate status block
+  (`printed / deliveredToCollege / deliveryDate / remarks`).
+- There is **no per-student certificate column** anywhere in the report.
+- ⚠️ `StudentRecord.certificateStatus` in `BatchManagement.tsx` contradicts this
+  and must be **removed** — it currently implies per-student tracking.
+- The "Certificates Delivered" KPI is a batch status, not a student count.
 
 ### 3.5 🟡 "Phone Number" is the Register No.
 Confirmed: **Register No. = phone number**, and it is the key used to match the
@@ -106,6 +136,30 @@ one. The report's assessment picker (§5) and the eligibility maths must use the
 **same** selection.
 
 ---
+
+## 3b. Eligibility algorithm (now fully specified)
+
+This is the single most business-critical calculation in the report. It must
+live in `daily-report.selectors.ts` as a pure function and be unit-tested.
+
+```
+eligibleForFinalExam(student, selectedAssessments):
+    for each assessment A in selectedAssessments:
+        passMark = A.passMarkPercent ?? businessRules.eligibility.defaultAssessmentPassPercent  // 84
+        scorePct = (A.marksObtained / A.maxMarks) * 100
+        if scorePct < passMark        -> NOT ELIGIBLE
+        if A.marksObtained is missing -> NOT ELIGIBLE (not attempted)
+    return ELIGIBLE
+```
+
+Rules that follow from §3:
+- Only the **trainer-selected** assessments count (`assessmentsSelectedPerTraining`).
+- The student must clear **every** selected assessment (`mustClearAllSelected`).
+- **Attendance is never consulted here.**
+- The **final exam's own 70%** is a separate pass/fail on the externally-entered
+  mark; it is *not* part of computing eligibility *to sit* the exam.
+- The report must print, per assessment, **which pass mark was applied**, since
+  the trainer can change it — otherwise a college cannot reproduce the result.
 
 ## 4. Report data contract
 
@@ -126,24 +180,57 @@ interface DailyReportData {
     trainer; coordinator; venue; mode; sessionNumber; ⚠️
     totalStudents; status; completionPct;
   };
-  attendance: {                // ← SessionAttendanceRecord for reportDate
+  attendance: {                // ← SessionAttendanceRecord
     present; absent; late; earlyOut ⚠️; attendancePct;
     average; highest; lowest;
-    trend: Array<{ date; pct }>;     // last N sessions
+
+    /** Date-wise batch attendance. `isLow` drives the RED styling (<75%). */
+    byDate: Array<{
+      date; present; absent; total;
+      attendancePct;
+      isLow: boolean;                     // attendancePct < 75
+      absentees: Array<{ registerNo; name }>;   // date-wise absent list
+    }>;
+
+    /** Per-student, cumulative across the batch. */
     students: Array<{
       registerNo; name; status; attendancePct;
       timeIn; timeOut ⚠️; trainingHours ⚠️; remarks;
     }>;
   };
+
   assessments: Array<{         // ← AssessmentRecord, only SELECTED ones
-    name; totalStudents; completed; pending; failed; notAttempted;
-    average; highest; lowest; passPct; completionPct; passMark;
+    id; name; totalStudents; completed; pending; failed; notAttempted;
+    average; highest; lowest; passPct; completionPct;
+    passMarkApplied;           // 84 default, or the trainer's override
+    isOverridden: boolean;     // print when the trainer changed it
     scores: number[];          // for the histogram
   }>;
-  eligibility: {               // ← business-rules.eligibility ONLY
-    eligible; notEligible; eligibilityPct;
-    passMarkApplied; requiredAssessments: string[];
+
+  /**
+   * Student Data is COLUMN-DRIVEN. One row per student; `assessmentScores` is
+   * keyed by assessment id so selecting "Assessment 1" in the builder renders
+   * exactly that column and no others.
+   */
+  studentData: {
+    columns: StudentColumnId[];          // trainer's selection
+    rows: Array<{
+      registerNo; name;
+      attendancePct;
+      assessmentScores: Record<string, number | null>;  // null = not attempted
+      assessmentStatus; eligible; remarks;
+    }>;
   };
+
+  eligibility: {               // ← §3b algorithm ONLY (never attendance)
+    eligible; notEligible; eligibilityPct;
+    requiredAssessments: Array<{ id; name; passMarkApplied }>;
+  };
+
+  certificate: {               // ← BATCH level only, never per student
+    printed; deliveredToCollege; deliveryDate; remarks;
+  };
+
   risk: Array<{ registerNo; name; reason; suggestedAction }>;
   trainerNotes?: TrainerNotes; ⚠️ // needs persistence
   attachments?: Array<{ name; uploadedAt }>; ⚠️
@@ -294,12 +381,23 @@ Phase 6 needs the backend.
 
 ## 11. Open questions
 
-1. Pass mark: global **84%** or per-course `passPercentage`? (§3.2)
-2. Confirm attendance stays **reporting-only**, not an eligibility gate. (§3.1)
-3. Drop or add schema for: session number, time-out, training hours, early
+**Answered** — attendance is reporting-only with a 75% red threshold (§3.1);
+pass marks are per-assessment, 84% default and trainer-overridable, final exam
+70% (§3.2); certificates are external and batch-level only (§3.4).
+
+**Still open:**
+1. **`Course.passPercentage` (seeded 70)** — repurpose as the final-exam pass
+   mark, or remove it? It currently duplicates/conflicts with the new
+   per-assessment override. (§3.2)
+2. **Where does the trainer set an assessment's pass %?** It needs a UI in the
+   assessment configuration, and the value must be **audited** — changing it
+   silently changes who is eligible.
+3. **Date-wise attendance %** — confirm this is the **batch** attendance % per
+   session date (not per-student per-date). (§4)
+4. Drop or add schema for: session number, time-out, training hours, early
    check-outs, attachments? (§4)
-4. PDF engine: `@react-pdf/renderer` or print CSS? (§8)
-5. Report language: English only, or bilingual for colleges?
-6. Retention: how long are generated reports kept, and can a coordinator
+5. PDF engine: `@react-pdf/renderer` or print CSS? (§8)
+6. Report language: English only, or bilingual for colleges?
+7. Retention: how long are generated reports kept, and can a coordinator
    re-download an old version?
-7. Can a **Coordinator** generate this report, or trainers/managers only? (FR-8)
+8. Can a **Coordinator** generate this report, or trainers/managers only? (FR-8)
