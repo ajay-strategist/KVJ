@@ -26,7 +26,7 @@ interface FormCtx {
   validateField: (name: string) => void;
 }
 const FormContext = createContext<FormCtx | null>(null);
-const useForm = () => {
+export const useForm = () => {
   const ctx = useContext(FormContext);
   if (!ctx) throw new Error('Form fields must be used within <Form>');
   return ctx;

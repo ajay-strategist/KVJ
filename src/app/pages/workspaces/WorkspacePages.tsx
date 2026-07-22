@@ -12,7 +12,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useState, useEffect, useCallback, memo } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, SelectField, TextField } from '../../../shared/forms/form';
+import { Form, SelectField, TextField, useForm } from '../../../shared/forms/form';
 
 function Greeting() {
   const { user } = useAuth();
@@ -27,6 +27,36 @@ const statusMap = {
   clocked_out: { label: 'Clocked Out', tone: 'neutral' as const },
   absent: { label: 'Absent', tone: 'danger' as const },
 };
+
+function ConditionalAttendanceFields() {
+  const { values } = useForm();
+  
+  if (values.classification === 'Training') {
+    return (
+      <SelectField
+        name="location"
+        label="Select Training Batch"
+        options={[
+          { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
+          { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
+          { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
+        ]}
+      />
+    );
+  }
+
+  if (values.classification === 'Marketing') {
+    return (
+      <TextField
+        name="organisationsVisited"
+        label="Organisations Visited"
+        placeholder="e.g. Christ College, Rajagiri College"
+      />
+    );
+  }
+
+  return null;
+}
 
 interface AttendancePanelProps {
   record: AttendanceRecord | null;
@@ -485,34 +515,41 @@ export const AttendancePanel = memo(function AttendancePanel({
         <Form
           initial={{
             date: new Date().toISOString().slice(0, 10),
+            classification: 'Office',
             location: 'Christ 3BBA Data Analytics B1',
+            organisationsVisited: '',
             startTime: '08:30 AM',
             endTime: '05:00 PM',
             notes: '',
           }}
           onSubmit={(values) => {
+            const locText = values.classification === 'Training' 
+              ? values.location 
+              : values.classification === 'Marketing' 
+              ? `Marketing: ${values.organisationsVisited}` 
+              : 'Office Work';
             toast({
               variant: 'success',
               title: 'Attendance Request Submitted',
               message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Manager/Admin review.`,
             });
             if (onActivityLog) {
-              onActivityLog(`Submitted attendance claim for ${values.date} (${values.location})`, 'success');
+              onActivityLog(`Submitted attendance claim for ${values.date} (${locText})`, 'success');
             }
             setClaimOpen(false);
           }}
         >
           <TextField name="date" label="Attendance Date" placeholder="YYYY-MM-DD" />
           <SelectField
-            name="location"
-            label="Location (Training Batch)"
+            name="classification"
+            label="Attendance Type"
             options={[
-              { value: 'Office Work', label: 'Office Work' },
-              { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
-              { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
-              { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
+              { value: 'Office', label: 'Office Work' },
+              { value: 'Training', label: 'Training Batch Session' },
+              { value: 'Marketing', label: 'Marketing Visit' },
             ]}
           />
+          <ConditionalAttendanceFields />
           <TextField name="startTime" label="Start Time" placeholder="08:30 AM" />
           <TextField name="endTime" label="End Time" placeholder="05:00 PM" />
           <TextField name="notes" label="Reason / Notes (Optional)" placeholder="Emergency, system delay, or missed clock-in..." />

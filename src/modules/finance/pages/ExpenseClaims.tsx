@@ -2,9 +2,25 @@ import { useState } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+
+function ConditionalBatchSelect() {
+  const { values } = useForm();
+  if (values.categoryType !== 'Training') return null;
+  return (
+    <SelectField
+      name="batch"
+      label="Select Training Batch (If Training)"
+      options={[
+        { value: 'None', label: 'None (Office Expense)' },
+        { value: 'Christ 3BBA B1', label: 'Christ 3BBA Data Analytics B1' },
+        { value: 'Vimala College B1', label: 'Vimala College Excel Expert B1' },
+      ]}
+    />
+  );
+}
 
 export function ExpenseClaims() {
   const { toast } = useNotifications();
@@ -114,15 +130,7 @@ export function ExpenseClaims() {
             ]}
           />
 
-          <SelectField
-            name="batch"
-            label="Select Training Batch (If Training)"
-            options={[
-              { value: 'None', label: 'None (Office Expense)' },
-              { value: 'Christ 3BBA B1', label: 'Christ 3BBA Data Analytics B1' },
-              { value: 'Vimala College B1', label: 'Vimala College Excel Expert B1' },
-            ]}
-          />
+          <ConditionalBatchSelect />
 
           <SelectField
             name="expenseType"
