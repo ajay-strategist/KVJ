@@ -43,12 +43,12 @@ function resolve(mode: ThemeMode): ResolvedTheme {
 
 /** Boot-time application of the stored theme (call before React renders to avoid flash). */
 export function initTheme(): void {
-  const stored = (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? 'system';
+  const stored = (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? 'light';
   document.documentElement.setAttribute('data-theme', resolve(stored));
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(() => (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? 'system');
+  const [mode, setModeState] = useState<ThemeMode>(() => (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? 'light');
   const [theme, setTheme] = useState<ResolvedTheme>(() => resolve(mode));
 
   const apply = useCallback((next: ThemeMode) => {

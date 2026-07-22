@@ -111,14 +111,14 @@ interface WorkspaceContextValue {
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [activePreset, setActivePreset] = useState('Executive Glass');
-  const [wallpaper, setWallpaper] = useState(WORKSPACE_PRESETS['Executive Glass'].wallpaper);
-  const [glassOpacity, setGlassOpacity] = useState(WORKSPACE_PRESETS['Executive Glass'].glassOpacity);
-  const [glassBlur, setGlassBlur] = useState(WORKSPACE_PRESETS['Executive Glass'].glassBlur);
-  const [accentColor, setAccentColor] = useState(WORKSPACE_PRESETS['Executive Glass'].accentColor);
-  const [cornerRadius, setCornerRadius] = useState(WORKSPACE_PRESETS['Executive Glass'].cornerRadius);
-  const [shadowSoftness, setShadowSoftness] = useState(WORKSPACE_PRESETS['Executive Glass'].shadowSoftness);
-  const [animationSpeed, setAnimationSpeed] = useState(WORKSPACE_PRESETS['Executive Glass'].animationSpeed);
+  const [activePreset, setActivePreset] = useState('Glass White (VisionOS)');
+  const [wallpaper, setWallpaper] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].wallpaper);
+  const [glassOpacity, setGlassOpacity] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].glassOpacity);
+  const [glassBlur, setGlassBlur] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].glassBlur);
+  const [accentColor, setAccentColor] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].accentColor);
+  const [cornerRadius, setCornerRadius] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].cornerRadius);
+  const [shadowSoftness, setShadowSoftness] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].shadowSoftness);
+  const [animationSpeed, setAnimationSpeed] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].animationSpeed);
   const [viewMode, setViewMode] = useState<WorkspaceViewMode>('Standard');
 
   const loadPreset = (name: string) => {
