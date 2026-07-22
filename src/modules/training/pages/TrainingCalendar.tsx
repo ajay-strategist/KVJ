@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, SectionHeader, Badge } from '../../../shared/ui/components';
 import { useTraining } from '../hooks/useTraining';
 import { container } from '../../../core/registry';
@@ -99,7 +100,7 @@ export function TrainingCalendar() {
   };
 
   return (
-    <div>
+    <AppShell>
       <PageHeader
         title="Training Calendar & Trainer Allocations"
         subtitle="Daily trainer schedule, batch assignments, and real-time leave request status"
@@ -247,7 +248,7 @@ export function TrainingCalendar() {
           </table>
         </div>
       </Card>
-    </div>
+    </AppShell>
   );
 }
 

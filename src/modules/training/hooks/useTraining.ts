@@ -75,6 +75,16 @@ export function useTraining() {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const updateCourse = useCallback(async (id: UUID, data: Partial<Course>): Promise<CallbackResult<Course>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.updateCourse(id, data, { id: user.id, role: user.role });
+    if (res.ok) {
+      setCourses((prev) => prev.map((c) => (c.id === id ? res.value : c)));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
   const createBatch = useCallback(async (data: Partial<Batch>): Promise<CallbackResult<Batch>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.createBatch(data, { id: user.id, role: user.role });
@@ -138,6 +148,7 @@ export function useTraining() {
     error,
     registerStudent,
     createCourse,
+    updateCourse,
     createBatch,
     enrollStudent,
     evaluateAssessment,

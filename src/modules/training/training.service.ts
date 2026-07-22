@@ -25,6 +25,7 @@ import { NOTIFICATION_ENGINE_TOKEN } from '../../core/engines/notification';
 export interface ITrainingService {
   registerStudent(data: Partial<Student>, actor: Actor): Promise<Result<Student>>;
   createCourse(data: Partial<Course>, actor: Actor): Promise<Result<Course>>;
+  updateCourse(id: UUID, data: Partial<Course>, actor: Actor): Promise<Result<Course>>;
   createBatch(data: Partial<Batch>, actor: Actor): Promise<Result<Batch>>;
   enrollStudent(studentId: UUID, batchId: UUID, actor: Actor): Promise<Result<Enrollment>>;
   logSessionAttendance(batchId: UUID, dateStr: string, records: Partial<SessionAttendanceRecord>[], actor: Actor): Promise<Result<SessionAttendanceRecord[]>>;
@@ -75,6 +76,17 @@ export class TrainingService implements ITrainingService {
       const course = await this.courseRepo.create(data, actor);
       await this.activity.log('training', course.id, actor, 'create', `Created course catalog ${course.title}`);
       await this.audit.log(actor, 'create', 'courses', course.id, { newValues: course });
+      return Ok(course);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async updateCourse(id: UUID, data: Partial<Course>, actor: Actor): Promise<Result<Course>> {
+    try {
+      const course = await this.courseRepo.update(id, data, actor);
+      await this.activity.log('training', course.id, actor, 'update', `Updated course catalog ${course.title}`);
+      await this.audit.log(actor, 'update', 'courses', course.id, { newValues: course });
       return Ok(course);
     } catch (e: any) {
       return Err(AppError.internal(e.message));

@@ -29,7 +29,8 @@ const ApprovalsQueue = lazy(() => import('../modules/attendance/pages/ApprovalsQ
 
 // Training & Student Lifecycle
 const CourseList = lazy(() => import('../modules/training/pages/CourseList').then((m) => ({ default: m.CourseList })));
-const BatchesPage = lazy(() => import('../modules/training/pages/BatchesPage').then((m) => ({ default: m.BatchesPage })));
+const BatchManagement = lazy(() => import('../modules/training/pages/BatchManagement').then((m) => ({ default: m.BatchManagement })));
+const TrainingCalendar = lazy(() => import('../modules/training/pages/TrainingCalendar').then((m) => ({ default: m.TrainingCalendar })));
 const ProjectsAndTasks = lazy(() => import('../modules/project/pages/ProjectsAndTasks').then((m) => ({ default: m.ProjectsAndTasks })));
 const StudentLifecycle = lazy(() => import('../modules/training/pages/StudentLifecycle').then((m) => ({ default: m.StudentLifecycle })));
 const StudentAttendance = lazy(() => import('../modules/training/pages/StudentAttendance').then((m) => ({ default: m.StudentAttendance })));
@@ -89,9 +90,9 @@ export function AppRouter() {
 
           {/* Training Platform */}
           <Route path="/app/training/courses" element={<ProtectedRoute resource="training" action="view"><CourseList /></ProtectedRoute>} />
-          <Route path="/app/training/batches" element={<ProtectedRoute resource="training" action="view"><BatchesPage defaultTab="details" /></ProtectedRoute>} />
-          <Route path="/app/training/details" element={<ProtectedRoute resource="training" action="view"><BatchesPage defaultTab="details" /></ProtectedRoute>} />
-          <Route path="/app/training/calendar" element={<ProtectedRoute resource="training" action="view"><BatchesPage defaultTab="calendar" /></ProtectedRoute>} />
+          <Route path="/app/training/batches" element={<ProtectedRoute resource="training" action="view"><BatchManagement /></ProtectedRoute>} />
+          <Route path="/app/training/details" element={<ProtectedRoute resource="training" action="view"><BatchManagement /></ProtectedRoute>} />
+          <Route path="/app/training/calendar" element={<ProtectedRoute resource="training" action="view"><TrainingCalendar /></ProtectedRoute>} />
           <Route path="/app/training/students" element={<ProtectedRoute resource="training" action="view"><StudentLifecycle /></ProtectedRoute>} />
           <Route path="/app/training/attendance" element={<ProtectedRoute resource="training" action="view"><StudentAttendance /></ProtectedRoute>} />
           <Route path="/app/training/assessments" element={<ProtectedRoute resource="training" action="view"><AssessmentBoard /></ProtectedRoute>} />
