@@ -208,6 +208,29 @@ export function TrainingCalendar() {
 
   return (
     <AppShell>
+      <style>{`
+        .matrix-scroll-container::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .matrix-scroll-container::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .matrix-scroll-container::-webkit-scrollbar-thumb {
+          background: rgba(100, 116, 139, 0.25);
+          border-radius: 4px;
+        }
+        .matrix-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: rgba(100, 116, 139, 0.45);
+        }
+        .matrix-cell-hover .add-schedule-btn {
+          opacity: 0.15;
+          transition: opacity 0.2s ease;
+        }
+        .matrix-cell-hover:hover .add-schedule-btn {
+          opacity: 1 !important;
+        }
+      `}</style>
       <PageHeader
         title="Training Resource Planner"
         subtitle="Hands-on scheduling interface featuring the visual Resource Matrix, conflict solver, leave integration, and live sheet sync."
@@ -326,7 +349,7 @@ export function TrainingCalendar() {
           {/* RESOURCE MATRIX VIEW */}
           {activeView === 'matrix' && (
             <Card style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
+              <div className="matrix-scroll-container" style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }} className="kvj-table">
                   <thead>
                     <tr style={{ background: 'var(--bg-sunken)', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -386,6 +409,7 @@ export function TrainingCalendar() {
                             return (
                               <td
                                 key={t.id}
+                                className="matrix-cell-hover"
                                 style={{
                                   padding: 8,
                                   borderRight: '1px solid var(--border)',
@@ -393,23 +417,43 @@ export function TrainingCalendar() {
                                 }}
                               >
                                 {/* Leave Request indicator */}
-                                {trainerLeaves.map((l) => (
-                                  <div
-                                    key={l.id}
-                                    style={{
-                                      background: l.status === 'Approved' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                      border: l.status === 'Approved' ? '1px solid var(--status-danger)' : '1px solid var(--status-warning)',
-                                      borderRadius: 6,
-                                      padding: '6px 10px',
-                                      fontSize: 11.5,
-                                      fontWeight: 600,
-                                      marginBottom: 6,
-                                      color: l.status === 'Approved' ? 'var(--status-danger)' : 'var(--status-warning)',
-                                    }}
-                                  >
-                                    ⏳ {l.duration} Leave ({l.status})
-                                  </div>
-                                ))}
+                                {trainerLeaves.map((l) => {
+                                  const isFull = l.duration === 'Full Day';
+                                  const isMorning = l.duration === 'Half Day Morning';
+                                  
+                                  const cardBg = isFull 
+                                    ? 'rgba(249, 115, 22, 0.12)' 
+                                    : isMorning 
+                                    ? 'rgba(234, 179, 8, 0.12)' 
+                                    : 'rgba(59, 130, 246, 0.12)';
+                                    
+                                  const cardBorder = isFull 
+                                    ? '1px solid #f97316' 
+                                    : isMorning 
+                                    ? '1px solid #eab308' 
+                                    : '1px solid #3b82f6';
+                                    
+                                  const emoji = isFull ? '🟧' : isMorning ? '🟨' : '🟦';
+
+                                  return (
+                                    <div
+                                      key={l.id}
+                                      style={{
+                                        background: cardBg,
+                                        border: cardBorder,
+                                        borderRadius: 6,
+                                        padding: '6px 10px',
+                                        fontSize: 11.5,
+                                        fontWeight: 700,
+                                        marginBottom: 6,
+                                        color: 'var(--text-primary)',
+                                      }}
+                                    >
+                                      {emoji} {l.duration} Leave
+                                      <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>{l.status}</div>
+                                    </div>
+                                  );
+                                })}
 
                                 {/* Overlapping Conflict Warning Border & Glow */}
                                 {conflicted && (
@@ -464,6 +508,7 @@ export function TrainingCalendar() {
                                   {sList.length === 0 && trainerLeaves.length === 0 && (
                                     <div
                                       onClick={() => handleCreateSession(r.dateNum, t.id)}
+                                      className="add-schedule-btn"
                                       style={{
                                         textAlign: 'center',
                                         padding: '12px 6px',
@@ -474,7 +519,7 @@ export function TrainingCalendar() {
                                         cursor: 'pointer',
                                       }}
                                     >
-                                      + Click to Assign
+                                      + Schedule Training
                                     </div>
                                   )}
                                 </div>
