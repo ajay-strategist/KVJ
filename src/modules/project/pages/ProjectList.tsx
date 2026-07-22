@@ -19,6 +19,33 @@ export interface ProjectCardData {
   milestonesCount: number;
 }
 
+interface TaskItem {
+  name: string;
+  assignee: string;
+  status: string;
+  dueDate: string;
+}
+
+const mockProjectTasks: Record<string, TaskItem[]> = {
+  p1: [
+    { name: 'Configure supabase clients and tenants', assignee: 'Linto George', status: 'Completed', dueDate: '2026-07-25' },
+    { name: 'Implement real-time replication listener', assignee: 'Ajay Kumar', status: 'Completed', dueDate: '2026-07-27' },
+    { name: 'Write dashboard analytics charts', assignee: 'Anju V', status: 'In Progress', dueDate: '2026-07-30' },
+  ],
+  p2: [
+    { name: 'Setup sync cron job for payroll', assignee: 'Linto George', status: 'Not Started', dueDate: '2026-07-26' },
+    { name: 'Integrate biometric attendance API', assignee: 'Sankar M', status: 'In Progress', dueDate: '2026-07-28' },
+  ],
+  p3: [
+    { name: 'Build OCR text parser', assignee: 'Ajay Kumar', status: 'Completed', dueDate: '2026-07-24' },
+    { name: 'Train custom layout model', assignee: 'Anju V', status: 'In Progress', dueDate: '2026-07-29' },
+  ],
+  p4: [
+    { name: 'Archive partition table data', assignee: 'Linto George', status: 'Completed', dueDate: '2026-07-20' },
+    { name: 'Deploy archive backup servers', assignee: 'Sankar M', status: 'Completed', dueDate: '2026-07-21' },
+  ],
+};
+
 export function ProjectList() {
   const { toast } = useNotifications();
 
@@ -152,6 +179,114 @@ export function ProjectList() {
     setSelectedStatuses((prev) =>
       prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
     );
+  };
+
+  // PDF Export Logic with custom print layout and KVJ logo
+  const exportReportToPDF = (p: ProjectCardData) => {
+    const tasks = mockProjectTasks[p.id] || [];
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ variant: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups to export the PDF.' });
+      return;
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Detailed Project Report - ${p.code}</title>
+          <style>
+            body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; padding: 40px; line-height: 1.5; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
+            .logo-container { display: flex; align-items: center; gap: 10px; }
+            .logo-text { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+            .project-title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0 0 8px 0; }
+            .project-meta { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+            .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; background: #e0f2fe; color: #0369a1; }
+            .badge-completed { background: #dcfce7; color: #15803d; }
+            .badge-in-progress { background: #fef9c3; color: #a16207; }
+            .badge-not-started { background: #f1f5f9; color: #475569; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .metric-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; background: #f8fafc; }
+            .metric-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+            .metric-value { font-size: 18px; font-weight: 800; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 30px; }
+            th { background: #f1f5f9; color: #475569; font-weight: 700; text-align: left; padding: 10px 12px; font-size: 12px; border-bottom: 2px solid #e2e8f0; }
+            td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
+            .section-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 20px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo-container">
+              <span style="width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; display: grid; place-items: center; font-weight: 800; font-size: 15px;">K</span>
+              <span class="logo-text">KVJ Analytics</span>
+            </div>
+            <div>
+              <span class="badge ${p.status === 'Completed' ? 'badge-completed' : p.status === 'In Progress' ? 'badge-in-progress' : 'badge-not-started'}">${p.status}</span>
+            </div>
+          </div>
+
+          <h2 class="project-title">${p.title}</h2>
+          <div class="project-meta">Project Code: <strong>${p.code}</strong> &middot; Client: <strong>${p.client}</strong> &middot; Lead Supervisor: <strong>${p.supervisor}</strong></div>
+
+          <div class="grid">
+            <div class="metric-card">
+              <div class="metric-label">Total Logged Work</div>
+              <div class="metric-value">${p.totalHours} Hours</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Task Progress</div>
+              <div class="metric-value">${p.tasksCompleted} / ${p.tasksTotal} Tasks Completed (${p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0}%)</div>
+            </div>
+          </div>
+
+          <div class="section-title">Member-Specific Logged Hours</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Team Member</th>
+                <th style="text-align: right;">Total Logged Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${p.members.map(m => `
+                <tr>
+                  <td>👤 ${m.name}</td>
+                  <td style="text-align: right; font-weight: 700;">${m.hours} hrs</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="section-title">Individual Task List</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Task Description</th>
+                <th>Assignee</th>
+                <th>Status</th>
+                <th>Due Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tasks.length > 0 ? tasks.map(t => `
+                <tr>
+                  <td>${t.name}</td>
+                  <td>👤 ${t.assignee}</td>
+                  <td>${t.status}</td>
+                  <td>${t.dueDate}</td>
+                </tr>
+              `).join('') : `<tr><td colspan="4" style="text-align: center; color: #64748b;">No individual tasks logged.</td></tr>`}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const tableColumns: Column<ProjectCardData>[] = [
@@ -336,15 +471,15 @@ export function ProjectList() {
                     </div>
                   </div>
 
-                  {/* Total Hours Worked & Task Completion Ratio */}
+                  {/* Total Hours Worked & Task Completion Ratio (Clearly Presented) */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 12 }}>
-                    <div style={{ padding: '8px 10px', background: 'rgba(95, 211, 232, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 600 }}>Total Hours:</span>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginTop: 2 }}>⏱ {p.totalHours} hrs</div>
+                    <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 700 }}>Total Hours Worked:</span>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>⏱ {p.totalHours} hrs</div>
                     </div>
-                    <div style={{ padding: '8px 10px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid #22C55E' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 600 }}>Task Ratio:</span>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--status-success)', marginTop: 2 }}>
+                    <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 700 }}>Task Ratio:</span>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
                         {p.tasksCompleted} / {p.tasksTotal} ({pct}%)
                       </div>
                     </div>
@@ -384,7 +519,7 @@ export function ProjectList() {
         <DataTable columns={tableColumns} rows={filteredProjects} rowKey={(p) => p.id} />
       )}
 
-      {/* Detailed Project Report Modal */}
+      {/* Detailed Project Report Modal with Tasks List and PDF Export */}
       {selectedProject && (
         <Drawer open={reportOpen} onClose={() => setReportOpen(false)} title={`Detailed Report — ${selectedProject.code}`}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, fontSize: 13 }}>
@@ -402,6 +537,7 @@ export function ProjectList() {
               </div>
             </Card>
 
+            {/* Member Hours Log */}
             <div>
               <SectionHeader title="Member-Specific Hours Log" />
               <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginTop: 8 }}>
@@ -422,7 +558,54 @@ export function ProjectList() {
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+            {/* Individual Task List (Positioned below Member Hours) */}
+            <div>
+              <SectionHeader title="Individual Task List" />
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginTop: 8 }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                    <th style={{ padding: 6 }}>Task Description</th>
+                    <th style={{ padding: 6 }}>Assignee</th>
+                    <th style={{ padding: 6 }}>Status</th>
+                    <th style={{ padding: 6 }}>Due Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(mockProjectTasks[selectedProject.id] || []).map((t, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px dashed var(--border)' }}>
+                      <td style={{ padding: 6 }}>{t.name}</td>
+                      <td style={{ padding: 6 }}>👤 {t.assignee}</td>
+                      <td style={{ padding: 6 }}>
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: t.status === 'Completed' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)',
+                          color: t.status === 'Completed' ? 'var(--status-success)' : 'var(--brand)',
+                        }}>
+                          {t.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: 6, color: 'var(--text-muted)' }}>{t.dueDate}</td>
+                    </tr>
+                  ))}
+                  {(mockProjectTasks[selectedProject.id] || []).length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No tasks logged for this project yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Action Buttons: Export to PDF & Close */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <Button variant="secondary" onClick={() => exportReportToPDF(selectedProject)}>
+                📄 Export PDF (with KVJ Logo)
+              </Button>
               <Button onClick={() => setReportOpen(false)}>Close Report</Button>
             </div>
           </div>
