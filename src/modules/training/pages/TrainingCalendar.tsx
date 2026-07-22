@@ -31,7 +31,7 @@ const EMPTY: ScheduleRangeResult = { sessions: [], leaves: [], holidays: [], day
 const FROZEN = { date: 116, day: 56, holiday: 132 };
 const FROZEN_W = FROZEN.date + FROZEN.day + FROZEN.holiday;
 const COL_W = 250;
-const ROW_BASE = 92;
+const ROW_BASE = 48;
 
 interface FilterState {
   search: string; trainer: string; college: string; course: string; batch: string;
@@ -61,6 +61,7 @@ export function TrainingCalendar() {
 
   const [conflictOverrides, setConflictOverrides] = useState<Record<string, ConflictStatus>>({});
   const [conflictFilter, setConflictFilter] = useState({ trainer: 'all', severity: 'all', status: 'Open', date: 'all' });
+  const [showConflictsPanel, setShowConflictsPanel] = useState(true);
   const [detailConflict, setDetailConflict] = useState<ScheduleConflict | null>(null);
   const [detailSession, setDetailSession] = useState<ScheduleSession | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -190,12 +191,30 @@ export function TrainingCalendar() {
     };
   }, [data, conflicts, range, visibleTrainers.length]);
 
+  // ── Dynamic Row Height Estimation ──
+  const getRowEstimate = useCallback(
+    (indexIdx: number) => {
+      const r = rows[indexIdx];
+      if (!r) return 48;
+      if (expanded[r.date]) return 110;
+      let maxCnt = 1;
+      for (const t of visibleTrainers) {
+        const cnt = (index.sessions.get(`${r.date}|${t.id}`) ?? []).length;
+        if (cnt > maxCnt) maxCnt = cnt;
+      }
+      if (maxCnt <= 1) return 48;
+      if (maxCnt === 2) return 84;
+      return 48 + maxCnt * 36;
+    },
+    [rows, expanded, visibleTrainers, index],
+  );
+
   // ── Virtualization ──
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const rowVirt = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_BASE,
+    estimateSize: getRowEstimate,
     overscan: 6,
   });
   const colVirt = useVirtualizer({
@@ -230,125 +249,216 @@ export function TrainingCalendar() {
 
   return (
     <AppShell>
-      {/* ── Sticky toolbar ── */}
+      {/* ── Sticky Header Toolbar ── */}
       <div style={{
-        position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg-app)',
-        paddingBottom: 10, marginBottom: 4, borderBottom: '1px solid var(--border)',
+        position: 'sticky', top: 0, zIndex: 20,
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-xl, 16px)',
+        padding: '14px 20px',
+        marginBottom: 16,
+        boxShadow: 'var(--e1)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, marginRight: 'auto' }}>Training Resource Planner</h1>
-          <Button size="sm" variant="secondary" onClick={() => toast({ variant: 'success', title: 'Live Sheets Sync', message: 'Synchronized with the active spreadsheet.' })}>🔄 Live Sheets Sync</Button>
-          <Button size="sm" variant="secondary" onClick={() => toast({ variant: 'info', title: 'Undo', message: 'Reverted last allocation.' })}>↶ Undo</Button>
-          <Button size="sm" variant="secondary" onClick={() => toast({ variant: 'info', title: 'Redo', message: 'Re-applied last allocation.' })}>↷ Redo</Button>
-          <Button size="sm" onClick={() => toast({ variant: 'success', title: 'Assign Schedule', message: 'Pick a matrix cell to allocate a batch.' })}>➕ Assign Schedule</Button>
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          {/* Title Block */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              display: 'inline-grid', placeItems: 'center',
+              width: 36, height: 36, borderRadius: 'var(--radius-md, 10px)',
+              background: 'color-mix(in srgb, var(--brand) 12%, var(--bg-sunken))',
+              color: 'var(--brand)', fontSize: 18, fontWeight: 800,
+            }}>
+              📅
+            </span>
+            <div>
+              <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                Training Resource Planner
+              </h1>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 500 }}>
+                Resource Allocation & Matrix Scheduling
+              </div>
+            </div>
+          </div>
 
-        {/* ── Date range ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => applyPreset(p.id)}
+          {/* Action & Filter Controls Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {/* Date Range Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-sunken)', padding: '4px 6px', borderRadius: 'var(--radius-md, 10px)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13, paddingLeft: 6, color: 'var(--text-muted)' }}>📅</span>
+              <select
+                aria-label="Date range preset"
+                value={preset}
+                onChange={(e) => applyPreset(e.target.value as PresetId)}
+                style={{
+                  height: 32,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  paddingRight: 6,
+                }}
+              >
+                {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+
+              {preset === 'custom' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 4, borderLeft: '1px solid var(--border)' }}>
+                  <input
+                    type="date"
+                    value={range.from}
+                    style={{
+                      height: 28, fontSize: 12, border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-xs, 6px)', background: 'var(--bg-surface)',
+                      color: 'var(--text-primary)', padding: '0 6px', outline: 'none',
+                    }}
+                    onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
+                  <input
+                    type="date"
+                    value={range.to}
+                    style={{
+                      height: 28, fontSize: 12, border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-xs, 6px)', background: 'var(--bg-surface)',
+                      color: 'var(--text-primary)', padding: '0 6px', outline: 'none',
+                    }}
+                    onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Undo / Redo Actions */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => toast({ variant: 'info', title: 'Undo', message: 'Reverted last allocation.' })}
+                style={{ height: 36, padding: '0 12px', fontSize: 12.5, fontWeight: 600 }}
+              >
+                ↶ Undo
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => toast({ variant: 'info', title: 'Redo', message: 'Re-applied last allocation.' })}
+                style={{ height: 36, padding: '0 12px', fontSize: 12.5, fontWeight: 600 }}
+              >
+                ↷ Redo
+              </Button>
+            </div>
+
+            {/* Toggle Conflicts Panel button (when conflicts exist) */}
+            {conflicts.length > 0 && (
+              <Button
+                size="sm"
+                variant={showConflictsPanel ? 'secondary' : 'danger'}
+                onClick={() => setShowConflictsPanel((v) => !v)}
+                style={{ height: 36, padding: '0 12px', fontSize: 12.5, fontWeight: 600 }}
+              >
+                ⚠ {showConflictsPanel ? 'Hide Conflicts' : `Show Conflicts (${shownConflicts.length})`}
+              </Button>
+            )}
+
+            {/* Assign Schedule Primary Action */}
+            <Button
+              size="sm"
+              onClick={() => toast({ variant: 'success', title: 'Assign Schedule', message: 'Pick a matrix cell to allocate a batch.' })}
               style={{
-                ...sel, cursor: 'pointer', fontWeight: 600,
-                background: preset === p.id ? 'var(--brand)' : 'var(--bg-sunken)',
-                color: preset === p.id ? 'var(--brand-contrast)' : 'var(--text-secondary)',
-                borderColor: preset === p.id ? 'var(--brand)' : 'var(--border)',
+                height: 36,
+                padding: '0 16px',
+                fontSize: 13,
+                fontWeight: 700,
+                borderRadius: 'var(--radius-md, 10px)',
+                boxShadow: '0 2px 8px color-mix(in srgb, var(--brand) 25%, transparent)',
               }}
-            >{p.label}</button>
-          ))}
-          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-muted)' }}>From</span>
-          <input type="date" value={range.from} style={sel}
-            onChange={(e) => { setPreset('custom'); setRange((r) => ({ ...r, from: e.target.value })); }} />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>To</span>
-          <input type="date" value={range.to} style={sel}
-            onChange={(e) => { setPreset('custom'); setRange((r) => ({ ...r, to: e.target.value })); }} />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            {loading ? 'Loading…' : `${data.daysLoaded} days loaded · ${data.sessions.length} sessions`}
-          </span>
-        </div>
-      </div>
-
-      {/* ── KPIs ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, margin: '12px 0' }}>
-        <Kpi label="TODAY'S SESSIONS" value={kpis.todayInRange ? String(kpis.todaySessions) : '—'} tone="var(--brand)" hint={kpis.todayInRange ? undefined : 'today outside range'} />
-        <Kpi label="AVAILABLE TRAINERS" value={String(kpis.availableTrainers)} tone="var(--status-success)" />
-        <Kpi label="PENDING LEAVES" value={String(kpis.pendingLeaves)} tone="var(--status-warning)" />
-        <Kpi label="SCHEDULE CONFLICTS" value={String(kpis.openConflicts)} tone="var(--status-danger)" />
-      </div>
-
-      {/* ── Conflicts ── */}
-      <section style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)', padding: 12, marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-          <strong style={{ fontSize: 13 }}>Schedule Conflicts</strong>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{shownConflicts.length} in range</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <select aria-label="Filter conflicts by trainer" style={sel} value={conflictFilter.trainer} onChange={(e) => setConflictFilter((f) => ({ ...f, trainer: e.target.value }))}>
-              <option value="all">All Trainers</option>
-              {trainers.map((t) => <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>)}
-            </select>
-            <select aria-label="Filter conflicts by severity" style={sel} value={conflictFilter.severity} onChange={(e) => setConflictFilter((f) => ({ ...f, severity: e.target.value }))}>
-              <option value="all">All Severity</option><option>High</option><option>Medium</option><option>Low</option>
-            </select>
-            <select aria-label="Filter conflicts by status" style={sel} value={conflictFilter.status} onChange={(e) => setConflictFilter((f) => ({ ...f, status: e.target.value }))}>
-              <option value="all">All Status</option><option>Open</option><option>Resolved</option><option>Ignored</option>
-            </select>
+            >
+              ➕ Assign Schedule
+            </Button>
           </div>
         </div>
-
-        {shownConflicts.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 2px' }}>No conflicts in the selected range.</div>
-        ) : (
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
-            {shownConflicts.slice(0, 40).map((c) => (
-              <ConflictCard
-                key={c.id}
-                c={c}
-                onDetails={() => setDetailConflict(c)}
-                onResolve={() => setConflictStatus(c.id, 'Resolved', 'Conflict resolved')}
-                onReassign={() => setConflictStatus(c.id, 'Resolved', 'Trainer reassigned')}
-                onIgnore={() => setConflictStatus(c.id, 'Ignored', 'Conflict ignored')}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ── Filters ── */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
-        <input style={{ ...sel, minWidth: 190 }} placeholder="Search sessions…" value={filters.search}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} aria-label="Search sessions" />
-        <Sel label="Trainer" value={filters.trainer} onChange={(v) => setFilters((f) => ({ ...f, trainer: v }))}
-          options={trainers.map((t) => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }))} style={sel} />
-        <Sel label="College" value={filters.college} onChange={(v) => setFilters((f) => ({ ...f, college: v }))} options={opts.colleges.map((v) => ({ value: v, label: v }))} style={sel} />
-        <Sel label="Course" value={filters.course} onChange={(v) => setFilters((f) => ({ ...f, course: v }))} options={opts.courses.map((v) => ({ value: v, label: v }))} style={sel} />
-        <Sel label="Batch" value={filters.batch} onChange={(v) => setFilters((f) => ({ ...f, batch: v }))} options={opts.batches.map((v) => ({ value: v, label: v }))} style={sel} />
-        <Sel label="Status" value={filters.status} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} options={['Scheduled', 'Completed', 'Cancelled'].map((v) => ({ value: v, label: v }))} style={sel} />
-        <Sel label="Leave" value={filters.leave} onChange={(v) => setFilters((f) => ({ ...f, leave: v }))} options={['Approved', 'Pending', 'Rejected'].map((v) => ({ value: v, label: v }))} style={sel} />
-        <select aria-label="Holiday filter" style={sel} value={filters.holiday} onChange={(e) => setFilters((f) => ({ ...f, holiday: e.target.value }))}>
-          <option value="all">All Days</option><option value="only">Holidays only</option><option value="exclude">Working days only</option>
-        </select>
-        <Sel label="Venue" value={filters.venue} onChange={(v) => setFilters((f) => ({ ...f, venue: v }))} options={opts.venues.map((v) => ({ value: v, label: v }))} style={sel} />
-        <Sel label="Coordinator" value={filters.coordinator} onChange={(v) => setFilters((f) => ({ ...f, coordinator: v }))} options={opts.coordinators.map((v) => ({ value: v, label: v }))} style={sel} />
-        <Sel label="Year" value={filters.year} onChange={(v) => setFilters((f) => ({ ...f, year: v }))} options={opts.years.map((v) => ({ value: v, label: v }))} style={sel} />
-        <select aria-label="Saved filters" style={sel} value="" onChange={(e) => { const f = savedFilters[e.target.value]; if (f) setFilters(f); }}>
-          <option value="">Saved Filters…</option>
-          {Object.keys(savedFilters).map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-        <Button size="sm" variant="secondary" onClick={saveCurrentFilters}>💾 Save</Button>
-        <Button size="sm" variant="secondary" onClick={() => setFilters(EMPTY_FILTERS)}>Reset</Button>
       </div>
 
-      {/* ── Resource Matrix ── */}
+
+      {/* ── Conflicts Panel (Collapsible to free up full page height) ── */}
+      {showConflictsPanel && conflicts.length > 0 && (
+        <section style={{ border: '1px solid var(--status-danger-border)', borderRadius: 'var(--radius-lg)', background: 'var(--status-danger-bg)', padding: '12px 16px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--status-danger)' }}>⚠ Schedule Conflicts</span>
+            <span style={{ fontSize: 11, background: 'var(--status-danger)', color: '#fff', borderRadius: 999, padding: '1px 8px', fontWeight: 700 }}>{shownConflicts.length}</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <select aria-label="Filter conflicts by trainer" style={sel} value={conflictFilter.trainer} onChange={(e) => setConflictFilter((f) => ({ ...f, trainer: e.target.value }))}>
+                <option value="all">All Trainers</option>
+                {trainers.map((t) => <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>)}
+              </select>
+              <select aria-label="Filter conflicts by severity" style={sel} value={conflictFilter.severity} onChange={(e) => setConflictFilter((f) => ({ ...f, severity: e.target.value }))}>
+                <option value="all">All Severity</option><option>High</option><option>Medium</option><option>Low</option>
+              </select>
+              <select aria-label="Filter conflicts by status" style={sel} value={conflictFilter.status} onChange={(e) => setConflictFilter((f) => ({ ...f, status: e.target.value }))}>
+                <option value="all">All Status</option><option>Open</option><option>Resolved</option><option>Ignored</option>
+              </select>
+
+              {/* Close Panel Button */}
+              <button
+                type="button"
+                onClick={() => setShowConflictsPanel(false)}
+                title="Close Conflicts Panel to expand matrix view"
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--status-danger-border)',
+                  borderRadius: 'var(--radius-xs, 6px)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: 'var(--status-danger)',
+                  padding: '4px 10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  transition: 'background 120ms',
+                }}
+              >
+                <span>✕</span> Close
+              </button>
+            </div>
+          </div>
+          {shownConflicts.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '4px 0' }}>No conflicts match current filters.</div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+              {shownConflicts.slice(0, 40).map((c) => (
+                <ConflictCard
+                  key={c.id}
+                  c={c}
+                  onDetails={() => setDetailConflict(c)}
+                  onResolve={() => setConflictStatus(c.id, 'Resolved', 'Conflict resolved')}
+                  onReassign={() => setConflictStatus(c.id, 'Resolved', 'Trainer reassigned')}
+                  onIgnore={() => setConflictStatus(c.id, 'Ignored', 'Conflict ignored')}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+
+
+      {/* ── Resource Matrix (Expands dynamically to utilize all bottom vertical space) ── */}
       <div
         ref={scrollRef}
         className="kvj-matrix"
         style={{
           position: 'relative', overflow: 'auto',
-          height: 'clamp(360px, calc(100vh - 430px), 900px)',
+          height: showConflictsPanel && conflicts.length > 0 ? 'calc(100vh - 240px)' : 'calc(100vh - 150px)',
+          minHeight: 550,
           border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
           background: 'var(--bg-surface)',
+          boxShadow: 'var(--e1)',
         }}
       >
         {/* Sticky matrix header */}
@@ -387,7 +497,7 @@ export function TrainingCalendar() {
                 style={{
                   position: 'absolute', top: 0, left: 0, transform: `translateY(${vr.start}px)`,
                   width: bodyW, display: 'flex', background: tint,
-                  borderBottom: '1px solid var(--border)', minHeight: ROW_BASE,
+                  borderBottom: '1px solid var(--border)', minHeight: 44,
                 }}
               >
                 <FrozenCell w={FROZEN.date} left={0} bg={tint}>
@@ -429,9 +539,7 @@ export function TrainingCalendar() {
         </div>
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-        {rows.length} day rows × {visibleTrainers.length} trainers · rendering {vRows.length} rows × {vCols.length} columns (virtualized)
-      </div>
+
 
       {/* Conflict detail */}
       <Drawer open={!!detailConflict} onClose={() => setDetailConflict(null)} title="Conflict Details">
@@ -506,22 +614,31 @@ function Sel({ label, value, onChange, options, style }: {
 function HeadCell({ w, left, children }: { w: number; left: number; children: React.ReactNode }) {
   return (
     <div style={{
-      position: 'sticky', left, width: w, minWidth: w, zIndex: 7,
+      position: 'sticky', left, width: w, minWidth: w, zIndex: 12,
       background: 'var(--bg-sunken)', borderRight: '1px solid var(--border)',
       display: 'flex', alignItems: 'center', padding: '0 10px',
       fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em',
-      color: 'var(--text-secondary)',
+      color: 'var(--text-secondary)', boxSizing: 'border-box',
     }}>{children}</div>
   );
 }
 
 function FrozenCell({ w, left, bg, children }: { w: number; left: number; bg: string; children: React.ReactNode }) {
+  // Ensure solid opaque background so underneath content never bleeds through during scroll
+  const isSpecialBg = bg && bg !== 'transparent';
+  const solidBg = isSpecialBg
+    ? `color-mix(in srgb, ${bg} 25%, var(--bg-surface))`
+    : 'var(--bg-surface)';
+
   return (
     <div style={{
-      position: 'sticky', left, width: w, minWidth: w, zIndex: 3,
-      background: bg === 'transparent' ? 'var(--bg-surface)' : bg,
+      position: 'sticky', left, width: w, minWidth: w, zIndex: 8,
+      background: solidBg,
+      backgroundColor: solidBg,
       borderRight: '1px solid var(--border)',
       display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 12,
+      boxSizing: 'border-box',
+      overflow: 'hidden',
     }}>{children}</div>
   );
 }

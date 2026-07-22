@@ -35,6 +35,7 @@ const ProjectsAndTasks = lazy(() => import('../modules/project/pages/ProjectsAnd
 const StudentLifecycle = lazy(() => import('../modules/training/pages/StudentLifecycle').then((m) => ({ default: m.StudentLifecycle })));
 const StudentAttendance = lazy(() => import('../modules/training/pages/StudentAttendance').then((m) => ({ default: m.StudentAttendance })));
 const AssessmentBoard = lazy(() => import('../modules/training/pages/AssessmentBoard').then((m) => ({ default: m.AssessmentBoard })));
+const FinalExamModule = lazy(() => import('../modules/training/pages/FinalExamModule').then((m) => ({ default: m.FinalExamModule })));
 
 // Project & Resource Management
 const ClientDirectory = lazy(() => import('../modules/project/pages/ClientDirectory').then((m) => ({ default: m.ClientDirectory })));
@@ -96,6 +97,7 @@ export function AppRouter() {
           <Route path="/app/training/students" element={<ProtectedRoute resource="training" action="view"><StudentLifecycle /></ProtectedRoute>} />
           <Route path="/app/training/attendance" element={<ProtectedRoute resource="training" action="view"><StudentAttendance /></ProtectedRoute>} />
           <Route path="/app/training/assessments" element={<ProtectedRoute resource="training" action="view"><AssessmentBoard /></ProtectedRoute>} />
+          <Route path="/app/training/final-exam" element={<ProtectedRoute resource="training" action="view"><FinalExamModule /></ProtectedRoute>} />
 
           {/* Project & Resource Management */}
           <Route path="/app/projects" element={<ProtectedRoute resource="project" action="view"><ProjectsAndTasks /></ProtectedRoute>} />

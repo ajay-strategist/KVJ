@@ -57,6 +57,18 @@ export const SEED_COURSES: Course[] = PROGRAMS.map((title, i) => ({
   id: `course-${i + 1}`,
   title,
   code: `KVJ-${title.split(' ')[0].toUpperCase().slice(0, 4)}-${100 + i}`,
+  maxMarks: 100,
+  passPercentage: 70,
+  checklist: [
+    'College Confirmation Form Signed',
+    'Trainer Assigned',
+    'Student Registry Uploaded',
+    'Syllabus Dispatched',
+    'Daily Sessions Logged',
+    'Final Report Generated',
+    'Certificates Dispatched',
+    'Signed Receipt Uploaded',
+  ],
   status: 'active',
   ...AUDIT,
 }));

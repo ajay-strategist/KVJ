@@ -42,7 +42,7 @@ export function EmployeeProfile() {
   const name = `${profile.firstName} ${profile.lastName}`;
 
   const mockTimeline: TimelineEntry[] = [
-    { id: '1', title: 'Joined KVJ Analytics', time: profile.dateOfJoining, tone: 'success', description: `Started as a ${profile.designation}` },
+    { id: '1', title: 'Joined Organization', time: profile.dateOfJoining, tone: 'success', description: `Started as a ${profile.designation}` },
     { id: '2', title: 'Onboarded to Training Workspace', time: '1 month ago', tone: 'info' },
     { id: '3', title: 'Clocked In', time: 'Today, 09:30 AM', tone: 'progress' },
   ];

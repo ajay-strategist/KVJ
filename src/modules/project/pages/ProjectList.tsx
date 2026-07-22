@@ -218,8 +218,7 @@ export function ProjectList() {
         <body>
           <div class="header">
             <div class="logo-container">
-              <img src="/logo.png" alt="KVJ Logo" style="height: 32px;" />
-              <span class="logo-text">KVJ Analytics</span>
+              <img src="/logo.png" alt="Logo" style="height: 32px;" />
             </div>
             <div>
               <span class="badge ${p.status === 'Completed' ? 'badge-completed' : p.status === 'In Progress' ? 'badge-in-progress' : 'badge-not-started'}">${p.status}</span>

@@ -20,6 +20,7 @@ export function AttendanceLogPage() {
   const [endDate, setEndDate] = useState('2026-06-30');
   const [selectedEmployee, setSelectedEmployee] = useState<string>(user?.fullName || 'Linto George');
   const [submitDrawerOpen, setSubmitDrawerOpen] = useState(false);
+  const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
   // Expense tab state (bulk approval)
@@ -413,10 +414,43 @@ export function AttendanceLogPage() {
                       <td style={{ padding: 10, fontWeight: 500, color: 'var(--brand)' }}>{exp.batch}</td>
                       <td style={{ padding: 10, fontWeight: 700 }}>₹ {exp.amount.toFixed(2)}</td>
                       <td style={{ padding: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => setReceiptModalUrl('/logo.png')}
+                          style={{
+                            background: 'var(--bg-sunken)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-xs)',
+                            fontSize: 11, fontWeight: 600,
+                            padding: '3px 8px', cursor: 'pointer',
+                            color: 'var(--brand)',
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                          }}
+                        >
+                          📎 Receipt
+                        </button>
+                      </td>
+                      <td style={{ padding: 10 }}>
                         <Badge tone={exp.status === 'Approved' ? 'success' : 'warning'}>
                           {exp.status}
                         </Badge>
                       </td>
+                      {isManagement && (
+                        <td style={{ padding: 10 }}>
+                          {exp.status === 'Pending Approval' && (
+                            <Button
+                              size="xs"
+                              variant="success"
+                              onClick={() => {
+                                setExpenseRows((prev) => prev.map((r) => (r.id === exp.id ? { ...r, status: 'Approved' } : r)));
+                                toast({ variant: 'success', title: 'Expense Approved', message: `Claim for ${exp.employee} (${exp.category}) approved.` });
+                              }}
+                            >
+                              Approve
+                            </Button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -554,6 +588,15 @@ export function AttendanceLogPage() {
             <Button type="submit">Submit for Review</Button>
           </div>
         </Form>
+      </Drawer>
+
+      {/* Receipt Preview Modal / Drawer */}
+      <Drawer open={!!receiptModalUrl} onClose={() => setReceiptModalUrl(null)} title="Expense Receipt Preview">
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 16 }}>
+          <img src={receiptModalUrl || '/logo.png'} alt="Receipt Preview" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8, border: '1px solid var(--border)' }} />
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Signed Voucher & Verified Official Receipt</div>
+          <Button variant="secondary" onClick={() => setReceiptModalUrl(null)}>Close Preview</Button>
+        </div>
       </Drawer>
     </AppShell>
   );

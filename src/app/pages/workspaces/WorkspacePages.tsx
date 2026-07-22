@@ -152,6 +152,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   const activeBreakMs = activeBreak ? (now - new Date(activeBreak.startTime).getTime()) : 0;
 
   const totalWorkMs = completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs;
+  const totalBreakMs = completedBreakMs + activeBreakMs;
 
   const handleCustomClockInSubmit = useCallback(async () => {
     const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : 'Office';
@@ -255,6 +256,12 @@ export const AttendancePanel = memo(function AttendancePanel({
               <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Duration Today</div>
               <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
                 {formatDuration(totalWorkMs)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Break Duration</div>
+              <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px', fontVariantNumeric: 'tabular-nums', color: currentStatus === 'on_break' ? 'var(--status-warning)' : undefined }}>
+                {formatDuration(totalBreakMs)}
               </div>
             </div>
           </div>
@@ -941,8 +948,8 @@ export function MyDayPage() {
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setTimelineEntries((prev) => [
-      { id: String(Date.now()), title, time: timeStr, tone },
       ...prev,
+      { id: String(Date.now()), title, time: timeStr, tone },
     ]);
   };
 

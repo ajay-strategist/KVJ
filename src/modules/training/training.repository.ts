@@ -30,6 +30,9 @@ export interface Student extends Entity {
 export interface Course extends Entity {
   title: string;
   code: string;
+  maxMarks?: number;
+  passPercentage?: number;
+  checklist?: string[];
 }
 
 /** Lifecycle phase of a training batch, shown as a coloured badge. */
