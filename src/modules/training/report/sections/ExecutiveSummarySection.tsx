@@ -1,6 +1,12 @@
 import React from 'react';
 import type { SectionProps } from './CoverPageSection';
 import { selectExecutiveKPIs } from '../daily-report.selectors';
+import { AttendanceGaugeChart } from '../charts/AttendanceGaugeChart';
+import {
+  GenderDonutChart,
+  PriorKnowledgeDonutChart,
+  LaptopAvailabilityDonutChart,
+} from '../charts/DemographicsDonutCharts';
 
 export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
   const kpis = selectExecutiveKPIs(data);
@@ -8,69 +14,85 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
       <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-        📊 Executive Summary & Student Demographics
+        📊 Executive Summary & Batch Intelligence Overview
       </h2>
-      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
-        High-level key performance metrics, demographic distribution, technical readiness, and eligibility status.
+      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>
+        Core batch profile, enrolled strength metrics, attendance gauge, and student demographics.
       </div>
 
-      {/* 6 Executive KPI Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+      {/* Top Row: Total Students KPI Card + Overall Attendance Gauge Chart */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
         
-        {/* 1. Total Students */}
-        <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569' }}>Total Enrolled Students</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
-            {kpis.totalStudents} <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Students</span>
+        {/* Total Students KPI Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
+            border: '1.5px solid #cbd5e1',
+            borderRadius: 10,
+            padding: '18px 22px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            boxSizing: 'border-box',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            🎓 Enrolled Batch Strength
           </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Active batch strength</div>
+          <div style={{ fontSize: 34, fontWeight: 900, color: '#0f172a', marginTop: 6, lineHeight: 1 }}>
+            {kpis.totalStudents} <span style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>Enrolled Students</span>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', marginTop: 10 }}>
+            Active strength for batch: {data.batchCode} ({data.collegeName})
+          </div>
         </div>
 
-        {/* 2. Gender Wise Distribution */}
-        <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569' }}>Gender Distribution</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
-            👩 {kpis.femaleCount} ({kpis.femalePct}%) · 👨 {kpis.maleCount} ({kpis.malePct}%)
-          </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Female to Male ratio</div>
+        {/* Gauge Chart for Overall Batch Attendance % */}
+        <div>
+          <AttendanceGaugeChart
+            percentage={kpis.overallAttendancePct}
+            title="Overall Batch Attendance %"
+            caption="Cumulative rate across all logged sessions"
+          />
         </div>
+      </div>
 
-        {/* 3. Computer / Laptop Ownership */}
-        <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569' }}>Laptop / Computer Availability</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#0284c7', marginTop: 2 }}>
-            💻 {kpis.hasLaptopCount} Has Laptop ({kpis.hasLaptopPct}%)
-          </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{kpis.noLaptopCount} Students require lab machine</div>
+      {/* Middle Row: Donut Charts Grid (Gender, Prior Course Knowledge, Laptop Availability) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14 }}>
+        <GenderDonutChart
+          femaleCount={kpis.femaleCount}
+          maleCount={kpis.maleCount}
+          totalStudents={kpis.totalStudents}
+        />
+        <PriorKnowledgeDonutChart
+          learnedBeforeCount={kpis.learnedBeforeCount}
+          newLearnerCount={kpis.newLearnerCount}
+          totalStudents={kpis.totalStudents}
+        />
+        <LaptopAvailabilityDonutChart
+          hasLaptopCount={kpis.hasLaptopCount}
+          noLaptopCount={kpis.noLaptopCount}
+          totalStudents={kpis.totalStudents}
+        />
+      </div>
+
+      {/* EXECUTIVE TRAINING INTELLIGENCE CALLOUT BOX */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)',
+          border: '1.5px solid #bfdbfe',
+          borderRadius: 8,
+          padding: '12px 16px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#1e40af', marginBottom: 4 }}>
+          <span>💡</span> Executive Training Intelligence Insights
         </div>
-
-        {/* 4. Previous Knowledge */}
-        <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569' }}>Prior Course Experience</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#7c3aed', marginTop: 2 }}>
-            📚 {kpis.learnedBeforeCount} Experienced ({kpis.learnedBeforePct}%)
-          </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{kpis.newLearnerCount} New learners to course</div>
+        <div style={{ fontSize: 11, color: '#1e3a8a', lineHeight: 1.5 }}>
+          Enrolled batch strength is <strong>{kpis.totalStudents} students</strong> with a cumulative overall attendance rate of <strong>{kpis.overallAttendancePct}%</strong>.
+          Demographics reflect <strong>{kpis.femaleCount} Female / {kpis.maleCount} Male</strong> students. Technical readiness indicates <strong>{kpis.hasLaptopCount} students ({Math.round((kpis.hasLaptopCount / Math.max(kpis.totalStudents, 1)) * 100)}%)</strong> possess personal laptops for practical lab assignments.
         </div>
-
-        {/* 5. Overall Batch Attendance */}
-        <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569' }}>Overall Batch Attendance</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: kpis.overallAttendancePct >= 84 ? '#16a34a' : '#d97706', marginTop: 2 }}>
-            {kpis.overallAttendancePct}%
-          </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Across all logged sessions</div>
-        </div>
-
-        {/* 6. Final Exam Eligibility Status */}
-        <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569' }}>Final Exam Eligibility Rate</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#059669', marginTop: 2 }}>
-            {kpis.eligibleCount} / {kpis.totalStudents} ({kpis.finalExamEligibilityRatePct}%)
-          </div>
-          <div style={{ fontSize: 10, color: '#dc2626', marginTop: 4 }}>{kpis.notEligibleCount} Ineligible students</div>
-        </div>
-
       </div>
     </div>
   );

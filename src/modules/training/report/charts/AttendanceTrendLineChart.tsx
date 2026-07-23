@@ -31,8 +31,8 @@ export const AttendanceTrendLineChart: React.FC<AttendanceTrendLineChartProps> =
   const refY75 = padding.top + innerH - (75 / 100) * innerH;
 
   return (
-    <div style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff' }}>
-      <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 4 }}>{title}</div>
+    <div className="chart-avoid-break" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff', boxSizing: 'border-box' }}>
+      <div className="report-block" style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>{caption}</div>
 
       <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto' }} role="img" aria-label="Attendance trend line chart">

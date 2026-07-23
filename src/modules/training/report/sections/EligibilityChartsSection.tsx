@@ -26,7 +26,7 @@ export const EligibilityChartsSection: React.FC<SectionProps> = ({ data, config 
     <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
       <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Eligibility Visual Analytics</h2>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="report-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <EligibilityPieChart eligibleCount={kpis.eligibleCount} notEligibleCount={kpis.notEligibleCount} />
         <EligibilityByAssessmentBarChart assessments={assessmentItems} />
       </div>

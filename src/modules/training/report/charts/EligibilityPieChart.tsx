@@ -26,7 +26,7 @@ export const EligibilityPieChart: React.FC<EligibilityPieChartProps> = ({
   const strokeDash = (eligiblePct / 100) * circumference;
 
   return (
-    <div style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff' }}>
+    <div className="report-block" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff' }}>
       <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 2 }}>{title}</div>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>{caption}</div>
 

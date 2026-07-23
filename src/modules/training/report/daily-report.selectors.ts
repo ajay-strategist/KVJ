@@ -212,6 +212,119 @@ export function selectAssessmentKPIs(data: DailyReportData, assessmentId: string
   };
 }
 
+// ── Date-Wise Assessment Status Selector ──────────────────────────────────────
+export interface DatewiseAssessmentProgressRow {
+  date: string;
+  attemptedToday: number;
+  passedToday: number;
+  dayPassPct: number;
+  cumulativePassed: number;
+  cumulativeAttempted: number;
+  enrolledTotal: number;
+  cumulativePassPct: number;
+}
+
+export function selectDatewiseAssessmentStatus(data: DailyReportData, assessmentId: string): DatewiseAssessmentProgressRow[] {
+  const assessment = data.assessments.find((a) => a.id === assessmentId);
+  const passMarkPercent = assessment ? assessment.passMarkPercent : 84;
+  const enrolledTotal = data.totalStudents || data.students.length || 0;
+
+  // Flatten all attempts for this assessment: { studentId, date, marks }
+  const rawAttempts: Array<{ studentId: string; date: string; marks: number; maxMarks: number }> = [];
+
+  data.students.forEach((st) => {
+    const sc = st.assessmentScores[assessmentId];
+    if (sc && sc.attempted) {
+      if (sc.attempts && sc.attempts.length > 0) {
+        sc.attempts.forEach((att) => {
+          rawAttempts.push({
+            studentId: st.id,
+            date: att.date,
+            marks: att.marks,
+            maxMarks: att.maxMarks || sc.maxMarks || 100,
+          });
+        });
+      } else if (sc.date) {
+        rawAttempts.push({
+          studentId: st.id,
+          date: sc.date,
+          marks: sc.marks,
+          maxMarks: sc.maxMarks || 100,
+        });
+      } else {
+        // Fallback: assign to the first session date if missing
+        const fallbackDate = data.sessions[0]?.date || data.reportDate;
+        rawAttempts.push({
+          studentId: st.id,
+          date: fallbackDate,
+          marks: sc.marks,
+          maxMarks: sc.maxMarks || 100,
+        });
+      }
+    }
+  });
+
+  // Extract unique sorted dates where at least 1 attempt took place
+  const uniqueDates = Array.from(new Set(rawAttempts.map((a) => a.date))).sort();
+
+  if (uniqueDates.length === 0) return [];
+
+  const result: DatewiseAssessmentProgressRow[] = [];
+
+  uniqueDates.forEach((date) => {
+    // Attempts on this specific date
+    const attemptsToday = rawAttempts.filter((a) => a.date === date);
+    const attemptedTodayStudents = Array.from(new Set(attemptsToday.map((a) => a.studentId)));
+    const attemptedToday = attemptedTodayStudents.length;
+
+    // RULE: "if a day they didn't attend the assessment (no one attended do not show that date)"
+    if (attemptedToday === 0) return;
+
+    // For students who attempted today, calculate their highest mark ON this date
+    let passedToday = 0;
+    attemptedTodayStudents.forEach((stId) => {
+      const stTodayAttempts = attemptsToday.filter((a) => a.studentId === stId);
+      const highestMarkToday = Math.max(...stTodayAttempts.map((a) => Math.round((a.marks / a.maxMarks) * 100)));
+      if (highestMarkToday >= passMarkPercent) {
+        passedToday++;
+      }
+    });
+
+    const dayPassPct = attemptedToday > 0 ? Math.round((passedToday / attemptedToday) * 100) : 0;
+
+    // All attempts up to and including this date
+    const attemptsUpToDate = rawAttempts.filter((a) => a.date <= date);
+    const uniqueStudentsUpToDate = Array.from(new Set(attemptsUpToDate.map((a) => a.studentId)));
+    const cumulativeAttempted = uniqueStudentsUpToDate.length;
+
+    // RULE: "(Some time they will attend 2 times and passed but show only the highest mark of that student)"
+    let cumulativePassed = 0;
+    uniqueStudentsUpToDate.forEach((stId) => {
+      const stCumulativeAttempts = attemptsUpToDate.filter((a) => a.studentId === stId);
+      const highestMarkUpToDate = Math.max(...stCumulativeAttempts.map((a) => Math.round((a.marks / a.maxMarks) * 100)));
+      if (highestMarkUpToDate >= passMarkPercent) {
+        cumulativePassed++;
+      }
+    });
+
+    // Current Pass % (based on enrolledTotal)
+    const cumulativePassPct = enrolledTotal > 0 ? Math.round((cumulativePassed / enrolledTotal) * 100) : 0;
+
+    result.push({
+      date,
+      attemptedToday,
+      passedToday,
+      dayPassPct,
+      cumulativePassed,
+      cumulativeAttempted,
+      enrolledTotal,
+      cumulativePassPct,
+    });
+  });
+
+  return result;
+}
+
 // ── Score Histogram Buckets (0-9, 10-19, ..., 90-100) ─────────────────────────
 export function selectScoreHistogramBuckets(data: DailyReportData, assessmentId: string) {
   const buckets = Array(10).fill(0);

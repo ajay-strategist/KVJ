@@ -1,7 +1,12 @@
 import React from 'react';
 import type { SectionProps } from './CoverPageSection';
-import { selectAssessmentKPIs, selectScoreHistogramBuckets } from '../daily-report.selectors';
+import {
+  selectAssessmentKPIs,
+  selectScoreHistogramBuckets,
+  selectDatewiseAssessmentStatus,
+} from '../daily-report.selectors';
 import { ScoreHistogramChart } from '../charts/ScoreHistogramChart';
+import { DatewiseAssessmentProgressLineChart } from '../charts/DatewiseAssessmentProgressLineChart';
 
 export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }) => {
   const selectedAssessments = data.assessments.filter((a) => config.selectedAssessmentIds.includes(a.id));
@@ -13,16 +18,17 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
       <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-        📝 Assessment Performance & Score Histogram
+        📝 Assessment Performance &amp; Outcomes Intelligence
       </h2>
-      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
-        Detailed performance metrics, score bucket distribution, and student outcomes for selected assessments.
+      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>
+        Detailed performance metrics, score bucket distribution, date-wise progress tracking, and student outcomes.
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {selectedAssessments.map((ass) => {
           const kpis = selectAssessmentKPIs(data, ass.id);
           const histogramBuckets = selectScoreHistogramBuckets(data, ass.id);
+          const datewiseProgress = selectDatewiseAssessmentStatus(data, ass.id);
 
           const passedCount = kpis.completed - kpis.failed;
 
@@ -32,11 +38,23 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
           const notAttendedStudents = data.students.filter((st) => !st.assessmentScores[ass.id]?.attempted);
 
           return (
-            <div key={ass.id} style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: 12, background: '#ffffff' }}>
+            <div
+              key={ass.id}
+              className="card-avoid-break"
+              style={{
+                pageBreakInside: 'avoid',
+                breakInside: 'avoid',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 10,
+                padding: 14,
+                background: '#ffffff',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+              }}
+            >
               
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 800, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
                   {ass.title} <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>({ass.type})</span>
                 </h3>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '3px 8px', borderRadius: 4 }}>
@@ -69,7 +87,7 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
               </div>
 
               {/* Grid: Histogram + Student Outcome Lists */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 
                 {/* Score Histogram */}
                 <div>
@@ -109,12 +127,68 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
 
                   {/* Passed Summary */}
                   <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: 8, color: '#166534' }}>
-                    <strong>✓ Passed ({passedStudents.length} Students):</strong> Achieved score ≥ {ass.passMarkPercent}%
+                    <strong>✓ Passed ({passedStudents.length} Students):</strong> Highest mark achieved ≥ {ass.passMarkPercent}%
                   </div>
 
                 </div>
 
               </div>
+
+              {/* DATE-WISE ASSESSMENT STATUS, LINE CHART & PROGRESS TABLE */}
+              {datewiseProgress.length > 0 && (
+                <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: 12, marginTop: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>
+                      📅 Date-Wise Assessment Progress &amp; Trend Analysis
+                    </div>
+                    <span style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>
+                      Evaluates highest mark per student across all attempts
+                    </span>
+                  </div>
+
+                  {/* Date-Wise Progress Line Chart */}
+                  <div className="chart-avoid-break" style={{ marginBottom: 12, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                    <DatewiseAssessmentProgressLineChart
+                      rows={datewiseProgress}
+                      title={`${ass.title} — Pass Rate Progress Trend`}
+                      caption={`Cumulative overall pass % progress across exam dates (Target: ${ass.passMarkPercent}%).`}
+                      targetPassPct={ass.passMarkPercent}
+                    />
+                  </div>
+
+                  {/* Date-Wise Progress Table */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, border: '1px solid #cbd5e1' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 8px' }}>Exam Date</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'center' }}>Attended Students</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'center' }}>Passed Count (Day)</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'center' }}>Day Pass %</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'center' }}>Cumulative Cleared</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'center' }}>Current Overall Pass %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {datewiseProgress.map((row, rIdx) => (
+                        <tr key={rIdx} style={{ borderBottom: '1px solid #e2e8f0', background: rIdx % 2 === 0 ? '#ffffff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                          <td style={{ padding: '6px 8px', fontWeight: 700, color: '#0f172a' }}>{row.date}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>{row.attemptedToday} Students</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700, color: '#16a34a' }}>{row.passedToday}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 800, color: row.dayPassPct >= 80 ? '#16a34a' : '#d97706' }}>
+                            {row.dayPassPct}%
+                          </td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700, color: '#2563eb' }}>
+                            {row.cumulativePassed} / {row.enrolledTotal} Enrolled
+                          </td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 900, color: row.cumulativePassPct >= 70 ? '#15803d' : '#dc2626' }}>
+                            {row.cumulativePassPct}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
             </div>
           );

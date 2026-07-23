@@ -24,7 +24,7 @@ export const ScoreHistogramChart: React.FC<ScoreHistogramChartProps> = ({
   const passMarkX = passMarkPercent;
 
   return (
-    <div style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff', position: 'relative' }}>
+    <div className="report-block" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff', position: 'relative' }}>
       <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>{caption}</div>
 

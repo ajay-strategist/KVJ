@@ -23,13 +23,8 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
   const defaultAssessments: string[] = data.assessments.map((a) => a.id);
   const defaultColumns: StudentColumnId[] = [
     'studentName',
-    'gender',
-    'hasComputer',
-    'learnedBefore',
     'attendancePct',
     ...data.assessments.map((a) => a.id),
-    'assessmentStatus',
-    'finalExamEligibility',
   ];
 
   const [selectedSections, setSelectedSections] = useState<SectionId[]>(defaultSections);
@@ -46,7 +41,14 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed.selectedSections)) setSelectedSections(parsed.selectedSections);
           if (Array.isArray(parsed.selectedAssessmentIds)) setSelectedAssessmentIds(parsed.selectedAssessmentIds);
-          if (Array.isArray(parsed.selectedStudentColumns)) setSelectedStudentColumns(parsed.selectedStudentColumns);
+          if (Array.isArray(parsed.selectedStudentColumns)) {
+            // Filter out deprecated columns
+            setSelectedStudentColumns(
+              parsed.selectedStudentColumns.filter(
+                (c: string) => !['gender', 'hasComputer', 'learnedBefore', 'assessmentStatus', 'finalExamEligibility'].includes(c)
+              )
+            );
+          }
           if (typeof parsed.trainerNotes === 'string') setTrainerNotes(parsed.trainerNotes);
         }
       } catch (e) {
@@ -71,6 +73,30 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
       } else {
         setSelectedStudentColumns((cols) => cols.filter((c) => c !== id));
       }
+      return next;
+    });
+  };
+
+  const handleMoveAssessmentUp = (id: string) => {
+    setSelectedAssessmentIds((prev) => {
+      const idx = prev.indexOf(id);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      const temp = next[idx - 1];
+      next[idx - 1] = next[idx];
+      next[idx] = temp;
+      return next;
+    });
+  };
+
+  const handleMoveAssessmentDown = (id: string) => {
+    setSelectedAssessmentIds((prev) => {
+      const idx = prev.indexOf(id);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      const temp = next[idx + 1];
+      next[idx + 1] = next[idx];
+      next[idx] = temp;
       return next;
     });
   };
@@ -108,6 +134,12 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
 
   if (!isOpen) return null;
 
+  // Build sorted list of assessments based on selectedAssessmentIds order first, then remaining
+  const orderedAssessments = [
+    ...data.assessments.filter((a) => selectedAssessmentIds.includes(a.id)).sort((a, b) => selectedAssessmentIds.indexOf(a.id) - selectedAssessmentIds.indexOf(b.id)),
+    ...data.assessments.filter((a) => !selectedAssessmentIds.includes(a.id)),
+  ];
+
   return (
     <Drawer
       open={isOpen}
@@ -125,7 +157,7 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
         
         {/* Header Intro */}
         <div style={{ background: 'var(--bg-sunken)', padding: 12, borderRadius: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
-          Configure sections, assessment filters, and student table columns for <strong>{data.batchCode} ({data.collegeName})</strong>.
+          Configure sections, assessment filters, assessment display order, and student table columns for <strong>{data.batchCode} ({data.collegeName})</strong>.
         </div>
 
         {/* GROUP A: SECTION CHECKBOXES */}
@@ -169,18 +201,21 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
           </div>
         </div>
 
-        {/* GROUP B: ASSESSMENT PICKER */}
+        {/* GROUP B: ASSESSMENT PICKER & ORDERING */}
         <div>
-          <SectionHeader title="Group B: Assessment Filter (Drives Assessment & Eligibility Sections)" />
+          <SectionHeader title="Group B: Assessment Filter & Display Ordering" />
           <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8 }}>
-            Deselecting all assessments omits Assessment Status, Assessment Charts, Failed/Not-Attended, and Eligibility sections.
+            Tick assessments to include and use ▲/▼ to change the display order of assessments in the report.
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {data.assessments.map((ass) => {
+            {orderedAssessments.map((ass) => {
               const isChecked = selectedAssessmentIds.includes(ass.id);
+              const isFirst = selectedAssessmentIds.indexOf(ass.id) === 0;
+              const isLast = selectedAssessmentIds.indexOf(ass.id) === selectedAssessmentIds.length - 1;
+
               return (
-                <label
+                <div
                   key={ass.id}
                   style={{
                     display: 'flex',
@@ -190,11 +225,10 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
                     borderRadius: 6,
                     border: '1px solid var(--border)',
                     background: isChecked ? 'var(--bg-surface)' : 'var(--bg-sunken)',
-                    cursor: 'pointer',
                     fontSize: 12.5,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}>
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -202,12 +236,47 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
                     />
                     <strong style={{ color: 'var(--text-primary)' }}>{ass.title}</strong>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({ass.type})</span>
-                  </div>
+                  </label>
 
-                  <Badge tone={ass.isCustomPassMark ? 'warning' : 'success'}>
-                    Pass Mark: {ass.passMarkPercent}% {ass.isCustomPassMark ? '(custom)' : '(default 84%)'}
-                  </Badge>
-                </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Badge tone={ass.isCustomPassMark ? 'warning' : 'success'}>
+                      Pass Mark: {ass.passMarkPercent}% {ass.isCustomPassMark ? '(custom)' : '(default 84%)'}
+                    </Badge>
+
+                    {isChecked && (
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        <button
+                          type="button"
+                          disabled={isFirst}
+                          onClick={() => handleMoveAssessmentUp(ass.id)}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: 10,
+                            cursor: isFirst ? 'not-allowed' : 'pointer',
+                            opacity: isFirst ? 0.3 : 1,
+                          }}
+                          title="Move Up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isLast}
+                          onClick={() => handleMoveAssessmentDown(ass.id)}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: 10,
+                            cursor: isLast ? 'not-allowed' : 'pointer',
+                            opacity: isLast ? 0.3 : 1,
+                          }}
+                          title="Move Down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -217,21 +286,18 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
         <div>
           <SectionHeader title="Group C: Student Data Table Columns" />
           <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8 }}>
-            First column is fixed to <strong>Register No. (Phone)</strong>. Tick additional columns to include in the Student Data table.
+            First columns fixed: <strong>Photo</strong> &amp; <strong>Register No. (Phone)</strong>. Tick additional columns to include.
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {/* Fixed Register No */}
             <div style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-sunken)', fontSize: 12, fontWeight: 700, opacity: 0.7 }}>
-              ✓ Register No. (Phone) [Fixed]
+              ✓ Photo &amp; Register No. [Fixed]
             </div>
 
             {/* Standard optional columns */}
             {[
               { id: 'studentName', label: 'Student Name' },
-              { id: 'gender', label: 'Gender' },
-              { id: 'hasComputer', label: 'Has Laptop' },
-              { id: 'learnedBefore', label: 'Prior Experience' },
               { id: 'attendancePct', label: 'Attendance %' },
             ].map((col) => {
               const isChecked = selectedStudentColumns.includes(col.id as any);
@@ -255,20 +321,6 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
                   </label>
                 );
               })}
-
-            {/* Final status columns */}
-            {[
-              { id: 'assessmentStatus', label: 'Assessment Status' },
-              { id: 'finalExamEligibility', label: 'Final Exam Eligibility' },
-            ].map((col) => {
-              const isChecked = selectedStudentColumns.includes(col.id as any);
-              return (
-                <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: isChecked ? 'var(--bg-surface)' : 'var(--bg-sunken)', cursor: 'pointer', fontSize: 12 }}>
-                  <input type="checkbox" checked={isChecked} onChange={() => handleToggleColumn(col.id as any)} />
-                  <span>{col.label}</span>
-                </label>
-              );
-            })}
           </div>
         </div>
 

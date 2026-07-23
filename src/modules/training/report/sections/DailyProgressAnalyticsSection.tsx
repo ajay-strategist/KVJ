@@ -11,7 +11,7 @@ export const DailyProgressAnalyticsSection: React.FC<SectionProps> = ({ data }) 
     <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
       <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Daily Progress & Curriculum Analytics</h2>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="report-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <CompletionFunnelChart
           enrolled={hero.totalStudents}
           attended={data.students.filter((s) => s.attendancePct >= 75).length}

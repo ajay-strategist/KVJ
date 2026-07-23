@@ -28,12 +28,12 @@ export const AssessmentChartsSection: React.FC<SectionProps> = ({ data, config }
                 📊 Analytics: {ass.title} <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>(Pass Target: {ass.passMarkPercent}%)</span>
               </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div className="report-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <ScoreHistogramChart buckets={histogramBuckets} passMarkPercent={ass.passMarkPercent} />
                 <PassFailDonutChart passed={kpis.completed - kpis.failed} failed={kpis.failed} notAttempted={kpis.notAttempted} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="report-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <AverageScoreGaugeChart score={kpis.averageMark} passMarkPercent={ass.passMarkPercent} />
                 <CompletionProgressBarChart completed={kpis.completed} pending={kpis.pending} notAttempted={kpis.notAttempted} total={kpis.totalStudents} />
               </div>

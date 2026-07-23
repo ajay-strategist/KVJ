@@ -60,6 +60,23 @@ export interface SessionAttendanceRecord {
   absentStudentIds: string[];
 }
 
+export interface AssessmentAttempt {
+  date: string; // YYYY-MM-DD
+  marks: number;
+  maxMarks: number;
+  passed: boolean;
+}
+
+export interface StudentAssessmentScore {
+  marks: number; // Highest mark achieved across all attempts
+  maxMarks: number;
+  grade: string;
+  passed: boolean;
+  attempted: boolean;
+  date?: string;
+  attempts?: AssessmentAttempt[];
+}
+
 export interface StudentReportRow {
   id: string;
   registerNo: string;
@@ -68,13 +85,14 @@ export interface StudentReportRow {
   email: string;
   college: string;
   batch: string;
+  avatarUrl?: string;
   gender?: 'Male' | 'Female';
   hasComputer?: 'Yes' | 'No';
   learnedBefore?: 'Yes' | 'No';
   attendancePct: number;
   totalPresent: number;
   totalSessions: number;
-  assessmentScores: Record<string, { marks: number; maxMarks: number; grade: string; passed: boolean; attempted: boolean }>;
+  assessmentScores: Record<string, StudentAssessmentScore>;
   assessmentStatus: 'Completed' | 'Pending' | 'Failed';
   finalExamEligibility: 'Eligible' | 'Not Eligible';
   eligibilityReason?: string;
@@ -101,20 +119,8 @@ export interface StudentRiskItem {
 
 export interface BatchCertificateStatus {
   printed: boolean;
-  deliveredToCollege: boolean;
-  deliveryDate?: string;
-  printedCount: number;
-  totalCount: number;
-  remarks?: string;
-}
-
-export interface AttachmentSummaryItem {
-  id: string;
-  fileName: string;
-  fileType: string;
-  fileSize: string;
-  uploadedBy: string;
-  uploadedAt: string;
+  issuedCount: number;
+  pendingCount: number;
 }
 
 export interface DailyReportData {
@@ -129,13 +135,14 @@ export interface DailyReportData {
   coordinatorName: string;
   totalStudents: number;
   courseMaxMarks: number;
-  finalExamPassMarkPercent: number;
+  finalExamPassMarkPercent: number; // e.g. 70
   assessments: AssessmentDefinition[];
   sessions: SessionAttendanceRecord[];
   students: StudentReportRow[];
   progressMilestones: DailyProgressMilestone[];
   riskItems: StudentRiskItem[];
-  certificateStatus: BatchCertificateStatus[];
-  attachments: AttachmentSummaryItem[];
+  certificates?: any;
+  certificateStatus?: any;
+  attachments?: any[];
   defaultTrainerNotes: string;
 }

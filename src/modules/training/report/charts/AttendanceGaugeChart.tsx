@@ -17,7 +17,7 @@ export const AttendanceGaugeChart: React.FC<AttendanceGaugeChartProps> = ({
   const color = pct >= 85 ? '#10b981' : pct >= 75 ? '#f59e0b' : '#ef4444';
 
   return (
-    <div style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff', textAlign: 'center' }}>
+    <div className="report-block" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#ffffff', textAlign: 'center' }}>
       <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 2 }}>{title}</div>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>{caption}</div>
 
