@@ -210,90 +210,90 @@ export const AttendancePanel = memo(function AttendancePanel({
     <>
       <div
         style={{
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
+          background: '#ffffff',
+          border: '1px solid #eef2f6',
           borderRadius: 20,
           padding: '20px 24px',
-          boxShadow: '0 4px 20px -2px rgba(99, 102, 241, 0.06), 0 2px 6px -1px rgba(0,0,0,0.03)',
+          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03)',
           marginBottom: 24,
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        {/* Header bar matching Sample Image 1 */}
+        {/* Header bar matching Sample Image */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>
             Attendance Control Panel — Office / Training
           </h3>
         </div>
 
-        {/* 5 Stat Columns inside a single light tinted container box (Image 1) */}
+        {/* 5 Stat Columns inside single soft ice-blue container box */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gridTemplateColumns: 'repeat(5, 1fr)',
             gap: 16,
-            padding: '16px 20px',
-            borderRadius: 14,
-            background: 'linear-gradient(135deg, rgba(239,246,255,0.95) 0%, rgba(240,249,255,0.95) 100%)',
-            border: '1px solid #bae6fd',
-            boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.8), 0 2px 8px rgba(59,130,246,0.06)',
-            marginBottom: 18,
+            padding: '16px 24px',
+            borderRadius: 16,
+            background: '#f1f5fe',
+            border: '1px solid #dbe6fe',
+            marginBottom: 20,
+            alignItems: 'center',
           }}
         >
           {/* CURRENT STATUS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CURRENT STATUS
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
               {currentStatus === 'present' ? '🟢 Working' : currentStatus === 'on_break' ? '🟡 On Break' : '⚫ Not Working'}
             </span>
           </div>
 
           {/* GPS LOCATION */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               GPS LOCATION
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#2563eb', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#6366f1', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
               📍 {resolveLocationName(locationStr)}
             </span>
           </div>
 
           {/* CLOCK IN TIME */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CLOCK IN TIME
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
               {clockInTimeStr}
             </span>
           </div>
 
           {/* DURATION TODAY */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               DURATION TODAY
             </span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(totalWorkMs)}
             </span>
           </div>
 
           {/* BREAK DURATION */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               BREAK DURATION
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : '#475569', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(totalBreakMs)}
             </span>
           </div>
         </div>
 
-        {/* Action Controls Bar matching Sample Image 1 */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Action Controls Bar matching Sample Image */}
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           {(currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && (
             <>
               <button
@@ -302,15 +302,15 @@ export const AttendancePanel = memo(function AttendancePanel({
                 disabled={loading}
                 onClick={() => setClockInOpen(true)}
                 style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
+                  background: '#00c875',
+                  color: '#ffffff',
                   border: 'none',
-                  padding: '10px 24px',
+                  padding: '12px 28px',
                   fontWeight: 700,
                   fontSize: 13.5,
                   borderRadius: 999,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
+                  boxShadow: '0 2px 8px rgba(0,200,117,0.25)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 8,
@@ -325,17 +325,17 @@ export const AttendancePanel = memo(function AttendancePanel({
                 onClick={() => setClaimOpen(true)}
                 style={{
                   background: '#ffffff',
-                  color: '#4f46e5',
-                  border: '2px solid #818cf8',
-                  padding: '9px 22px',
+                  color: '#6366f1',
+                  border: '2px solid #a5b4fc',
+                  padding: '10px 24px',
                   fontWeight: 700,
-                  fontSize: 13,
+                  fontSize: 13.5,
                   borderRadius: 999,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 6,
-                  boxShadow: '0 2px 8px rgba(99,102,241,0.12)',
+                  boxShadow: '0 2px 6px rgba(99,102,241,0.08)',
                 }}
               >
                 📋 Submit Attendance
