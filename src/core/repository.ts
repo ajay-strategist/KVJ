@@ -45,17 +45,14 @@ export class MemoryRepository<T extends Entity> implements IRepository<T> {
   ) {
     const persisted = this.load();
     if (persisted && persisted.length > 0) {
-      if (seed.length === 0) {
-        // Clear legacy mock data stored from earlier development sessions
-        this.store.clear();
-        this.persist();
-      } else {
-        persisted.forEach((e) => this.store.set(e.id, e));
-      }
-    } else {
+      // Restore persisted data (user-created records survive refresh)
+      persisted.forEach((e) => this.store.set(e.id, e));
+    } else if (seed.length > 0) {
+      // First-time initialization from seed data
       seed.forEach((e) => this.store.set(e.id, e));
       this.persist();
     }
+    // If both persisted and seed are empty, start with an empty store — clean slate
   }
 
   private load(): T[] | null {
