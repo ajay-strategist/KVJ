@@ -964,7 +964,7 @@ export function TrainingCalendar() {
             flexDirection: 'column',
             gap: 4,
           }}>
-            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>🎓 {assignForm.college} · {assignForm.course}</div>
+            <div style={{ fontWeight: 700, color: 'var(--brand-primary, #1e40af)', fontSize: 12 }}>🎓 {assignForm.batchCode || `${assignForm.college} · ${assignForm.course}`}</div>
             <div>Coordinator: <strong>{assignForm.coordinator}</strong> · Students: <strong>{assignForm.studentCount}</strong></div>
             <div>Default Venue: <strong>{assignForm.venue} ({assignForm.mode})</strong></div>
           </div>
