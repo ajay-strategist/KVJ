@@ -13,16 +13,88 @@ import type {
   AlumniProfile, IAlumniRepository
 } from './training.repository';
 
+const DEFAULT_COURSES: any[] = [
+  {
+    id: 'c1',
+    title: 'Power BI',
+    code: 'KVJ-PBI-101',
+    maxMarks: 100,
+    passPercentage: 84,
+    checklist: ['College Confirmation Form Signed', 'Trainer Assigned', 'Student Registry Uploaded', 'Syllabus Dispatched', 'Daily Sessions Logged', 'Final Report Generated', 'Certificates Dispatched', 'Signed Receipt Uploaded'],
+  },
+  {
+    id: 'c2',
+    title: 'Data Analytics',
+    code: 'KVJ-DA-101',
+    maxMarks: 100,
+    passPercentage: 84,
+    checklist: ['College Confirmation Form Signed', 'Trainer Assigned', 'Student Registry Uploaded', 'Syllabus Dispatched', 'Daily Sessions Logged', 'Final Report Generated', 'Certificates Dispatched', 'Signed Receipt Uploaded'],
+  },
+  {
+    id: 'c3',
+    title: 'Advanced Excel',
+    code: 'KVJ-EXCEL-101',
+    maxMarks: 100,
+    passPercentage: 84,
+    checklist: ['College Confirmation Form Signed', 'Trainer Assigned', 'Student Registry Uploaded', 'Syllabus Dispatched', 'Daily Sessions Logged', 'Final Report Generated', 'Certificates Dispatched', 'Signed Receipt Uploaded'],
+  },
+];
+
+const DEFAULT_BATCHES: any[] = [
+  {
+    id: 'b1',
+    code: 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI',
+    college: 'Christ Irinjalakkuda',
+    courseId: 'c1',
+    academicYear: '2026-2027',
+    trainingName: 'Power BI',
+    capacity: 30,
+    coordinator: 'Prof. Anil Kumar',
+    venue: 'Lab 1',
+    status: 'scheduled',
+    startDate: '2026-07-01',
+    endDate: '2026-08-30',
+  },
+  {
+    id: 'b2',
+    code: 'MIM Kuttikkanam-1 MBA-2026-27-Batch 1-Data Analytics',
+    college: 'MIM Kuttikkanam',
+    courseId: 'c2',
+    academicYear: '2026-2027',
+    trainingName: 'Data Analytics',
+    capacity: 45,
+    coordinator: 'Dr. Joby Thomas',
+    venue: 'Hall B',
+    status: 'scheduled',
+    startDate: '2026-07-05',
+    endDate: '2026-09-15',
+  },
+  {
+    id: 'b3',
+    code: 'St. Thomas College-3 BCOM-2026-27-Batch 1-Advanced Excel',
+    college: 'St. Thomas College',
+    courseId: 'c3',
+    academicYear: '2026-2027',
+    trainingName: 'Advanced Excel',
+    capacity: 40,
+    coordinator: 'Prof. Mary John',
+    venue: 'Lab 3',
+    status: 'scheduled',
+    startDate: '2026-07-10',
+    endDate: '2026-09-20',
+  },
+];
+
 export class MockStudentRepository extends MemoryRepository<Student> implements IStudentRepository {
   constructor() { super({ defaultStatus: 'active', pageSize: 20 }, [], 'MockStudentRepository'); }
 }
 
 export class MockCourseRepository extends MemoryRepository<Course> implements ICourseRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, [], 'MockCourseRepository'); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, DEFAULT_COURSES as Course[], 'MockCourseRepository'); }
 }
 
 export class MockBatchRepository extends MemoryRepository<Batch> implements IBatchRepository {
-  constructor() { super({ defaultStatus: 'scheduled', pageSize: 500 }, [], 'MockBatchRepository'); }
+  constructor() { super({ defaultStatus: 'scheduled', pageSize: 500 }, DEFAULT_BATCHES as Batch[], 'MockBatchRepository'); }
 }
 
 export class MockEnrollmentRepository extends MemoryRepository<Enrollment> implements IEnrollmentRepository {

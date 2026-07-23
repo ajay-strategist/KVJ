@@ -66,14 +66,14 @@ export const featureFlags = {
   },
 
   supabaseModules: {
-    employee: true,
-    attendance: true,
-    leave: true,
-    training: true,
-    project: true,
-    finance: true,
-    communication: true,
-    analytics: true,
+    employee: true,   // Table public.employees exists in Supabase
+    attendance: true, // Table public.attendance_records exists in Supabase
+    leave: true,      // Table public.leave_records exists in Supabase
+    training: false,  // Uses persistent MemoryRepository/LocalStorage until remote DB migration
+    project: false,
+    finance: false,
+    communication: false,
+    analytics: false,
   },
 } as const;
 
