@@ -4,7 +4,7 @@ import type { AttendanceRecord, IAttendanceRepository } from './attendance.repos
 
 export class MockAttendanceRepository extends MemoryRepository<AttendanceRecord> implements IAttendanceRepository {
   constructor() {
-    super({ defaultStatus: 'clocked_out', pageSize: 20 }, []);
+    super({ defaultStatus: 'clocked_out', pageSize: 20 }, [], 'MockAttendanceRepository');
   }
 
   async findActiveRecord(employeeId: UUID, dateStr: string): Promise<AttendanceRecord | null> {

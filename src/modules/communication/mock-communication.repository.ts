@@ -91,13 +91,13 @@ const DEFAULT_CHANNELS: ChatChannel[] = [
 
 export class MockChatChannelRepository extends MemoryRepository<ChatChannel> implements IChatChannelRepository {
   constructor() {
-    super({ defaultStatus: 'active', pageSize: 100 }, DEFAULT_CHANNELS);
+    super({ defaultStatus: 'active', pageSize: 100 }, DEFAULT_CHANNELS, 'MockChatChannelRepository');
   }
 }
 
 export class MockChatMessageRepository extends MemoryRepository<ChatMessage> implements IChatMessageRepository {
   constructor() {
-    super({ defaultStatus: 'active', pageSize: 500 }, []);
+    super({ defaultStatus: 'active', pageSize: 500 }, [], 'MockChatMessageRepository');
   }
 
   async findByChannel(channelId: UUID): Promise<ChatMessage[]> {
@@ -106,11 +106,11 @@ export class MockChatMessageRepository extends MemoryRepository<ChatMessage> imp
 }
 
 export class MockAnnouncementRepository extends MemoryRepository<Announcement> implements IAnnouncementRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, [], 'MockAnnouncementRepository'); }
 }
 
 export class MockEmailLogRepository extends MemoryRepository<EmailLog> implements IEmailLogRepository {
-  constructor() { super({ defaultStatus: 'pending', pageSize: 50 }, []); }
+  constructor() { super({ defaultStatus: 'pending', pageSize: 50 }, [], 'MockEmailLogRepository'); }
 
   async findPending(): Promise<EmailLog[]> {
     return [...this.store.values()].filter((l) => l.status === 'pending' && !l.deletedAt);
@@ -118,7 +118,7 @@ export class MockEmailLogRepository extends MemoryRepository<EmailLog> implement
 }
 
 export class MockNotificationPreferenceRepository extends MemoryRepository<NotificationPreference> implements INotificationPreferenceRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 50 }, []); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 50 }, [], 'MockNotificationPreferenceRepository'); }
 
   async findByEmployee(employeeId: UUID): Promise<NotificationPreference | null> {
     return [...this.store.values()].find((p) => p.employeeId === employeeId && !p.deletedAt) ?? null;

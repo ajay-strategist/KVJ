@@ -4,7 +4,7 @@ import type { LeaveRecord, ILeaveRepository } from './leave.repository';
 
 export class MockLeaveRepository extends MemoryRepository<LeaveRecord> implements ILeaveRepository {
   constructor() {
-    super({ defaultStatus: 'pending', pageSize: 20 }, []);
+    super({ defaultStatus: 'pending', pageSize: 20 }, [], 'MockLeaveRepository');
   }
 
   async findByEmployeeId(employeeId: UUID): Promise<LeaveRecord[]> {

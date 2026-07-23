@@ -421,20 +421,53 @@ export function BatchManagement() {
   });
 
   // Hour-based Multi-Date Attendance Column Matrix State
-  const [attendanceSessions, setAttendanceSessions] = useState<Array<{ id: string; date: string; hour: number }>>([
-    { id: 'col-1', date: '2026-07-20', hour: 1 },
-    { id: 'col-2', date: '2026-07-20', hour: 2 },
-    { id: 'col-3', date: '2026-07-21', hour: 1 },
-    { id: 'col-4', date: '2026-07-22', hour: 1 },
-    { id: 'col-5', date: '2026-07-23', hour: 1 },
-  ]);
-
-  const [attendanceMatrix, setAttendanceMatrix] = useState<Record<string, Record<string, 'present' | 'absent' | 'late'>>>({
-    's-1': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-    's-2': { 'col-1': 'present', 'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-    's-3': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-    's-4': { 'col-1': 'absent',  'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+  const [attendanceSessions, setAttendanceSessions] = useState<Array<{ id: string; date: string; hour: number }>>(() => {
+    try {
+      const saved = localStorage.getItem('kvj.batch.attendanceSessions');
+      return saved ? JSON.parse(saved) : [
+        { id: 'col-1', date: '2026-07-20', hour: 1 },
+        { id: 'col-2', date: '2026-07-20', hour: 2 },
+        { id: 'col-3', date: '2026-07-21', hour: 1 },
+        { id: 'col-4', date: '2026-07-22', hour: 1 },
+        { id: 'col-5', date: '2026-07-23', hour: 1 },
+      ];
+    } catch {
+      return [
+        { id: 'col-1', date: '2026-07-20', hour: 1 },
+        { id: 'col-2', date: '2026-07-20', hour: 2 },
+        { id: 'col-3', date: '2026-07-21', hour: 1 },
+        { id: 'col-4', date: '2026-07-22', hour: 1 },
+        { id: 'col-5', date: '2026-07-23', hour: 1 },
+      ];
+    }
   });
+
+  useEffect(() => {
+    try { localStorage.setItem('kvj.batch.attendanceSessions', JSON.stringify(attendanceSessions)); } catch {}
+  }, [attendanceSessions]);
+
+  const [attendanceMatrix, setAttendanceMatrix] = useState<Record<string, Record<string, 'present' | 'absent' | 'late'>>>(() => {
+    try {
+      const saved = localStorage.getItem('kvj.batch.attendanceMatrix');
+      return saved ? JSON.parse(saved) : {
+        's-1': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+        's-2': { 'col-1': 'present', 'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+        's-3': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+        's-4': { 'col-1': 'absent',  'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+      };
+    } catch {
+      return {
+        's-1': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+        's-2': { 'col-1': 'present', 'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+        's-3': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+        's-4': { 'col-1': 'absent',  'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+      };
+    }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('kvj.batch.attendanceMatrix', JSON.stringify(attendanceMatrix)); } catch {}
+  }, [attendanceMatrix]);
 
   const toggleSessionStatus = (studentId: string, colId: string, statusOverride?: 'present' | 'absent' | 'late') => {
     setAttendanceMatrix((prev) => {
@@ -889,11 +922,33 @@ export function BatchManagement() {
     }
   };
 
-  // Student list state
-  const [students, setStudents] = useState<StudentRecord[]>([]);
+  // Student list state — initialized from and saved to localStorage
+  const [students, setStudents] = useState<StudentRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('kvj.batch.students');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('kvj.batch.students', JSON.stringify(students)); } catch {}
+  }, [students]);
 
   // Final Exam student ID list — separate from master students array
-  const [finalExamStudentIds, setFinalExamStudentIds] = useState<string[]>([]);
+  const [finalExamStudentIds, setFinalExamStudentIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('kvj.batch.finalExamStudentIds');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('kvj.batch.finalExamStudentIds', JSON.stringify(finalExamStudentIds)); } catch {}
+  }, [finalExamStudentIds]);
 
   // Email communications log
   const [emailLogs, setEmailLogs] = useState<EmailHistoryItem[]>([]);

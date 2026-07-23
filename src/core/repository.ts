@@ -37,12 +37,14 @@ const uuid = (): UUID =>
 export class MemoryRepository<T extends Entity> implements IRepository<T> {
   protected store = new Map<UUID, T>();
   /** localStorage key — unique per repository class so mock data survives refresh. */
-  private readonly persistKey = `kvj.repo.${this.constructor.name}`;
+  private readonly persistKey: string;
 
   constructor(
     protected defaults: { defaultStatus: string; pageSize: number },
     seed: T[] = [],
+    keyName?: string,
   ) {
+    this.persistKey = `kvj.repo.${keyName || this.constructor.name}`;
     const persisted = this.load();
     if (persisted && persisted.length > 0) {
       // Restore persisted data (user-created records survive refresh)

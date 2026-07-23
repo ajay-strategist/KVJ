@@ -34,7 +34,7 @@ export class MockEmployeeRepository
   implements IEmployeeRepository
 {
   constructor() {
-    super({ defaultStatus: 'active', pageSize: 20 }, INITIAL_EMPLOYEES);
+    super({ defaultStatus: 'active', pageSize: 20 }, INITIAL_EMPLOYEES, 'MockEmployeeRepository');
 
     // Enforce production mode: purge non-admin employee records cached in localStorage
     const list = Array.from(this.store.values());

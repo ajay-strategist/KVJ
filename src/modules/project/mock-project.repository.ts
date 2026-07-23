@@ -11,15 +11,15 @@ import type {
 } from './project.repository';
 
 export class MockClientRepository extends MemoryRepository<Client> implements IClientRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, [], 'MockClientRepository'); }
 }
 
 export class MockProjectRepository extends MemoryRepository<Project> implements IProjectRepository {
-  constructor() { super({ defaultStatus: 'initiation', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'initiation', pageSize: 20 }, [], 'MockProjectRepository'); }
 }
 
 export class MockMilestoneRepository extends MemoryRepository<Milestone> implements IMilestoneRepository {
-  constructor() { super({ defaultStatus: 'pending', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'pending', pageSize: 20 }, [], 'MockMilestoneRepository'); }
 
   async findByProject(projectId: UUID): Promise<Milestone[]> {
     return [...this.store.values()].filter(
@@ -29,7 +29,7 @@ export class MockMilestoneRepository extends MemoryRepository<Milestone> impleme
 }
 
 export class MockResourceAllocationRepository extends MemoryRepository<ResourceAllocation> implements IResourceAllocationRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, [], 'MockResourceAllocationRepository'); }
 
   async findByProject(projectId: UUID): Promise<ResourceAllocation[]> {
     return [...this.store.values()].filter(
@@ -45,7 +45,7 @@ export class MockResourceAllocationRepository extends MemoryRepository<ResourceA
 }
 
 export class MockTaskRepository extends MemoryRepository<Task> implements ITaskRepository {
-  constructor() { super({ defaultStatus: 'todo', pageSize: 50 }, []); }
+  constructor() { super({ defaultStatus: 'todo', pageSize: 50 }, [], 'MockTaskRepository'); }
 
   async findByProject(projectId: UUID): Promise<Task[]> {
     return [...this.store.values()].filter(
@@ -55,7 +55,7 @@ export class MockTaskRepository extends MemoryRepository<Task> implements ITaskR
 }
 
 export class MockTimesheetRepository extends MemoryRepository<TimesheetRecord> implements ITimesheetRepository {
-  constructor() { super({ defaultStatus: 'draft', pageSize: 50 }, []); }
+  constructor() { super({ defaultStatus: 'draft', pageSize: 50 }, [], 'MockTimesheetRepository'); }
 
   async findByEmployee(employeeId: UUID): Promise<TimesheetRecord[]> {
     return [...this.store.values()].filter(
@@ -65,5 +65,5 @@ export class MockTimesheetRepository extends MemoryRepository<TimesheetRecord> i
 }
 
 export class MockClientMeetingRepository extends MemoryRepository<ClientMeeting> implements IClientMeetingRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, []); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, [], 'MockClientMeetingRepository'); }
 }
