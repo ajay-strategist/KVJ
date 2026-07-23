@@ -126,27 +126,35 @@ export function AnnouncementsBoard() {
                 </tr>
               </thead>
               <tbody>
-                {holidays.map((h) => (
-                  <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: 8, fontWeight: 700 }}>{h.date}</td>
-                    <td style={{ padding: 8 }}>{h.name}</td>
-                    <td style={{ padding: 8 }}>{h.type}</td>
-                    <td style={{ padding: 8 }}>
-                      <Badge tone={h.status === 'active' ? 'danger' : 'neutral'}>
-                        {h.status.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: 8, textAlign: 'right' }}>
-                      <Button
-                        variant="secondary"
-                        onClick={() => handleToggleHolidayStatus(h.id, h.status, h.name)}
-                        style={{ padding: '4px 10px', fontSize: 11 }}
-                      >
-                        {h.status === 'active' ? '❌ Cancel Holiday' : '✓ Reactivate'}
-                      </Button>
+                {holidays.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No declared holidays. Click "Declare Holiday" above to schedule a public or company holiday.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  holidays.map((h) => (
+                    <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: 8, fontWeight: 700 }}>{h.date}</td>
+                      <td style={{ padding: 8 }}>{h.name}</td>
+                      <td style={{ padding: 8 }}>{h.type}</td>
+                      <td style={{ padding: 8 }}>
+                        <Badge tone={h.status === 'active' ? 'danger' : 'neutral'}>
+                          {h.status.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: 8, textAlign: 'right' }}>
+                        <Button
+                          variant="secondary"
+                          onClick={() => handleToggleHolidayStatus(h.id, h.status, h.name)}
+                          style={{ padding: '4px 10px', fontSize: 11 }}
+                        >
+                          {h.status === 'active' ? '❌ Cancel Holiday' : '✓ Reactivate'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
