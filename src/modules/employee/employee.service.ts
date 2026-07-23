@@ -5,6 +5,7 @@ import { EMPLOYEE_REPOSITORY_TOKEN, type Employee } from './employee.repository'
 
 export interface IEmployeeService {
   getProfile(employeeId: UUID): Promise<Result<Employee>>;
+  createEmployee(data: Partial<Employee>, actor: Actor): Promise<Result<Employee>>;
   updateProfile(employeeId: UUID, patch: Partial<Employee>, actor: Actor): Promise<Result<Employee>>;
   getHierarchy(employeeId: UUID): Promise<Result<{ manager?: Employee; directReports: Employee[] }>>;
   listEmployees(): Promise<Result<Employee[]>>;
@@ -19,6 +20,15 @@ export class EmployeeService implements IEmployeeService {
     try {
       const emp = await this.repo.findById(employeeId);
       if (!emp) return Err(AppError.notFound('Employee profile not found.'));
+      return Ok(emp);
+    } catch (err) {
+      return Err(AppError.internal());
+    }
+  }
+
+  async createEmployee(data: Partial<Employee>, actor: Actor): Promise<Result<Employee>> {
+    try {
+      const emp = await this.repo.create(data, actor);
       return Ok(emp);
     } catch (err) {
       return Err(AppError.internal());

@@ -23,6 +23,16 @@ export function useEmployee() {
     setLoading(false);
   }, [service]);
 
+  const createEmployee = useCallback(async (data: Partial<Employee>) => {
+    if (!principal) return { ok: false, error: 'Unauthorized' };
+    const res = await service.createEmployee(data, { id: principal.id, role: principal.role });
+    if (res.ok) {
+      setEmployees((prev) => [res.value, ...prev]);
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, principal]);
+
   const updateProfile = useCallback(async (id: string, patch: Partial<Employee>) => {
     if (!principal) return { ok: false, error: 'Unauthorized' };
     const res = await service.updateProfile(id, patch, { id: principal.id, role: principal.role });
@@ -37,7 +47,7 @@ export function useEmployee() {
     fetchEmployees();
   }, [fetchEmployees]);
 
-  return { employees, loading, error, refresh: fetchEmployees, updateProfile };
+  return { employees, loading, error, refresh: fetchEmployees, createEmployee, updateProfile };
 }
 
 export function useEmployeeProfile(employeeId?: string) {
