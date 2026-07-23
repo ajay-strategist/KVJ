@@ -15,7 +15,10 @@ export function useAttendance() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTodayRecord = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const res = await service.getRecordForToday(user.id);
     if (res.ok) {

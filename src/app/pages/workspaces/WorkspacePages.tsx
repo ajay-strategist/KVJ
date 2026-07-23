@@ -208,8 +208,8 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   return (
     <>
-      <Card>
-        <SectionHeader title="Attendance Control Panel — Office / Training" />
+      <Card style={{ border: '2px solid var(--brand)', boxShadow: 'var(--e2)', marginBottom: 20 }}>
+        <SectionHeader title="⏱️ Attendance Control Panel — Office / Training" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{
             background: 'var(--bg-sunken)',
@@ -997,8 +997,11 @@ export function MyDayPage() {
     <AppShell>
       <Greeting />
 
-      {/* Single Row: Quick Actions + Resized Metrics Aligned Together in 6 Equal Columns matching 66px Height */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, alignItems: 'center', marginBottom: 20 }}>
+      {/* Quick Actions + Resized Metrics. auto-fit so the six cards WRAP to a
+          new line on narrower widths instead of overflowing and clipping the
+          right-most card (previously a rigid repeat(6, 1fr) that could not
+          shrink below its content width). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, alignItems: 'center', marginBottom: 20 }}>
         <ResizedQuickAction icon="✓" label="Add Task" />
         <ResizedQuickAction icon="₹" label="Submit Expense" />
         <ResizedQuickAction icon="🗓" label="Request Leave" />
