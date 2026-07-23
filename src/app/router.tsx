@@ -90,7 +90,8 @@ export function AppRouter() {
           <Route path="/app/settings" element={<ProtectedRoute resource="settings" action="view"><SettingsPage /></ProtectedRoute>} />
 
           {/* Training Platform */}
-          <Route path="/app/training/courses" element={<ProtectedRoute resource="training" action="view"><CourseList /></ProtectedRoute>} />
+          <Route path="/app/training/courses" element={<ProtectedRoute resource="training" action="view"><CourseList defaultTab="courses" /></ProtectedRoute>} />
+          <Route path="/app/training/colleges" element={<ProtectedRoute resource="training" action="view"><CourseList defaultTab="colleges" /></ProtectedRoute>} />
           <Route path="/app/training/batches" element={<ProtectedRoute resource="training" action="view"><BatchManagement /></ProtectedRoute>} />
           <Route path="/app/training/details" element={<ProtectedRoute resource="training" action="view"><BatchManagement /></ProtectedRoute>} />
           <Route path="/app/training/calendar" element={<ProtectedRoute resource="training" action="view"><TrainingCalendar /></ProtectedRoute>} />

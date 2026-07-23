@@ -29,6 +29,7 @@ export const NAV_TREE: NavItem[] = [
   { id: 'leave', label: 'Leave', path: '/app/leave', icon: 'CalendarDays', permission: ['leave', 'view'], module: 'leave' },
   { id: 'approvals', label: 'Approvals Queue', path: '/app/approvals', icon: 'CheckSquare', permission: ['leave', 'approve'] },
   { id: 'training-courses', label: 'Courses Catalog', path: '/app/training/courses', icon: 'BookOpen', permission: ['training', 'view'], module: 'training' },
+  { id: 'training-colleges', label: 'Colleges Catalog', path: '/app/training/colleges', icon: 'Building2', permission: ['training', 'view'], module: 'training' },
   { id: 'training-details', label: 'Training Details', path: '/app/training/details', icon: 'Layers', permission: ['training', 'view'], module: 'training' },
   { id: 'training-calendar', label: 'Training Calendar', path: '/app/training/calendar', icon: 'CalendarDays', permission: ['training', 'view'], module: 'training' },
   { id: 'training-students', label: 'Student Lifecycle', path: '/app/training/students', icon: 'GraduationCap', permission: ['training', 'view'], module: 'training', page: 'studentLifecycle' },

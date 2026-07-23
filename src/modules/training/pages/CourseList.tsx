@@ -1,18 +1,92 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useTraining } from '../hooks/useTraining';
 import Drawer from '../../../shared/ui/Drawer';
+import Tabs from '../../../shared/ui/Tabs';
 import { Form, TextField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Course } from '../training.repository';
 
-export function CourseList() {
+export interface College {
+  id: string;
+  name: string;
+  code: string;
+  location: string;
+  principalName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}
+
+const INITIAL_COLLEGES: College[] = [
+  {
+    id: 'col-1',
+    name: 'Christ Irinjalakkuda',
+    code: 'CHRIST-IRK',
+    location: 'Irinjalakkuda, Thrissur',
+    principalName: 'Dr. Fr. Jolly Andrews',
+    contactEmail: 'info@christcollegeijk.edu.in',
+    contactPhone: '+91 480 2825258',
+  },
+  {
+    id: 'col-2',
+    name: 'MIM Kuttikkanam',
+    code: 'MIM-KUTT',
+    location: 'Kuttikkanam, Idukki',
+    principalName: 'Dr. Joby Thomas',
+    contactEmail: 'info@mim.edu',
+    contactPhone: '+91 4869 232203',
+  },
+  {
+    id: 'col-3',
+    name: 'St. Thomas College',
+    code: 'STC-THR',
+    location: 'Thrissur',
+    principalName: 'Dr. Martin K. A.',
+    contactEmail: 'info@stthomas.ac.in',
+    contactPhone: '+91 487 2420435',
+  },
+];
+
+export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' | 'colleges' }) {
   const { courses, createCourse, updateCourse, loading } = useTraining();
   const { toast } = useNotifications();
-  const [open, setOpen] = useState(false);
+
+  // Active Tab State
+  const [activeTab, setActiveTab] = useState<'courses' | 'colleges'>(defaultTab);
+
+  // Courses Modal State
+  const [openCourseModal, setOpenCourseModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+
+  // Colleges Management State (Persisted in localStorage)
+  const [colleges, setColleges] = useState<College[]>(() => {
+    try {
+      const saved = localStorage.getItem('kvj.colleges');
+      return saved ? JSON.parse(saved) : INITIAL_COLLEGES;
+    } catch {
+      return INITIAL_COLLEGES;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kvj.colleges', JSON.stringify(colleges));
+    } catch {}
+  }, [colleges]);
+
+  // College Modal State
+  const [openCollegeModal, setOpenCollegeModal] = useState(false);
+  const [editingCollege, setEditingCollege] = useState<College | null>(null);
+  const [collegeForm, setCollegeForm] = useState({
+    name: '',
+    code: '',
+    location: '',
+    principalName: '',
+    contactEmail: '',
+    contactPhone: '',
+  });
 
   const DEFAULT_COURSE_CHECKLIST = [
     'College Confirmation Form Signed',
@@ -29,7 +103,7 @@ export function CourseList() {
   const [checklistItems, setChecklistItems] = useState<string[]>(DEFAULT_COURSE_CHECKLIST);
   const [newCheckitemText, setNewCheckitemText] = useState('');
 
-  const handleOpenEdit = (c: Course) => {
+  const handleOpenEditCourse = (c: Course) => {
     setEditingCourse(c);
     setChecklistItems(
       c.checklist && c.checklist.length > 0
@@ -38,8 +112,8 @@ export function CourseList() {
     );
   };
 
-  const handleOpenCreate = () => {
-    setOpen(true);
+  const handleOpenCreateCourse = () => {
+    setOpenCourseModal(true);
     setChecklistItems(DEFAULT_COURSE_CHECKLIST);
   };
 
@@ -53,7 +127,7 @@ export function CourseList() {
     setChecklistItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleCreateSubmit = async (values: Record<string, unknown>) => {
+  const handleCreateCourseSubmit = async (values: Record<string, unknown>) => {
     const maxMarks = Number(values.maxMarks) || 100;
     const passPct = Number(values.passPercentage) || 70;
     const res = await createCourse({
@@ -66,13 +140,13 @@ export function CourseList() {
 
     if (res.ok) {
       toast({ variant: 'success', title: 'Course Created', message: `${values.title} added with Max Marks: ${maxMarks}, Pass Criteria: ${passPct}%.` });
-      setOpen(false);
+      setOpenCourseModal(false);
     } else {
       toast({ variant: 'error', title: 'Error', message: res.error });
     }
   };
 
-  const handleEditSubmit = async (values: Record<string, unknown>) => {
+  const handleEditCourseSubmit = async (values: Record<string, unknown>) => {
     if (!editingCourse) return;
     const maxMarks = Number(values.maxMarks) || 100;
     const passPct = Number(values.passPercentage) || 70;
@@ -92,7 +166,81 @@ export function CourseList() {
     }
   };
 
-  const columns: Column<Course>[] = [
+  // College Handlers
+  const handleOpenCreateCollege = () => {
+    setEditingCollege(null);
+    setCollegeForm({
+      name: '',
+      code: '',
+      location: '',
+      principalName: '',
+      contactEmail: '',
+      contactPhone: '',
+    });
+    setOpenCollegeModal(true);
+  };
+
+  const handleOpenEditCollege = (c: College) => {
+    setEditingCollege(c);
+    setCollegeForm({
+      name: c.name,
+      code: c.code,
+      location: c.location || '',
+      principalName: c.principalName || '',
+      contactEmail: c.contactEmail || '',
+      contactPhone: c.contactPhone || '',
+    });
+    setOpenCollegeModal(true);
+  };
+
+  const handleSaveCollege = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!collegeForm.name.trim() || !collegeForm.code.trim()) {
+      toast({ variant: 'error', title: 'Required Fields', message: 'College name and code are required.' });
+      return;
+    }
+
+    if (editingCollege) {
+      setColleges((prev) =>
+        prev.map((c) =>
+          c.id === editingCollege.id
+            ? {
+                ...c,
+                name: collegeForm.name.trim(),
+                code: collegeForm.code.trim().toUpperCase(),
+                location: collegeForm.location.trim(),
+                principalName: collegeForm.principalName.trim(),
+                contactEmail: collegeForm.contactEmail.trim(),
+                contactPhone: collegeForm.contactPhone.trim(),
+              }
+            : c
+        )
+      );
+      toast({ variant: 'success', title: 'College Updated', message: `${collegeForm.name} updated successfully.` });
+    } else {
+      const newCollege: College = {
+        id: `col-${Date.now()}`,
+        name: collegeForm.name.trim(),
+        code: collegeForm.code.trim().toUpperCase(),
+        location: collegeForm.location.trim(),
+        principalName: collegeForm.principalName.trim(),
+        contactEmail: collegeForm.contactEmail.trim(),
+        contactPhone: collegeForm.contactPhone.trim(),
+      };
+      setColleges((prev) => [newCollege, ...prev]);
+      toast({ variant: 'success', title: 'College Added', message: `${collegeForm.name} added to catalog successfully.` });
+    }
+    setOpenCollegeModal(false);
+  };
+
+  const handleDeleteCollege = (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete ${name}?`)) {
+      setColleges((prev) => prev.filter((c) => c.id !== id));
+      toast({ variant: 'info', title: 'College Deleted', message: `${name} removed from catalog.` });
+    }
+  };
+
+  const courseColumns: Column<Course>[] = [
     { key: 'code', header: 'Code', sortable: true, accessor: (c) => c.code },
     { key: 'title', header: 'Course Title', sortable: true, accessor: (c) => c.title },
     {
@@ -130,9 +278,68 @@ export function CourseList() {
       key: 'actions',
       header: 'Actions',
       render: (c) => (
-        <Button variant="secondary" size="sm" onClick={() => handleOpenEdit(c)}>
+        <Button variant="secondary" size="sm" onClick={() => handleOpenEditCourse(c)}>
           Edit Course & Tasks
         </Button>
+      ),
+    },
+  ];
+
+  const collegeColumns: Column<College>[] = [
+    { key: 'code', header: 'College Code', sortable: true, accessor: (c) => c.code },
+    {
+      key: 'name',
+      header: 'College Name',
+      sortable: true,
+      accessor: (c) => c.name,
+      render: (c) => (
+        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>
+          🏛️ {c.name}
+        </div>
+      ),
+    },
+    { key: 'location', header: 'Location', sortable: true, accessor: (c) => c.location || '—' },
+    { key: 'principalName', header: 'Principal / Head', accessor: (c) => c.principalName || '—' },
+    {
+      key: 'contact',
+      header: 'Contact Info',
+      render: (c) => (
+        <div style={{ fontSize: 11.5 }}>
+          {c.contactEmail && <div>📧 {c.contactEmail}</div>}
+          {c.contactPhone && <div style={{ color: 'var(--text-muted)' }}>📞 {c.contactPhone}</div>}
+          {!c.contactEmail && !c.contactPhone && '—'}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (c) => (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Button variant="secondary" size="sm" onClick={() => handleOpenEditCollege(c)}>
+            Edit
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => handleDeleteCollege(c.id, c.name)} style={{ color: 'var(--status-danger)' }}>
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const tabItems = [
+    {
+      id: 'courses',
+      label: `📚 Courses Catalog (${courses.length})`,
+      content: (
+        <DataTable columns={courseColumns} rows={courses} rowKey={(c) => c.id} loading={loading} />
+      ),
+    },
+    {
+      id: 'colleges',
+      label: `🏛️ Colleges Catalog (${colleges.length})`,
+      content: (
+        <DataTable columns={collegeColumns} rows={colleges} rowKey={(c) => c.id} />
       ),
     },
   ];
@@ -140,16 +347,30 @@ export function CourseList() {
   return (
     <AppShell>
       <PageHeader
-        title="Courses Catalog"
-        subtitle="Manage courses master list, maximum marks, pass criteria, and execution task checklists"
-        actions={<Button onClick={handleOpenCreate}>Create Course</Button>}
+        title={activeTab === 'colleges' ? 'Colleges Catalog' : 'Courses Catalog'}
+        subtitle={
+          activeTab === 'colleges'
+            ? 'Manage affiliated colleges, locations, head details, and contact information'
+            : 'Manage courses master list, maximum marks, pass criteria, and execution task checklists'
+        }
+        actions={
+          activeTab === 'colleges' ? (
+            <Button onClick={handleOpenCreateCollege}>➕ Add New College</Button>
+          ) : (
+            <Button onClick={handleOpenCreateCourse}>➕ Create Course</Button>
+          )
+        }
       />
 
-      <DataTable columns={columns} rows={courses} rowKey={(c) => c.id} loading={loading} />
+      <Tabs
+        items={tabItems}
+        defaultTabId={activeTab}
+        onChange={(id) => setActiveTab(id as 'courses' | 'colleges')}
+      />
 
       {/* Create New Course Drawer */}
-      <Drawer open={open} onClose={() => setOpen(false)} title="Create New Course">
-        <Form initial={{ maxMarks: 100, passPercentage: 70 }} onSubmit={handleCreateSubmit}>
+      <Drawer open={openCourseModal} onClose={() => setOpenCourseModal(false)} title="Create New Course">
+        <Form initial={{ maxMarks: 100, passPercentage: 70 }} onSubmit={handleCreateCourseSubmit}>
           <TextField name="title" label="Course Title" />
           <TextField name="code" label="Course Code" placeholder="e.g. KVJ-PY-101" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -185,7 +406,7 @@ export function CourseList() {
           </div>
 
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="secondary" type="button" onClick={() => setOpenCourseModal(false)}>Cancel</Button>
             <Button type="submit">Create Course</Button>
           </div>
         </Form>
@@ -194,7 +415,7 @@ export function CourseList() {
       {/* Edit Existing Course Drawer */}
       <Drawer open={editingCourse !== null} onClose={() => setEditingCourse(null)} title="Edit Course Details">
         {editingCourse && (
-          <Form initial={{ title: editingCourse.title, code: editingCourse.code, maxMarks: editingCourse.maxMarks ?? 100, passPercentage: editingCourse.passPercentage ?? 70 }} onSubmit={handleEditSubmit}>
+          <Form initial={{ title: editingCourse.title, code: editingCourse.code, maxMarks: editingCourse.maxMarks ?? 100, passPercentage: editingCourse.passPercentage ?? 70 }} onSubmit={handleEditCourseSubmit}>
             <TextField name="title" label="Course Title" />
             <TextField name="code" label="Course Code" placeholder="e.g. KVJ-PY-101" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -235,6 +456,106 @@ export function CourseList() {
             </div>
           </Form>
         )}
+      </Drawer>
+
+      {/* Create / Edit College Drawer */}
+      <Drawer
+        open={openCollegeModal}
+        onClose={() => setOpenCollegeModal(false)}
+        title={editingCollege ? '🏛️ Edit College Details' : '🏛️ Add New College'}
+      >
+        <form onSubmit={handleSaveCollege} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              College Name *
+            </label>
+            <input
+              type="text"
+              className="kvj-input"
+              required
+              placeholder="e.g. Christ Irinjalakkuda"
+              value={collegeForm.name}
+              onChange={(e) => setCollegeForm({ ...collegeForm, name: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                College Code *
+              </label>
+              <input
+                type="text"
+                className="kvj-input"
+                required
+                placeholder="e.g. CHRIST-IRK"
+                value={collegeForm.code}
+                onChange={(e) => setCollegeForm({ ...collegeForm, code: e.target.value })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Location / City
+              </label>
+              <input
+                type="text"
+                className="kvj-input"
+                placeholder="e.g. Irinjalakkuda, Thrissur"
+                value={collegeForm.location}
+                onChange={(e) => setCollegeForm({ ...collegeForm, location: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              Principal / Head Name
+            </label>
+            <input
+              type="text"
+              className="kvj-input"
+              placeholder="e.g. Dr. Fr. Jolly Andrews"
+              value={collegeForm.principalName}
+              onChange={(e) => setCollegeForm({ ...collegeForm, principalName: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Contact Email
+              </label>
+              <input
+                type="email"
+                className="kvj-input"
+                placeholder="e.g. info@christcollegeijk.edu.in"
+                value={collegeForm.contactEmail}
+                onChange={(e) => setCollegeForm({ ...collegeForm, contactEmail: e.target.value })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Contact Phone
+              </label>
+              <input
+                type="tel"
+                className="kvj-input"
+                placeholder="e.g. +91 480 2825258"
+                value={collegeForm.contactPhone}
+                onChange={(e) => setCollegeForm({ ...collegeForm, contactPhone: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: 18, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button variant="secondary" type="button" onClick={() => setOpenCollegeModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              {editingCollege ? 'Save Changes' : '➕ Create College'}
+            </Button>
+          </div>
+        </form>
       </Drawer>
     </AppShell>
   );

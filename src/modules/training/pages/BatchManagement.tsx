@@ -3300,14 +3300,47 @@ export function BatchManagement() {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
                   College Name
                 </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  placeholder="e.g. Christ Irinjalakkuda"
-                  value={newBatchForm.college}
-                  onChange={(e) => setNewBatchForm({ ...newBatchForm, college: e.target.value })}
-                />
+                {(() => {
+                  let savedColleges: Array<{ id: string; name: string; code: string }> = [
+                    { id: 'col-1', name: 'Christ Irinjalakkuda', code: 'CHRIST-IRK' },
+                    { id: 'col-2', name: 'MIM Kuttikkanam', code: 'MIM-KUTT' },
+                    { id: 'col-3', name: 'St. Thomas College', code: 'STC-THR' },
+                  ];
+                  try {
+                    const raw = localStorage.getItem('kvj.colleges');
+                    if (raw) savedColleges = JSON.parse(raw);
+                  } catch {}
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <select
+                        className="kvj-input"
+                        value={savedColleges.some(c => c.name === newBatchForm.college) ? newBatchForm.college : 'Custom'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== 'Custom') {
+                            setNewBatchForm({ ...newBatchForm, college: val });
+                          }
+                        }}
+                      >
+                        {savedColleges.map((c) => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                        <option value="Custom">✏️ Type Custom College Name...</option>
+                      </select>
+                      {(!savedColleges.some(c => c.name === newBatchForm.college) || newBatchForm.college === 'Custom') && (
+                        <input
+                          type="text"
+                          className="kvj-input"
+                          required
+                          placeholder="Type College Name..."
+                          value={newBatchForm.college === 'Custom' ? '' : newBatchForm.college}
+                          onChange={(e) => setNewBatchForm({ ...newBatchForm, college: e.target.value })}
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>

@@ -897,11 +897,16 @@ export function TrainingCalendar() {
                 style={{ width: '100%', padding: '9px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
               >
                 {dynamicBatchPresets.length > 0 ? (
-                  dynamicBatchPresets.map((b) => (
-                    <option key={b.batchCode} value={b.batchCode}>
-                      {b.batchCode} — {b.name} ({b.college})
-                    </option>
-                  ))
+                  dynamicBatchPresets.map((b) => {
+                    const fullLabel = b.batchCode.toLowerCase().includes(b.name.toLowerCase())
+                      ? b.batchCode
+                      : `${b.batchCode} - ${b.name}`;
+                    return (
+                      <option key={b.batchCode} value={b.batchCode}>
+                        {fullLabel}
+                      </option>
+                    );
+                  })
                 ) : (
                   <option value="">No batches found</option>
                 )}
