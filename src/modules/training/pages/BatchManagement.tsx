@@ -114,7 +114,8 @@ export function BatchManagement() {
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
   const [newBatchForm, setNewBatchForm] = useState({
     code: '',
-    trainingName: 'Excel Expert 365',
+    selectedCourseId: '',
+    trainingName: '',
     college: 'Christ Irinjalakkuda',
     collegeCourse: 'BCOM Self',
     academicYear: '2026-2027',
@@ -138,12 +139,13 @@ export function BatchManagement() {
     e.preventDefault();
     if (!newBatchForm.code.trim()) return;
 
-    const courseId = courses[0]?.id || 'c-1';
+    const courseId = newBatchForm.selectedCourseId || courses[0]?.id || 'c-1';
+    const selectedCourse = courses.find(c => c.id === courseId);
     const trainerId = trainers[0]?.id || 'u-admin';
 
     const res = await createBatch({
       code: newBatchForm.code,
-      trainingName: newBatchForm.trainingName || newBatchForm.code,
+      trainingName: newBatchForm.trainingName || selectedCourse?.title || newBatchForm.code,
       college: newBatchForm.college,
       courseId,
       trainerId,
@@ -168,7 +170,8 @@ export function BatchManagement() {
       setCreateBatchModalOpen(false);
       setNewBatchForm({
         code: '',
-        trainingName: 'Excel Expert 365',
+        selectedCourseId: '',
+        trainingName: '',
         college: 'Christ Irinjalakkuda',
         collegeCourse: 'BCOM Self',
         academicYear: '2026-2027',
@@ -3235,13 +3238,27 @@ export function BatchManagement() {
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
                 Training Course Title (Program)
               </label>
-              <input
-                type="text"
+              <select
                 className="kvj-input"
-                placeholder="e.g. Excel Expert 365"
-                value={newBatchForm.trainingName}
-                onChange={(e) => setNewBatchForm({ ...newBatchForm, trainingName: e.target.value })}
-              />
+                required
+                value={newBatchForm.selectedCourseId}
+                onChange={(e) => {
+                  const cId = e.target.value;
+                  const selected = courses.find(c => c.id === cId);
+                  setNewBatchForm({ ...newBatchForm, selectedCourseId: cId, trainingName: selected?.title || '' });
+                }}
+                style={{ appearance: 'auto' }}
+              >
+                <option value="" disabled>— Select a Program from Course Catalog —</option>
+                {courses.map(c => (
+                  <option key={c.id} value={c.id}>{c.title} ({c.code})</option>
+                ))}
+              </select>
+              {courses.length === 0 && (
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                  No courses in catalog yet. Add courses in the Course Catalog first.
+                </p>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
