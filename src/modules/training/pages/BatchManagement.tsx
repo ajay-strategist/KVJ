@@ -648,7 +648,8 @@ export function BatchManagement() {
       const regStudents = Array.from(uniqueRegMap.values());
       setRegistrationRecords(regStudents);
 
-      // Update existing students and insert new registered students using Phone Number as Primary Key
+      // Enrich existing students (uploaded via Excel) with photos & contact info from Google Sheet.
+      // Do NOT auto-insert new students — Performance Matrix shows only Excel-uploaded data.
       setStudents((prevStudents) => {
         const updated = [...prevStudents];
 
@@ -666,6 +667,7 @@ export function BatchManagement() {
             return normRegName && stName && normRegName === stName;
           });
 
+          // Only update existing students — never auto-insert from Google Sheet
           if (existingIdx >= 0) {
             updated[existingIdx] = {
               ...updated[existingIdx],
@@ -676,31 +678,8 @@ export function BatchManagement() {
               college: reg.college || updated[existingIdx].college,
               department: reg.batch || updated[existingIdx].department,
             };
-          } else {
-            const newSt: StudentRecord = {
-              id: `gs-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-              name: reg.name || 'Registered Student',
-              photo: '📷',
-              photoUrl: reg.photoUrl,
-              phone: reg.phone || '+91 90000 00000',
-              email: reg.email || 'student@mim.edu',
-              college: reg.college || 'MIM Kuttikkanam',
-              department: reg.batch || 'Batch 1',
-              course: 'Excel Expert 365',
-              attendancePct: 0,
-              attendanceStatus: 'Critical',
-              ass1: 0,
-              ass2: 0,
-              ass3: 0,
-              project: 0,
-              finalExam: 0,
-              overallScore: 0,
-              voucherId: '',
-              voucherStatus: '',
-              certificateStatus: '',
-            };
-            updated.push(newSt);
           }
+          // Registration-only students (no Excel match) are shown in the Registration tab only
         });
 
         return updated;
