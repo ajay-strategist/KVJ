@@ -108,7 +108,12 @@ function loadStoredUsers(): MockRecord[] {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
       return DEFAULT_USERS;
     }
-    return JSON.parse(raw);
+    const parsed: MockRecord[] = JSON.parse(raw);
+    const cleaned = parsed.filter((u) => u.id === 'u-admin' || u.role === 'ADMIN');
+    if (cleaned.length !== parsed.length) {
+      saveStoredUsers(cleaned.length > 0 ? cleaned : DEFAULT_USERS);
+    }
+    return cleaned.length > 0 ? cleaned : DEFAULT_USERS;
   } catch {
     return DEFAULT_USERS;
   }

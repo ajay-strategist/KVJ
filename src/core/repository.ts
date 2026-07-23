@@ -43,14 +43,18 @@ export class MemoryRepository<T extends Entity> implements IRepository<T> {
     protected defaults: { defaultStatus: string; pageSize: number },
     seed: T[] = [],
   ) {
-    // Hydrate from localStorage if present; otherwise fall back to the seed and
-    // persist it so subsequent loads are stable. (Phase-1 mock persistence.)
     const persisted = this.load();
-    if (persisted) {
-      persisted.forEach((e) => this.store.set(e.id, e));
+    if (persisted && persisted.length > 0) {
+      if (seed.length === 0) {
+        // Clear legacy mock data stored from earlier development sessions
+        this.store.clear();
+        this.persist();
+      } else {
+        persisted.forEach((e) => this.store.set(e.id, e));
+      }
     } else {
       seed.forEach((e) => this.store.set(e.id, e));
-      if (seed.length) this.persist();
+      this.persist();
     }
   }
 
