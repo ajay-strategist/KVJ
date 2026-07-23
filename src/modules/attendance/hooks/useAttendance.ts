@@ -5,12 +5,15 @@ import type { AttendanceRecord, WorkSessionType } from '../attendance.repository
 import type { GeoPoint } from '../../../core/types';
 import { useAuth } from '../../auth/AuthProvider';
 import { useGeolocation } from './useGeolocation';
+import { toLocalISODate } from '../../../shared/utils/date';
+import { hoursThisMonth as calcHoursThisMonth, attendancePercent } from '../../../shared/utils/metrics';
 
 export function useAttendance() {
   const service = useMemo(() => container.resolve(ATTENDANCE_SERVICE_TOKEN), []);
   const { user } = useAuth();
   const { getPosition } = useGeolocation();
   const [record, setRecord] = useState<AttendanceRecord | null>(null);
+  const [monthRecords, setMonthRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,8 +30,26 @@ export function useAttendance() {
     } else {
       setError(res.error.message);
     }
+
+    // This month's history — used for the real "Hours this Month" and
+    // "Attendance %" figures (formerly hardcoded on My Day).
+    const now = new Date();
+    const from = toLocalISODate(new Date(now.getFullYear(), now.getMonth(), 1));
+    const to = toLocalISODate(now);
+    const hist = await service.getHistory(user.id, { from, to });
+    if (hist.ok) setMonthRecords(hist.value);
+
     setLoading(false);
   }, [service, user]);
+
+  /** Real monthly aggregates (0 when there is no attendance yet). */
+  const monthly = useMemo(() => {
+    const hours = calcHoursThisMonth(monthRecords);
+    // Attendance % = present days ÷ recorded working days × 100.
+    const total = monthRecords.length;
+    const present = monthRecords.filter((r) => !!r.firstClockIn).length;
+    return { hours, attendancePct: attendancePercent(present, total) };
+  }, [monthRecords]);
 
   const clockIn = useCallback(async (workType: WorkSessionType) => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
@@ -96,6 +117,9 @@ export function useAttendance() {
 
   return {
     record,
+    monthRecords,
+    hoursThisMonth: monthly.hours,
+    monthAttendancePct: monthly.attendancePct,
     loading,
     error,
     clockIn,

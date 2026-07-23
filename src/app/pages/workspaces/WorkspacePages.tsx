@@ -957,7 +957,7 @@ function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; l
 
 /** My Day — default employee workspace. */
 export function MyDayPage() {
-  const { record, loading, clockIn, clockOut, startBreak, endBreak } = useAttendance();
+  const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
@@ -1022,8 +1022,8 @@ export function MyDayPage() {
         <ResizedQuickAction icon="₹" label="Submit Expense" />
         <ResizedQuickAction icon="🗓" label="Request Leave" />
         <ResizedStatPill label="Tasks Due" value={`${tasks.filter(t => !t.underReview).length}`} tone="warning" icon="◧" />
-        <ResizedStatPill label="Hours this Month" value="0 hrs" tone="info" icon="⌛" />
-        <ResizedStatPill label="Attendance %" value="0%" tone="success" icon="📈" />
+        <ResizedStatPill label="Hours this Month" value={`${hoursThisMonth} hrs`} tone="info" icon="⌛" />
+        <ResizedStatPill label="Attendance %" value={`${monthAttendancePct}%`} tone="success" icon="📈" />
       </div>
 
       <AttendancePanel

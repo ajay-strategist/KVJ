@@ -1,5 +1,4 @@
 import { MemoryRepository } from '../../core/repository';
-import { SEED_COURSES, SEED_BATCHES } from './training.seed';
 import type { UUID } from '../../core/types';
 import type {
   Student, IStudentRepository,
