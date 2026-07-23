@@ -314,6 +314,21 @@ export function TrainingCalendar() {
   useEffect(() => {
     rowVirt.measure();
   }, [expanded, rowVirt]);
+
+  // Auto-scroll to Today's row on calendar load
+  const hasScrolledToToday = useRef(false);
+  useEffect(() => {
+    if (rows.length > 0 && !hasScrolledToToday.current) {
+      const todayIdx = rows.findIndex((r) => r.isToday);
+      if (todayIdx >= 0) {
+        setTimeout(() => {
+          rowVirt.scrollToIndex(todayIdx, { align: 'center' });
+        }, 80);
+        hasScrolledToToday.current = true;
+      }
+    }
+  }, [rows, rowVirt]);
+
   const colVirt = useVirtualizer({
     horizontal: true,
     count: visibleTrainers.length,
@@ -766,7 +781,7 @@ export function TrainingCalendar() {
         <div style={{ height: rowVirt.getTotalSize(), width: bodyW, position: 'relative' }}>
           {vRows.map((vr) => {
             const r = rows[vr.index];
-            const tint = r.holiday ? '#fff1f2' : r.isToday ? '#eff6ff' : 'transparent';
+            const tint = r.holiday ? '#fff1f2' : r.isToday ? 'rgba(59, 130, 246, 0.12)' : 'transparent';
             const isOpen = !!expanded[r.date];
             return (
               <div
@@ -776,7 +791,8 @@ export function TrainingCalendar() {
                 style={{
                   position: 'absolute', top: 0, left: 0, transform: `translateY(${vr.start}px)`,
                   width: bodyW, display: 'flex', background: tint,
-                  borderBottom: '1px solid var(--border)', height: vr.size,
+                  borderBottom: r.isToday ? '2px solid rgba(59, 130, 246, 0.4)' : '1px solid var(--border)',
+                  height: vr.size,
                   boxSizing: 'border-box',
                 }}
               >
@@ -787,7 +803,14 @@ export function TrainingCalendar() {
                     aria-label={isOpen ? 'Collapse day' : 'Expand day'}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginRight: 4 }}
                   >{isOpen ? '▾' : '▸'}</button>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: r.isToday ? 800 : 500, color: r.isToday ? '#2563eb' : 'inherit' }}>{r.date}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: r.isToday ? 800 : 500, color: r.isToday ? '#1d4ed8' : 'inherit' }}>
+                    {r.date}
+                    {r.isToday && (
+                      <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, background: '#2563eb', color: '#ffffff', padding: '1px 5px', borderRadius: 4, letterSpacing: '0.04em' }}>
+                        TODAY
+                      </span>
+                    )}
+                  </span>
                 </FrozenCell>
                 <FrozenCell w={FROZEN.day} left={FROZEN.date} bg={tint}>{r.dayName}</FrozenCell>
                 <FrozenCell w={FROZEN.holiday} left={FROZEN.date + FROZEN.day} bg={tint}>
@@ -1140,40 +1163,48 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
           🟧 {leave.duration} {leave.type} ({leave.status})
         </div>
       )}
-      {sessions.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen(s);
-          }}
-          style={{
-            textAlign: 'left',
-            borderLeft: `3.5px solid ${s.color}`,
-            background: 'var(--bg-panel)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            padding: '4px 7px',
-            cursor: 'pointer',
-            fontSize: 11,
-            color: 'var(--text-primary)',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-            width: '100%',
-            flexShrink: 0,
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-          }}
-        >
-          <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
-          <div style={{ color: 'var(--text-muted)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.startTime}–{s.endTime} · {s.batchCode}</div>
-          {expanded && (
-            <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              📍 {s.venue} · {s.mode} · 👥 {s.studentCount}<br />🎓 {s.college} · {s.coordinator}
+      {sessions.map((s) => {
+        const batchDisplay = s.batchCode || s.name || 'Training Batch';
+        const timeDisplay = `${s.startTime}–${s.endTime}`;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen(s);
+            }}
+            style={{
+              textAlign: 'left',
+              borderLeft: `3.5px solid ${s.color}`,
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              padding: '5px 8px',
+              cursor: 'pointer',
+              fontSize: 11,
+              color: 'var(--text-primary)',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              width: '100%',
+              flexShrink: 0,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--brand-primary, #1e40af)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              🎓 {batchDisplay}
             </div>
-          )}
-        </button>
-      ))}
+            <div style={{ color: 'var(--text-secondary)', fontSize: 10, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+              ⏰ {timeDisplay} {s.name && s.name !== batchDisplay ? `· ${s.name}` : ''}
+            </div>
+            {expanded && (
+              <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                📍 {s.venue} · {s.mode} · 👥 {s.studentCount}<br />🏛️ {s.college} · 👤 {s.coordinator}
+              </div>
+            )}
+          </button>
+        );
+      })}
       {!leave && sessions.length === 0 && (
         <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontStyle: 'italic', alignSelf: 'center', marginTop: 'auto', marginBottom: 'auto', opacity: 0.6 }}>
           Office
