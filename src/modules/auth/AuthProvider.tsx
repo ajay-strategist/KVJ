@@ -25,6 +25,8 @@ interface AuthContextValue {
   updateUserPassword: (userId: string, newPassword: string) => Promise<{ ok: boolean }>;
   resetToDefaultPassword: (userId: string) => Promise<{ ok: boolean }>;
   getUsers: () => Promise<import('./auth.service').AuthUser[]>;
+  hasUsers: () => Promise<boolean>;
+  bootstrapInitialAdmin: (input: import('./auth.service').BootstrapAdminInput) => Promise<import('./auth.service').AuthUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -110,11 +112,19 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     return authService.getUsers();
   }, [authService]);
 
+  const hasUsers = useCallback(async () => {
+    return authService.hasUsers();
+  }, [authService]);
+
+  const bootstrapInitialAdmin = useCallback(async (input: import('./auth.service').BootstrapAdminInput) => {
+    return authService.bootstrapInitialAdmin(input);
+  }, [authService]);
+
   const value = useMemo<AuthContextValue>(() => ({
     session, user: session?.user ?? null, principal, status, login, logout,
     requestPasswordReset: authService.requestPasswordReset.bind(authService),
-    createUser, updateUser, deleteUser, updateUserPassword, resetToDefaultPassword, getUsers,
-  }), [session, principal, status, login, logout, authService, createUser, updateUser, deleteUser, updateUserPassword, resetToDefaultPassword, getUsers]);
+    createUser, updateUser, deleteUser, updateUserPassword, resetToDefaultPassword, getUsers, hasUsers, bootstrapInitialAdmin,
+  }), [session, principal, status, login, logout, authService, createUser, updateUser, deleteUser, updateUserPassword, resetToDefaultPassword, getUsers, hasUsers, bootstrapInitialAdmin]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

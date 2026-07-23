@@ -3,19 +3,23 @@
  * Clean production authentication portal with mandatory first-time password reset workflow.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../modules/auth/AuthProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Button } from '../../../shared/ui/components';
 import { AppError } from '../../../core/result';
+import { InitialAdminBootstrapScreen } from './InitialAdminBootstrapScreen';
 
 type View = 'login' | 'forgot' | 'first_time_reset';
 
 export function LoginPage() {
-  const { login, requestPasswordReset, updateUserPassword } = useAuth();
+  const { login, requestPasswordReset, updateUserPassword, hasUsers } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
+
+  const [bootstrapNeeded, setBootstrapNeeded] = useState(false);
+  const [checkingBootstrap, setCheckingBootstrap] = useState(true);
 
   const [view, setView] = useState<View>('login');
   const [identifier, setIdentifier] = useState('');
@@ -27,6 +31,28 @@ export function LoginPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    hasUsers().then((exists) => {
+      if (!active) return;
+      setBootstrapNeeded(!exists);
+      setCheckingBootstrap(false);
+    });
+    return () => { active = false; };
+  }, [hasUsers]);
+
+  if (checkingBootstrap) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>Initializing system authentication...</div>
+      </div>
+    );
+  }
+
+  if (bootstrapNeeded) {
+    return <InitialAdminBootstrapScreen onBootstrapSuccess={() => setBootstrapNeeded(false)} />;
+  }
 
   const doLogin = async () => {
     if (!identifier.trim() || !password.trim()) {

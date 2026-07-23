@@ -263,7 +263,7 @@ export function AttendanceLogPage() {
                                   </div>
                                   {r.tasks && r.tasks.length > 0 ? (
                                     <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                                      {r.tasks.map((taskStr, tIdx) => (
+                                      {r.tasks.map((taskStr: string, tIdx: number) => (
                                         <li key={tIdx}>{taskStr}</li>
                                       ))}
                                     </ul>

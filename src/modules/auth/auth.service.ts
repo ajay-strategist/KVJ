@@ -17,6 +17,9 @@ export interface AuthUser {
   username?: string;
   fullName: string;
   email: string;
+  phone?: string;
+  designation?: string;
+  department?: string;
   role: RoleKey;
   avatarUrl?: string;
   mustChangePassword?: boolean;
@@ -33,7 +36,7 @@ export interface Session {
 }
 
 export interface Credentials {
-  email: string; // accepts email or username
+  email: string; // accepts email, phone, or username
   password: string;
   rememberMe?: boolean;
 }
@@ -42,7 +45,19 @@ export interface NewUserInput {
   username: string;
   fullName: string;
   email: string;
+  phone?: string;
+  designation?: string;
+  department?: string;
   role: RoleKey;
+}
+
+export interface BootstrapAdminInput {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  designation: string;
+  department: string;
 }
 
 export interface IAuthService {
@@ -58,6 +73,8 @@ export interface IAuthService {
   updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }>;
   resetToDefaultPassword(userId: string): Promise<{ ok: boolean }>;
   getUsers(): Promise<AuthUser[]>;
+  hasUsers(): Promise<boolean>;
+  bootstrapInitialAdmin(input: BootstrapAdminInput): Promise<AuthUser>;
 }
 
 export const AUTH_SERVICE_TOKEN = createToken<IAuthService>('AuthService');
@@ -70,6 +87,9 @@ const DEFAULT_USERS: MockRecord[] = [
     username: 'Admin',
     fullName: 'System Admin',
     email: 'admin@kvjanalytics.com',
+    phone: '+91 9876543210',
+    designation: 'Chief Executive Officer',
+    department: 'Executive Management',
     role: 'ADMIN',
     password: 'AjayThomas',
     mustChangePassword: false,
@@ -109,6 +129,35 @@ export class MockAuthService implements IAuthService {
     return loadStoredUsers();
   }
 
+  async hasUsers(): Promise<boolean> {
+    const users = this.getUsersList();
+    return users.length > 0;
+  }
+
+  async bootstrapInitialAdmin(input: BootstrapAdminInput): Promise<AuthUser> {
+    const users = this.getUsersList();
+    if (users.length > 0) {
+      throw new AppError({ code: 'ALREADY_EXISTS' as never, message: 'System Administrator already initialized.', severity: 'error' });
+    }
+
+    const adminUser: MockRecord = {
+      id: 'u-admin',
+      username: 'Admin',
+      fullName: input.fullName,
+      email: input.email,
+      phone: input.phone,
+      designation: input.designation || 'System Administrator',
+      department: input.department || 'Management',
+      role: 'ADMIN',
+      password: input.password,
+      mustChangePassword: false,
+    };
+
+    saveStoredUsers([adminUser]);
+    const { password: _, ...user } = adminUser;
+    return user;
+  }
+
   async getUsers(): Promise<AuthUser[]> {
     const records = this.getUsersList();
     return records.map(({ password: _, ...user }) => user);
@@ -124,7 +173,10 @@ export class MockAuthService implements IAuthService {
 
     const users = this.getUsersList();
     const rec = users.find(
-      (u) => u.email.toLowerCase() === key || u.username?.toLowerCase() === key,
+      (u) =>
+        u.email.toLowerCase() === key ||
+        u.username?.toLowerCase() === key ||
+        (u.phone && u.phone.replace(/[^0-9+]/g, '') === key.replace(/[^0-9+]/g, ''))
     );
 
     if (!rec || rec.password !== password) {

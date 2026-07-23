@@ -697,7 +697,12 @@ export const TaskWidget = memo(function TaskWidget({
         }
       `}</style>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {tasks.map((t, idx) => (
+        {tasks.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            📋 No tasks logged today. Click <strong>Add Task</strong> to create your first task.
+          </div>
+        ) : (
+          tasks.map((t, idx) => (
           <div
             key={t.id}
             draggable
@@ -771,7 +776,7 @@ export const TaskWidget = memo(function TaskWidget({
               </div>
             </div>
           </div>
-        ))}
+        )))}
       </div>
     </Card>
   );
@@ -957,11 +962,7 @@ export function MyDayPage() {
   const { toast, addNotification } = useNotifications();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const [tasks, setTasks] = useState<TaskItem[]>([
-    { id: '1', title: 'Power BI Unit 1 - Christ 3BBA Syllabus Review & Installation', project: 'Christ 3BBA Data Analytics', due: 'Today, 5:00 PM', priority: 'High', active: false, secondsToday: 3600 },
-    { id: '2', title: 'DAX Expressions Lab & Practice Assessment Grading', project: 'SB College MBA Batch 1', due: 'Today, 6:00 PM', priority: 'Critical', active: false, secondsToday: 1800 },
-    { id: '3', title: 'Weekly Student Progress Log & Attendance Verification', project: 'Internal Operations', due: 'Tomorrow', priority: 'Normal', active: false, secondsToday: 0 },
-  ]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
@@ -1016,17 +1017,14 @@ export function MyDayPage() {
     <AppShell>
       <Greeting />
 
-      {/* Quick Actions + Resized Metrics. auto-fit so the six cards WRAP to a
-          new line on narrower widths instead of overflowing and clipping the
-          right-most card (previously a rigid repeat(6, 1fr) that could not
-          shrink below its content width). */}
+      {/* Quick Actions + Resized Metrics. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, alignItems: 'center', marginBottom: 20 }}>
         <ResizedQuickAction icon="✓" label="Add Task" />
         <ResizedQuickAction icon="₹" label="Submit Expense" />
         <ResizedQuickAction icon="🗓" label="Request Leave" />
-        <ResizedStatPill label="Tasks Due" value="3" tone="warning" icon="◧" />
-        <ResizedStatPill label="Hours this Month" value="168 hrs" tone="info" icon="⌛" />
-        <ResizedStatPill label="Attendance %" value="96.2%" tone="success" icon="📈" />
+        <ResizedStatPill label="Tasks Due" value={`${tasks.filter(t => !t.underReview).length}`} tone="warning" icon="◧" />
+        <ResizedStatPill label="Hours this Month" value="0 hrs" tone="info" icon="⌛" />
+        <ResizedStatPill label="Attendance %" value="0%" tone="success" icon="📈" />
       </div>
 
       <AttendancePanel

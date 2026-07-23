@@ -27,46 +27,17 @@ export interface MockCalendarEvent { id: string; title: string; date: string; ty
 export interface MockChartPoint { label: string; value: number }
 
 export const mock = {
-  employees: (): MockEmployee[] => [
-    {
-      id: 'u-admin',
-      name: 'System Admin',
-      role: 'Super Administrator',
-      department: 'Management',
-      status: 'Present',
-      attendancePct: 100,
-    },
-  ],
+  employees: (_n?: number): MockEmployee[] => [],
 
-  projects: (n = 6): MockProject[] => Array.from({ length: n }, (_, i) => ({
-    id: id('prj', i + 1), name: `${pick(['Corporate', 'College', 'Internal', 'Marketing'])} ${pick(['Power BI', 'Python', 'SQL', 'Excel'])} Program`,
-    client: pick(['Acme Corp', 'NIT Calicut', 'TCS', 'Infosys', 'Internal']),
-    status: pick(['In Progress', 'Planning', 'On Hold', 'Completed']),
-    progress: int(10, 100), health: pick(['On Track', 'Needs Attention', 'At Risk']),
-  })),
+  projects: (_n?: number): MockProject[] => [],
 
-  students: (n = 10): MockStudent[] => Array.from({ length: n }, (_, i) => ({
-    id: id('std', i + 1), name: name(), college: pick(['NIT Calicut', 'CUSAT', 'Amrita', 'MEC']),
-    batch: `B-${int(1, 6)}`, attendancePct: int(55, 100), eligibility: pick(['Eligible', 'Pending', 'Not Eligible']),
-  })),
+  students: (_n?: number): MockStudent[] => [],
 
-  tasks: (n = 6): MockTask[] => Array.from({ length: n }, (_, i) => ({
-    id: id('tsk', i + 1), title: pick(['Prepare session deck', 'Review assessments', 'Client follow-up', 'Update tracker', 'Draft report', 'Mark attendance']),
-    project: pick(['Power BI Program', 'Python Batch', 'SQL Corporate']),
-    priority: pick(['Critical', 'High', 'Medium', 'Low']), status: pick(['To Do', 'In Progress', 'In Review', 'Done']),
-    due: `${int(18, 30)} Jul`,
-  })),
+  tasks: (_n?: number): MockTask[] => [],
 
-  activity: (n = 6): MockActivity[] => Array.from({ length: n }, (_, i) => ({
-    id: id('act', i + 1), actor: name(),
-    action: pick(['completed a task', 'submitted an expense', 'marked attendance', 'created a project', 'approved a leave', 'started a session']),
-    time: `${int(1, 59)}m ago`,
-  })),
+  activity: (_n?: number): MockActivity[] => [],
 
-  calendar: (n = 5): MockCalendarEvent[] => Array.from({ length: n }, (_, i) => ({
-    id: id('cal', i + 1), title: pick(['Power BI Session', 'Team Standup', 'Client Review', 'Public Holiday', 'Assessment Day']),
-    date: `${int(18, 31)} Jul`, type: pick(['training', 'meeting', 'leave', 'holiday'] as const),
-  })),
+  calendar: (_n?: number): MockCalendarEvent[] => [],
 
-  series: (labels: string[]): MockChartPoint[] => labels.map((label) => ({ label, value: int(20, 100) })),
+  series: (labels: string[]): MockChartPoint[] => labels.map((label) => ({ label, value: 0 })),
 };

@@ -28,7 +28,7 @@ export function ShowcasePage() {
   const { confirm, alertSuccess } = useDialog();
   const { toast } = useNotifications();
   const [q, setQ] = useState('');
-  const [employees] = useState(() => mock.employees(6));
+  const [employees] = useState(() => mock.employees());
   const [activities] = useState(() => mock.activity(3));
   const cols: Column<MockEmployee>[] = [
     { key: 'name', header: 'Name', sortable: true, accessor: (r) => r.name, render: (r) => <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={r.name} size={26} />{r.name}</span> },
