@@ -231,61 +231,62 @@ export const AttendancePanel = memo(function AttendancePanel({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
             gap: 16,
             padding: '16px 20px',
             borderRadius: 14,
-            background: 'var(--bg-sunken)',
-            border: '1px solid var(--border)',
+            background: 'linear-gradient(135deg, rgba(239,246,255,0.95) 0%, rgba(240,249,255,0.95) 100%)',
+            border: '1px solid #bae6fd',
+            boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.8), 0 2px 8px rgba(59,130,246,0.06)',
             marginBottom: 18,
           }}
         >
           {/* CURRENT STATUS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
               CURRENT STATUS
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
               {currentStatus === 'present' ? '🟢 Working' : currentStatus === 'on_break' ? '🟡 On Break' : '⚫ Not Working'}
             </span>
           </div>
 
           {/* GPS LOCATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
               GPS LOCATION
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#2563eb', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
               📍 {resolveLocationName(locationStr)}
             </span>
           </div>
 
           {/* CLOCK IN TIME */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
               CLOCK IN TIME
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>
               {clockInTimeStr}
             </span>
           </div>
 
           {/* DURATION TODAY */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
               DURATION TODAY
             </span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(totalWorkMs)}
             </span>
           </div>
 
           {/* BREAK DURATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 700, letterSpacing: '0.06em' }}>
               BREAK DURATION
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : '#475569', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(totalBreakMs)}
             </span>
           </div>
@@ -293,7 +294,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
         {/* Action Controls Bar matching Sample Image 1 */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {currentStatus === 'clocked_out' && (
+          {(currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && (
             <>
               <button
                 type="button"
@@ -301,15 +302,15 @@ export const AttendancePanel = memo(function AttendancePanel({
                 disabled={loading}
                 onClick={() => setClockInOpen(true)}
                 style={{
-                  background: '#10b981',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: 'white',
                   border: 'none',
-                  padding: '10px 22px',
+                  padding: '10px 24px',
                   fontWeight: 700,
                   fontSize: 13.5,
                   borderRadius: 999,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(16,185,129,0.25)',
+                  boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 8,
@@ -323,10 +324,10 @@ export const AttendancePanel = memo(function AttendancePanel({
                 className="kvj-btn"
                 onClick={() => setClaimOpen(true)}
                 style={{
-                  background: 'var(--bg-surface)',
-                  color: 'var(--brand)',
-                  border: '1.5px solid var(--brand)',
-                  padding: '10px 20px',
+                  background: '#ffffff',
+                  color: '#4f46e5',
+                  border: '2px solid #818cf8',
+                  padding: '9px 22px',
                   fontWeight: 700,
                   fontSize: 13,
                   borderRadius: 999,
@@ -334,6 +335,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 6,
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.12)',
                 }}
               >
                 📋 Submit Attendance
