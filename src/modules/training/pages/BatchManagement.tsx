@@ -2627,8 +2627,8 @@ export function BatchManagement() {
         onEdit={handleOpenEditBatch}
       />
 
-      {/* Main Two-Column Content Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 280px', gap: 20, alignItems: 'start' }}>
+      {/* Main Content Layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
         
         {/* Left Side: Navigation Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -2684,7 +2684,7 @@ export function BatchManagement() {
                   <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>👥 Enrolled Students</h3>
                   <div style={{ fontSize: 24, fontWeight: 800 }}>{students.length} Students</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Average attendance: <strong>{attendanceAvg}%</strong>
+                    Average attendance: <strong>{students.length ? attendanceAvg : 0}%</strong>
                   </div>
                 </Card>
 
@@ -2694,23 +2694,23 @@ export function BatchManagement() {
                     {eligibleCount} / {students.length} Eligible
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Requires at least <strong>84%</strong> attendance threshold.
+                    Requires at least <strong>{attendanceThreshold}%</strong> attendance threshold.
                   </div>
                 </Card>
 
                 <Card style={{ padding: 16 }}>
                   <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>📜 Certificate Status</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)' }}>{certificateStatus}</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)' }}>{students.length ? certificateStatus : 'Pending'}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Tracking courier: <strong>{trackingNumber}</strong>
+                    Tracking courier: <strong>{students.length ? trackingNumber : '—'}</strong>
                   </div>
                 </Card>
 
                 <Card style={{ padding: 16 }}>
                   <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>📈 Average Performance Score</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800 }}>{scoreAvg}%</div>
+                  <div style={{ fontSize: 24, fontWeight: 800 }}>{students.length ? scoreAvg : 0}%</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    From 3 assessments + project + final exam.
+                    From assessments + project + final exam.
                   </div>
                 </Card>
               </div>
@@ -3659,42 +3659,6 @@ export function BatchManagement() {
               </div>
             </div>
           )}
-
-        </div>
-
-        {/* Right Sidebar: AI suggestions & Coordinator Notes */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          
-          <Card style={{ padding: 16, borderLeft: '4px solid var(--brand)', background: 'var(--bg-sunken)' }}>
-            <h3 style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', marginBottom: 8 }}>🤖 Workspace AI Assistant</h3>
-            <div style={{ fontSize: 11.5, lineHeight: 1.4 }}>
-              <div>💡 <strong>Attendance Warning:</strong> Merlin K Thomas & Riya Rose are below the required 84% pass threshold.</div>
-              <div style={{ marginTop: 8 }}>💡 <strong>Voucher Status:</strong> 2 students have unassigned exam voucher IDs. Suggest matching them now.</div>
-              <div style={{ marginTop: 8 }}>💡 <strong>Signed Receipt:</strong> Certificates are printed but receipt signature upload is pending.</div>
-            </div>
-          </Card>
-
-          <Card style={{ padding: 16 }}>
-            <h3 style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>📋 Coordinator Daily Remarks</h3>
-            <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
-              "Lab systems checked. Day 1 training session started on time. Need to schedule retest for students failing initial mock quiz."
-            </p>
-          </Card>
-
-          <Card style={{ padding: 16 }}>
-            <h3 style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>📜 Quick Report Download</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Attendance Report')}>
-                📥 PDF Attendance Report
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Assessment Marks Grid')}>
-                📥 PDF Assessment Report
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Certificate Delivery Status')}>
-                📥 PDF Certificates Report
-              </Button>
-            </div>
-          </Card>
 
         </div>
 
