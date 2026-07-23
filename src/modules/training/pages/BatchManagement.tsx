@@ -17,8 +17,6 @@ import type { DailyReportConfig } from '../report/daily-report.types';
 
 // Workspace Navigation Tabs
 type WorkspaceTab =
-  | 'overview'
-  | 'pipeline'
   | 'students'
   | 'mark-attendance'
   | 'final-exam'
@@ -108,9 +106,67 @@ interface DocumentItem {
 export function BatchManagement() {
   const { can } = usePermissions();
   const canViewDailyReport = can('training', 'view');
-  const { batches, courses } = useTraining();
+  const { batches, courses, createBatch } = useTraining();
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
+
+  // Create Batch Modal State
+  const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
+  const [newBatchForm, setNewBatchForm] = useState({
+    code: '',
+    trainingName: '',
+    college: 'Christ University',
+    academicYear: '2026-2027',
+    coordinator: 'Prof. Anil Kumar',
+    startDate: todayISO(),
+    endDate: '2026-08-30',
+  });
+
+  const handleCreateBatchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBatchForm.code.trim()) return;
+
+    const courseId = courses[0]?.id || 'c-1';
+    const trainerId = trainers[0]?.id || 'u-admin';
+
+    const res = await createBatch({
+      code: newBatchForm.code,
+      trainingName: newBatchForm.trainingName || newBatchForm.code,
+      college: newBatchForm.college,
+      courseId,
+      trainerId,
+      startDate: newBatchForm.startDate,
+      endDate: newBatchForm.endDate,
+      coordinator: newBatchForm.coordinator,
+      academicYear: newBatchForm.academicYear,
+      phase: 'Scheduled',
+    });
+
+    if (res.ok) {
+      toast({
+        variant: 'success',
+        title: 'Training Batch Created',
+        message: `Batch "${newBatchForm.code}" created successfully.`,
+      });
+      setSelectedBatchId(res.value.id);
+      setCreateBatchModalOpen(false);
+      setNewBatchForm({
+        code: '',
+        trainingName: '',
+        college: 'Christ University',
+        academicYear: '2026-2027',
+        coordinator: 'Prof. Anil Kumar',
+        startDate: todayISO(),
+        endDate: '2026-08-30',
+      });
+    } else {
+      toast({
+        variant: 'error',
+        title: 'Failed to Create Batch',
+        message: res.error,
+      });
+    }
+  };
 
   // Daily Report Builder & Preview States
   const [dailyReportBuilderOpen, setDailyReportBuilderOpen] = useState(false);
@@ -167,7 +223,7 @@ export function BatchManagement() {
   };
   
   // Tab control
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('students');
 
   // Full Page student table overlay
   const [showFullStudentReport, setShowFullStudentReport] = useState(false);
@@ -824,51 +880,25 @@ export function BatchManagement() {
   };
 
   // Student list state
-  const [students, setStudents] = useState<StudentRecord[]>([
-    { id: 's-1', name: 'Albin Joseph', photo: '👨‍🎓', phone: '+91 98765 43210', email: 'albin.joseph@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 88, attendanceStatus: 'Regular', ass1: 85, ass2: 78, ass3: 90, project: 82, finalExam: 84, overallScore: 83.4, voucherId: 'VOUCH-CHRIST-101', voucherStatus: 'Assigned', certificateStatus: 'Printed' },
-    { id: 's-2', name: 'Merlin K Thomas', photo: '👩‍🎓', phone: '+91 94455 66778', email: 'merlin.t@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 82, attendanceStatus: 'Irregular', ass1: 72, ass2: 65, ass3: 80, project: 75, finalExam: 0, overallScore: 58.4, voucherId: '', voucherStatus: 'Unassigned', certificateStatus: 'Generated' },
-    { id: 's-3', name: 'Devanand P', photo: '👨‍🎓', phone: '+91 88990 11223', email: 'devanand.p@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 94, attendanceStatus: 'Regular', ass1: 92, ass2: 88, ass3: 95, project: 90, finalExam: 88, overallScore: 90.6, voucherId: 'VOUCH-CHRIST-102', voucherStatus: 'Assigned', certificateStatus: 'Printed' },
-    { id: 's-4', name: 'Riya Rose', photo: '👩‍🎓', phone: '+91 77889 90011', email: 'riya.rose@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 76, attendanceStatus: 'Critical', ass1: 60, ass2: 54, ass3: 68, project: 62, finalExam: 0, overallScore: 48.8, voucherId: '', voucherStatus: 'Unassigned', certificateStatus: 'Generated' },
-  ]);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
 
   // Final Exam student ID list — separate from master students array
-  // Performance Matrix always shows ALL students. Final Exam only shows students in this list.
-  const [finalExamStudentIds, setFinalExamStudentIds] = useState<string[]>(['s-1', 's-2', 's-3', 's-4']);
+  const [finalExamStudentIds, setFinalExamStudentIds] = useState<string[]>([]);
 
   // Email communications log
-  const [emailLogs, setEmailLogs] = useState<EmailHistoryItem[]>([
-    { id: 'e-1', to: 'coordinator@christcollege.edu', subject: 'Christ BCOM Batch 1 — Student Details', sentAt: '2026-07-20 09:30 AM', status: 'Read' },
-    { id: 'e-2', to: 'coordinator@christcollege.edu', subject: 'Christ BCOM Batch 1 — Daily Session Report (Day 1)', sentAt: '2026-07-21 05:00 PM', status: 'Delivered' }
-  ]);
+  const [emailLogs, setEmailLogs] = useState<EmailHistoryItem[]>([]);
 
   // Uploaded documents
-  const [documents, setDocuments] = useState<DocumentItem[]>([
-    { id: 'd-1', name: 'Christ_BCOM_Student_Registry.xlsx', category: 'Material', uploadedAt: '2026-07-20', size: '24 KB' },
-    { id: 'd-2', name: 'Power_BI_Syllabus_Outline.pdf', category: 'Material', uploadedAt: '2026-07-18', size: '1.2 MB' },
-    { id: 'd-3', name: 'Christ_BCOM_Day1_Attendance.pdf', category: 'Report', uploadedAt: '2026-07-21', size: '120 KB' }
-  ]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
 
   // Activity Timeline
-  const [timeline, setTimeline] = useState([
-    { id: 't-1', action: 'Daily Session Report Generated', user: 'Linto George', timestamp: '2026-07-21 05:00 PM' },
-    { id: 't-2', action: 'Signed Confirmation Form Uploaded', user: 'Admin Operations', timestamp: '2026-07-20 02:15 PM' },
-    { id: 't-3', action: 'Batch Scheduled & Coordinator Notified', user: 'Manager Operations', timestamp: '2026-07-15 11:30 AM' },
-  ]);
+  const [timeline, setTimeline] = useState<{ id: string; action: string; user: string; timestamp: string }[]>([]);
 
   // Attendance Session Logging State
   const [sessionLogDate, setSessionLogDate] = useState(() => todayISO());
-  const [sessionTopic, setSessionTopic] = useState('Day 4: Power BI DAX & Data Modeling');
-  const [sessionStatuses, setSessionStatuses] = useState<Record<string, 'present' | 'absent' | 'late' | 'leave'>>({
-    's-1': 'present',
-    's-2': 'present',
-    's-3': 'present',
-    's-4': 'absent',
-  });
-  const [sessionLogsHistory, setSessionLogsHistory] = useState([
-    { id: 'sl-1', date: '2026-07-20', topic: 'Day 1: Orientation & Desktop Setup', presentCount: 4, absentCount: 0, trainer: 'Linto George' },
-    { id: 'sl-2', date: '2026-07-21', topic: 'Day 2: Power Query Transformation', presentCount: 3, absentCount: 1, trainer: 'Linto George' },
-    { id: 'sl-3', date: '2026-07-22', topic: 'Day 3: Star Schema & Relationships', presentCount: 4, absentCount: 0, trainer: 'Linto George' },
-  ]);
+  const [sessionTopic, setSessionTopic] = useState('Day 1: Orientation');
+  const [sessionStatuses, setSessionStatuses] = useState<Record<string, 'present' | 'absent' | 'late' | 'leave'>>({});
+  const [sessionLogsHistory, setSessionLogsHistory] = useState<{ id: string; date: string; topic: string; presentCount: number; absentCount: number; trainer: string }[]>([]);
 
   const handleSaveSessionAttendance = () => {
     const presentCount = Object.values(sessionStatuses).filter((st) => st === 'present' || st === 'late').length;
@@ -2601,7 +2631,7 @@ export function BatchManagement() {
 
   return (
     <AppShell>
-      {/* Top Bar with Daily Report Trigger */}
+      {/* Top Bar with Add Batch Action */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
@@ -2612,7 +2642,9 @@ export function BatchManagement() {
           </p>
         </div>
 
-
+        <Button onClick={() => setCreateBatchModalOpen(true)}>
+          ➕ Add New Batch
+        </Button>
       </div>
 
       {/* Training Batch Overview Carousel — one card per assigned batch.
@@ -2634,8 +2666,6 @@ export function BatchManagement() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(
             [
-              { id: 'overview', label: '📊 Overview Dashboard' },
-              { id: 'pipeline', label: '⚙️ Training Pipeline' },
               { id: 'students', label: '👥 Student Records' },
               { id: 'mark-attendance', label: '📝 Mark Attendance' },
               { id: 'final-exam', label: '🎓 Final Exam' },
@@ -2673,104 +2703,6 @@ export function BatchManagement() {
 
         {/* Center: Content View Area */}
         <div>
-          
-          {/* TAB 1: OVERVIEW DASHBOARD */}
-          {activeTab === 'overview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <SectionHeader title="Batch Overview Metrics" />
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <Card style={{ padding: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>👥 Enrolled Students</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800 }}>{students.length} Students</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Average attendance: <strong>{students.length ? attendanceAvg : 0}%</strong>
-                  </div>
-                </Card>
-
-                <Card style={{ padding: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>🎯 Exam Eligibility</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)' }}>
-                    {eligibleCount} / {students.length} Eligible
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Requires at least <strong>{attendanceThreshold}%</strong> attendance threshold.
-                  </div>
-                </Card>
-
-                <Card style={{ padding: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>📜 Certificate Status</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)' }}>{students.length ? certificateStatus : 'Pending'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Tracking courier: <strong>{students.length ? trackingNumber : '—'}</strong>
-                  </div>
-                </Card>
-
-                <Card style={{ padding: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>📈 Average Performance Score</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800 }}>{students.length ? scoreAvg : 0}%</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    From assessments + project + final exam.
-                  </div>
-                </Card>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: TRAINING PIPELINE */}
-          {activeTab === 'pipeline' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <SectionHeader title="Operational Training Pipeline Stage Tracker" />
-              
-              {/* Planning Stage */}
-              <Card style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <strong style={{ fontSize: 14 }}>1. Planning Stage</strong>
-                  <Badge tone="success">100% Complete</Badge>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {checklist.planning.map((item) => (
-                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={item.checked} onChange={() => handleToggleCheck('planning', item.id)} />
-                      <span>{item.task} (Assigned: <strong>{item.assigned}</strong>)</span>
-                    </label>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Preparation Stage */}
-              <Card style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <strong style={{ fontSize: 14 }}>2. Preparation Stage</strong>
-                  <Badge tone="progress">66% Complete</Badge>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {checklist.prep.map((item) => (
-                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={item.checked} onChange={() => handleToggleCheck('prep', item.id)} />
-                      <span>{item.task} (Assigned: <strong>{item.assigned}</strong>)</span>
-                    </label>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Training Stage */}
-              <Card style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <strong style={{ fontSize: 14 }}>3. Training Stage</strong>
-                  <Badge tone="neutral">50% Complete</Badge>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {checklist.training.map((item) => (
-                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={item.checked} onChange={() => handleToggleCheck('training', item.id)} />
-                      <span>{item.task} (Assigned: <strong>{item.assigned}</strong>)</span>
-                    </label>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          )}
 
           {/* TAB 3: STUDENT RECORDS */}
           {activeTab === 'students' && (
@@ -4044,6 +3976,118 @@ export function BatchManagement() {
           data={dailyReportFixture}
           initialConfig={dailyReportConfig}
         />
+      )}
+
+      {/* CREATE NEW BATCH MODAL */}
+      {createBatchModalOpen && (
+        <Drawer
+          open={true}
+          onClose={() => setCreateBatchModalOpen(false)}
+          title="➕ Create New Training Batch"
+        >
+          <form onSubmit={handleCreateBatchSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Batch Code / Name
+              </label>
+              <input
+                type="text"
+                className="kvj-input"
+                required
+                placeholder="e.g. Christ BCOM B2"
+                value={newBatchForm.code}
+                onChange={(e) => setNewBatchForm({ ...newBatchForm, code: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Training Course Title
+              </label>
+              <input
+                type="text"
+                className="kvj-input"
+                placeholder="e.g. Power BI & Advanced Analytics"
+                value={newBatchForm.trainingName}
+                onChange={(e) => setNewBatchForm({ ...newBatchForm, trainingName: e.target.value })}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Name
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  value={newBatchForm.college}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, college: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Academic Year
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  value={newBatchForm.academicYear}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, academicYear: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                College Coordinator Name
+              </label>
+              <input
+                type="text"
+                className="kvj-input"
+                required
+                value={newBatchForm.coordinator}
+                onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinator: e.target.value })}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  className="kvj-input"
+                  required
+                  value={newBatchForm.startDate}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, startDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  className="kvj-input"
+                  required
+                  value={newBatchForm.endDate}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, endDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Button variant="secondary" type="button" onClick={() => setCreateBatchModalOpen(false)}>Cancel</Button>
+              <Button type="submit">➕ Create Batch</Button>
+            </div>
+          </form>
+        </Drawer>
       )}
 
     </AppShell>

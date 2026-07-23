@@ -21,13 +21,7 @@ export interface RegistrationRecord {
   registrationDate: string;
 }
 
-// Sample Registration DB records for lookup
-const REGISTRATION_DATABASE: Record<string, RegistrationRecord> = {
-  '9876543210': { phone: '9876543210', fullName: 'Albin Joseph', email: 'albin.joseph@student.edu', qualification: 'B.Com Computer Applications', gender: 'Male', college: 'Christ University', registrationDate: '2026-06-15' },
-  '9445566778': { phone: '9445566778', fullName: 'Merlin K Thomas', email: 'merlin.t@student.edu', qualification: 'B.Com Finance', gender: 'Female', college: 'Christ University', registrationDate: '2026-06-16' },
-  '8899011223': { phone: '8899011223', fullName: 'Devanand P', email: 'devanand.p@student.edu', qualification: 'MBA Marketing', gender: 'Male', college: 'SB College', registrationDate: '2026-06-18' },
-  '7788990011': { phone: '7788990011', fullName: 'Riya Rose', email: 'riya.rose@student.edu', qualification: 'B.Sc Computer Science', gender: 'Female', college: 'Vimala College', registrationDate: '2026-06-20' },
-};
+const REGISTRATION_DATABASE: Record<string, RegistrationRecord> = {};
 
 export function RegistrationLookup({
   onSelectRecord,

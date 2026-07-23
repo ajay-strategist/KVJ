@@ -35,28 +35,13 @@ interface StudentTopPerformer {
   rank: number;
 }
 
-const TRAINER_LEADERBOARD: TrainerPerformance[] = [
-  { id: 't1', name: 'Linto George', batchesCount: 6, studentsTrained: 240, attendanceAvg: 94, completionRate: 98, feedbackScore: 4.9 },
-  { id: 't2', name: 'Ajay Kumar', batchesCount: 5, studentsTrained: 180, attendanceAvg: 91, completionRate: 95, feedbackScore: 4.8 },
-  { id: 't3', name: 'Anju V', batchesCount: 4, studentsTrained: 150, attendanceAvg: 89, completionRate: 92, feedbackScore: 4.7 },
-  { id: 't4', name: 'Sankar M', batchesCount: 3, studentsTrained: 110, attendanceAvg: 86, completionRate: 90, feedbackScore: 4.6 },
-];
+const TRAINER_LEADERBOARD: TrainerPerformance[] = [];
 
-const TOP_STUDENTS: StudentTopPerformer[] = [
-  { id: 's1', name: 'Devanand P', college: 'Christ University', batch: 'Christ BCOM B1', attendancePct: 98, overallScore: 94.5, rank: 1 },
-  { id: 's2', name: 'Albin Joseph', college: 'Christ University', batch: 'Christ BCOM B1', attendancePct: 96, overallScore: 91.2, rank: 2 },
-  { id: 's3', name: 'Riya Rose', college: 'Vimala College', batch: 'Vimala Excel B1', attendancePct: 94, overallScore: 89.8, rank: 3 },
-  { id: 's4', name: 'Merlin K Thomas', college: 'SB College', batch: 'SB MBA B1', attendancePct: 92, overallScore: 88.4, rank: 4 },
-];
+const TOP_STUDENTS: StudentTopPerformer[] = [];
 
 // Heatmap data: Day of week × Trainer attendance rate (%)
 const HEATMAP_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const HEATMAP_DATA: Record<string, number[]> = {
-  'Linto George': [96, 95, 94, 98, 92, 88],
-  'Ajay Kumar':   [92, 94, 91, 90, 89, 85],
-  'Anju V':       [90, 91, 88, 92, 86, 84],
-  'Sankar M':     [88, 86, 85, 87, 84, 80],
-};
+const HEATMAP_DATA: Record<string, number[]> = {};
 
 function getHeatColor(val: number) {
   if (val >= 94) return 'rgba(16, 185, 129, 0.35)'; // high success green

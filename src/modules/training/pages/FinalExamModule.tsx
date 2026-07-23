@@ -34,12 +34,7 @@ export interface ExamRecord {
   certificateEligible: boolean;
 }
 
-const SAMPLE_EXAM_RECORDS: ExamRecord[] = [
-  { id: 'e1', studentName: 'Albin Joseph', phone: '+91 98765 43210', email: 'albin.joseph@student.edu', college: 'Christ University', batch: 'Christ BCOM B1', attendancePct: 88, voucherCode: 'VOUCH-CHRIST-101', voucherStatus: 'Assigned', originalScore: 84, finalScore: 84, certificateEligible: true },
-  { id: 'e2', studentName: 'Merlin K Thomas', phone: '+91 94455 66778', email: 'merlin.t@student.edu', college: 'Christ University', batch: 'Christ BCOM B1', attendancePct: 82, voucherCode: '', voucherStatus: 'Unassigned', originalScore: 48, finalScore: 48, isRetestEligible: true, retestStatus: 'Pending', certificateEligible: false },
-  { id: 'e3', studentName: 'Devanand P', phone: '+91 88990 11223', email: 'devanand.p@student.edu', college: 'SB College', batch: 'SB MBA B1', attendancePct: 94, voucherCode: 'VOUCH-SB-202', voucherStatus: 'Redeemed', originalScore: 62, retestScore: 88, finalScore: 88, isRetestEligible: true, retestStatus: 'Completed', certificateEligible: true },
-  { id: 'e4', studentName: 'Riya Rose', phone: '+91 77889 90011', email: 'riya.rose@student.edu', college: 'Vimala College', batch: 'Vimala Excel B1', attendancePct: 76, voucherCode: '', voucherStatus: 'Unassigned', originalScore: 42, finalScore: 42, isRetestEligible: true, retestStatus: 'Pending', certificateEligible: false },
-];
+const SAMPLE_EXAM_RECORDS: ExamRecord[] = [];
 
 export function FinalExamModule() {
   const { user } = useAuth();
