@@ -15,6 +15,7 @@ import { Form, SelectField, TextField, useForm } from '../../../shared/forms/for
 
 import { useProject } from '../../../modules/project/hooks/useProject';
 import { useEmployee } from '../../../modules/employee/hooks/useEmployee';
+import { useTraining } from '../../../modules/training/hooks/useTraining';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attendance.repository';
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
@@ -36,17 +37,17 @@ const statusMap = {
 
 function ConditionalAttendanceFields() {
   const { values } = useForm();
+  const { batches } = useTraining();
   
   if (values.classification === 'Training') {
+    const options = batches.length > 0
+      ? batches.map((b) => ({ value: b.code, label: b.code }))
+      : [{ value: 'No Batches Available', label: 'No Batches Available' }];
     return (
       <SelectField
         name="location"
         label="Select Training Batch"
-        options={[
-          { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
-          { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
-          { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
-        ]}
+        options={options}
       />
     );
   }
@@ -92,11 +93,35 @@ export const AttendancePanel = memo(function AttendancePanel({
 }: AttendancePanelProps) {
   const { confirm } = useDialog();
   const { toast } = useNotifications();
+  const { batches, courses } = useTraining();
   const [clockInOpen, setClockInOpen] = useState(false);
   const [breakOpen, setBreakOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState('Office');
-  const [selectedBatch, setSelectedBatch] = useState('Christ 3BBA Data Analytics B1');
+
+  const availableBatches = useMemo(() => {
+    if (!batches || batches.length === 0) return [];
+    return batches.map((b) => {
+      const courseObj = courses.find((c) => c.id === b.courseId);
+      return {
+        id: b.id,
+        name: b.code,
+        college: b.college || '—',
+        course: courseObj?.title || b.trainingName || 'Training Program',
+        time: '09:00 AM - 12:00 PM',
+        students: b.capacity || 30,
+        trainer: b.coordinator || 'Assigned Trainer',
+      };
+    });
+  }, [batches, courses]);
+
+  const [selectedBatch, setSelectedBatch] = useState('');
+
+  useEffect(() => {
+    if (availableBatches.length > 0 && (!selectedBatch || !availableBatches.some((b) => b.name === selectedBatch))) {
+      setSelectedBatch(availableBatches[0].name);
+    }
+  }, [availableBatches, selectedBatch]);
 
   // GPS & Location state
   const [locationStr, setLocationStr] = useState<string>('Detecting location...');
@@ -478,39 +503,41 @@ export const AttendancePanel = memo(function AttendancePanel({
           {selectedMode === 'Training' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Select Training Batch</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
-                {[
-                  { id: 'b1', name: 'Christ 3BBA Data Analytics B1', college: 'Christ College', course: 'Data Analytics', time: '10:00 AM - 01:00 PM', students: 48, trainer: 'Linto George' },
-                  { id: 'b2', name: 'SB College MBA Batch 1', college: 'SB College', course: 'Advanced Excel', time: '02:00 PM - 05:00 PM', students: 35, trainer: 'Unassigned' },
-                  { id: 'b3', name: 'MIM 1MBA 2026-27 B1', college: 'MIM Campus', course: 'Power BI', time: '09:00 AM - 12:00 PM', students: 42, trainer: 'Linto George' }
-                ].map((b) => {
-                  const active = selectedBatch === b.name;
-                  return (
-                    <div
-                      key={b.id}
-                      onClick={() => setSelectedBatch(b.name)}
-                      style={{
-                        border: active ? '2px solid var(--brand)' : '1px solid var(--border)',
-                        background: active ? 'var(--bg-sunken)' : 'var(--bg-surface)',
-                        borderRadius: 8,
-                        padding: '10px 14px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700 }}>{b.name}</span>
-                        <Badge tone={active ? 'success' : 'neutral'}>{b.course}</Badge>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+                {availableBatches.length === 0 ? (
+                  <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', background: 'var(--bg-sunken)', borderRadius: 8, border: '1px dashed var(--border)' }}>
+                    No training batches found. Create batches in Training Details page.
+                  </div>
+                ) : (
+                  availableBatches.map((b) => {
+                    const active = selectedBatch === b.name;
+                    return (
+                      <div
+                        key={b.id}
+                        onClick={() => setSelectedBatch(b.name)}
+                        style={{
+                          border: active ? '2px solid var(--brand)' : '1px solid var(--border)',
+                          background: active ? 'var(--bg-sunken)' : 'var(--bg-surface)',
+                          borderRadius: 8,
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{b.name}</span>
+                          <Badge tone={active ? 'success' : 'neutral'}>{b.course}</Badge>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                          <span>🏫 {b.college}</span>
+                          <span>👥 {b.students} Students</span>
+                          <span>🕒 {b.time}</span>
+                          <span>👤 {b.trainer}</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-                        <span>🏫 {b.college}</span>
-                        <span>👥 {b.students} Students</span>
-                        <span>🕒 {b.time}</span>
-                        <span>👤 {b.trainer}</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

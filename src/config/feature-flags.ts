@@ -60,29 +60,20 @@ export const featureFlags = {
   },
   // Integrations
   integrations: {
-    supabase: false, // master switch — must be on for ANY module to use Supabase
+    supabase: true, // master switch — set to true for live Supabase integration
     googleDrive: false,
     powerBi: false,
   },
 
-  /**
-   * Per-module Supabase cutover. A module may only be switched on once its
-   * tables actually exist in the database, otherwise every query fails with
-   * "table not found". This lets us migrate module-by-module instead of
-   * flipping the whole app at once.
-   *
-   * Covered by supabase/migrations today: employee, attendance, leave.
-   * The rest still need their schema written.
-   */
   supabaseModules: {
-    employee: false,
-    attendance: false,
-    leave: false,
-    training: false,
-    project: false,
-    finance: false,
-    communication: false,
-    analytics: false,
+    employee: true,
+    attendance: true,
+    leave: true,
+    training: true,
+    project: true,
+    finance: true,
+    communication: true,
+    analytics: true,
   },
 } as const;
 
