@@ -348,11 +348,22 @@ export function TrainingCalendar() {
 
   const handleOpenCellAssign = (date: string, trainerId: string) => {
     setEditingSessionId(null);
-    setAssignForm((prev) => ({
-      ...prev,
+    const firstPreset = dynamicBatchPresets[0];
+    setAssignForm({
       date,
       trainerId: trainerId || (trainers[0]?.id ?? ''),
-    }));
+      name: firstPreset?.name || 'Power BI',
+      batchCode: firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI',
+      college: firstPreset?.college || 'Christ Irinjalakkuda',
+      course: firstPreset?.course || 'Power BI',
+      academicYear: '2026-2027',
+      coordinator: firstPreset?.coordinator || '—',
+      startTime: '09:00',
+      endTime: '12:00',
+      venue: firstPreset?.venue || 'Lab 1',
+      mode: firstPreset?.mode || 'Offline',
+      studentCount: firstPreset?.studentCount || 20,
+    });
     setIsAssignDrawerOpen(true);
   };
 
@@ -382,13 +393,17 @@ export function TrainingCalendar() {
       return;
     }
 
+    const firstPreset = dynamicBatchPresets[0];
+    const finalBatchCode = assignForm.batchCode.trim() || firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI';
+    const finalName = assignForm.name.trim() || firstPreset?.name || 'Power BI';
+
     if (editingSessionId) {
       const updatedSession: ScheduleSession = {
         id: editingSessionId,
         trainerId: assignForm.trainerId,
         date: assignForm.date,
-        name: assignForm.name,
-        batchCode: assignForm.batchCode,
+        name: finalName,
+        batchCode: finalBatchCode,
         college: assignForm.college,
         course: assignForm.course,
         academicYear: assignForm.academicYear,
@@ -415,8 +430,8 @@ export function TrainingCalendar() {
         id: `custom-sess-${Date.now()}`,
         trainerId: assignForm.trainerId,
         date: assignForm.date,
-        name: assignForm.name,
-        batchCode: assignForm.batchCode,
+        name: finalName,
+        batchCode: finalBatchCode,
         college: assignForm.college,
         course: assignForm.course,
         academicYear: assignForm.academicYear,
@@ -1164,7 +1179,12 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
         </div>
       )}
       {sessions.map((s) => {
-        const batchDisplay = s.batchCode || s.name || 'Training Batch';
+        let batchDisplay = s.batchCode;
+        if (!batchDisplay || batchDisplay === 'Training Batch' || batchDisplay === 'Custom') {
+          batchDisplay = (s.name && s.name !== 'Training Batch' && s.name !== 'Custom')
+            ? s.name
+            : (s.course && s.course !== '—' ? s.course : 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI');
+        }
         const timeDisplay = `${s.startTime}–${s.endTime}`;
         return (
           <button
