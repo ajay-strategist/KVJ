@@ -211,17 +211,16 @@ export const AttendancePanel = memo(function AttendancePanel({
       <div
         style={{
           background: '#ffffff',
-          border: '1px solid #eef2f6',
-          borderRadius: 20,
-          padding: '20px 24px',
+          border: '1px solid #e2e8f0',
+          borderRadius: 24,
+          padding: '24px 28px 28px 28px',
           boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03)',
           marginBottom: 24,
           position: 'relative',
-          overflow: 'hidden',
         }}
       >
         {/* Header bar matching Sample Image */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>
             Attendance Control Panel — Office / Training
           </h3>
@@ -237,22 +236,22 @@ export const AttendancePanel = memo(function AttendancePanel({
             borderRadius: 16,
             background: '#f1f5fe',
             border: '1px solid #dbe6fe',
-            marginBottom: 20,
+            marginBottom: 18,
             alignItems: 'center',
           }}
         >
           {/* CURRENT STATUS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CURRENT STATUS
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
               {currentStatus === 'present' ? '🟢 Working' : currentStatus === 'on_break' ? '🟡 On Break' : '⚫ Not Working'}
             </span>
           </div>
 
           {/* GPS LOCATION */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               GPS LOCATION
             </span>
@@ -262,7 +261,7 @@ export const AttendancePanel = memo(function AttendancePanel({
           </div>
 
           {/* CLOCK IN TIME */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CLOCK IN TIME
             </span>
@@ -272,7 +271,7 @@ export const AttendancePanel = memo(function AttendancePanel({
           </div>
 
           {/* DURATION TODAY */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               DURATION TODAY
             </span>
@@ -282,7 +281,7 @@ export const AttendancePanel = memo(function AttendancePanel({
           </div>
 
           {/* BREAK DURATION */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               BREAK DURATION
             </span>
@@ -293,7 +292,7 @@ export const AttendancePanel = memo(function AttendancePanel({
         </div>
 
         {/* Action Controls Bar matching Sample Image */}
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
           {(currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && (
             <>
               <button
