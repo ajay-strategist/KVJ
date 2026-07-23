@@ -97,7 +97,8 @@ export function TrainingCalendar() {
   const [detailSession, setDetailSession] = useState<ScheduleSession | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  // Assign Schedule Drawer state
+  // Assign / Edit Schedule Drawer state
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [isAssignDrawerOpen, setIsAssignDrawerOpen] = useState(false);
   const [assignForm, setAssignForm] = useState<{
     date: string;
@@ -235,8 +236,8 @@ export function TrainingCalendar() {
 
   // ── Conflicts (range-scoped) ──
   const conflicts = useMemo(
-    () => detectConflicts({ ...data, sessions: combinedSessions }, trainerName).map((c) => ({ ...c, status: conflictOverrides[c.id] ?? c.status })),
-    [data, combinedSessions, trainerName, conflictOverrides],
+    () => detectConflicts(combinedSessions, data.leaves, data.holidays, trainers.map((t) => ({ id: t.id, name: `${t.firstName} ${t.lastName}` }))).map((c) => ({ ...c, status: conflictOverrides[c.id] ?? c.status })),
+    [data.leaves, data.holidays, combinedSessions, trainers, conflictOverrides],
   );
 
   const shownConflicts = useMemo(() => conflicts.filter((c) => {
@@ -313,11 +314,32 @@ export function TrainingCalendar() {
   };
 
   const handleOpenCellAssign = (date: string, trainerId: string) => {
+    setEditingSessionId(null);
     setAssignForm((prev) => ({
       ...prev,
       date,
       trainerId: trainerId || (trainers[0]?.id ?? ''),
     }));
+    setIsAssignDrawerOpen(true);
+  };
+
+  const handleEditSchedule = (s: ScheduleSession) => {
+    setEditingSessionId(s.id);
+    setAssignForm({
+      date: s.date,
+      trainerId: s.trainerId,
+      name: s.name,
+      batchCode: s.batchCode,
+      college: s.college,
+      course: s.course,
+      academicYear: s.academicYear,
+      coordinator: s.coordinator,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      venue: s.venue,
+      mode: s.mode,
+      studentCount: s.studentCount,
+    });
     setIsAssignDrawerOpen(true);
   };
 
@@ -327,32 +349,72 @@ export function TrainingCalendar() {
       return;
     }
 
-    const newSession: ScheduleSession = {
-      id: `custom-sess-${Date.now()}`,
-      trainerId: assignForm.trainerId,
-      date: assignForm.date,
-      name: assignForm.name,
-      batchCode: assignForm.batchCode,
-      college: assignForm.college,
-      course: assignForm.course,
-      academicYear: assignForm.academicYear,
-      coordinator: assignForm.coordinator,
-      startTime: assignForm.startTime,
-      endTime: assignForm.endTime,
-      venue: assignForm.venue,
-      mode: assignForm.mode,
-      studentCount: Number(assignForm.studentCount) || 20,
-      status: 'Scheduled',
-      color: '#3b82f6',
-    };
+    if (editingSessionId) {
+      const updatedSession: ScheduleSession = {
+        id: editingSessionId,
+        trainerId: assignForm.trainerId,
+        date: assignForm.date,
+        name: assignForm.name,
+        batchCode: assignForm.batchCode,
+        college: assignForm.college,
+        course: assignForm.course,
+        academicYear: assignForm.academicYear,
+        coordinator: assignForm.coordinator,
+        startTime: assignForm.startTime,
+        endTime: assignForm.endTime,
+        venue: assignForm.venue,
+        mode: assignForm.mode,
+        studentCount: Number(assignForm.studentCount) || 20,
+        status: 'Scheduled',
+        color: '#3b82f6',
+      };
 
-    setCustomSessions((prev) => [...prev, newSession]);
+      setCustomSessions((prev) =>
+        prev.map((sess) => (sess.id === editingSessionId ? updatedSession : sess))
+      );
+      toast({
+        variant: 'success',
+        title: 'Schedule Updated',
+        message: `Updated schedule for ${updatedSession.batchCode} on ${updatedSession.date}`,
+      });
+    } else {
+      const newSession: ScheduleSession = {
+        id: `custom-sess-${Date.now()}`,
+        trainerId: assignForm.trainerId,
+        date: assignForm.date,
+        name: assignForm.name,
+        batchCode: assignForm.batchCode,
+        college: assignForm.college,
+        course: assignForm.course,
+        academicYear: assignForm.academicYear,
+        coordinator: assignForm.coordinator,
+        startTime: assignForm.startTime,
+        endTime: assignForm.endTime,
+        venue: assignForm.venue,
+        mode: assignForm.mode,
+        studentCount: Number(assignForm.studentCount) || 20,
+        status: 'Scheduled',
+        color: '#3b82f6',
+      };
+
+      setCustomSessions((prev) => [...prev, newSession]);
+      toast({
+        variant: 'success',
+        title: 'Schedule Assigned',
+        message: `Assigned ${newSession.name} (${newSession.batchCode}) to ${trainerName(newSession.trainerId)} on ${newSession.date}`,
+      });
+    }
+
     setIsAssignDrawerOpen(false);
-    toast({
-      variant: 'success',
-      title: 'Schedule Assigned',
-      message: `Assigned ${newSession.name} (${newSession.batchCode}) to ${trainerName(newSession.trainerId)} on ${newSession.date}`,
-    });
+    setEditingSessionId(null);
+  };
+
+  const handleDeleteSession = () => {
+    if (!editingSessionId) return;
+    setCustomSessions((prev) => prev.filter((s) => s.id !== editingSessionId));
+    setIsAssignDrawerOpen(false);
+    setEditingSessionId(null);
+    toast({ variant: 'info', title: 'Schedule Removed', message: 'Assigned schedule deleted.' });
   };
 
   const resetFilters = () => {
@@ -441,7 +503,9 @@ export function TrainingCalendar() {
                   paddingRight: 6,
                 }}
               >
-                {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                {Object.entries(PRESETS).map(([id, p]) => (
+                  <option key={id} value={id}>{p.label}</option>
+                ))}
               </select>
 
               {preset === 'custom' && (
@@ -728,7 +792,7 @@ export function TrainingCalendar() {
                         sessions={index.sessions.get(key) ?? []}
                         leave={index.leaves.get(key)}
                         expanded={isOpen}
-                        onOpen={setDetailSession}
+                        onOpen={handleEditSchedule}
                         onAssignCell={handleOpenCellAssign}
                       />
                     );
@@ -740,16 +804,27 @@ export function TrainingCalendar() {
         </div>
       </div>
 
-      {/* ASSIGN SCHEDULE DRAWER */}
+      {/* ASSIGN / EDIT SCHEDULE DRAWER */}
       <Drawer
         open={isAssignDrawerOpen}
         onClose={() => setIsAssignDrawerOpen(false)}
-        title="➕ Assign Training Schedule Session"
+        title={editingSessionId ? '✏️ Edit Assigned Training Schedule' : '➕ Assign Training Schedule Session'}
         size="md"
         footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
-            <Button variant="secondary" onClick={() => setIsAssignDrawerOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveSession}>💾 Save Schedule Allocation</Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            {editingSessionId ? (
+              <button
+                type="button"
+                onClick={handleDeleteSession}
+                style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+              >
+                🗑️ Remove Schedule
+              </button>
+            ) : <div />}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button variant="secondary" onClick={() => setIsAssignDrawerOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveSession}>{editingSessionId ? '💾 Update Schedule' : '💾 Save Schedule Allocation'}</Button>
+            </div>
           </div>
         }
       >

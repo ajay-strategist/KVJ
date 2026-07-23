@@ -19,11 +19,11 @@ export class MockStudentRepository extends MemoryRepository<Student> implements 
 }
 
 export class MockCourseRepository extends MemoryRepository<Course> implements ICourseRepository {
-  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, SEED_COURSES); }
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, []); }
 }
 
 export class MockBatchRepository extends MemoryRepository<Batch> implements IBatchRepository {
-  constructor() { super({ defaultStatus: 'scheduled', pageSize: 500 }, SEED_BATCHES); }
+  constructor() { super({ defaultStatus: 'scheduled', pageSize: 500 }, []); }
 }
 
 export class MockEnrollmentRepository extends MemoryRepository<Enrollment> implements IEnrollmentRepository {

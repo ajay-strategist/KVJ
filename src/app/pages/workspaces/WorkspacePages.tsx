@@ -933,17 +933,8 @@ export function MyDayPage() {
   const { toast, addNotification } = useNotifications();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const [tasks, setTasks] = useState<TaskItem[]>([
-    { id: '1', title: 'Prepare Power BI Syllabus', project: 'Christ College Training', due: '21/07/2026', priority: 'High', active: false, secondsToday: 5400 },
-    { id: '2', title: 'Review Voucher Inventory Excel', project: 'Voucher Portal', due: '21/07/2026', priority: 'Critical', active: false, secondsToday: 3600 },
-    { id: '3', title: 'Submit Travel Expense Claim', project: 'Internal Operations', due: '22/07/2026', priority: 'Normal', active: false, secondsToday: 0 },
-  ]);
-
-  const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([
-    { id: '1', title: '🟢 Clocked in (Office - GPS Verified)', time: '08:30 AM', tone: 'success' },
-    { id: '2', title: '⚡ Power BI Session Started', time: '10:00 AM', tone: 'progress' },
-    { id: '3', title: '📝 Assessment Review', time: '02:00 PM', tone: 'info' },
-  ]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

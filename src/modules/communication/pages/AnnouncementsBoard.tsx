@@ -22,10 +22,7 @@ export function AnnouncementsBoard() {
   const [open, setOpen] = useState(false);
   const [holidayOpen, setHolidayOpen] = useState(false);
 
-  const [holidays, setHolidays] = useState<DeclaredHoliday[]>([
-    { id: 'h1', date: '2026-08-15', name: 'Independence Day', type: 'Public Holiday', status: 'active' },
-    { id: 'h2', date: '2026-09-05', name: 'Onam / Teacher Day Celebration', type: 'Company Holiday', status: 'active' },
-  ]);
+  const [holidays, setHolidays] = useState<DeclaredHoliday[]>([]);
 
   const handlePostSubmit = async (values: Record<string, unknown>) => {
     const res = await postAnnouncement({

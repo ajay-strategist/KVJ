@@ -59,74 +59,7 @@ export function ProjectList() {
   const [reportOpen, setReportOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectCardData | null>(null);
 
-  // Sample Master Projects Data
-  const [projectsList, setProjectsList] = useState<ProjectCardData[]>([
-    {
-      id: 'p1',
-      code: 'KVJ-PROJ-101',
-      title: 'Supabase Multi-Tenant Analytics Platform',
-      client: 'Christ University',
-      supervisor: 'Manager (Operations)',
-      status: 'In Progress',
-      members: [
-        { name: 'Linto George', hours: 24.5 },
-        { name: 'Ajay Kumar', hours: 12.0 },
-        { name: 'Anju V', hours: 8.5 },
-      ],
-      totalHours: 45.0,
-      tasksTotal: 10,
-      tasksCompleted: 8,
-      milestonesCount: 3,
-    },
-    {
-      id: 'p2',
-      code: 'KVJ-PROJ-102',
-      title: 'Enterprise ERP Attendance & Payroll Sync',
-      client: 'Vimala College',
-      supervisor: 'CEO',
-      status: 'Not Started',
-      members: [
-        { name: 'Linto George', hours: 18.0 },
-        { name: 'Sankar M', hours: 14.0 },
-      ],
-      totalHours: 32.0,
-      tasksTotal: 6,
-      tasksCompleted: 4,
-      milestonesCount: 2,
-    },
-    {
-      id: 'p3',
-      code: 'KVJ-PROJ-103',
-      title: 'AI Data Processing & OCR Pipeline',
-      client: 'Nehru Group',
-      supervisor: 'Manager (Operations)',
-      status: 'In Progress',
-      members: [
-        { name: 'Ajay Kumar', hours: 30.0 },
-        { name: 'Anju V', hours: 22.0 },
-      ],
-      totalHours: 52.0,
-      tasksTotal: 8,
-      tasksCompleted: 5,
-      milestonesCount: 4,
-    },
-    {
-      id: 'p4',
-      code: 'KVJ-PROJ-099',
-      title: 'Legacy Database Migration & Archival',
-      client: 'SB College',
-      supervisor: 'CEO',
-      status: 'Completed',
-      members: [
-        { name: 'Linto George', hours: 40.0 },
-        { name: 'Sankar M', hours: 25.0 },
-      ],
-      totalHours: 65.0,
-      tasksTotal: 12,
-      tasksCompleted: 12,
-      milestonesCount: 5,
-    },
-  ]);
+  const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
   // Filter based on selected checkboxes
   const filteredProjects = projectsList.filter((p) => selectedStatuses.includes(p.status));

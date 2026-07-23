@@ -82,9 +82,9 @@ export function ChatChannels() {
   const { user } = useAuth();
   const { toast } = useNotifications();
 
-  const [activeChannelId, setActiveChannelId] = useState<string>('c-gen');
-  const [channels, setChannels] = useState<ChatChannel[]>(SAMPLE_CHANNELS);
-  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
+  const [activeChannelId, setActiveChannelId] = useState<string>('');
+  const [channels, setChannels] = useState<ChatChannel[]>([]);
+  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
 
   const [text, setText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
