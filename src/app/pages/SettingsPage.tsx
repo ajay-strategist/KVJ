@@ -324,6 +324,9 @@ export function SettingsPage() {
             <Row label="Role">{user?.role ?? '—'}</Row>
           </Card>
 
+          {/* User Password Reset Card (Task 11) */}
+          <UserPasswordResetCard />
+
           {/* Admin User Management Panel */}
           {user?.role === 'ADMIN' && (
             <AdminUserManagementCard />
@@ -340,8 +343,90 @@ export function SettingsPage() {
   );
 }
 
+function UserPasswordResetCard() {
+  const { user, updateUserPassword } = useAuth();
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (!newPassword || newPassword.length < 6) {
+      setMsg({ type: 'error', text: 'New password must be at least 6 characters.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMsg({ type: 'error', text: 'Passwords do not match.' });
+      return;
+    }
+
+    setBusy(true);
+    setMsg(null);
+    try {
+      await updateUserPassword(user.id, newPassword);
+      setMsg({ type: 'success', text: 'Password successfully updated!' });
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setMsg({ type: 'error', text: err?.message || 'Failed to update password.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <SectionHeader title="🔐 Reset Account Password" />
+      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+        Update your login password for this workspace.
+      </p>
+
+      {msg && (
+        <div style={{
+          fontSize: 12, padding: '8px 12px', borderRadius: 6,
+          background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
+          color: msg.type === 'success' ? '#15803d' : '#b91c1c',
+          marginBottom: 12, fontWeight: 600
+        }}>
+          {msg.text}
+        </div>
+      )}
+
+      <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>New Password</label>
+          <input
+            type="password"
+            className="kvj-input"
+            placeholder="Enter new password (min 6 characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Confirm New Password</label>
+          <input
+            type="password"
+            className="kvj-input"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+          <Button type="submit" disabled={busy}>
+            {busy ? 'Updating...' : 'Update Password'}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 function AdminUserManagementCard() {
-  const { createUser, updateUser, deleteUser, getUsers } = useAuth();
+  const { createUser, updateUser, deleteUser, getUsers, resetToDefaultPassword } = useAuth();
   const [usersList, setUsersList] = useState<import('../../modules/auth/auth.service').AuthUser[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<import('../../modules/auth/auth.service').AuthUser | null>(null);
@@ -360,6 +445,18 @@ function AdminUserManagementCard() {
   useEffect(() => {
     reloadUsers();
   }, []);
+
+  const handleResetToDefault = async (u: import('../../modules/auth/auth.service').AuthUser) => {
+    if (confirm(`Reset password for "${u.fullName}" to default password ("password")? They will be required to change password on next login.`)) {
+      try {
+        await resetToDefaultPassword(u.id);
+        alert(`Password for ${u.fullName} reset to "password". User must change password on next login.`);
+        reloadUsers();
+      } catch (e: any) {
+        alert(e?.message || 'Failed to reset password.');
+      }
+    }
+  };
 
   const openCreateModal = () => {
     setEditingUser(null);
@@ -456,6 +553,9 @@ function AdminUserManagementCard() {
                   ✓ Active
                 </span>
               )}
+              <Button size="sm" variant="secondary" onClick={() => handleResetToDefault(u)} style={{ padding: '4px 10px', fontSize: 11 }}>
+                🔑 Reset Password
+              </Button>
               <Button size="sm" variant="secondary" onClick={() => openEditModal(u)} style={{ padding: '4px 10px', fontSize: 11 }}>
                 ✏️ Edit
               </Button>

@@ -23,6 +23,7 @@ interface AuthContextValue {
   updateUser: (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string }>) => Promise<import('./auth.service').AuthUser>;
   deleteUser: (userId: string) => Promise<{ ok: boolean }>;
   updateUserPassword: (userId: string, newPassword: string) => Promise<{ ok: boolean }>;
+  resetToDefaultPassword: (userId: string) => Promise<{ ok: boolean }>;
   getUsers: () => Promise<import('./auth.service').AuthUser[]>;
 }
 
@@ -101,6 +102,10 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     return res;
   }, [authService, session]);
 
+  const resetToDefaultPassword = useCallback(async (userId: string) => {
+    return authService.resetToDefaultPassword(userId);
+  }, [authService]);
+
   const getUsers = useCallback(async () => {
     return authService.getUsers();
   }, [authService]);
@@ -108,8 +113,8 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
   const value = useMemo<AuthContextValue>(() => ({
     session, user: session?.user ?? null, principal, status, login, logout,
     requestPasswordReset: authService.requestPasswordReset.bind(authService),
-    createUser, updateUser, deleteUser, updateUserPassword, getUsers,
-  }), [session, principal, status, login, logout, authService, createUser, updateUser, deleteUser, updateUserPassword, getUsers]);
+    createUser, updateUser, deleteUser, updateUserPassword, resetToDefaultPassword, getUsers,
+  }), [session, principal, status, login, logout, authService, createUser, updateUser, deleteUser, updateUserPassword, resetToDefaultPassword, getUsers]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

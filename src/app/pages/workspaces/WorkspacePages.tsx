@@ -208,187 +208,216 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   return (
     <>
-      <Card style={{ border: '2px solid var(--brand)', boxShadow: 'var(--e2)', marginBottom: 20 }}>
-        <SectionHeader title="⏱️ Attendance Control Panel — Office / Training" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{
-            background: 'var(--bg-sunken)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            padding: '16px',
+      <div
+        style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 20,
+          padding: '20px 24px',
+          boxShadow: '0 4px 20px -2px rgba(99, 102, 241, 0.06), 0 2px 6px -1px rgba(0,0,0,0.03)',
+          marginBottom: 24,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header bar matching Sample Image 1 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+            Attendance Control Panel — Office / Training
+          </h3>
+        </div>
+
+        {/* 5 Stat Columns inside a single light tinted container box (Image 1) */}
+        <div
+          style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-            gap: '16px'
-          }}>
-            <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Current Status</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                <span style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: currentStatus === 'present' ? 'var(--status-success)' : currentStatus === 'on_break' ? 'var(--status-warning)' : 'var(--text-muted)'
-                }} />
-                {currentStatus === 'present' ? 'Working' : currentStatus === 'on_break' ? 'On Break' : 'Not Working'}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>GPS Location</div>
-              <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '4px', color: 'var(--brand)' }}>
-                📍 {resolveLocationName(locationStr)}
-              </div>
-            </div>
-            {currentStatus !== 'clocked_out' && (
-              <div>
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Work Type</div>
-                <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px' }}>
-                  {currentWorkType}
-                </div>
-              </div>
-            )}
-            <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Clock In Time</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px' }}>
-                {clockInTimeStr}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Duration Today</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
-                {formatDuration(totalWorkMs)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>Break Duration</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, marginTop: '4px', fontVariantNumeric: 'tabular-nums', color: currentStatus === 'on_break' ? 'var(--status-warning)' : undefined }}>
-                {formatDuration(totalBreakMs)}
-              </div>
-            </div>
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: 16,
+            padding: '16px 20px',
+            borderRadius: 14,
+            background: 'color-mix(in srgb, var(--brand) 5%, var(--bg-sunken))',
+            border: '1px solid var(--border)',
+            marginBottom: 18,
+          }}
+        >
+          {/* CURRENT STATUS */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+              CURRENT STATUS
+            </span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {currentStatus === 'present' ? '🟢 Working' : currentStatus === 'on_break' ? '🟡 On Break' : '⚫ Not Working'}
+            </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {currentStatus === 'clocked_out' && (
-              <>
-                <button
-                  type="button"
-                  className="kvj-btn"
-                  disabled={loading}
-                  onClick={() => setClockInOpen(true)}
-                  style={{
-                    background: 'var(--status-success)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 20px',
-                    fontWeight: '600',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--e1)',
-                  }}
-                >
-                  Clock In (Office / Training)
-                </button>
+          {/* GPS LOCATION */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+              GPS LOCATION
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              📍 {resolveLocationName(locationStr)}
+            </span>
+          </div>
 
-                <button
-                  type="button"
-                  className="kvj-btn"
-                  onClick={() => setClaimOpen(true)}
-                  style={{
-                    background: 'var(--bg-surface)',
-                    color: 'var(--brand)',
-                    border: '1px solid var(--brand)',
-                    padding: '10px 20px',
-                    fontWeight: '600',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  📋 Submit Attendance
-                </button>
-              </>
-            )}
+          {/* CLOCK IN TIME */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+              CLOCK IN TIME
+            </span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>
+              {clockInTimeStr}
+            </span>
+          </div>
 
-            {currentStatus === 'present' && (
-              <>
-                <button
-                  type="button"
-                  className="kvj-btn"
-                  disabled={loading}
-                  onClick={() => setBreakOpen(true)}
-                  style={{
-                    background: 'var(--status-warning)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 20px',
-                    fontWeight: '600',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--e1)',
-                  }}
-                >
-                  Start Break
-                </button>
-                <button
-                  type="button"
-                  className="kvj-btn"
-                  disabled={loading}
-                  onClick={handleClockOut}
-                  style={{
-                    background: 'var(--status-danger-bg)',
-                    color: 'var(--status-danger)',
-                    border: '1px solid var(--status-danger)',
-                    padding: '10px 20px',
-                    fontWeight: '600',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Clock Out
-                </button>
-              </>
-            )}
+          {/* DURATION TODAY */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+              DURATION TODAY
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+              {formatDuration(totalWorkMs)}
+            </span>
+          </div>
 
-            {currentStatus === 'on_break' && (
-              <>
-                <button
-                  type="button"
-                  className="kvj-btn"
-                  disabled={loading}
-                  onClick={handleEndBreak}
-                  style={{
-                    background: 'var(--brand)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 20px',
-                    fontWeight: '600',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--e1)',
-                  }}
-                >
-                  End Break (Resume)
-                </button>
-                <button
-                  type="button"
-                  className="kvj-btn"
-                  disabled={loading}
-                  onClick={handleClockOut}
-                  style={{
-                    background: 'var(--status-danger-bg)',
-                    color: 'var(--status-danger)',
-                    border: '1px solid var(--status-danger)',
-                    padding: '10px 20px',
-                    fontWeight: '600',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Clock Out
-                </button>
-              </>
-            )}
+          {/* BREAK DURATION */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em' }}>
+              BREAK DURATION
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+              {formatDuration(totalBreakMs)}
+            </span>
           </div>
         </div>
-      </Card>
+
+        {/* Action Controls Bar matching Sample Image 1 */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          {currentStatus === 'clocked_out' && (
+            <>
+              <button
+                type="button"
+                className="kvj-btn"
+                disabled={loading}
+                onClick={() => setClockInOpen(true)}
+                style={{
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 22px',
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(16,185,129,0.25)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                Clock In (Office / Training)
+              </button>
+
+              <button
+                type="button"
+                className="kvj-btn"
+                onClick={() => setClaimOpen(true)}
+                style={{
+                  background: 'var(--bg-surface)',
+                  color: 'var(--brand)',
+                  border: '1.5px solid var(--brand)',
+                  padding: '10px 20px',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                📋 Submit Attendance
+              </button>
+            </>
+          )}
+
+          {currentStatus === 'present' && (
+            <>
+              <button
+                type="button"
+                className="kvj-btn"
+                disabled={loading}
+                onClick={() => setBreakOpen(true)}
+                style={{
+                  background: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 22px',
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(245,158,11,0.25)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                ☕ Start Official Break
+              </button>
+              <button
+                type="button"
+                className="kvj-btn"
+                disabled={loading}
+                onClick={handleClockOut}
+                style={{
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 22px',
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                🔴 Clock Out
+              </button>
+            </>
+          )}
+
+          {currentStatus === 'on_break' && (
+            <>
+              <button
+                type="button"
+                className="kvj-btn"
+                disabled={loading}
+                onClick={handleEndBreak}
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '11px 22px',
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                ▶️ Resume Work Session
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Clock In Drawer */}
       <Drawer

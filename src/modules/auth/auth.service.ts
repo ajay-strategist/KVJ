@@ -56,6 +56,7 @@ export interface IAuthService {
   updateUser(userId: string, data: Partial<NewUserInput & { password?: string }>): Promise<AuthUser>;
   deleteUser(userId: string): Promise<{ ok: boolean }>;
   updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }>;
+  resetToDefaultPassword(userId: string): Promise<{ ok: boolean }>;
   getUsers(): Promise<AuthUser[]>;
 }
 
@@ -246,6 +247,30 @@ export class MockAuthService implements IAuthService {
       }
     }
 
+    return { ok: true };
+  }
+
+  async resetToDefaultPassword(userId: string): Promise<{ ok: boolean }> {
+    const users = this.getUsersList();
+    let found = false;
+
+    const updated = users.map((u) => {
+      if (u.id === userId) {
+        found = true;
+        return {
+          ...u,
+          password: 'password',
+          mustChangePassword: true,
+        };
+      }
+      return u;
+    });
+
+    if (!found) {
+      throw new AppError({ code: 'NOT_FOUND' as never, message: 'User not found', severity: 'warning' });
+    }
+
+    saveStoredUsers(updated);
     return { ok: true };
   }
 

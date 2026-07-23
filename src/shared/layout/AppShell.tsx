@@ -174,11 +174,20 @@ function AppShellFrame({ children }: { children: ReactNode }) {
 
             {/* Logo */}
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '14px 16px',
-              borderBottom: '1px solid var(--border)', flexShrink: 0
+              display: 'flex', alignItems: 'center', justifyContent: collapsed && !isMobile ? 'center' : 'flex-start',
+              padding: collapsed && !isMobile ? '14px 8px' : '14px 16px',
+              borderBottom: '1px solid var(--border)', flexShrink: 0, gap: 10, overflow: 'hidden'
             }}>
-              <img src="/logo.png" alt="Logo" style={{ height: 36, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+              <img
+                src="/logo.png"
+                alt="KVJ Analytics Logo"
+                style={{
+                  height: collapsed && !isMobile ? 28 : 36,
+                  maxWidth: '100%',
+                  objectFit: 'contain',
+                  flexShrink: 0
+                }}
+              />
             </div>
 
             {/* Nav */}
@@ -199,7 +208,12 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               
               {/* Toolbar Actions Row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: collapsed && !isMobile ? '1fr' : 'repeat(4, 1fr)',
+                gap: 6,
+                alignItems: 'center'
+              }}>
                 {/* Theme Toggle */}
                 <button
                   type="button"

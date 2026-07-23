@@ -141,13 +141,7 @@ export function ExpenseClaims() {
   const [bikeRate, setBikeRate] = useState(5.0);
   const [carRate, setCarRate] = useState(12.0);
 
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>([
-    { id: '1', date: '01/06/2026', person: 'Linto George', category: 'Training Expense', type: 'Self Travel', vehicle: 'Bike', km: 16, route: 'HQ to Christ College', amount: 80.0, batch: 'Christ 3BBA Data Analytics B1', status: 'approved', approvedBy: 'Manager Ops', approvedAt: '01/06/2026 05:00 PM' },
-    { id: '2', date: '01/06/2026', person: 'Linto George', category: 'Training Expense', type: 'Morning Tea', amount: 30.0, receipt: 'receipt_tea.jpg', batch: 'Christ 3BBA Data Analytics B1', status: 'approved', approvedBy: 'Manager Ops', approvedAt: '01/06/2026 05:00 PM' },
-    { id: '3', date: '02/06/2026', person: 'Linto George', category: 'Office Expense', type: 'Stationery & Printing', amount: 450.0, receipt: 'office_print.pdf', status: 'approved', approvedBy: 'Manager Ops', approvedAt: '02/06/2026 06:00 PM' },
-    { id: '4', date: '24/06/2026', person: 'Linto George', category: 'Training Expense', type: 'Self Travel', vehicle: 'Car', km: 37.5, route: 'HQ to Vimala College', amount: 450.0, batch: 'Vimala College Batch 2', status: 'submitted' },
-    { id: '5', date: '25/06/2026', person: 'Linto George', category: 'Office Expense', type: 'Self Travel', vehicle: 'Bike', km: 40, route: 'HQ to Govt Press', amount: 200.0, status: 'submitted' },
-  ]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
 
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '');
 

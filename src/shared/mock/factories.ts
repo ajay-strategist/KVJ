@@ -27,13 +27,16 @@ export interface MockCalendarEvent { id: string; title: string; date: string; ty
 export interface MockChartPoint { label: string; value: number }
 
 export const mock = {
-  employees: (n = 8): MockEmployee[] => Array.from({ length: n }, (_, i) => ({
-    id: id('emp', i + 1), name: name(),
-    role: pick(['Trainer', 'Employee', 'Supervisor', 'Marketing', 'Intern']),
-    department: pick(['Training', 'Operations', 'Marketing', 'Finance', 'HR']),
-    status: pick(['Present', 'On Break', 'On Leave', 'Absent']),
-    attendancePct: int(70, 100),
-  })),
+  employees: (): MockEmployee[] => [
+    {
+      id: 'u-admin',
+      name: 'System Admin',
+      role: 'Super Administrator',
+      department: 'Management',
+      status: 'Present',
+      attendancePct: 100,
+    },
+  ],
 
   projects: (n = 6): MockProject[] => Array.from({ length: n }, (_, i) => ({
     id: id('prj', i + 1), name: `${pick(['Corporate', 'College', 'Internal', 'Marketing'])} ${pick(['Power BI', 'Python', 'SQL', 'Excel'])} Program`,

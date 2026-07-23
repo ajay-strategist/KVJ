@@ -963,7 +963,7 @@ export function BatchManagement() {
     switch (action.id) {
       case 'daily':
         if (canViewDailyReport) {
-          setDailyReportBuilderOpen(true);
+          setDailyReportPreviewOpen(true);
         } else {
           toast({ variant: 'warning', title: 'Access Denied', message: 'You do not have permission to view daily reports.' });
         }
@@ -2714,65 +2714,6 @@ export function BatchManagement() {
                   </div>
                 </Card>
               </div>
-
-              {/* Photo & Video quick previews */}
-              <Card style={{ padding: 16 }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>🖼️ Media Galleries</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div style={{ border: '1px dashed var(--border)', borderRadius: 6, padding: 12, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20 }}>📸</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>Photos (3 Uploaded)</div>
-                  </div>
-                  <div style={{ border: '1px dashed var(--border)', borderRadius: 6, padding: 12, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20 }}>🎥</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>Videos (1 Logged)</div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Simple Batch Directory */}
-              <Card style={{ padding: 18 }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>📋 Training Details Directory</h3>
-                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                      <th style={{ padding: 10 }}>College</th>
-                      <th style={{ padding: 10 }}>Course</th>
-                      <th style={{ padding: 10 }}>Trainer</th>
-                      <th style={{ padding: 10 }}>Marketing Converted (Status)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batches.map((b, idx) => {
-                      const courseObj = courses.find((c) => c.id === b.courseId);
-                      const trainerObj = trainers.find((t) => t.id === b.trainerId);
-                      // Alternate Yes, No, Yes, No as requested
-                      const marketingStatus = idx % 2 === 0 ? 'Yes' : 'No';
-                      
-                      return (
-                        <tr
-                          key={b.id}
-                          onClick={() => setSelectedBatchId(b.id)}
-                          style={{
-                            borderBottom: '1px solid var(--border)',
-                            cursor: 'pointer',
-                            background: selectedBatchId === b.id ? 'var(--bg-sunken)' : 'transparent',
-                          }}
-                        >
-                          <td style={{ padding: 10, fontWeight: 700 }}>{b.code}</td>
-                          <td style={{ padding: 10 }}>{courseObj ? courseObj.title : 'General Training'}</td>
-                          <td style={{ padding: 10 }}>{trainerObj ? `${trainerObj.firstName} ${trainerObj.lastName}` : 'Unassigned'}</td>
-                          <td style={{ padding: 10 }}>
-                            <Badge tone={marketingStatus === 'Yes' ? 'success' : 'danger'}>
-                              {marketingStatus}
-                            </Badge>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Card>
             </div>
           )}
 

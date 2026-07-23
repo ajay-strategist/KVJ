@@ -22,9 +22,12 @@ export interface BatchAction {
 }
 
 const ACTIONS: BatchAction[] = [
-  { id: 'student',   label: 'Student Data',       icon: '👨‍🎓' },
-  { id: 'daily',     label: 'Daily Report',       icon: '📧' },
-  { id: 'documents', label: 'Certificate Receipt', icon: '📜' },
+  { id: 'student',     label: 'Student Data',       icon: '👨‍🎓' },
+  { id: 'daily',       label: 'Daily Report',       icon: '📊' },
+  { id: 'final',       label: 'Final Report',       icon: '📄' },
+  { id: 'attendance',  label: 'Attendance',         icon: '📊' },
+  { id: 'assessments', label: 'Assessments',        icon: '📝' },
+  { id: 'documents',   label: 'Certificate Receipt', icon: '📜' },
 ];
 
 /** Phase → tone map */

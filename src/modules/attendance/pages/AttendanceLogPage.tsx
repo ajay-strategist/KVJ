@@ -23,22 +23,12 @@ export function AttendanceLogPage() {
   const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
-  // Expense tab state (bulk approval)
-  const [expenseRows, setExpenseRows] = useState([
-    { id: '1', date: '01/06/2026', employee: 'Linto George', category: 'Morning & Evening Tea', batch: 'Christ 3BBA Data Analytics B1', amount: 80.0, status: 'Approved' },
-    { id: '2', date: '01/06/2026', employee: 'Linto George', category: 'Lunch & Refreshments', batch: 'SB College MBA Batch 1', amount: 150.0, status: 'Approved' },
-    { id: '3', date: '05/06/2026', employee: 'Linto George', category: 'Self Travel (Bike/Car)', batch: 'Christ 3BBA Data Analytics B1', amount: 120.0, status: 'Approved' },
-    { id: '4', date: '24/06/2026', employee: 'Linto George', category: 'Self Travel (Bike/Car)', batch: 'Vimala College Batch 2', amount: 450.0, status: 'Pending Approval' },
-    { id: '5', date: '25/06/2026', employee: 'Linto George', category: 'Self Travel (Bike/Car)', batch: 'Nehru College Batch 1', amount: 200.0, status: 'Pending Approval' },
-  ]);
+  const [expenseRows, setExpenseRows] = useState<any[]>([]);
 
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
 
   const employeeList = [
-    'Linto George',
-    'Ajay Kumar',
-    'Anju V',
-    'Sankar M',
+    'System Admin',
   ];
 
   const handleFilterPreset = (preset: 'current_month' | 'last_month' | 'last_1_year' | 'custom') => {
@@ -88,24 +78,8 @@ export function AttendanceLogPage() {
     setSelectedExpenses({});
   };
 
-  // Table View rows: Multiple training entries for single employee listed as separate rows!
-  const tableRows = [
-    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '12:00 PM', duration: '3:30:00', expenses: '₹ 80.00', note: '', break: '', tasks: ['Power BI Syllabus Unit 1', 'Assessment Setup'] },
-    { date: '01/06/26', name: 'Linto George', holiday: '', org: 'SB College', location: 'SB College', type: 'Training', mode: 'Offline', start: '01:30 PM', end: '05:00 PM', duration: '3:30:00', expenses: '₹ 70.00', note: '', break: '', tasks: ['MBA Batch 1 Orientation & Intro'] },
-    { date: '02/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '₹ 150.00', note: '', break: '', tasks: ['DAX Expressions Lab', 'Student Practice Guidance'] },
-    { date: '03/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Desktop Installation Sync'] },
-    { date: '04/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Data Modeling & Star Schema'] },
-    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '01:00 PM', duration: '4:30:00', expenses: '₹ 120.00', note: '', break: '', tasks: ['Weekly Batch Test Evaluation'] },
-    { date: '05/06/26', name: 'Linto George', holiday: '', org: 'Vimala College', location: 'Vimala College', type: 'Supervision', mode: 'Offline', start: '02:00 PM', end: '05:00 PM', duration: '3:00:00', expenses: '', note: '', break: '', tasks: ['Lab Supervision Session'] },
-    { date: '06/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Visualizations & Dashboard Layout'] },
-    { date: '07/06/26', name: 'Linto George', holiday: 'Sunday', org: '', location: '', type: 'Holiday', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
-    { date: '08/06/26', name: 'Linto George', holiday: '', org: 'Christ Irinjalakkuda', location: 'KVJ Kochi HQ', type: 'Training', mode: 'Offline', start: '08:30 AM', end: '05:00 PM', duration: '8:30:00', expenses: '', note: '', break: '', tasks: ['Power BI Gateway Configuration'] },
-    { date: '13/06/26', name: 'Linto George', holiday: '', org: '', location: '', type: 'Leave', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
-    { date: '14/06/26', name: 'Linto George', holiday: 'Sunday', org: '', location: '', type: 'Holiday', mode: '', start: '', end: '', duration: '', expenses: '', note: '', break: '', tasks: [] },
-    { date: '24/06/26', name: 'Linto George', holiday: '', org: 'Vimala College', location: 'Vimala College', type: 'Marketing', mode: 'Offline', start: '10:00 AM', end: '03:00 PM', duration: '5:00:00', expenses: '₹ 450.00', note: '', break: '', tasks: ['Principal Meeting & Campus Seminar'] },
-    { date: '25/06/26', name: 'Linto George', holiday: '', org: 'Nehru College', location: 'Nehru College', type: 'Marketing', mode: 'Offline', start: '09:00 AM', end: '05:00 PM', duration: '8:00:00', expenses: '₹ 200.00', note: '', break: '', tasks: ['Career Guidance Workshop'] },
-    { date: '26/06/26', name: 'Linto George', holiday: '', org: 'Office', location: 'KVJ Kochi HQ', type: 'Work', mode: '', start: '09:49 AM', end: '05:31 PM', duration: '7:42:12', expenses: '', note: 'Late', break: '0.73', tasks: ['Internal Operations & Voucher Review'] },
-  ];
+  // Table View rows: empty default attendance data
+  const tableRows: any[] = [];
 
   // Calendar Days mapping: Grouping multiple training sessions together in single date tiles!
   const calendarDays: CalendarDayDetail[] = Array.from({ length: 30 }, (_, i) => {
