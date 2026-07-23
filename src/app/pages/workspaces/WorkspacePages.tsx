@@ -235,7 +235,7 @@ export const AttendancePanel = memo(function AttendancePanel({
             gap: 16,
             padding: '16px 20px',
             borderRadius: 14,
-            background: 'color-mix(in srgb, var(--brand) 5%, var(--bg-sunken))',
+            background: 'var(--bg-sunken)',
             border: '1px solid var(--border)',
             marginBottom: 18,
           }}
@@ -928,30 +928,23 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
 
 /** Resized Stat Pill matching exact height (64px) & style of QuickActionCard */
 function ResizedStatPill({ label, value, tone = 'neutral', icon }: { label: string; value: string; tone?: 'success' | 'warning' | 'info' | 'danger' | 'neutral'; icon?: string }) {
-  const colorMap = {
-    success: 'var(--status-success)',
-    warning: 'var(--status-warning)',
-    info: 'var(--status-info)',
-    danger: 'var(--status-danger)',
-    neutral: 'var(--brand)',
-  };
   return (
-    <div className="kvj-card" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', height: 66 }}>
-      {icon && <span className={`kvj-badge kvj-badge--${tone}`} style={{ width: 32, height: 32, borderRadius: 10, justifyContent: 'center', padding: 0, flexShrink: 0, fontSize: 16 }}>{icon}</span>}
-      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{label}</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+    <div className="kvj-card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', minHeight: 64, borderRadius: 16 }}>
+      {icon && <span className={`kvj-badge kvj-badge--${tone}`} style={{ width: 34, height: 34, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, fontSize: 16 }}>{icon}</span>}
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{label}</span>
+        <span style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
       </div>
     </div>
   );
 }
 
-/** Resized QuickAction matching exact height (66px) */
+/** Resized QuickAction matching exact height (64px) */
 function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
   return (
-    <button onClick={onClick} className="kvj-card kvj-card--hover" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', border: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-primary)', height: 66, width: '100%' }}>
-      <span className="kvj-badge kvj-badge--progress" style={{ width: 32, height: 32, borderRadius: 10, justifyContent: 'center', padding: 0, flexShrink: 0, fontSize: 16 }}>{icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
+    <button onClick={onClick} className="kvj-card kvj-card--hover" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', border: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-primary)', minHeight: 64, width: '100%', borderRadius: 16 }}>
+      <span className="kvj-badge kvj-badge--progress" style={{ width: 34, height: 34, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, fontSize: 16 }}>{icon}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</span>
     </button>
   );
 }
@@ -962,7 +955,11 @@ export function MyDayPage() {
   const { toast, addNotification } = useNotifications();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([
+    { id: '1', title: 'Power BI Unit 1 - Christ 3BBA Syllabus Review & Installation', project: 'Christ 3BBA Data Analytics', due: 'Today, 5:00 PM', priority: 'High', active: false, secondsToday: 3600 },
+    { id: '2', title: 'DAX Expressions Lab & Practice Assessment Grading', project: 'SB College MBA Batch 1', due: 'Today, 6:00 PM', priority: 'Critical', active: false, secondsToday: 1800 },
+    { id: '3', title: 'Weekly Student Progress Log & Attendance Verification', project: 'Internal Operations', due: 'Tomorrow', priority: 'Normal', active: false, secondsToday: 0 },
+  ]);
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
