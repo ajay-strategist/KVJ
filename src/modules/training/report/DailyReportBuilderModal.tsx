@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
 import { Button, SectionHeader, Badge } from '../../../shared/ui/components';
-import type { DailyReportData, DailyReportConfig, SectionId, StudentColumnId } from './daily-report.types';
+import type { DailyReportData, DailyReportConfig, SectionId, StudentColumnId, ReportMode } from './daily-report.types';
 import { SECTIONS } from './daily-report.registry';
 
-const LOCAL_STORAGE_KEY = 'kvj_daily_report_builder_config_v1';
+const LOCAL_STORAGE_KEY = 'kvj_daily_report_builder_config_v2';
 
 interface DailyReportBuilderModalProps {
   isOpen: boolean;
@@ -23,10 +23,14 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
   const defaultAssessments: string[] = data.assessments.map((a) => a.id);
   const defaultColumns: StudentColumnId[] = [
     'studentName',
+    'qualification',
     'attendancePct',
     ...data.assessments.map((a) => a.id),
+    'finalExamMark',
+    'finalExamResult',
   ];
 
+  const [reportMode, setReportMode] = useState<ReportMode>('final');
   const [selectedSections, setSelectedSections] = useState<SectionId[]>(defaultSections);
   const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>(defaultAssessments);
   const [selectedStudentColumns, setSelectedStudentColumns] = useState<StudentColumnId[]>(defaultColumns);
@@ -39,23 +43,30 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
+          if (parsed.reportMode) setReportMode(parsed.reportMode);
           if (Array.isArray(parsed.selectedSections)) setSelectedSections(parsed.selectedSections);
           if (Array.isArray(parsed.selectedAssessmentIds)) setSelectedAssessmentIds(parsed.selectedAssessmentIds);
           if (Array.isArray(parsed.selectedStudentColumns)) {
-            // Filter out deprecated columns
-            setSelectedStudentColumns(
-              parsed.selectedStudentColumns.filter(
-                (c: string) => !['gender', 'hasComputer', 'learnedBefore', 'assessmentStatus', 'finalExamEligibility'].includes(c)
-              )
-            );
+            setSelectedStudentColumns(parsed.selectedStudentColumns);
           }
           if (typeof parsed.trainerNotes === 'string') setTrainerNotes(parsed.trainerNotes);
         }
       } catch (e) {
-        console.warn('Failed to load daily report config from localStorage', e);
+        console.warn('Failed to load report config from localStorage', e);
       }
     }
   }, [isOpen]);
+
+  const handleReportModeChange = (mode: ReportMode) => {
+    setReportMode(mode);
+    if (mode === 'final') {
+      if (!selectedSections.includes('final-exam-results')) {
+        setSelectedSections((prev) => [...prev, 'final-exam-results']);
+      }
+      const finalCols: StudentColumnId[] = ['finalExamMark', 'finalExamResult', 'qualification'];
+      setSelectedStudentColumns((prev) => Array.from(new Set([...prev, ...finalCols])));
+    }
+  };
 
   const handleToggleSection = (id: SectionId) => {
     setSelectedSections((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -116,6 +127,7 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
 
   const handleGenerate = () => {
     const config: DailyReportConfig = {
+      reportMode,
       selectedSections,
       selectedAssessmentIds,
       selectedStudentColumns,
@@ -144,20 +156,69 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
     <Drawer
       open={isOpen}
       onClose={onClose}
-      title="📊 Daily Training Report Builder"
+      title="📊 Report Builder & Intelligence Generator"
       size="lg"
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleGenerate}>📊 Generate Daily Report Preview</Button>
+          <Button onClick={handleGenerate}>📊 Generate {reportMode === 'final' ? 'Final Report' : 'Daily Report'} Preview</Button>
         </div>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '8px 0' }}>
         
-        {/* Header Intro */}
-        <div style={{ background: 'var(--bg-sunken)', padding: 12, borderRadius: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
-          Configure sections, assessment filters, assessment display order, and student table columns for <strong>{data.batchCode} ({data.collegeName})</strong>.
+        {/* REPORT TYPE SELECTOR TOGGLE */}
+        <div style={{ background: 'var(--bg-sunken)', padding: 14, borderRadius: 10, border: '1.5px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            📋 Select Report Format &amp; Scope
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            
+            {/* Daily Report Button */}
+            <button
+              type="button"
+              onClick={() => handleReportModeChange('daily')}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 8,
+                border: reportMode === 'daily' ? '2px solid #2563eb' : '1px solid var(--border)',
+                background: reportMode === 'daily' ? '#eff6ff' : 'var(--bg-surface)',
+                color: reportMode === 'daily' ? '#1e40af' : 'var(--text-secondary)',
+                fontWeight: reportMode === 'daily' ? 800 : 600,
+                fontSize: 12.5,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div>📅 Daily Training Report</div>
+              <div style={{ fontSize: 10.5, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
+                Session attendance, daily log, and prerequisite eligibility status.
+              </div>
+            </button>
+
+            {/* Final Exam Certification Report Button */}
+            <button
+              type="button"
+              onClick={() => handleReportModeChange('final')}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 8,
+                border: reportMode === 'final' ? '2px solid #16a34a' : '1px solid var(--border)',
+                background: reportMode === 'final' ? '#f0fdf4' : 'var(--bg-surface)',
+                color: reportMode === 'final' ? '#166534' : 'var(--text-secondary)',
+                fontWeight: reportMode === 'final' ? 800 : 600,
+                fontSize: 12.5,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div>🎓 Final Certification Exam Report</div>
+              <div style={{ fontSize: 10.5, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
+                Includes Final Exam Marks, Results, and 5 Cross-Demographic Analytics.
+              </div>
+            </button>
+
+          </div>
         </div>
 
         {/* GROUP A: SECTION CHECKBOXES */}
@@ -298,13 +359,16 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
             {/* Standard optional columns */}
             {[
               { id: 'studentName', label: 'Student Name' },
+              { id: 'qualification', label: 'Qualification / Degree' },
               { id: 'attendancePct', label: 'Attendance %' },
+              { id: 'finalExamMark', label: '🎓 Final Exam Mark' },
+              { id: 'finalExamResult', label: '🎓 Final Exam Result' },
             ].map((col) => {
               const isChecked = selectedStudentColumns.includes(col.id as any);
               return (
                 <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: isChecked ? 'var(--bg-surface)' : 'var(--bg-sunken)', cursor: 'pointer', fontSize: 12 }}>
                   <input type="checkbox" checked={isChecked} onChange={() => handleToggleColumn(col.id as any)} />
-                  <span>{col.label}</span>
+                  <span style={{ fontWeight: col.id.startsWith('final') ? 700 : 500, color: col.id.startsWith('final') ? '#16a34a' : 'inherit' }}>{col.label}</span>
                 </label>
               );
             })}
@@ -332,7 +396,7 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
             value={trainerNotes}
             onChange={(e) => setTrainerNotes(e.target.value)}
             rows={3}
-            placeholder="Enter qualitative notes regarding batch engagement, practical lab progress, or coordinator follow-ups..."
+            placeholder="Enter qualitative notes regarding batch engagement, final certification exam remarks, or coordinator follow-ups..."
             style={{ width: '100%', fontSize: 12, padding: 10, borderRadius: 6 }}
           />
         </div>

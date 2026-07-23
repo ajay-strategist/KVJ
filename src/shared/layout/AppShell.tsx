@@ -482,7 +482,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
         )}
 
         {/* ── Main content ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflow: 'hidden' }}>
           {isMobile && !mobileOpen && (
             <button
               type="button"
@@ -502,11 +502,14 @@ function AppShellFrame({ children }: { children: ReactNode }) {
           )}
           <main style={{
             flex: 1,
-            padding: isMobile ? '16px 16px 32px' : '20px 28px 48px 28px',
-            maxWidth: 1600,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: isMobile ? '12px' : '16px 20px 36px 20px',
+            maxWidth: '100%',
             width: '100%',
-            margin: '0 auto',
+            margin: 0,
             boxSizing: 'border-box',
+            overflowY: 'auto',
           }}>
             {children}
           </main>

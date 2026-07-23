@@ -4,6 +4,7 @@
  * glass opacity/blur, accent colors, custom radii, and shadow softness.
  */
 
+import { useState, useEffect } from 'react';
 import { AppShell } from '../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, Button } from '../../shared/ui/components';
 import { useTheme, type ThemeMode } from '../../shared/theme/ThemeProvider';
@@ -323,14 +324,10 @@ export function SettingsPage() {
             <Row label="Role">{user?.role ?? '—'}</Row>
           </Card>
 
-          <Card>
-            <SectionHeader title="Active Modules status" />
-            {Object.entries(features.modules).map(([key, on]) => (
-              <Row key={key} label={key}>
-                <span style={{ color: on ? 'var(--status-success)' : 'var(--text-muted)' }}>{on ? 'Enabled' : 'Disabled'}</span>
-              </Row>
-            ))}
-          </Card>
+          {/* Admin User Management Panel */}
+          {user?.role === 'ADMIN' && (
+            <AdminUserManagementCard />
+          )}
 
         </div>
 
@@ -340,6 +337,195 @@ export function SettingsPage() {
         Lead Design Team Spec · Enterprise OS custom settings are saved and loaded instantly.
       </p>
     </AppShell>
+  );
+}
+
+function AdminUserManagementCard() {
+  const { createUser, updateUser, deleteUser, getUsers } = useAuth();
+  const [usersList, setUsersList] = useState<import('../../modules/auth/auth.service').AuthUser[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<import('../../modules/auth/auth.service').AuthUser | null>(null);
+
+  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<import('../../shared/permissions/roles').RoleKey>('TRAINER');
+  const [password, setPassword] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const reloadUsers = () => {
+    getUsers().then(setUsersList);
+  };
+
+  useEffect(() => {
+    reloadUsers();
+  }, []);
+
+  const openCreateModal = () => {
+    setEditingUser(null);
+    setUsername('');
+    setFullName('');
+    setEmail('');
+    setRole('TRAINER');
+    setPassword('');
+    setMsg(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (u: import('../../modules/auth/auth.service').AuthUser) => {
+    setEditingUser(u);
+    setUsername(u.username || '');
+    setFullName(u.fullName || '');
+    setEmail(u.email || '');
+    setRole(u.role || 'TRAINER');
+    setPassword('');
+    setMsg(null);
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!username || !fullName || !email) {
+      setMsg('❌ All fields (Username, Full Name, Email) are required.');
+      return;
+    }
+
+    try {
+      if (editingUser) {
+        await updateUser(editingUser.id, {
+          username,
+          fullName,
+          email,
+          role,
+          ...(password ? { password } : {}),
+        });
+        setMsg(`✅ User "${fullName}" updated successfully!`);
+      } else {
+        await createUser({ username, fullName, email, role });
+        setMsg(`✅ User "${username}" created successfully! Default password: "password" (Must reset password on first login).`);
+      }
+      reloadUsers();
+      setTimeout(() => {
+        setModalOpen(false);
+        setMsg(null);
+      }, 1500);
+    } catch (e: any) {
+      setMsg(`❌ ${e?.message || 'Operation failed.'}`);
+    }
+  };
+
+  const handleDelete = async (u: import('../../modules/auth/auth.service').AuthUser) => {
+    if (u.username === 'Admin' || u.id === 'u-admin') {
+      alert('Cannot delete root System Admin user.');
+      return;
+    }
+    if (confirm(`Are you sure you want to delete user "${u.fullName}" (${u.username || u.email})?`)) {
+      await deleteUser(u.id);
+      reloadUsers();
+      setModalOpen(false);
+    }
+  };
+
+  return (
+    <Card style={{ border: '2px solid var(--brand)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div>
+          <SectionHeader title="👑 Admin User Management & Access Control" />
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+            Manage platform users, roles, default passwords, and access privileges.
+          </p>
+        </div>
+        <Button size="sm" onClick={openCreateModal}>
+          ➕ Add New User
+        </Button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+        {usersList.map((u) => (
+          <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
+            <div>
+              <strong style={{ fontSize: 13 }}>{u.fullName} ({u.username || u.email})</strong>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.email} · Role: <strong>{u.role}</strong></div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {u.mustChangePassword ? (
+                <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 12, background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                  ⚠️ Password Reset Pending
+                </span>
+              ) : (
+                <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 12, background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>
+                  ✓ Active
+                </span>
+              )}
+              <Button size="sm" variant="secondary" onClick={() => openEditModal(u)} style={{ padding: '4px 10px', fontSize: 11 }}>
+                ✏️ Edit
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {modalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--bg-surface)', padding: 24, borderRadius: 16, width: 440, border: '1px solid var(--border)' }}>
+            <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>
+              {editingUser ? `✏️ Edit User: ${editingUser.fullName}` : '➕ Add New User'}
+            </h3>
+
+            {msg && <div style={{ fontSize: 12, padding: '8px 12px', borderRadius: 6, background: msg.startsWith('✅') ? '#dcfce7' : '#fee2e2', color: msg.startsWith('✅') ? '#15803d' : '#b91c1c', marginBottom: 12, fontWeight: 600 }}>{msg}</div>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Username</label>
+                <input type="text" className="kvj-input" placeholder="e.g. AnilKumar" value={username} onChange={(e) => setUsername(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Full Name</label>
+                <input type="text" className="kvj-input" placeholder="e.g. Prof. Anil Kumar" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Email</label>
+                <input type="email" className="kvj-input" placeholder="anil.kumar@kvjanalytics.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Role</label>
+                <select className="kvj-select" style={{ width: '100%' }} value={role} onChange={(e) => setRole(e.target.value as any)}>
+                  <option value="TRAINER">TRAINER</option>
+                  <option value="MANAGER">COORDINATOR / MANAGER</option>
+                  <option value="EMPLOYEE">EMPLOYEE</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </div>
+
+              {editingUser && (
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Reset / Change Password (Optional)</label>
+                  <input type="password" className="kvj-input" placeholder="Leave empty to keep current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                </div>
+              )}
+
+              {!editingUser && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-sunken)', padding: 8, borderRadius: 6, marginTop: 4 }}>
+                  ℹ️ Default password will be set to <strong>password</strong>. User must change password upon first login.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+                {editingUser && editingUser.id !== 'u-admin' ? (
+                  <button type="button" onClick={() => handleDelete(editingUser)} style={{ color: 'var(--status-danger)', border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                    🗑️ Delete User
+                  </button>
+                ) : <div />}
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+                  <Button onClick={handleSave}>{editingUser ? 'Save Changes' : 'Create User'}</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 

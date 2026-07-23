@@ -16,9 +16,14 @@ interface AuthContextValue {
   user: Session['user'] | null;
   principal: PrincipalLike | null; // fed to the permission engine
   status: 'loading' | 'authenticated' | 'unauthenticated';
-  login: (creds: Credentials) => Promise<void>;
+  login: (creds: Credentials) => Promise<Session>;
   logout: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ sent: boolean }>;
+  createUser: (input: import('./auth.service').NewUserInput) => Promise<import('./auth.service').AuthUser>;
+  updateUser: (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string }>) => Promise<import('./auth.service').AuthUser>;
+  deleteUser: (userId: string) => Promise<{ ok: boolean }>;
+  updateUserPassword: (userId: string, newPassword: string) => Promise<{ ok: boolean }>;
+  getUsers: () => Promise<import('./auth.service').AuthUser[]>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -54,6 +59,7 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     setSession(s);
     setStatus('authenticated');
     eventBus.emit('auth.login', { userId: s.user.id, role: s.user.role });
+    return s;
   }, [authService]);
 
   const logout = useCallback(async () => {
@@ -75,10 +81,35 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     [session],
   );
 
+  const createUser = useCallback(async (input: import('./auth.service').NewUserInput) => {
+    return authService.createUser(input);
+  }, [authService]);
+
+  const updateUser = useCallback(async (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string }>) => {
+    return authService.updateUser(userId, data);
+  }, [authService]);
+
+  const deleteUser = useCallback(async (userId: string) => {
+    return authService.deleteUser(userId);
+  }, [authService]);
+
+  const updateUserPassword = useCallback(async (userId: string, newPassword: string) => {
+    const res = await authService.updateUserPassword(userId, newPassword);
+    if (session && session.user.id === userId) {
+      setSession((prev) => prev ? { ...prev, user: { ...prev.user, mustChangePassword: false } } : null);
+    }
+    return res;
+  }, [authService, session]);
+
+  const getUsers = useCallback(async () => {
+    return authService.getUsers();
+  }, [authService]);
+
   const value = useMemo<AuthContextValue>(() => ({
     session, user: session?.user ?? null, principal, status, login, logout,
     requestPasswordReset: authService.requestPasswordReset.bind(authService),
-  }), [session, principal, status, login, logout, authService]);
+    createUser, updateUser, deleteUser, updateUserPassword, getUsers,
+  }), [session, principal, status, login, logout, authService, createUser, updateUser, deleteUser, updateUserPassword, getUsers]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

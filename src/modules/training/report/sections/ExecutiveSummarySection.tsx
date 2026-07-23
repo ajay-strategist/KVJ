@@ -14,14 +14,14 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
       <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-        📊 Executive Summary & Batch Intelligence Overview
+        📊 Executive Summary &amp; Batch Intelligence Overview
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>
         Core batch profile, enrolled strength metrics, attendance gauge, and student demographics.
       </div>
 
       {/* Top Row: Total Students KPI Card + Overall Attendance Gauge Chart */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+      <div className="card-avoid-break" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         
         {/* Total Students KPI Card */}
         <div
@@ -59,7 +59,7 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
       </div>
 
       {/* Middle Row: Donut Charts Grid (Gender, Prior Course Knowledge, Laptop Availability) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14 }}>
+      <div className="chart-avoid-break" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         <GenderDonutChart
           femaleCount={kpis.femaleCount}
           maleCount={kpis.maleCount}
@@ -79,7 +79,10 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
 
       {/* EXECUTIVE TRAINING INTELLIGENCE CALLOUT BOX */}
       <div
+        className="card-avoid-break"
         style={{
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
           background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)',
           border: '1.5px solid #bfdbfe',
           borderRadius: 8,

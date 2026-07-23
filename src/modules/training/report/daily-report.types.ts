@@ -1,5 +1,5 @@
 /**
- * Daily Training Report Types & Interfaces
+ * Daily & Final Training Report Types & Interfaces
  */
 
 export type SectionId =
@@ -17,6 +17,7 @@ export type SectionId =
   | 'not-attended-students'
   | 'final-exam-eligibility'
   | 'eligibility-charts'
+  | 'final-exam-results'
   | 'student-data'
   | 'progress-analytics'
   | 'risk-analysis'
@@ -27,14 +28,20 @@ export type StudentColumnId =
   | 'registerNo'
   | 'studentName'
   | 'gender'
+  | 'qualification'
   | 'hasComputer'
   | 'learnedBefore'
   | 'attendancePct'
   | 'assessmentStatus'
   | 'finalExamEligibility'
+  | 'finalExamMark'
+  | 'finalExamResult'
   | string; // Allows dynamic assessment IDs like 'ass-1', 'ass-2'
 
+export type ReportMode = 'daily' | 'final';
+
 export interface DailyReportConfig {
+  reportMode?: ReportMode;
   selectedSections: SectionId[];
   selectedAssessmentIds: string[];
   selectedStudentColumns: StudentColumnId[];
@@ -87,6 +94,7 @@ export interface StudentReportRow {
   batch: string;
   avatarUrl?: string;
   gender?: 'Male' | 'Female';
+  qualification?: string; // e.g., B.Tech CS, BCA, B.Com, MCA
   hasComputer?: 'Yes' | 'No';
   learnedBefore?: 'Yes' | 'No';
   attendancePct: number;
@@ -95,6 +103,8 @@ export interface StudentReportRow {
   assessmentScores: Record<string, StudentAssessmentScore>;
   assessmentStatus: 'Completed' | 'Pending' | 'Failed';
   finalExamEligibility: 'Eligible' | 'Not Eligible';
+  finalExamMark?: number;
+  finalExamResult?: 'Passed' | 'Failed';
   eligibilityReason?: string;
   remarks?: string;
 }
@@ -136,6 +146,8 @@ export interface DailyReportData {
   totalStudents: number;
   courseMaxMarks: number;
   finalExamPassMarkPercent: number; // e.g. 70
+  finalExamTitle?: string;
+  finalExamDate?: string;
   assessments: AssessmentDefinition[];
   sessions: SessionAttendanceRecord[];
   students: StudentReportRow[];

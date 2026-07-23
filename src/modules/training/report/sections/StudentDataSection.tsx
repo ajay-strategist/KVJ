@@ -11,10 +11,8 @@ interface RegisterColumn {
 }
 
 /**
- * How many DATA columns (attendance + assessments) fit beside the identity
- * columns on one A4 page before the table runs off the edge. Beyond this the
- * register is split into stacked sub-tables, each repeating the identity
- * columns and carrying its own header — instead of one table that overflows.
+ * How many DATA columns (attendance + assessments + final exam) fit beside the
+ * identity columns on one A4 page before the table runs off the edge.
  */
 const MAX_DATA_COLS_PER_TABLE = 4;
 
@@ -47,6 +45,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
       render: (st) => <span style={{ fontWeight: 700, color: '#2563eb' }}>{st.phone}</span>,
     },
   ];
+
   if (selectedCols.includes('studentName')) {
     identityCols.push({
       id: 'name', header: 'Student Name', short: 'Name', align: 'left',
@@ -54,8 +53,16 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
     });
   }
 
-  // ── Data columns: attendance + each selected assessment. These get chunked. ──
+  if (selectedCols.includes('qualification')) {
+    identityCols.push({
+      id: 'qualification', header: 'Qualification', short: 'Degree', align: 'left',
+      render: (st) => <span style={{ fontWeight: 600, color: '#334155' }}>{st.qualification || '—'}</span>,
+    });
+  }
+
+  // ── Data columns: attendance + each selected assessment + final exam results. ──
   const dataCols: RegisterColumn[] = [];
+
   if (selectedCols.includes('attendancePct')) {
     dataCols.push({
       id: 'attendancePct', header: 'Attendance %', short: 'Attendance', align: 'center',
@@ -72,6 +79,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
       },
     });
   }
+
   for (const ass of selectedAsses) {
     if (!selectedCols.includes(ass.id)) continue;
     dataCols.push({
@@ -80,6 +88,43 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
         const sc = st.assessmentScores[ass.id];
         if (!sc || !sc.attempted) return <span style={{ color: '#94a3b8' }}>—</span>;
         return <span style={{ fontWeight: 700, color: sc.passed ? '#16a34a' : '#dc2626' }}>{sc.marks}% {sc.passed ? '✓' : '✗'}</span>;
+      },
+    });
+  }
+
+  if (selectedCols.includes('finalExamMark')) {
+    dataCols.push({
+      id: 'finalExamMark', header: 'Final Exam Mark', short: 'Final Mark', align: 'center',
+      render: (st) => {
+        const mark = st.finalExamMark;
+        if (mark === undefined) return <span style={{ color: '#94a3b8' }}>—</span>;
+        const passed = mark >= (data.finalExamPassMarkPercent || 70);
+        return <span style={{ fontWeight: 800, color: passed ? '#16a34a' : '#dc2626' }}>{mark} / 100</span>;
+      },
+    });
+  }
+
+  if (selectedCols.includes('finalExamResult')) {
+    dataCols.push({
+      id: 'finalExamResult', header: 'Final Exam Result', short: 'Result', align: 'center',
+      render: (st) => {
+        const res = st.finalExamResult || ((st.finalExamMark ?? 0) >= (data.finalExamPassMarkPercent || 70) ? 'Passed' : 'Failed');
+        const isPass = res === 'Passed';
+        return (
+          <span
+            style={{
+              background: isPass ? '#dcfce7' : '#fee2e2',
+              color: isPass ? '#166534' : '#991b1b',
+              border: `1px solid ${isPass ? '#86efac' : '#fca5a5'}`,
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontWeight: 800,
+              fontSize: 10,
+            }}
+          >
+            {isPass ? '✓ Passed' : '✗ Failed'}
+          </span>
+        );
       },
     });
   }
@@ -95,7 +140,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
         👨‍🎓 Student Performance Register
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
-        Complete academic performance, attendance, and assessment records for every enrolled student.
+        Complete academic performance, attendance, assessment, and final exam certification records for every enrolled student.
         {multi && ` The register is split into ${groups.length} parts so every column stays readable on the page.`}
       </div>
 
@@ -124,7 +169,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
               </thead>
               <tbody>
                 {data.students.map((st, idx) => (
-                  <tr key={st.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <tr key={st.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                     {cols.map((c) => (
                       <td key={c.id} style={{ padding: '4px 6px', textAlign: c.align }}>
                         {c.render(st)}

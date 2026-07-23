@@ -2612,13 +2612,7 @@ export function BatchManagement() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {canViewDailyReport && (
-            <Button onClick={() => setDailyReportBuilderOpen(true)}>
-              📊 Daily Report Builder
-            </Button>
-          )}
-        </div>
+
       </div>
 
       {/* Training Batch Overview Carousel — one card per assigned batch.
