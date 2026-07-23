@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, SectionHeader, Badge } from '../../../shared/ui/components';
 
 export interface SessionEntry {
@@ -28,6 +28,7 @@ export interface AttendanceCalendarViewProps {
   selectedEmployeeName: string;
   showTopSummaries?: boolean;
   showBottomSummaries?: boolean;
+  showCalendarGrid?: boolean;
 }
 
 export function AttendanceCalendarView({
@@ -35,6 +36,7 @@ export function AttendanceCalendarView({
   selectedEmployeeName,
   showTopSummaries = true,
   showBottomSummaries = true,
+  showCalendarGrid = true,
 }: AttendanceCalendarViewProps) {
   const [selectedDay, setSelectedDay] = useState<CalendarDayDetail | null>(null);
   const [selectedFY, setSelectedFY] = useState('FY 2026-27');
@@ -55,46 +57,121 @@ export function AttendanceCalendarView({
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  // Monthly summary stats matching specs
-  const monthlyStats = {
-    workingDaysInMonth: 26,
-    daysToBeWorked: 26,
-    noOfLeaves: 1,
-    holidayWorked: 0,
-    workingDays: 25,
-    lateReporting: 1,
-    earlyLeaving: 0,
-    totalBreakHrs: 0.73,
-    totalExpenses: 4806.0,
+  // Helper to parse time strings like "08:30 AM" into minutes from midnight
+  const parseTime = (timeStr?: string) => {
+    if (!timeStr) return null;
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return null;
+    let [_, hrs, mins, amp] = match;
+    let h = parseInt(hrs, 10);
+    const m = parseInt(mins, 10);
+    if (amp.toUpperCase() === 'PM' && h < 12) h += 12;
+    if (amp.toUpperCase() === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
   };
+
+  const isLate = (timeStr?: string) => {
+    const mins = parseTime(timeStr);
+    return mins !== null && mins > 9 * 60; // Late if clock-in is after 09:00 AM
+  };
+
+  const isEarly = (timeStr?: string) => {
+    const mins = parseTime(timeStr);
+    return mins !== null && mins < 17 * 60; // Early if clock-out is before 05:00 PM
+  };
+
+  // Monthly summary stats calculated dynamically
+  const monthlyStats = useMemo(() => {
+    const workingDaysInMonth = days.filter((d) => d.dayName !== 'Sun').length;
+    const daysToBeWorked = days.filter((d) => d.dayName !== 'Sun' && d.status !== 'holiday').length;
+    const noOfLeaves = days.filter((d) => d.status === 'leave').length;
+    const holidayWorked = days.filter((d) => d.status === 'present' && d.dayName === 'Sun').length;
+    const workingDays = days.filter((d) => d.status === 'present').length;
+    const lateReporting = days.filter((d) => d.status === 'present' && isLate(d.startTime)).length;
+    const earlyLeaving = days.filter((d) => d.status === 'present' && isEarly(d.endTime)).length;
+
+    const totalBreakHrs = 0; // Not logged daily in detail array
+
+    const totalExpenses = days.reduce((sum, d) => {
+      const amt = parseFloat(d.expenses.replace(/[^\d.]/g, '')) || 0;
+      return sum + amt;
+    }, 0);
+
+    return {
+      workingDaysInMonth,
+      daysToBeWorked,
+      noOfLeaves,
+      holidayWorked,
+      workingDays,
+      lateReporting,
+      earlyLeaving,
+      totalBreakHrs,
+      totalExpenses,
+    };
+  }, [days]);
 
   // Financial Year Accumulated Stats matching specs
-  const fyStats = {
-    joinedDate: '01/12/2024',
-    workingDaysInFY: 312,
-    daysToBeWorkedFY: 312,
-    noOfLeavesFY: 12,
-    holidayWorkedFY: 3,
-    workingDaysFY: 297,
-    lateReportingFY: 8,
-    earlyLeavingFY: 1,
-    totalBreakHrsFY: 14.5,
-    totalExpensesFY: 54200.0,
-  };
+  const fyStats = useMemo(() => {
+    return {
+      joinedDate: '—',
+      workingDaysInFY: monthlyStats.workingDaysInMonth,
+      daysToBeWorkedFY: monthlyStats.daysToBeWorked,
+      noOfLeavesFY: monthlyStats.noOfLeaves,
+      holidayWorkedFY: monthlyStats.holidayWorked,
+      workingDaysFY: monthlyStats.workingDays,
+      lateReportingFY: monthlyStats.lateReporting,
+      earlyLeavingFY: monthlyStats.earlyLeaving,
+      totalBreakHrsFY: monthlyStats.totalBreakHrs,
+      totalExpensesFY: monthlyStats.totalExpenses,
+    };
+  }, [monthlyStats]);
 
-  const orgBreakdown = [
-    { organization: 'Vimala College', avgDuration: 5.0 },
-    { organization: 'Office', avgDuration: 7.7 },
-    { organization: 'Nehru College', avgDuration: 8.0 },
-    { organization: 'Christ Irinjalakkuda', avgDuration: 8.5 },
-    { organization: 'SB College', avgDuration: 3.5 },
-  ];
+  const orgBreakdown = useMemo(() => {
+    const orgMap: Record<string, { totalHrs: number; count: number }> = {};
+    days.forEach((d) => {
+      if (d.status === 'present') {
+        const loc = d.location || 'Office';
+        const hrs = parseFloat(d.hoursWorked.replace(/[^\d.]/g, '')) || 0;
+        if (!orgMap[loc]) orgMap[loc] = { totalHrs: 0, count: 0 };
+        orgMap[loc].totalHrs += hrs;
+        orgMap[loc].count += 1;
+      }
+    });
+    return Object.entries(orgMap).map(([organization, data]) => ({
+      organization,
+      avgDuration: data.count > 0 ? Math.round((data.totalHrs / data.count) * 10) / 10 : 0,
+    }));
+  }, [days]);
 
-  const classSupervisionSummary = [
-    { institution: 'Christ Irinjalakkuda', physicalClasses: 22, physicalSupervision: 0, totalPhysical: 22, onlineClasses: 0, physicalClassDuration: 187, physicalSupervisionDuration: 0, totalPhysicalDuration: 187, onlineDuration: 0 },
-    { institution: 'Vimala College', physicalClasses: 4, physicalSupervision: 0, totalPhysical: 4, onlineClasses: 0, physicalClassDuration: 20, physicalSupervisionDuration: 0, totalPhysicalDuration: 20, onlineDuration: 0 },
-    { institution: 'SB College', physicalClasses: 3, physicalSupervision: 0, totalPhysical: 3, onlineClasses: 0, physicalClassDuration: 15, physicalSupervisionDuration: 0, totalPhysicalDuration: 15, onlineDuration: 0 },
-  ];
+  const classSupervisionSummary = useMemo(() => {
+    const instMap: Record<string, { physicalCount: number; onlineCount: number; physicalDur: number; onlineDur: number }> = {};
+    days.forEach((d) => {
+      if (d.status === 'present') {
+        const loc = d.location || 'Office';
+        if (loc === 'Office') return;
+        const hrs = parseFloat(d.hoursWorked.replace(/[^\d.]/g, '')) || 0;
+        if (!instMap[loc]) instMap[loc] = { physicalCount: 0, onlineCount: 0, physicalDur: 0, onlineDur: 0 };
+
+        const isOnline = d.sessions?.some((s) => s.location.toLowerCase().includes('online')) || false;
+        if (isOnline) {
+          instMap[loc].onlineCount += 1;
+          instMap[loc].onlineDur += hrs;
+        } else {
+          instMap[loc].physicalCount += 1;
+          instMap[loc].physicalDur += hrs;
+        }
+      }
+    });
+    return Object.entries(instMap).map(([institution, data]) => ({
+      institution,
+      physicalClasses: data.physicalCount,
+      onlineClasses: data.onlineCount,
+      physicalClassDuration: data.physicalDur,
+      onlineDuration: data.onlineDur,
+      totalPhysicalDuration: data.physicalDur + data.onlineDur,
+    }));
+  }, [days]);
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -169,7 +246,7 @@ export function AttendanceCalendarView({
       )}
 
       {/* Main Core Full-Width Calendar View Grid (Grouped Multiple Sessions) */}
-      {days.length > 0 && (
+      {showCalendarGrid && days.length > 0 && (
         <Card>
           <SectionHeader title={`Monthly Attendance Calendar Grid — ${selectedEmployeeName}`} />
 
@@ -184,12 +261,13 @@ export function AttendanceCalendarView({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
             {days.map((d, i) => {
               const styles = getStatusColor(d.status);
+              const startColIdx = daysOfWeek.indexOf(d.dayName);
               return (
                 <div
                   key={i}
                   onClick={() => setSelectedDay(d)}
                   style={{
-                    gridColumnStart: i === 0 ? 2 : undefined, // Monday start for Day 1
+                    gridColumnStart: i === 0 && startColIdx !== -1 ? startColIdx + 1 : undefined,
                     background: styles.bg,
                     border: `1.5px solid ${styles.border}`,
                     borderRadius: 'var(--radius-sm)',

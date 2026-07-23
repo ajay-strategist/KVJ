@@ -24,9 +24,6 @@ export interface BatchAction {
 const ACTIONS: BatchAction[] = [
   { id: 'student',     label: 'Student Data',       icon: '👨‍🎓' },
   { id: 'daily',       label: 'Daily Report',       icon: '📊' },
-  { id: 'final',       label: 'Final Report',       icon: '📄' },
-  { id: 'attendance',  label: 'Attendance',         icon: '📊' },
-  { id: 'assessments', label: 'Assessments',        icon: '📝' },
   { id: 'documents',   label: 'Certificate Receipt', icon: '📜' },
 ];
 
@@ -62,8 +59,8 @@ export interface BatchCardVM {
 export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): BatchCardVM {
   const course = courses.find((c) => c.id === b.courseId);
   const trainer = trainers.find((t) => t.id === b.trainerId);
-  const total = b.totalTasks ?? 8;
-  const done  = b.completedTasks ?? 8;
+  const total = b.totalTasks ?? 0;
+  const done  = b.completedTasks ?? 0;
   return {
     id:            b.id,
     trainingName:  b.trainingName || course?.title || b.code,
@@ -73,13 +70,13 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
     program:       (b as any).program || (course as any)?.program || '—',
     academicYear:  b.academicYear || '—',
     batchNo:       b.batchNo || b.code,
-    trainer:       trainer ? `${trainer.firstName} ${trainer.lastName}` : (b as any).trainer || 'Priya Nair',
-    coordinator:   b.coordinator || 'Prof. Anil Kumar',
+    trainer:       trainer ? `${trainer.firstName} ${trainer.lastName}` : (b as any).trainer || '—',
+    coordinator:   b.coordinator || '—',
     startDate:     b.startDate,
     endDate:       b.endDate,
     completedTasks: done,
     totalTasks:     total,
-    progress:       total > 0 ? Math.round((done / total) * 100) : 100,
+    progress:       total > 0 ? Math.round((done / total) * 100) : 0,
   };
 }
 
@@ -94,14 +91,14 @@ function loadPrefs(): Prefs {
 interface ChecklistTask { id: string; label: string; done: boolean }
 function defaultChecklist(batchId: string): ChecklistTask[] {
   return [
-    { id: `${batchId}-cl-1`, label: 'College Confirmation Form Signed', done: true },
-    { id: `${batchId}-cl-2`, label: 'Trainer Assigned',                  done: true },
-    { id: `${batchId}-cl-3`, label: 'Student Registry Uploaded',          done: true },
-    { id: `${batchId}-cl-4`, label: 'Syllabus Dispatched',                done: true },
-    { id: `${batchId}-cl-5`, label: 'Daily Sessions Logged',              done: true },
-    { id: `${batchId}-cl-6`, label: 'Final Report Generated',             done: true },
-    { id: `${batchId}-cl-7`, label: 'Certificates Dispatched',            done: true },
-    { id: `${batchId}-cl-8`, label: 'Signed Receipt Uploaded',            done: true },
+    { id: `${batchId}-cl-1`, label: 'College Confirmation Form Signed', done: false },
+    { id: `${batchId}-cl-2`, label: 'Trainer Assigned',                  done: false },
+    { id: `${batchId}-cl-3`, label: 'Student Registry Uploaded',          done: false },
+    { id: `${batchId}-cl-4`, label: 'Syllabus Dispatched',                done: false },
+    { id: `${batchId}-cl-5`, label: 'Daily Sessions Logged',              done: false },
+    { id: `${batchId}-cl-6`, label: 'Final Report Generated',             done: false },
+    { id: `${batchId}-cl-7`, label: 'Certificates Dispatched',            done: false },
+    { id: `${batchId}-cl-8`, label: 'Signed Receipt Uploaded',            done: false },
   ];
 }
 

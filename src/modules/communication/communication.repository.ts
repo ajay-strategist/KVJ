@@ -2,7 +2,7 @@ import type { IRepository } from '../../core/repository';
 import type { Entity, UUID } from '../../core/types';
 import { createToken } from '../../core/registry';
 
-export type ChannelType = 'direct' | 'team' | 'project' | 'department' | 'training';
+export type ChannelType = 'direct' | 'team' | 'project' | 'department' | 'training' | 'announcement';
 
 export interface ChatChannel extends Entity {
   name?: string;
@@ -10,6 +10,11 @@ export interface ChatChannel extends Entity {
   projectId?: UUID;
   trainingId?: UUID;
   department?: string;
+  isMuted?: boolean;
+  isArchived?: boolean;
+  isStarred?: boolean;
+  pinnedMessageId?: UUID;
+  members?: UUID[];
 }
 
 export interface Reaction {
@@ -25,6 +30,11 @@ export interface ChatMessage extends Entity {
   replyTo?: UUID;
   reactions?: Reaction[];
   readBy?: UUID[];
+  isEdited?: boolean;
+  isDeleted?: boolean;
+  isPinned?: boolean;
+  fileAttachment?: { name: string; type: 'image' | 'pdf' | 'file'; url: string; size: string };
+  replyToMessage?: { id: string; senderName: string; text: string };
 }
 
 export interface Announcement extends Entity {

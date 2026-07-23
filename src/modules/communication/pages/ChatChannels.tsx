@@ -1,578 +1,1183 @@
-/**
- * KVJ Analytics — Full Enterprise Chat Module (Phase 2 Upgrade)
- * Spec Section 9:
- *  - Categories: Personal (DMs), Department, Project, Training/Batch, Admin
- *  - Message Features: Edit, Delete for me, Delete for everyone, Thread reply, Emoji reactions, Pin message
- *  - File sharing: Inline images, PDF icons, attachments
- *  - Search within channel
- *  - Unread counters per channel
- *  - Group management (Create/Rename/Archive/Add/Remove)
- */
-
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Button, Avatar, Badge, SearchInput, Tooltip } from '../../../shared/ui/components';
+import { Button, Avatar, Badge, SearchInput } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { useCommunication } from '../hooks/useCommunication';
+import { useEmployee } from '../../employee/hooks/useEmployee';
+import type { UUID } from '../../../core/types';
+import { container } from '../../../core/registry';
+import { CHAT_CHANNEL_REPOSITORY_TOKEN, type ChannelType } from '../communication.repository';
 
-export type ChannelCategory = 'dm' | 'department' | 'project' | 'training' | 'admin';
-
-export interface ChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar?: string;
-  senderRole?: string;
-  text: string;
-  createdAt: string;
-  reactions?: Record<string, string[]>; // emoji -> array of usernames
-  replyTo?: { id: string; senderName: string; text: string };
-  isPinned?: boolean;
-  isEdited?: boolean;
-  isDeleted?: boolean;
-  fileAttachment?: { name: string; type: 'image' | 'pdf' | 'file'; url: string; size: string };
-}
-
-export interface ChatChannel {
-  id: string;
-  name: string;
-  category: ChannelCategory;
-  description?: string;
-  unreadCount?: number;
-  isPrivate?: boolean;
-  membersCount?: number;
-  lastMessage?: string;
-  lastMessageTime?: string;
-  pinnedMessageId?: string;
-}
-
-const SAMPLE_CHANNELS: ChatChannel[] = [
-  { id: 'c-gen', name: 'General Operations', category: 'department', description: 'Company-wide updates and announcements', unreadCount: 2, membersCount: 24, lastMessage: 'Q3 schedule has been finalized', lastMessageTime: '10:30 AM' },
-  { id: 'c-train', name: 'Christ College B3 Batch', category: 'training', description: 'Batch coordination & daily session chat', unreadCount: 5, membersCount: 42, lastMessage: 'Day 3 attendance sheet uploaded', lastMessageTime: '11:45 AM' },
-  { id: 'c-proj', name: 'KVJ-PROJ-101 Multi-Tenant', category: 'project', description: 'Engineering team dev updates', unreadCount: 0, membersCount: 8, lastMessage: 'Supabase RLS migration done', lastMessageTime: 'Yesterday' },
-  { id: 'c-admin', name: 'Executive Leadership', category: 'admin', description: 'Management & CEO discussion', unreadCount: 1, isPrivate: true, membersCount: 4, lastMessage: 'Monthly expense claims approved', lastMessageTime: '09:15 AM' },
-  { id: 'dm-1', name: 'Ajay Kumar (Lead)', category: 'dm', description: 'Direct Message', unreadCount: 0, membersCount: 2, lastMessage: 'Can you review the training deck?', lastMessageTime: 'Jul 21' },
-  { id: 'dm-2', name: 'Anju V (Senior Trainer)', category: 'dm', description: 'Direct Message', unreadCount: 1, membersCount: 2, lastMessage: 'Vimala batch certificates printed', lastMessageTime: '08:00 AM' },
-];
-
-const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
-  'c-gen': [
-    { id: 'm1', senderId: 'u1', senderName: 'Manager Ops', text: 'Good morning team! Please submit all pending attendance logs by 5 PM today.', createdAt: '09:00 AM', reactions: { '👍': ['Linto George', 'Ajay Kumar'] } },
-    { id: 'm2', senderId: 'u2', senderName: 'Linto George', text: 'Got it! Attendance for Christ College B3 is logged.', createdAt: '09:15 AM', reactions: { '🙌': ['Manager Ops'] } },
-    { id: 'm3', senderId: 'u3', senderName: 'CEO', text: 'Great work team on the Q2 training milestones!', createdAt: '10:30 AM', isPinned: true, reactions: { '🎉': ['Linto George', 'Anju V', 'Ajay Kumar'] } },
-  ],
-  'c-train': [
-    { id: 'm4', senderId: 'u2', senderName: 'Linto George', text: 'Day 3 Power BI DAX Session starts at 10:00 AM in Lab 2.', createdAt: '09:45 AM' },
-    { id: 'm5', senderId: 'u4', senderName: 'Anju V', text: 'Lab system updates applied on all 45 workstations.', createdAt: '10:05 AM', fileAttachment: { name: 'Lab_Setup_Checklist.pdf', type: 'pdf', url: '#', size: '1.2 MB' } },
-    { id: 'm6', senderId: 'u2', senderName: 'Linto George', text: 'Here is the Day 3 session cover banner.', createdAt: '11:45 AM', fileAttachment: { name: 'PowerBI_Session_3.png', type: 'image', url: '/logo.png', size: '240 KB' } },
-  ],
-};
+export type ChannelCategory = 'announcement' | 'department' | 'dm' | 'starred' | 'archived';
 
 const CATEGORY_LABELS: Record<ChannelCategory, { label: string; icon: string }> = {
-  dm: { label: 'Direct Messages', icon: '👤' },
+  announcement: { label: 'Announcements', icon: '📢' },
   department: { label: 'Departments', icon: '🏢' },
-  project: { label: 'Projects', icon: '🚀' },
-  training: { label: 'Training Batches', icon: '🎓' },
-  admin: { label: 'Leadership', icon: '🔒' },
+  starred: { label: 'Starred Chats', icon: '⭐' },
+  archived: { label: 'Archived Chats', icon: '📁' },
+  dm: { label: 'Direct Messages', icon: '👤' },
 };
 
 export function ChatChannels() {
   const { user } = useAuth();
   const { toast } = useNotifications();
+  const { employees, loading: employeesLoading } = useEmployee();
 
-  const [activeChannelId, setActiveChannelId] = useState<string>('c-gen');
-  const [channels, setChannels] = useState<ChatChannel[]>(SAMPLE_CHANNELS);
-  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
+  // Active channel and layout state
+  const [activeChannelId, setActiveChannelId] = useState<string>('c-general');
+  const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
+  const [activeCategory, setActiveCategory] = useState<ChannelCategory>('department');
 
+  // Input composer state
   const [text, setText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [channelSearch, setChannelSearch] = useState('');
-  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
+  const [composerAttachment, setComposerAttachment] = useState<{ name: string; type: 'image' | 'pdf' | 'file'; url: string; size: string } | null>(null);
+  const [replyToMessage, setReplyToMessage] = useState<{ id: string; senderName: string; text: string } | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
-  const [createChannelOpen, setCreateChannelOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<{ name: string; type: 'image' | 'pdf' | 'file'; url: string; size: string } | null>(null);
+  // Search filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [channelSearch, setChannelSearch] = useState('');
 
+  // Dropdown states
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+
+  // Voice recording simulation
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordDuration, setRecordDuration] = useState(0);
+  const recordTimerRef = useRef<any>(null);
+
+  // Modal states
+  const [createChannelOpen, setCreateChannelOpen] = useState(false);
+  const [createDmOpen, setCreateDmOpen] = useState(false);
+
+  // Layout refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const composerInputRef = useRef<HTMLInputElement>(null);
+
+  // Hooks data layer
+  const {
+    channels: repoChannels,
+    messages: repoMessages,
+    typingUsers,
+    sendMessage: hookSendMessage,
+    editMessage: hookEditMessage,
+    deleteMessage: hookDeleteMessage,
+    toggleReaction: hookToggleReaction,
+    togglePinMessage: hookTogglePinMessage,
+    sendTypingStatus,
+    createChannel: hookCreateChannel,
+  } = useCommunication(activeChannelId ? (activeChannelId as UUID) : undefined);
+
+  // Map database channels to local view model contract
+  const mappedChannels = useMemo(() => {
+    return repoChannels.map((c) => {
+      let category: ChannelCategory = 'department';
+      if (c.type === 'announcement') category = 'announcement';
+      else if (c.type === 'department') category = 'department';
+      else if (c.type === 'direct' || c.type === 'team') category = 'dm';
+
+      if (c.isStarred) category = 'starred';
+      if (c.isArchived) category = 'archived';
+
+      // Find direct message recipient details
+      let dmParticipant = null;
+      if (c.type === 'direct' && c.name?.startsWith('DM:')) {
+        const parts = c.name.split(' <-> ');
+        const otherUserId = parts.find((p) => p !== user?.id && p !== 'DM:')?.replace('DM:', '').trim();
+        dmParticipant = employees.find((e) => e.id === otherUserId) || null;
+      }
+
+      return {
+        id: c.id,
+        name: dmParticipant ? `${dmParticipant.firstName} ${dmParticipant.lastName}` : (c.name || 'Direct Message'),
+        category,
+        description: c.department || c.type || '',
+        unreadCount: 0,
+        membersCount: c.members?.length || 5,
+        isMuted: c.isMuted,
+        isStarred: c.isStarred,
+        isArchived: c.isArchived,
+        type: c.type,
+        pinnedMessageId: c.pinnedMessageId,
+        dmParticipant,
+      };
+    });
+  }, [repoChannels, employees, user]);
+
+  // Set initial active channel
+  useEffect(() => {
+    if (mappedChannels.length > 0 && !activeChannelId) {
+      setActiveChannelId(mappedChannels[0].id);
+    }
+  }, [mappedChannels, activeChannelId]);
 
   const activeChannel = useMemo(
-    () => channels.find((c) => c.id === activeChannelId) ?? channels[0],
-    [channels, activeChannelId]
+    () => mappedChannels.find((c) => c.id === activeChannelId) ?? mappedChannels[0] ?? {
+      id: 'c-general',
+      name: 'General',
+      category: 'department' as ChannelCategory,
+      description: 'Default department chat',
+      membersCount: 5,
+      isMuted: false,
+      isStarred: false,
+      isArchived: false,
+      type: 'department',
+      pinnedMessageId: undefined,
+      dmParticipant: null,
+    },
+    [mappedChannels, activeChannelId]
   );
 
+  // Map messages and enrich with sender profiles
   const currentMessages = useMemo(() => {
-    const list = messages[activeChannelId] || [];
+    const list = repoMessages.map((m) => {
+      const sender = employees.find((e) => e.id === m.senderId);
+      const senderName = sender ? `${sender.firstName} ${sender.lastName}` : 'System Admin';
+
+      // Group reactions by emoji key
+      const reactionsGrouped: Record<string, string[]> = {};
+      m.reactions?.forEach((r) => {
+        const reactingUser = employees.find((e) => e.id === r.userId);
+        const rName = reactingUser ? `${reactingUser.firstName} ${reactingUser.lastName}` : 'System Admin';
+        if (!reactionsGrouped[r.reaction]) reactionsGrouped[r.reaction] = [];
+        reactionsGrouped[r.reaction].push(rName);
+      });
+
+      return {
+        id: m.id,
+        senderId: m.senderId,
+        senderName,
+        senderAvatar: sender?.avatarUrl,
+        senderRole: sender?.designation || 'System Bot',
+        senderDepartment: sender?.departmentId || 'Operations',
+        text: m.text,
+        createdAt: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        reactions: reactionsGrouped,
+        isPinned: m.isPinned,
+        isEdited: m.isEdited,
+        isDeleted: m.isDeleted,
+        fileAttachment: m.fileAttachment,
+        replyToMessage: m.replyToMessage || (m.replyTo ? { id: m.replyTo, senderName: 'Message', text: 'Thread Reply' } : undefined),
+      };
+    });
+
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
     return list.filter((m) => m.text.toLowerCase().includes(q) || m.senderName.toLowerCase().includes(q));
-  }, [messages, activeChannelId, searchQuery]);
+  }, [repoMessages, employees, searchQuery]);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentMessages.length, activeChannelId]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  // Send typing notifications to the BroadcastChannel when user is actively writing
+  const handleComposerChange = (val: string) => {
+    setText(val);
+    sendTypingStatus(val.length > 0);
+
+    // Mentions autocomplete trigger
+    const words = val.split(' ');
+    const lastWord = words[words.length - 1];
+    if (lastWord.startsWith('@')) {
+      setShowMentions(true);
+      setMentionQuery(lastWord.slice(1));
+    } else {
+      setShowMentions(false);
+    }
+  };
+
+  const handleSelectMention = (empName: string) => {
+    const words = text.split(' ');
+    words[words.length - 1] = `@${empName} `;
+    setText(words.join(' '));
+    setShowMentions(false);
+    composerInputRef.current?.focus();
+  };
+
+  // Recording timer simulation
+  const startRecording = () => {
+    setIsRecording(true);
+    setRecordDuration(0);
+    recordTimerRef.current = setInterval(() => {
+      setRecordDuration((prev) => prev + 1);
+    }, 1000);
+  };
+
+  const stopRecording = (shouldAttach: boolean) => {
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    setIsRecording(false);
+    if (shouldAttach) {
+      setComposerAttachment({
+        name: `Audio_Note_${new Date().toLocaleTimeString().replace(/ /g, '')}.mp3`,
+        type: 'file',
+        url: '#',
+        size: `${Math.round((recordDuration * 12.8))} KB`,
+      });
+      toast({ variant: 'success', title: 'Voice Note Ready', message: 'Audio memo attached successfully.' });
+    }
+  };
+
+  // Composer submit
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() && !selectedFile) return;
+    if (!text.trim() && !composerAttachment) return;
 
     if (editingMessageId) {
-      // Edit existing message
-      setMessages((prev) => ({
-        ...prev,
-        [activeChannelId]: (prev[activeChannelId] || []).map((m) =>
-          m.id === editingMessageId ? { ...m, text: text.trim(), isEdited: true } : m
-        ),
-      }));
-      setEditingMessageId(null);
-      setText('');
-      toast({ variant: 'info', title: 'Message Updated' });
+      const res = await hookEditMessage(editingMessageId as UUID, text.trim());
+      if (res.ok) {
+        setEditingMessageId(null);
+        setText('');
+        toast({ variant: 'success', title: 'Message Updated' });
+      } else {
+        toast({ variant: 'error', title: 'Update Failed', message: res.error });
+      }
       return;
     }
 
-    const newMsg: ChatMessage = {
-      id: `m-${Date.now()}`,
-      senderId: user?.id || 'u2',
-      senderName: user?.fullName || 'Linto George',
-      senderRole: user?.role || 'EMPLOYEE',
-      text: text.trim(),
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      replyTo: replyToMessage ? { id: replyToMessage.id, senderName: replyToMessage.senderName, text: replyToMessage.text } : undefined,
-      fileAttachment: selectedFile || undefined,
-    };
+    const fileToUpload = composerAttachment || undefined;
+    const replyToId = replyToMessage ? (replyToMessage.id as UUID) : undefined;
 
-    setMessages((prev) => ({
-      ...prev,
-      [activeChannelId]: [...(prev[activeChannelId] || []), newMsg],
-    }));
-
-    // Update last message in channel list
-    setChannels((prev) =>
-      prev.map((c) =>
-        c.id === activeChannelId
-          ? { ...c, lastMessage: text.slice(0, 40) || 'Sent an attachment', lastMessageTime: 'Just now' }
-          : c
-      )
-    );
-
-    setText('');
-    setReplyToMessage(null);
-    setSelectedFile(null);
+    const res = await hookSendMessage(text.trim(), fileToUpload, replyToId);
+    if (res.ok) {
+      setText('');
+      setComposerAttachment(null);
+      setReplyToMessage(null);
+      sendTypingStatus(false);
+    } else {
+      toast({ variant: 'error', title: 'Send Failed', message: res.error });
+    }
   };
 
-  const handleToggleReaction = (msgId: string, emoji: string) => {
-    const userName = user?.fullName || 'Linto George';
-    setMessages((prev) => ({
-      ...prev,
-      [activeChannelId]: (prev[activeChannelId] || []).map((m) => {
-        if (m.id !== msgId) return m;
-        const currentReactions = { ...(m.reactions || {}) };
-        const users = currentReactions[emoji] || [];
-        if (users.includes(userName)) {
-          currentReactions[emoji] = users.filter((u) => u !== userName);
-          if (currentReactions[emoji].length === 0) delete currentReactions[emoji];
-        } else {
-          currentReactions[emoji] = [...users, userName];
-        }
-        return { ...m, reactions: currentReactions };
-      }),
-    }));
+  // Star, Pin, Archive channel triggers
+  const handleToggleStarChannel = async (cId: string) => {
+    const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
+    const target = await channelRepo.findById(cId as UUID);
+    if (target) {
+      target.isStarred = !target.isStarred;
+      await channelRepo.update(cId as UUID, target, { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' });
+      toast({ variant: 'success', title: target.isStarred ? 'Channel Starred' : 'Channel Unstarred' });
+    }
   };
 
-  const handlePinMessage = (msgId: string) => {
-    setMessages((prev) => ({
-      ...prev,
-      [activeChannelId]: (prev[activeChannelId] || []).map((m) =>
-        m.id === msgId ? { ...m, isPinned: !m.isPinned } : m
-      ),
-    }));
-    toast({ variant: 'success', title: 'Message Pin Updated' });
+  const handleToggleArchiveChannel = async (cId: string) => {
+    const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
+    const target = await channelRepo.findById(cId as UUID);
+    if (target) {
+      target.isArchived = !target.isArchived;
+      await channelRepo.update(cId as UUID, target, { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' });
+      toast({ variant: 'success', title: target.isArchived ? 'Channel Archived' : 'Channel Unarchived' });
+    }
   };
 
-  const handleDeleteMessage = (msgId: string, forEveryone = false) => {
-    setMessages((prev) => ({
-      ...prev,
-      [activeChannelId]: (prev[activeChannelId] || []).filter((m) => {
-        if (m.id !== msgId) return true;
-        if (forEveryone) return false;
-        return false;
-      }),
-    }));
-    toast({ variant: 'info', title: 'Message Removed' });
+  const handleToggleMuteChannel = async (cId: string) => {
+    const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
+    const target = await channelRepo.findById(cId as UUID);
+    if (target) {
+      target.isMuted = !target.isMuted;
+      await channelRepo.update(cId as UUID, target, { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' });
+      toast({ variant: 'success', title: target.isMuted ? 'Channel Muted' : 'Channel Unmuted' });
+    }
   };
 
-  const handleCreateChannelSubmit = (values: Record<string, unknown>) => {
-    const newChan: ChatChannel = {
-      id: `c-${Date.now()}`,
+  // Group creation handler
+  const handleCreateChannelSubmit = async (values: Record<string, unknown>) => {
+    const cat = (values.category as ChannelType) || 'department';
+    const res = await hookCreateChannel({
       name: values.name as string,
-      category: (values.category as ChannelCategory) || 'department',
-      description: values.description as string,
-      unreadCount: 0,
-      membersCount: 1,
-      lastMessage: 'Channel created',
-      lastMessageTime: 'Just now',
-    };
-    setChannels([newChan, ...channels]);
-    setActiveChannelId(newChan.id);
-    toast({ variant: 'success', title: 'Channel Created', message: `#${newChan.name} is ready.` });
-    setCreateChannelOpen(false);
+      type: cat,
+      department: values.description as string,
+      members: [user?.id as UUID],
+    });
+
+    if (res.ok) {
+      setActiveChannelId(res.value.id);
+      toast({ variant: 'success', title: 'Channel Created', message: `#${res.value.name} is ready.` });
+      setCreateChannelOpen(false);
+    } else {
+      toast({ variant: 'error', title: 'Creation Failed', message: res.error });
+    }
   };
 
-  const groupedChannels = useMemo(() => {
+  // Dynamic DM Channel Creator
+  const handleStartDirectMessage = async (targetEmployeeId: string) => {
+    // Check if channel already exists
+    const existing = mappedChannels.find(
+      (c) => c.type === 'direct' && c.name?.includes(targetEmployeeId) && c.name?.includes(user?.id || '')
+    );
+    if (existing) {
+      setActiveChannelId(existing.id);
+      setCreateDmOpen(false);
+      return;
+    }
+
+    // Create a new direct channel
+    const res = await hookCreateChannel({
+      name: `DM: ${user?.id} <-> ${targetEmployeeId}`,
+      type: 'direct',
+      members: [user?.id as UUID, targetEmployeeId as UUID],
+    });
+
+    if (res.ok) {
+      setActiveChannelId(res.value.id);
+      setCreateDmOpen(false);
+      toast({ variant: 'success', title: 'Direct Message Started' });
+    } else {
+      toast({ variant: 'error', title: 'DM Initialization Failed', message: res.error });
+    }
+  };
+
+  // Filter channels grouped by categories
+  const filteredChannelsGrouped = useMemo(() => {
     const q = channelSearch.toLowerCase();
-    const filtered = channels.filter((c) => c.name.toLowerCase().includes(q));
-    const groups: Record<ChannelCategory, ChatChannel[]> = {
-      dm: [], department: [], project: [], training: [], admin: [],
+    const filtered = mappedChannels.filter((c) => c.name.toLowerCase().includes(q));
+
+    const groups: Record<ChannelCategory, typeof mappedChannels> = {
+      announcement: [], department: [], dm: [], starred: [], archived: [],
     };
-    filtered.forEach((c) => groups[c.category]?.push(c));
+    filtered.forEach((c) => {
+      if (c.isStarred) groups.starred.push(c);
+      else if (c.isArchived) groups.archived.push(c);
+      else groups[c.category]?.push(c);
+    });
     return groups;
-  }, [channels, channelSearch]);
+  }, [mappedChannels, channelSearch]);
+
+  // Autocomplete list of employees for mentions
+  const filteredEmployeesForMention = useMemo(() => {
+    const q = mentionQuery.toLowerCase();
+    return employees.filter((e) => `${e.firstName} ${e.lastName}`.toLowerCase().includes(q));
+  }, [employees, mentionQuery]);
+
+  // Pinned message item in Active Channel
+  const pinnedMessage = useMemo(() => {
+    if (!activeChannel.pinnedMessageId) return null;
+    return currentMessages.find((m) => m.id === activeChannel.pinnedMessageId);
+  }, [currentMessages, activeChannel.pinnedMessageId]);
 
   return (
     <AppShell>
-      <PageHeader
-        title="Real-Time Workspace Chat"
-        subtitle="Collaborate across departments, project teams, training batches, and direct staff messages"
-        actions={<Button onClick={() => setCreateChannelOpen(true)}>➕ New Channel</Button>}
-      />
-
+      {/* ── Slack/Teams Workspace Outer Grid Layout ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '280px 1fr',
+        gridTemplateColumns: '300px 1fr' + (showRightPanel ? ' 320px' : ''),
         gap: 16,
-        height: 'calc(100vh - 210px)',
-        minHeight: 520,
+        height: 'calc(100vh - 180px)',
+        minHeight: 600,
+        fontFamily: 'var(--font-ui)',
       }}>
 
-        {/* ── Left Sidebar: Channel Navigation ── */}
+        {/* ── Left Sidebar (Channel Navigation) ── */}
         <div style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-xl)',
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden', boxShadow: 'var(--e1)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: 'var(--e1)',
         }}>
-          {/* Search bar inside channels */}
-          <div style={{ padding: 12, borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
-            <SearchInput value={channelSearch} onChange={setChannelSearch} placeholder="Search channels..." />
+          {/* Header Actions */}
+          <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <Button style={{ flex: 1 }} size="sm" onClick={() => setCreateChannelOpen(true)}>
+                💬 Create Group
+              </Button>
+              <Button style={{ flex: 1 }} size="sm" variant="secondary" onClick={() => setCreateDmOpen(true)}>
+                👤 New Chat
+              </Button>
+            </div>
+            <SearchInput value={channelSearch} onChange={setChannelSearch} placeholder="Jump to channel/chat..." />
           </div>
 
-          {/* Channels grouped by category */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {(Object.keys(CATEGORY_LABELS) as ChannelCategory[]).map((cat) => {
-              const list = groupedChannels[cat];
-              if (list.length === 0) return null;
-              const meta = CATEGORY_LABELS[cat];
+          {/* Categories / Channel Accordions */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {(Object.keys(CATEGORY_LABELS) as ChannelCategory[]).map((catKey) => {
+              const list = filteredChannelsGrouped[catKey];
+              const meta = CATEGORY_LABELS[catKey];
+              const isCatActive = activeCategory === catKey;
+
               return (
-                <div key={cat}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', marginBottom: 4 }}>
-                    {meta.icon} {meta.label}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {list.map((c) => {
-                      const active = c.id === activeChannelId;
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => {
-                            setActiveChannelId(c.id);
-                            // clear unread count
-                            setChannels((prev) => prev.map((ch) => ch.id === c.id ? { ...ch, unreadCount: 0 } : ch));
-                          }}
-                          style={{
-                            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '8px 10px', borderRadius: 'var(--radius-md)', border: 'none',
-                            background: active ? 'var(--brand-muted)' : 'transparent',
-                            color: active ? 'var(--brand)' : 'var(--text-primary)',
-                            fontWeight: active ? 700 : 500, fontSize: 13,
-                            cursor: 'pointer', textAlign: 'left',
-                            transition: 'background 120ms',
-                            fontFamily: 'var(--font-ui)',
-                          }}
-                          onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-                          onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                        >
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                            {c.category === 'dm' ? '👤 ' : '# '}{c.name}
-                          </span>
-                          {c.unreadCount && c.unreadCount > 0 ? (
-                            <span className="kvj-notif-dot">{c.unreadCount}</span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div key={catKey}>
+                  <button
+                    onClick={() => setActiveCategory(isCatActive ? 'department' : catKey)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: 'var(--text-muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      padding: '4px 8px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{meta.icon} {meta.label} ({list.length})</span>
+                    <span>{isCatActive ? '▼' : '▶'}</span>
+                  </button>
+
+                  {isCatActive && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, paddingLeft: 6 }}>
+                      {list.length === 0 ? (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 8px', fontStyle: 'italic' }}>
+                          No channels in this list
+                        </div>
+                      ) : (
+                        list.map((c) => {
+                          const active = c.id === activeChannelId;
+                          return (
+                            <button
+                              key={c.id}
+                              onClick={() => setActiveChannelId(c.id)}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 10px',
+                                borderRadius: 'var(--radius-md)',
+                                border: 'none',
+                                background: active ? 'var(--brand-muted)' : 'transparent',
+                                color: active ? 'var(--brand)' : 'var(--text-primary)',
+                                fontWeight: active ? 700 : 500,
+                                fontSize: 13,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {c.type === 'direct' ? (
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--status-success)' }} />
+                                ) : (
+                                  <span>#</span>
+                                )}
+                                {c.name}
+                              </span>
+                              {c.isMuted && <span style={{ fontSize: 11, opacity: 0.6 }}>🔇</span>}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* ── Main Chat Area ── */}
+        {/* ── Center Chat Panel (Feed & Input Composer) ── */}
         <div style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-xl)',
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden', boxShadow: 'var(--e1)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: 'var(--e1)',
+          position: 'relative',
         }}>
-          {/* Active Channel Header */}
+          {/* Header Panel */}
           <div style={{
-            padding: '12px 20px', borderBottom: '1px solid var(--border)',
-            background: 'var(--bg-sunken)', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', gap: 12,
+            padding: '12px 20px',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-sunken)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
           }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {activeChannel.category === 'dm' ? '👤' : '#'} {activeChannel.name}
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {activeChannel.type === 'direct' ? '👤' : '#'} {activeChannel.name}
                 </h3>
-                {activeChannel.isPrivate && <Badge tone="warning">Private</Badge>}
+                {activeChannel.type === 'announcement' && <Badge tone="warning">Announcements Only</Badge>}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                {activeChannel.description || 'Workspace discussion channel'} · {activeChannel.membersCount ?? 2} members
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                {activeChannel.description || 'Enterprise collaboration room'} · {activeChannel.membersCount} members
               </div>
             </div>
 
-            {/* In-channel Search input */}
-            <div style={{ width: 220 }}>
-              <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search messages..." />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 180 }}>
+                <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Find messages..." />
+              </div>
+              <button
+                onClick={() => handleToggleStarChannel(activeChannel.id)}
+                title="Star Channel"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
+              >
+                {activeChannel.isStarred ? '⭐' : '☆'}
+              </button>
+              <button
+                onClick={() => handleToggleArchiveChannel(activeChannel.id)}
+                title="Archive Channel"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
+              >
+                📥
+              </button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowRightPanel(!showRightPanel)}
+              >
+                {showRightPanel ? 'Hide Details' : 'Show Details'}
+              </Button>
             </div>
           </div>
 
-          {/* Messages Stream */}
+          {/* Pinned Message Alert Bar */}
+          {pinnedMessage && (
+            <div style={{
+              padding: '8px 16px',
+              background: 'var(--brand-muted)',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: 12,
+              color: 'var(--brand)',
+            }}>
+              <span>📌 **Pinned Message**: {pinnedMessage.senderName}: "{pinnedMessage.text.slice(0, 75)}..."</span>
+              <button
+                onClick={() => hookTogglePinMessage(pinnedMessage.id as UUID)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--brand)' }}
+              >
+                Unpin
+              </button>
+            </div>
+          )}
+
+          {/* Messages Feed Area */}
           <div style={{
-            flex: 1, overflowY: 'auto', padding: '16px 20px',
-            display: 'flex', flexDirection: 'column', gap: 14,
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
           }}>
             {currentMessages.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
-                No messages yet. Start the conversation!
+              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
+                <strong style={{ display: 'block', fontSize: 15, color: 'var(--text-secondary)' }}>Welcome to #{activeChannel.name}!</strong>
+                <span style={{ fontSize: 12 }}>No messages in this conversation. Start the chat below.</span>
               </div>
             ) : (
               currentMessages.map((msg) => {
-                const isMe = msg.senderName === (user?.fullName || 'Linto George');
+                const isMe = msg.senderId === user?.id;
                 return (
                   <div
                     key={msg.id}
+                    className="group"
                     style={{
-                      display: 'flex', gap: 10, alignItems: 'flex-start',
+                      display: 'flex',
+                      gap: 12,
                       alignSelf: isMe ? 'flex-end' : 'flex-start',
-                      maxWidth: '80%',
+                      maxWidth: '75%',
+                      alignItems: 'flex-start',
                     }}
                   >
-                    {!isMe && <Avatar name={msg.senderName} size={32} />}
+                    {!isMe && <Avatar name={msg.senderName} src={msg.senderAvatar} size={36} />}
 
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                      {/* Sender Name + Time */}
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{msg.senderName}</span>
+                      {/* Name + Time */}
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{msg.senderName}</span>
+                        <span style={{ fontSize: 9, opacity: 0.7 }}>{msg.senderRole}</span>
                         <span>{msg.createdAt}</span>
-                        {msg.isPinned && <span title="Pinned">📌</span>}
+                        {msg.isPinned && <span>📌</span>}
                         {msg.isEdited && <span style={{ fontStyle: 'italic' }}>(edited)</span>}
                       </div>
 
-                      {/* Reply parent snippet */}
-                      {msg.replyTo && (
+                      {/* Parent reply preview bubble */}
+                      {msg.replyToMessage && (
                         <div style={{
-                          padding: '4px 10px', borderRadius: 'var(--radius-xs)',
-                          background: 'var(--bg-sunken)', borderLeft: '3px solid var(--brand)',
-                          fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, maxWidth: 280,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: 'var(--bg-sunken)',
+                          borderLeft: '3px solid var(--brand)',
+                          fontSize: 11,
+                          color: 'var(--text-muted)',
+                          marginBottom: 4,
+                          maxWidth: 320,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}>
-                          ↩ <strong>{msg.replyTo.senderName}:</strong> {msg.replyTo.text}
+                          ↩ **{msg.replyToMessage.senderName}**: {msg.replyToMessage.text}
                         </div>
                       )}
 
-                      {/* Message Bubble */}
-                      <div
-                        style={{
-                          padding: '10px 14px',
-                          borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                          background: isMe
-                            ? 'linear-gradient(135deg, var(--brand), var(--accent))'
-                            : 'var(--bg-sunken)',
-                          color: isMe ? '#FFFFFF' : 'var(--text-primary)',
-                          fontSize: 13.5, lineHeight: 1.45,
-                          boxShadow: 'var(--e0)',
-                          border: isMe ? 'none' : '1px solid var(--border)',
-                          position: 'relative',
-                        }}
-                      >
-                        {msg.text}
+                      {/* Bubble */}
+                      <div style={{
+                        padding: '12px 16px',
+                        borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                        background: isMe ? 'linear-gradient(135deg, var(--brand), var(--accent, var(--brand)))' : 'var(--bg-sunken)',
+                        color: isMe ? '#FFFFFF' : 'var(--text-primary)',
+                        fontSize: 13.5,
+                        lineHeight: 1.5,
+                        border: isMe ? 'none' : '1px solid var(--border)',
+                        position: 'relative',
+                        boxShadow: 'var(--e0)',
+                      }}>
+                        {msg.isDeleted ? (
+                          <span style={{ fontStyle: 'italic', opacity: 0.7 }}>This message was deleted.</span>
+                        ) : (
+                          msg.text
+                        )}
 
-                        {/* File Attachment preview */}
+                        {/* File Attachment Card */}
                         {msg.fileAttachment && (
                           <div style={{
-                            marginTop: 8, padding: 8, borderRadius: 'var(--radius-sm)',
+                            marginTop: 10,
+                            padding: '10px 12px',
+                            borderRadius: 'var(--radius-md)',
                             background: isMe ? 'rgba(255,255,255,0.15)' : 'var(--bg-surface)',
                             border: '1px solid var(--border)',
-                            display: 'flex', alignItems: 'center', gap: 8,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
                           }}>
-                            {msg.fileAttachment.type === 'image' ? (
-                              <img src={msg.fileAttachment.url} alt="Attachment" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 4 }} />
-                            ) : (
-                              <span style={{ fontSize: 22 }}>📄</span>
-                            )}
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 700 }}>{msg.fileAttachment.name}</div>
+                            <span style={{ fontSize: 24 }}>
+                              {msg.fileAttachment.type === 'image' ? '🖼️' : '📄'}
+                            </span>
+                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {msg.fileAttachment.name}
+                              </div>
                               <div style={{ fontSize: 10, opacity: 0.8 }}>{msg.fileAttachment.size}</div>
                             </div>
+                            <Button
+                              size="xs"
+                              variant="secondary"
+                              onClick={() => toast({ variant: 'info', title: 'Downloading file', message: msg.fileAttachment?.name })}
+                            >
+                              Download
+                            </Button>
                           </div>
                         )}
                       </div>
 
-                      {/* Reaction bar + action triggers */}
+                      {/* Reaction status / Actions menu */}
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
                         {msg.reactions && Object.entries(msg.reactions).map(([emoji, users]) => (
                           <button
                             key={emoji}
                             type="button"
-                            onClick={() => handleToggleReaction(msg.id, emoji)}
+                            onClick={() => hookToggleReaction(msg.id as UUID, emoji)}
                             style={{
-                              fontSize: 11, padding: '2px 7px', borderRadius: 999,
-                              border: users.includes(user?.fullName || 'Linto George') ? '1px solid var(--brand)' : '1px solid var(--border)',
-                              background: users.includes(user?.fullName || 'Linto George') ? 'var(--brand-muted)' : 'var(--bg-sunken)',
-                              cursor: 'pointer', display: 'flex', gap: 4, alignItems: 'center',
+                              fontSize: 11,
+                              padding: '2px 7px',
+                              borderRadius: 999,
+                              border: users.includes(user?.fullName || '') ? '1px solid var(--brand)' : '1px solid var(--border)',
+                              background: users.includes(user?.fullName || '') ? 'var(--brand-muted)' : 'var(--bg-sunken)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              gap: 4,
+                              alignItems: 'center',
                             }}
                           >
                             <span>{emoji}</span> <span>{users.length}</span>
                           </button>
                         ))}
 
-                        {/* Hover Quick Reaction Buttons */}
-                        {['👍', '❤️', '🎉', '🚀'].map((em) => (
-                          <button
-                            key={em}
-                            type="button"
-                            onClick={() => handleToggleReaction(msg.id, em)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, opacity: 0.6, padding: '1px 3px' }}
-                          >
-                            {em}
-                          </button>
-                        ))}
+                        {/* Hover Quick Shortcuts */}
+                        <div style={{ display: 'flex', gap: 6, opacity: 0.8 }}>
+                          {['👍', '❤️', '🎉', '🚀'].map((em) => (
+                            <button
+                              key={em}
+                              type="button"
+                              onClick={() => hookToggleReaction(msg.id as UUID, em)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '1px 3px' }}
+                            >
+                              {em}
+                            </button>
+                          ))}
+                        </div>
 
+                        {/* Text Actions */}
                         <button
                           type="button"
-                          onClick={() => setReplyToMessage(msg)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--brand)', fontWeight: 600, padding: 0 }}
+                          onClick={() => setReplyToMessage({ id: msg.id, senderName: msg.senderName, text: msg.text })}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}
                         >
                           Reply
                         </button>
                         <button
                           type="button"
-                          onClick={() => handlePinMessage(msg.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', padding: 0 }}
+                          onClick={() => hookTogglePinMessage(msg.id as UUID)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}
                         >
                           {msg.isPinned ? 'Unpin' : 'Pin'}
                         </button>
-                        {isMe && (
-                          <button
-                            type="button"
-                            onClick={() => { setEditingMessageId(msg.id); setText(msg.text); }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', padding: 0 }}
-                          >
-                            Edit
-                          </button>
+                        {isMe && !msg.isDeleted && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => { setEditingMessageId(msg.id); setText(msg.text); }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => hookDeleteMessage(msg.id as UUID)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--status-danger)' }}
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
-                        {isMe && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMessage(msg.id, true)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--status-danger)', padding: 0 }}
-                          >
-                            Delete
-                          </button>
-                        )}
+                        {isMe && <span style={{ fontSize: 11, color: 'var(--brand)', marginLeft: 4 }}>✓✓</span>}
                       </div>
                     </div>
                   </div>
                 );
               })
             )}
+
+            {/* Typing indicators */}
+            {Object.keys(typingUsers).length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', paddingLeft: 12 }}>
+                <span className="kvj-typing-dots" style={{ display: 'inline-flex', gap: 2 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-muted)', animation: 'pulse 1s infinite 0s' }} />
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-muted)', animation: 'pulse 1s infinite 0.2s' }} />
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-muted)', animation: 'pulse 1s infinite 0.4s' }} />
+                </span>
+                <span>{Object.values(typingUsers).join(', ')} is typing...</span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Reply Banner */}
+          {/* Composer Banners (Replies & Attachments) */}
           {replyToMessage && (
             <div style={{
-              padding: '8px 16px', background: 'var(--bg-sunken)', borderTop: '1px solid var(--border)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12,
+              padding: '8px 16px',
+              background: 'var(--bg-sunken)',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 12,
             }}>
-              <span>Replying to <strong>{replyToMessage.senderName}</strong>: "{replyToMessage.text.slice(0, 40)}..."</span>
-              <button onClick={() => setReplyToMessage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+              <span>Replying to **{replyToMessage.senderName}**: "{replyToMessage.text.slice(0, 45)}..."</span>
+              <button
+                onClick={() => setReplyToMessage(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 700 }}
+              >
+                ✕
+              </button>
             </div>
           )}
 
-          {/* Attachment Preview Banner */}
-          {selectedFile && (
+          {composerAttachment && (
             <div style={{
-              padding: '8px 16px', background: 'var(--brand-muted)', borderTop: '1px solid var(--border)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--brand)',
+              padding: '8px 16px',
+              background: 'var(--brand-muted)',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 12,
+              color: 'var(--brand)',
             }}>
-              <span>📎 Attached: <strong>{selectedFile.name}</strong> ({selectedFile.size})</span>
-              <button onClick={() => setSelectedFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brand)' }}>✕</button>
+              <span>📎 Attached: **{composerAttachment.name}** ({composerAttachment.size})</span>
+              <button
+                onClick={() => setComposerAttachment(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brand)', fontWeight: 700 }}
+              >
+                ✕
+              </button>
             </div>
           )}
 
-          {/* Message Input Box */}
+          {/* Voice recording Banner */}
+          {isRecording && (
+            <div style={{
+              padding: '10px 16px',
+              background: 'var(--status-danger-muted, #ffebeb)',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 12,
+              color: 'var(--status-danger, #d32f2f)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="kvj-recording-dot" style={{ width: 10, height: 10, borderRadius: '50%', background: '#d32f2f', animation: 'pulse 1s infinite' }} />
+                <span>Recording Audio Memo... <strong>{Math.floor(recordDuration / 60)}:{(recordDuration % 60).toString().padStart(2, '0')}</strong></span>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button size="xs" variant="secondary" onClick={() => stopRecording(false)}>Cancel</Button>
+                <Button size="xs" onClick={() => stopRecording(true)}>✅ Done</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Mentions Dropdown Autocomplete */}
+          {showMentions && (
+            <div style={{
+              position: 'absolute',
+              bottom: 60,
+              left: 60,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--e3)',
+              maxHeight: 180,
+              overflowY: 'auto',
+              zIndex: 100,
+              width: 220,
+            }}>
+              {filteredEmployeesForMention.map((emp) => (
+                <button
+                  key={emp.id}
+                  onClick={() => handleSelectMention(`${emp.firstName}${emp.lastName}`)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  @{emp.firstName} {emp.lastName}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Emoji Picker Popup */}
+          {showEmojiPicker && (
+            <div style={{
+              position: 'absolute',
+              bottom: 60,
+              left: 10,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--e3)',
+              padding: 10,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5, 1fr)',
+              gap: 8,
+              zIndex: 100,
+            }}>
+              {['😀', '😂', '🔥', '👍', '🎉', '🚀', '❤️', '👀', '👏', '😮'].map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => {
+                    setText((prev) => prev + emoji);
+                    setShowEmojiPicker(false);
+                    composerInputRef.current?.focus();
+                  }}
+                  style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4 }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Attachment Menu Popup */}
+          {showAttachmentMenu && (
+            <div style={{
+              position: 'absolute',
+              bottom: 60,
+              left: 10,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--e3)',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 100,
+              width: 180,
+            }}>
+              {[
+                { label: '🖼️ Image File', type: 'image', name: 'Dashboard_Screen.png', size: '1.4 MB' },
+                { label: '📄 PDF Document', type: 'pdf', name: 'Training_Syllabus.pdf', size: '380 KB' },
+                { label: '📊 Excel Sheet', type: 'file', name: 'Q3_Payroll_Records.xlsx', size: '2.1 MB' },
+                { label: '🗂️ Zip Archive', type: 'file', name: 'Assets_Bundle.zip', size: '12.4 MB' },
+              ].map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setComposerAttachment({ name: item.name, type: item.type as any, url: '#', size: item.size });
+                    setShowAttachmentMenu(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Composer Input Box */}
           <form onSubmit={handleSendMessage} style={{
-            padding: '12px 16px', borderTop: '1px solid var(--border)',
-            background: 'var(--bg-sunken)', display: 'flex', gap: 10, alignItems: 'center',
+            padding: '14px 20px',
+            borderTop: '1px solid var(--border)',
+            background: 'var(--bg-sunken)',
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
           }}>
-            {/* Attachment Button */}
+            {/* Attachment clip */}
             <button
               type="button"
-              onClick={() => setSelectedFile({ name: 'Report_Summary.pdf', type: 'pdf', url: '#', size: '480 KB' })}
+              onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
               title="Attach File"
               style={{
-                width: 36, height: 36, borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)', background: 'var(--bg-surface)',
-                cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 16,
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                cursor: 'pointer',
+                fontSize: 18,
+                display: 'grid',
+                placeItems: 'center',
               }}
             >
               📎
             </button>
 
+            {/* Emoji Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              title="Add Emoji"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                cursor: 'pointer',
+                fontSize: 18,
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              😀
+            </button>
+
+            {/* Voice Memo Recording */}
+            <button
+              type="button"
+              onClick={isRecording ? () => stopRecording(false) : startRecording}
+              title="Record Voice Note"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--radius-md)',
+                border: isRecording ? '1px solid #d32f2f' : '1px solid var(--border)',
+                background: isRecording ? '#ffebeb' : 'var(--bg-surface)',
+                cursor: 'pointer',
+                fontSize: 18,
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              🎙️
+            </button>
+
             <input
+              ref={composerInputRef}
               type="text"
               className="kvj-input"
-              placeholder={editingMessageId ? 'Edit your message...' : `Message #${activeChannel.name}...`}
+              placeholder={editingMessageId ? 'Edit your message...' : `Message ${activeChannel.name}...`}
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => handleComposerChange(e.target.value)}
               style={{ flex: 1 }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(e);
+                }
+              }}
             />
 
             <Button type="submit" size="md">
-              {editingMessageId ? 'Update' : 'Send'}
+              {editingMessageId ? 'Save' : 'Send'}
             </Button>
           </form>
         </div>
+
+        {/* ── Right Panel (Profile Details & Pin List) ── */}
+        {showRightPanel && (
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-xl)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: 'var(--e1)',
+          }}>
+            <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>
+                Room Specifications
+              </h4>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Profile card if active DM channel */}
+              {activeChannel.dmParticipant ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10 }}>
+                  <Avatar name={`${activeChannel.dmParticipant.firstName} ${activeChannel.dmParticipant.lastName}`} src={activeChannel.dmParticipant.avatarUrl} size={80} />
+                  <div>
+                    <h5 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
+                      {activeChannel.dmParticipant.firstName} {activeChannel.dmParticipant.lastName}
+                    </h5>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {activeChannel.dmParticipant.designation}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2 }}>
+                      {activeChannel.dmParticipant.departmentId || 'Operations'} Department
+                    </div>
+                  </div>
+                  <Badge tone={activeChannel.dmParticipant.status === 'active' ? 'success' : 'neutral'}>
+                    {activeChannel.dmParticipant.status}
+                  </Badge>
+
+                  <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, textAlign: 'left' }}>
+                    <div>📧 <strong>Email:</strong> {activeChannel.dmParticipant.email}</div>
+                    <div>📞 <strong>Phone:</strong> {activeChannel.dmParticipant.phone || '+91 9988776655'}</div>
+                    <div>📅 <strong>Joined:</strong> {activeChannel.dmParticipant.dateOfJoining}</div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <h5 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>
+                    #{activeChannel.name}
+                  </h5>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                    {activeChannel.description}
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <Badge tone="neutral">{activeChannel.type}</Badge>
+                    <Badge tone="success">{activeChannel.membersCount} members</Badge>
+                  </div>
+                </div>
+              )}
+
+              {/* Pin list panel */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                <h5 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 800, color: 'var(--text-secondary)' }}>
+                  📌 Pinned Messages ({currentMessages.filter((m) => m.isPinned).length})
+                </h5>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {currentMessages.filter((m) => m.isPinned).map((pm) => (
+                    <div
+                      key={pm.id}
+                      style={{
+                        padding: 10,
+                        background: 'var(--bg-sunken)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 12,
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <strong>{pm.senderName}</strong>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{pm.createdAt}</span>
+                      </div>
+                      <div>{pm.text}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Create Channel Modal */}
-      <Drawer open={createChannelOpen} onClose={() => setCreateChannelOpen(false)} title="Create New Chat Channel">
+      {/* Group Creation Drawer */}
+      <Drawer open={createChannelOpen} onClose={() => setCreateChannelOpen(false)} title="Create New Collaboration Channel">
         <Form initial={{ category: 'department' }} onSubmit={handleCreateChannelSubmit}>
-          <TextField name="name" label="Channel Name *" placeholder="e.g. christ-bcom-batch1" />
+          <TextField name="name" label="Channel Name *" placeholder="e.g. sales-team-updates" />
           <SelectField
             name="category"
-            label="Category *"
+            label="Category Type *"
             options={[
-              { value: 'department', label: 'Department' },
-              { value: 'project', label: 'Project Team' },
-              { value: 'training', label: 'Training Batch' },
-              { value: 'admin', label: 'Leadership / Admin' },
-              { value: 'dm', label: 'Direct Message (1:1)' },
+              { value: 'department', label: 'Department Room' },
+              { value: 'announcement', label: 'Announcement Room (Restricted)' },
+              { value: 'team', label: 'General Project/Team Room' },
             ]}
           />
-          <TextField name="description" label="Channel Description" placeholder="What is this channel for?" />
+          <TextField name="description" label="Room Purpose / Description" placeholder="Explain what is discussed here..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateChannelOpen(false)}>Cancel</Button>
             <Button type="submit">Create Channel</Button>
           </div>
         </Form>
+      </Drawer>
+
+      {/* Start Direct Message Drawer */}
+      <Drawer open={createDmOpen} onClose={() => setCreateDmOpen(false)} title="Select Colleague to Message">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
+          {employeesLoading ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Retrieving colleagues list...</div>
+          ) : (
+            employees.filter((e) => e.id !== user?.id).map((emp) => (
+              <button
+                key={emp.id}
+                onClick={() => handleStartDirectMessage(emp.id)}
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-surface)')}
+              >
+                <Avatar name={`${emp.firstName} ${emp.lastName}`} src={emp.avatarUrl} size={36} />
+                <div>
+                  <strong style={{ display: 'block', fontSize: 13 }}>{emp.firstName} {emp.lastName}</strong>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{emp.designation} · {emp.departmentId || 'Operations'}</span>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
       </Drawer>
     </AppShell>
   );

@@ -114,13 +114,25 @@ export function BatchManagement() {
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
   const [newBatchForm, setNewBatchForm] = useState({
     code: '',
-    trainingName: '',
-    college: 'Christ University',
+    trainingName: 'Excel Expert 365',
+    college: 'Christ Irinjalakkuda',
+    collegeCourse: 'BCOM Self',
     academicYear: '2026-2027',
+    batchName: 'Batch 2',
     coordinator: 'Prof. Anil Kumar',
-    startDate: todayISO(),
-    endDate: '2026-08-30',
+    coordinatorEmail: 'anil@christcollege.edu',
+    coordinator2: '',
+    coordinatorEmail2: '',
+    startDate: '',
+    endDate: '',
   });
+
+  useEffect(() => {
+    setNewBatchForm(prev => ({
+      ...prev,
+      code: `${prev.college} - ${prev.collegeCourse} - ${prev.academicYear} - ${prev.batchName}`
+    }));
+  }, [newBatchForm.college, newBatchForm.collegeCourse, newBatchForm.academicYear, newBatchForm.batchName]);
 
   const handleCreateBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,7 +150,11 @@ export function BatchManagement() {
       startDate: newBatchForm.startDate,
       endDate: newBatchForm.endDate,
       coordinator: newBatchForm.coordinator,
+      coordinatorEmail: newBatchForm.coordinatorEmail,
+      coordinator2: newBatchForm.coordinator2 || undefined,
+      coordinatorEmail2: newBatchForm.coordinatorEmail2 || undefined,
       academicYear: newBatchForm.academicYear,
+      batchNo: newBatchForm.batchName,
       phase: 'Scheduled',
     });
 
@@ -152,12 +168,17 @@ export function BatchManagement() {
       setCreateBatchModalOpen(false);
       setNewBatchForm({
         code: '',
-        trainingName: '',
-        college: 'Christ University',
+        trainingName: 'Excel Expert 365',
+        college: 'Christ Irinjalakkuda',
+        collegeCourse: 'BCOM Self',
         academicYear: '2026-2027',
+        batchName: 'Batch 2',
         coordinator: 'Prof. Anil Kumar',
-        startDate: todayISO(),
-        endDate: '2026-08-30',
+        coordinatorEmail: 'anil@christcollege.edu',
+        coordinator2: '',
+        coordinatorEmail2: '',
+        startDate: '',
+        endDate: '',
       });
     } else {
       toast({
@@ -197,6 +218,9 @@ export function BatchManagement() {
     academicYear: '',
     trainer: '',
     coordinator: '',
+    coordinatorEmail: '',
+    coordinator2: '',
+    coordinatorEmail2: '',
   });
 
   const handleOpenEditBatch = (id: string) => {
@@ -209,6 +233,9 @@ export function BatchManagement() {
       academicYear: target?.academicYear || '2026-2027',
       trainer: 'Priya Nair',
       coordinator: target?.coordinator || 'Prof. Anil Kumar',
+      coordinatorEmail: target?.coordinatorEmail || 'anil@christcollege.edu',
+      coordinator2: target?.coordinator2 || '',
+      coordinatorEmail2: target?.coordinatorEmail2 || '',
     });
   };
 
@@ -268,10 +295,10 @@ export function BatchManagement() {
     phone: '',
     college: 'Christ University',
     department: 'BCOM B',
-    attendancePct: 85,
-    ass1: 80,
-    ass2: 80,
-    ass3: 80,
+    attendancePct: 0,
+    ass1: 0,
+    ass2: 0,
+    ass3: 0,
   });
 
   // Add Final Exam Student modal state
@@ -282,7 +309,7 @@ export function BatchManagement() {
     college: 'Christ University',
     course: 'Data Analytics',
     examDate: '2026-07-25',
-    finalExam: 85,
+    finalExam: 0,
     voucherId: '',
   });
 
@@ -300,18 +327,18 @@ export function BatchManagement() {
       department: 'BCOM B',
       course: newFinalExamStudentForm.course,
       examDate: newFinalExamStudentForm.examDate,
-      attendancePct: 90,
-      attendanceStatus: 'Regular',
-      ass1: 85,
-      ass2: 85,
-      ass3: 85,
-      project: 85,
+      attendancePct: 0,
+      attendanceStatus: 'Critical',
+      ass1: 0,
+      ass2: 0,
+      ass3: 0,
+      project: 0,
       finalExam: Number(newFinalExamStudentForm.finalExam) || 0,
       retestScore: Number(newFinalExamStudentForm.finalExam) || 0,
-      overallScore: Number(newFinalExamStudentForm.finalExam) || 85,
-      voucherId: newFinalExamStudentForm.voucherId || `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}`,
-      voucherStatus: 'Assigned',
-      certificateStatus: 'Generated',
+      overallScore: Number(newFinalExamStudentForm.finalExam) || 0,
+      voucherId: newFinalExamStudentForm.voucherId || '',
+      voucherStatus: '',
+      certificateStatus: '',
       examAttemptCount: 1,
     };
 
@@ -322,10 +349,11 @@ export function BatchManagement() {
       phone: '',
       college: 'Christ University',
       course: 'Data Analytics',
+      closeReason: '',
       examDate: '2026-07-25',
-      finalExam: 85,
+      finalExam: 0,
       voucherId: '',
-    });
+    } as any);
     toast({
       variant: 'success',
       title: 'Final Exam Student Added',
@@ -345,19 +373,19 @@ export function BatchManagement() {
       department: 'BCOM B',
       course: 'Data Analytics',
       examDate: new Date().toISOString().split('T')[0],
-      attendancePct: 90,
-      attendanceStatus: 'Regular',
-      ass1: 85,
-      ass2: 85,
-      ass3: 85,
-      project: 85,
+      attendancePct: 0,
+      attendanceStatus: 'Critical',
+      ass1: 0,
+      ass2: 0,
+      ass3: 0,
+      project: 0,
       finalExam: 0,
       retestScore: 0,
-      overallScore: 85,
-      voucherId: `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}`,
-      retestVoucherId: `VOUCH-RETEST-${Math.floor(100 + Math.random() * 900)}`,
-      voucherStatus: 'Assigned',
-      certificateStatus: 'Generated',
+      overallScore: 0,
+      voucherId: '',
+      retestVoucherId: '',
+      voucherStatus: '',
+      certificateStatus: '',
       examAttemptCount: 1,
     };
 
@@ -480,7 +508,7 @@ export function BatchManagement() {
   };
 
   const [uploadVoucherModalOpen, setUploadVoucherModalOpen] = useState(false);
-  const [studentSubTab, setStudentSubTab] = useState<'matrix' | 'attendance' | 'final-exam' | 'retest' | 'registration'>('matrix');
+  const [studentSubTab, setStudentSubTab] = useState<'matrix' | 'attendance' | 'final-exam' | 'retest' | 'registration' | 'certificates'>('matrix');
   const [registrationRecords, setRegistrationRecords] = useState<RegistrationRecord[]>([]);
   const [registrationSearchQuery, setRegistrationSearchQuery] = useState('');
 
@@ -656,17 +684,17 @@ export function BatchManagement() {
               college: reg.college || 'MIM Kuttikkanam',
               department: reg.batch || 'Batch 1',
               course: 'Excel Expert 365',
-              attendancePct: 88,
-              attendanceStatus: 'Regular',
-              ass1: 85,
-              ass2: 80,
-              ass3: 90,
-              project: 85,
-              finalExam: 85,
-              overallScore: 85,
-              voucherId: `VOUCH-MIM-${Math.floor(100 + Math.random() * 900)}`,
-              voucherStatus: 'Assigned',
-              certificateStatus: 'Printed',
+              attendancePct: 0,
+              attendanceStatus: 'Critical',
+              ass1: 0,
+              ass2: 0,
+              ass3: 0,
+              project: 0,
+              finalExam: 0,
+              overallScore: 0,
+              voucherId: '',
+              voucherStatus: '',
+              certificateStatus: '',
             };
             updated.push(newSt);
           }
@@ -980,6 +1008,12 @@ export function BatchManagement() {
   const handleOpenComposer = (subject: string, defaultBody: string) => {
     setEmailSubject(subject);
     setEmailBody(defaultBody);
+    
+    const emails = [];
+    if (activeBatch?.coordinatorEmail) emails.push(activeBatch.coordinatorEmail);
+    if (activeBatch?.coordinatorEmail2) emails.push(activeBatch.coordinatorEmail2);
+    
+    setEmailTo(emails.length > 0 ? emails.join(', ') : 'coordinator@christcollege.edu');
     setEmailComposerOpen(true);
   };
 
@@ -1106,6 +1140,7 @@ export function BatchManagement() {
               { id: 'final-exam', label: '🎓 Final Exam' },
               { id: 'retest', label: '🔄 Retest' },
               { id: 'registration', label: '📋 Registration' },
+              { id: 'certificates', label: '📜 Certificate Receipt' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -2600,6 +2635,98 @@ export function BatchManagement() {
               })()}
             </Card>
           )}
+
+          {studentSubTab === 'certificates' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <SectionHeader title="📜 Certificate Logistics & Delivery tracking" />
+              
+              <Card style={{ padding: 18 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Logistics Delivery Status
+                      </label>
+                      <select
+                        className="kvj-select"
+                        value={certificateStatus}
+                        onChange={(e) => setCertificateStatus(e.target.value as any)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                      >
+                        <option value="Generated">Generated</option>
+                        <option value="Printed">Printed</option>
+                        <option value="Dispatched">Dispatched</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Received">Received</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Expected/Delivered Date
+                      </label>
+                      <input
+                        type="date"
+                        className="kvj-input"
+                        value={certificateDeliveryDate}
+                        onChange={(e) => setCertificateDeliveryDate(e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Courier Name
+                      </label>
+                      <input
+                        type="text"
+                        className="kvj-input"
+                        value={courierName}
+                        onChange={(e) => setCourierName(e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Tracking reference ID
+                      </label>
+                      <input
+                        type="text"
+                        className="kvj-input"
+                        value={trackingNumber}
+                        onChange={(e) => setTrackingNumber(e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                      Signed Courier Receipt Document
+                    </label>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setSignedReceiptUploaded(true);
+                          toast({ variant: 'success', title: 'Receipt Uploaded', message: 'Signed receipt has been linked successfully.' });
+                        }}
+                      >
+                        {signedReceiptUploaded ? '✅ Change Uploaded Document' : '📤 Upload Signed Receipt'}
+                      </Button>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        {signedReceiptUploaded ? 'receipt_christ_signed_co.pdf' : 'Pending upload'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
         </div>
 
       {/* Daily Report Builder Modal */}
@@ -2658,943 +2785,6 @@ export function BatchManagement() {
         onAction={handleCarouselAction}
         onEdit={handleOpenEditBatch}
       />
-
-      {/* Main Content Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
-        
-        {/* Left Side: Navigation Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(
-            [
-              { id: 'students', label: '👥 Student Records' },
-              { id: 'mark-attendance', label: '📝 Mark Attendance' },
-              { id: 'final-exam', label: '🎓 Final Exam' },
-              { id: 'retest', label: '🔄 Retest Management' },
-              { id: 'registration', label: '📋 Registration Details' },
-              { id: 'attendance', label: '📅 Attendance Logs' },
-              { id: 'assessments', label: '📝 Assessments' },
-              { id: 'certificates', label: '📜 Certificates Delivery' },
-              { id: 'communication', label: '✉️ Communications Log' },
-              { id: 'documents', label: '📁 Document Center' },
-              { id: 'timeline', label: '🕒 Activity Timeline' },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                textAlign: 'left',
-                border: 'none',
-                borderRadius: 6,
-                background: activeTab === t.id ? 'var(--brand)' : 'transparent',
-                color: activeTab === t.id ? 'white' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Center: Content View Area */}
-        <div>
-
-          {/* TAB 3: STUDENT RECORDS */}
-          {activeTab === 'students' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <SectionHeader title="Students Enrolled Registry" />
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Button size="sm" onClick={() => setUploadModalOpen(true)}>
-                    📤 Upload Students Data
-                  </Button>
-                  <Button size="sm" onClick={() => setAddStudentModalOpen(true)}>
-                    ➕ Add Student Data
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={downloadVoucherTemplate}>
-                    📥 Download Voucher Template
-                  </Button>
-                  <Button size="sm" onClick={() => setShowFullStudentReport(true)}>
-                    🔍 Dedicated Full Page
-                  </Button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {students.map((s) => (
-                  <Card key={s.id} style={{ padding: 14 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 24 }}>{s.photo}</span>
-                        <div>
-                          <strong style={{ fontSize: 13.5 }}>{s.name}</strong>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.email} · {s.phone}</div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Attendance</div>
-                          <strong style={{ fontSize: 12.5 }}>{s.attendancePct}%</strong>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Voucher Status</div>
-                          <Badge tone={s.voucherId ? 'success' : 'neutral'}>
-                            {s.voucherId ? 'Assigned' : 'Unassigned'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* NEW TAB: MARK ATTENDANCE */}
-          {activeTab === 'mark-attendance' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                  <SectionHeader title="Daily Attendance Recorder" />
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Mark daily session attendance for batch <strong>{activeBatch?.code || 'Christ B1'}</strong>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <input
-                    type="date"
-                    className="kvj-input"
-                    value={sessionLogDate}
-                    onChange={(e) => setSessionLogDate(e.target.value)}
-                    style={{ fontSize: 12, padding: '5px 10px' }}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      toast({
-                        variant: 'success',
-                        title: 'Attendance Saved',
-                        message: `Recorded attendance for ${Object.keys(sessionStatuses).length} students on ${sessionLogDate}.`,
-                      });
-                    }}
-                  >
-                    💾 Save Today's Attendance
-                  </Button>
-                </div>
-              </div>
-
-              <Card style={{ padding: 18 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-sunken)', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: 10 }}>Student Name</th>
-                      <th style={{ padding: 10 }}>Department</th>
-                      <th style={{ padding: 10 }}>Current %</th>
-                      <th style={{ padding: 10, textAlign: 'center' }}>Mark Attendance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((s) => {
-                      const currentStatus = sessionStatuses[s.id] || 'present';
-                      return (
-                        <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: 10, fontWeight: 700 }}>
-                            {s.photo} {s.name}
-                          </td>
-                          <td style={{ padding: 10, color: 'var(--text-muted)' }}>{s.department}</td>
-                          <td style={{ padding: 10 }}>
-                            <Badge tone={s.attendancePct >= 84 ? 'success' : 'danger'}>
-                              {s.attendancePct}%
-                            </Badge>
-                          </td>
-                          <td style={{ padding: 10, textAlign: 'center' }}>
-                            <div style={{ display: 'inline-flex', gap: 6 }}>
-                              <button
-                                type="button"
-                                onClick={() => setSessionStatuses((prev) => ({ ...prev, [s.id]: 'present' }))}
-                                style={{
-                                  padding: '4px 12px', fontSize: 11, fontWeight: 700, borderRadius: 6, cursor: 'pointer',
-                                  border: '1px solid var(--border)',
-                                  background: currentStatus === 'present' ? 'var(--status-success)' : 'var(--bg-sunken)',
-                                  color: currentStatus === 'present' ? '#fff' : 'var(--text-primary)',
-                                }}
-                              >
-                                Present 🟢
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSessionStatuses((prev) => ({ ...prev, [s.id]: 'absent' }))}
-                                style={{
-                                  padding: '4px 12px', fontSize: 11, fontWeight: 700, borderRadius: 6, cursor: 'pointer',
-                                  border: '1px solid var(--border)',
-                                  background: currentStatus === 'absent' ? 'var(--status-danger)' : 'var(--bg-sunken)',
-                                  color: currentStatus === 'absent' ? '#fff' : 'var(--text-primary)',
-                                }}
-                              >
-                                Absent 🔴
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSessionStatuses((prev) => ({ ...prev, [s.id]: 'late' }))}
-                                style={{
-                                  padding: '4px 12px', fontSize: 11, fontWeight: 700, borderRadius: 6, cursor: 'pointer',
-                                  border: '1px solid var(--border)',
-                                  background: currentStatus === 'late' ? 'var(--status-warning)' : 'var(--bg-sunken)',
-                                  color: currentStatus === 'late' ? '#fff' : 'var(--text-primary)',
-                                }}
-                              >
-                                Late 🟡
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Card>
-            </div>
-          )}
-
-          {/* NEW TAB: FINAL EXAM */}
-          {activeTab === 'final-exam' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                  <SectionHeader title="Final Exam & Voucher Distribution" />
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Manage final certification exam schedules, voucher codes, and pass/fail marks.
-                  </div>
-                </div>
-                <Button size="sm" onClick={downloadVoucherTemplate}>
-                  📥 Download Voucher Template
-                </Button>
-              </div>
-
-              <Card style={{ padding: 18 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-sunken)', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: 10 }}>Student Name</th>
-                      <th style={{ padding: 10 }}>Attendance</th>
-                      <th style={{ padding: 10 }}>Exam Eligibility</th>
-                      <th style={{ padding: 10 }}>Exam Date</th>
-                      <th style={{ padding: 10 }}>Voucher Code</th>
-                      <th style={{ padding: 10, textAlign: 'center' }}>Exam Score</th>
-                      <th style={{ padding: 10 }}>Status</th>
-                      <th style={{ padding: 10 }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((s) => {
-                      const eligible = s.attendancePct >= 84;
-                      const hasPassed = s.finalExam >= 60;
-                      return (
-                        <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: 10, fontWeight: 700 }}>
-                            {s.photo} {s.name}
-                          </td>
-                          <td style={{ padding: 10 }}>{s.attendancePct}%</td>
-                          <td style={{ padding: 10 }}>
-                            <Badge tone={eligible ? 'success' : 'danger'}>
-                              {eligible ? 'Eligible' : 'Not Eligible'}
-                            </Badge>
-                          </td>
-                          <td style={{ padding: 10 }}>
-                            <input
-                              type="date"
-                              className="kvj-input"
-                              value={examScheduleDates[s.id] || '2026-08-01'}
-                              onChange={(e) => setExamScheduleDates((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                              style={{ fontSize: 11, padding: '3px 6px' }}
-                            />
-                          </td>
-                          <td style={{ padding: 10 }}>
-                            <input
-                              type="text"
-                              className="kvj-input"
-                              value={s.voucherId}
-                              onChange={(e) => assignVoucherId(s.id, e.target.value)}
-                              placeholder="VOUCH-XXX-000"
-                              style={{ fontSize: 11, padding: '3px 6px', width: 130 }}
-                            />
-                          </td>
-                          <td style={{ padding: 10, textAlign: 'center' }}>
-                            <input
-                              type="number"
-                              className="kvj-input"
-                              value={s.finalExam || ''}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, finalExam: val } : st));
-                              }}
-                              placeholder="Score"
-                              style={{ fontSize: 11, padding: '3px 6px', width: 60, textAlign: 'center' }}
-                            />
-                          </td>
-                          <td style={{ padding: 10 }}>
-                            {s.finalExam > 0 ? (
-                              <Badge tone={hasPassed ? 'success' : 'danger'}>
-                                {hasPassed ? 'Passed 🏆' : 'Failed ❌'}
-                              </Badge>
-                            ) : (
-                              <Badge tone="neutral">Scheduled ⏳</Badge>
-                            )}
-                          </td>
-                          <td style={{ padding: 10 }}>
-                            <Button
-                              size="sm"
-                              style={{ padding: '3px 8px', fontSize: 10 }}
-                              onClick={() => notifyTrainerVoucher(s.name, s.voucherId)}
-                            >
-                              📧 Send Voucher
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Card>
-            </div>
-          )}
-
-          {/* NEW TAB: RETEST MANAGEMENT */}
-          {activeTab === 'retest' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                  <SectionHeader title="Retest Management & Special Evaluation" />
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Manage retest applications, retest approvals, and re-evaluation scores for students.
-                  </div>
-                </div>
-              </div>
-
-              <Card style={{ padding: 18 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-sunken)', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: 10 }}>Student Name</th>
-                      <th style={{ padding: 10 }}>Retest Reason</th>
-                      <th style={{ padding: 10 }}>Approval Status</th>
-                      <th style={{ padding: 10 }}>Scheduled Retest Date</th>
-                      <th style={{ padding: 10, textAlign: 'center' }}>Retest Score</th>
-                      <th style={{ padding: 10 }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((s) => {
-                      const reason = s.attendancePct < 84
-                        ? 'Low Attendance (<84%)'
-                        : s.finalExam > 0 && s.finalExam < 60
-                        ? 'Failed Initial Exam (<60%)'
-                        : 'Optional Grade Improvement';
-                      return (
-                        <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: 10, fontWeight: 700 }}>
-                            {s.photo} {s.name}
-                          </td>
-                          <td style={{ padding: 10, color: 'var(--text-muted)' }}>{reason}</td>
-                          <td style={{ padding: 10 }}>
-                            <Button
-                              size="sm"
-                              variant={s.retestApproved ? 'secondary' : 'primary'}
-                              style={{ padding: '3px 8px', fontSize: 10 }}
-                              onClick={() => {
-                                setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, retestApproved: !st.retestApproved } : st));
-                                toast({
-                                  variant: 'success',
-                                  title: 'Retest Status Updated',
-                                  message: `Retest status for "${s.name}" set to ${!s.retestApproved ? 'Approved' : 'Pending'}.`,
-                                });
-                              }}
-                            >
-                              {s.retestApproved ? 'Approved ✅' : 'Approve Retest ⏳'}
-                            </Button>
-                          </td>
-                          <td style={{ padding: 10 }}>
-                            <input
-                              type="date"
-                              className="kvj-input"
-                              value={s.retestDate || '2026-08-10'}
-                              onChange={(e) => {
-                                const d = e.target.value;
-                                setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, retestDate: d } : st));
-                              }}
-                              style={{ fontSize: 11, padding: '3px 6px' }}
-                            />
-                          </td>
-                          <td style={{ padding: 10, textAlign: 'center' }}>
-                            <input
-                              type="number"
-                              className="kvj-input"
-                              value={s.retestScore || ''}
-                              onChange={(e) => {
-                                const sc = Number(e.target.value);
-                                setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, retestScore: sc } : st));
-                              }}
-                              placeholder="Score"
-                              style={{ fontSize: 11, padding: '3px 6px', width: 60, textAlign: 'center' }}
-                            />
-                          </td>
-                          <td style={{ padding: 10 }}>
-                            <Button
-                              size="sm"
-                              style={{ padding: '3px 8px', fontSize: 10 }}
-                              onClick={() => {
-                                toast({
-                                  variant: 'success',
-                                  title: 'Retest Invite Sent',
-                                  message: `Retest schedule notification sent to ${s.name} (${s.email}).`,
-                                });
-                              }}
-                            >
-                              📩 Send Invite
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Card>
-            </div>
-          )}
-
-          {/* TAB 3.5: REGISTRATION DETAILS */}
-          {activeTab === 'registration' && (
-            <Card style={{ padding: 18 }}>
-              {(() => {
-                // Filter registration records to show ONLY latest registration for students matched in the master student dataset
-                const matchedRegistrations = (() => {
-                  const map = new Map<string, RegistrationRecord>();
-
-                  registrationRecords.forEach((r) => {
-                    const regPhoneDigits = r.phone.replace(/\D/g, '');
-                    const regNameNorm = r.name.toLowerCase().trim();
-
-                    const isMatched = students.some((st) => {
-                      const stPhoneDigits = st.phone.replace(/\D/g, '');
-                      const stNameNorm = st.name.toLowerCase().trim();
-                      if (regPhoneDigits && stPhoneDigits && regPhoneDigits.length >= 10 && stPhoneDigits.length >= 10) {
-                        return regPhoneDigits.slice(-10) === stPhoneDigits.slice(-10);
-                      }
-                      return regNameNorm && stNameNorm && regNameNorm === stNameNorm;
-                    });
-
-                    if (isMatched) {
-                      const key = regPhoneDigits && regPhoneDigits.length >= 10 ? regPhoneDigits.slice(-10) : regNameNorm;
-                      // Overwrite so only latest registration entry is kept
-                      map.set(key, r);
-                    }
-                  });
-
-                  return Array.from(map.values());
-                })();
-
-                const q = registrationSearchQuery.toLowerCase().trim();
-                const filtered = matchedRegistrations.filter((r) =>
-                  !q ||
-                  r.name.toLowerCase().includes(q) ||
-                  r.phone.includes(q) ||
-                  r.email.toLowerCase().includes(q) ||
-                  r.registerNo.toLowerCase().includes(q) ||
-                  r.college.toLowerCase().includes(q)
-                );
-
-                return (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
-                      <div>
-                        <SectionHeader title="📋 Matched Student Registration Details (Google Sheet)" />
-                        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                          Showing only registration records matched with current students data using Phone Number as Primary Key.
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input
-                          type="text"
-                          className="kvj-input"
-                          value={registrationSearchQuery}
-                          onChange={(e) => setRegistrationSearchQuery(e.target.value)}
-                          placeholder="🔍 Search Name, Phone, Email, Reg No..."
-                          style={{ fontSize: 11.5, padding: '5px 10px', width: 220, borderRadius: 6 }}
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => syncGoogleSheetData(true)}
-                          disabled={isSyncingSheet}
-                          style={{ fontSize: 11.5 }}
-                        >
-                          🔄 {isSyncingSheet ? 'Syncing...' : 'Sync Google Sheet'}
-                        </Button>
-                        <Badge tone="success">
-                          ✅ {matchedRegistrations.length} Matched / {registrationRecords.length} Total
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }} className="kvj-table">
-                        <thead>
-                          <tr style={{ background: 'var(--bg-sunken)' }}>
-                            <th style={{ padding: 10, textAlign: 'center', minWidth: 60 }}>Photo</th>
-                            <th style={{ padding: 10, textAlign: 'left', minWidth: 150 }}>Full Name</th>
-                            <th style={{ padding: 10, textAlign: 'left', minWidth: 120 }}>Phone (Primary Key)</th>
-                            <th style={{ padding: 10, textAlign: 'left', minWidth: 160 }}>Email Address</th>
-                            <th style={{ padding: 10, textAlign: 'left', minWidth: 130 }}>College Name</th>
-                            <th style={{ padding: 10, textAlign: 'left', minWidth: 90 }}>Batch / Dept</th>
-                            <th style={{ padding: 10, textAlign: 'center', minWidth: 100 }}>Register No.</th>
-                            <th style={{ padding: 10, textAlign: 'center', minWidth: 80 }}>Gender</th>
-                            <th style={{ padding: 10, textAlign: 'center', minWidth: 110 }}>Qualification</th>
-                            <th style={{ padding: 10, textAlign: 'center', minWidth: 90 }}>Has Computer</th>
-                            <th style={{ padding: 10, textAlign: 'center', minWidth: 90 }}>Learned Before</th>
-                            <th style={{ padding: 10, textAlign: 'left', minWidth: 130 }}>Certiport User</th>
-                            <th style={{ padding: 10, textAlign: 'left', minWidth: 130 }}>Reg Timestamp</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filtered.length === 0 ? (
-                            <tr>
-                              <td colSpan={13} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-                                No matched registration records found for current students...
-                              </td>
-                            </tr>
-                          ) : (
-                            filtered.map((r, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                                  {r.photoUrl ? (
-                                    <img
-                                      src={r.photoUrl}
-                                      alt={r.name}
-                                      style={{
-                                        width: 34,
-                                        height: 34,
-                                        borderRadius: '50%',
-                                        objectFit: 'cover',
-                                        border: '1.5px solid var(--brand)',
-                                        display: 'inline-block',
-                                      }}
-                                      onError={(e) => {
-                                        (e.target as HTMLElement).style.display = 'none';
-                                        const fb = (e.target as HTMLElement).nextElementSibling;
-                                        if (fb) (fb as HTMLElement).style.display = 'inline-flex';
-                                      }}
-                                    />
-                                  ) : null}
-                                  <div
-                                    style={{
-                                      width: 34,
-                                      height: 34,
-                                      borderRadius: '50%',
-                                      background: 'var(--bg-sunken)',
-                                      border: '1px solid var(--border)',
-                                      display: r.photoUrl ? 'none' : 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontWeight: 700,
-                                      fontSize: 12,
-                                      color: 'var(--brand)',
-                                      margin: '0 auto',
-                                    }}
-                                  >
-                                    {r.name ? r.name.charAt(0) : '👤'}
-                                  </div>
-                                </td>
-                                <td style={{ padding: 10, fontWeight: 700 }}>{r.name}</td>
-                                <td style={{ padding: 10, color: 'var(--brand)', fontWeight: 600 }}>{r.phone}</td>
-                                <td style={{ padding: 10 }}>{r.email}</td>
-                                <td style={{ padding: 10 }}>{r.college}</td>
-                                <td style={{ padding: 10 }}>{r.batch}</td>
-                                <td style={{ padding: 10, textAlign: 'center', fontWeight: 600 }}>{r.registerNo || '—'}</td>
-                                <td style={{ padding: 10, textAlign: 'center' }}>{r.gender || '—'}</td>
-                                <td style={{ padding: 10, textAlign: 'center' }}>{r.qualification || '—'}</td>
-                                <td style={{ padding: 10, textAlign: 'center' }}>
-                                  <Badge tone={r.hasComputer === 'Yes' ? 'success' : 'warning'}>
-                                    {r.hasComputer || 'No'}
-                                  </Badge>
-                                </td>
-                                <td style={{ padding: 10, textAlign: 'center' }}>
-                                  <Badge tone={r.learnedBefore === 'Yes' ? 'info' : 'neutral'}>
-                                    {r.learnedBefore || 'No'}
-                                  </Badge>
-                                </td>
-                                <td style={{ padding: 10 }}>{r.certiportUser || '—'}</td>
-                                <td style={{ padding: 10, color: 'var(--text-muted)', fontSize: 11 }}>{r.timestamp || '—'}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                );
-              })()}
-            </Card>
-          )}
-
-          {/* TAB 4: ATTENDANCE LOGS & SESSION REGISTRY */}
-          {activeTab === 'attendance' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Header & Quick Action */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                  <SectionHeader title="Daily Session Attendance Registry" />
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Log and track daily session attendance for batch {activeBatch?.code || 'Batch 1'} ({activeBatch?.college})
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <Button size="sm" variant="secondary" onClick={handleMarkAllPresent}>
-                    ✓ Mark All Present
-                  </Button>
-                  <Button size="sm" onClick={handleSaveSessionAttendance}>
-                    💾 Save Session Attendance
-                  </Button>
-                </div>
-              </div>
-
-              {/* Session Details Form Box */}
-              <Card style={{ padding: 18, background: 'var(--bg-sunken)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
-                      SESSION DATE
-                    </label>
-                    <input
-                      type="date"
-                      className="kvj-input"
-                      value={sessionLogDate}
-                      onChange={(e) => setSessionLogDate(e.target.value)}
-                      style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
-                    />
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
-                      SESSION TOPIC / MODULE
-                    </label>
-                    <input
-                      type="text"
-                      className="kvj-input"
-                      placeholder="e.g. Day 4: Power BI DAX & Data Modeling"
-                      value={sessionTopic}
-                      onChange={(e) => setSessionTopic(e.target.value)}
-                      style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
-                    />
-                  </div>
-                </div>
-              </Card>
-
-              {/* Student Attendance Marking Sheet */}
-              <Card style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>
-                  Enrolled Students Attendance Sheet ({students.length} Students)
-                </div>
-                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                      <th style={{ padding: '10px 16px' }}>Student</th>
-                      <th style={{ padding: '10px 16px' }}>Overall Rate</th>
-                      <th style={{ padding: '10px 16px' }}>Eligibility Status</th>
-                      <th style={{ padding: '10px 16px', textAlign: 'right' }}>Session Attendance Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((s) => {
-                      const currStatus = sessionStatuses[s.id] || 'present';
-                      return (
-                        <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span style={{ fontSize: 20 }}>{s.photo}</span>
-                              <div>
-                                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{s.name}</div>
-                                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{s.department} · {s.phone}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <strong style={{ fontSize: 13 }}>{s.attendancePct}%</strong>
-                              <div style={{ width: 80 }}><ProgressBar value={s.attendancePct} max={100} size="sm" /></div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <Badge tone={s.attendancePct >= 84 ? 'success' : 'danger'}>
-                              {s.attendancePct >= 84 ? 'Eligible' : 'At Risk (<84%)'}
-                            </Badge>
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: 6 }}>
-                              {(['present', 'absent', 'late', 'leave'] as const).map((st) => {
-                                const isSel = currStatus === st;
-                                const colors = {
-                                  present: { bg: 'var(--status-success-bg)', fg: 'var(--status-success)', border: 'var(--status-success-border)' },
-                                  absent: { bg: 'var(--status-danger-bg)', fg: 'var(--status-danger)', border: 'var(--status-danger-border)' },
-                                  late: { bg: 'var(--status-warning-bg)', fg: 'var(--status-warning)', border: 'var(--status-warning-border)' },
-                                  leave: { bg: 'var(--status-info-bg)', fg: 'var(--status-info)', border: 'var(--status-info-border)' },
-                                }[st];
-                                return (
-                                  <button
-                                    key={st}
-                                    type="button"
-                                    onClick={() => setSessionStatuses((prev) => ({ ...prev, [s.id]: st }))}
-                                    style={{
-                                      padding: '5px 12px',
-                                      borderRadius: 6,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      textTransform: 'capitalize',
-                                      border: `1px solid ${isSel ? colors.border : 'var(--border)'}`,
-                                      background: isSel ? colors.bg : 'var(--bg-surface)',
-                                      color: isSel ? colors.fg : 'var(--text-secondary)',
-                                      transition: 'all 120ms',
-                                    }}
-                                  >
-                                    {st === 'present' ? '✓ Present' : st === 'absent' ? '✗ Absent' : st === 'late' ? '⏱ Late' : '🏝 Leave'}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Card>
-
-              {/* Historical Session Logs Table */}
-              <Card style={{ padding: 18 }}>
-                <SectionHeader title="Past Logged Sessions History" />
-                <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse', marginTop: 12 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                      <th style={{ padding: '8px 12px' }}>Date</th>
-                      <th style={{ padding: '8px 12px' }}>Session Topic</th>
-                      <th style={{ padding: '8px 12px' }}>Present</th>
-                      <th style={{ padding: '8px 12px' }}>Absent</th>
-                      <th style={{ padding: '8px 12px' }}>Logged By</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessionLogsHistory.map((log) => (
-                      <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{log.date}</td>
-                        <td style={{ padding: '10px 12px', color: 'var(--text-primary)' }}>{log.topic}</td>
-                        <td style={{ padding: '10px 12px', color: 'var(--status-success)', fontWeight: 700 }}>{log.presentCount} Students</td>
-                        <td style={{ padding: '10px 12px', color: log.absentCount > 0 ? 'var(--status-danger)' : 'var(--text-muted)', fontWeight: 700 }}>{log.absentCount} Students</td>
-                        <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{log.trainer}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                          <Badge tone="success">Verified Log</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            </div>
-          )}
-
-          {/* TAB 5: ASSESSMENTS */}
-          {activeTab === 'assessments' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <SectionHeader title="Student Assessment Grades" />
-              <Card style={{ padding: 16 }}>
-                <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                      <th style={{ padding: 8 }}>Student Name</th>
-                      <th style={{ padding: 8 }}>Ass 1</th>
-                      <th style={{ padding: 8 }}>Ass 2</th>
-                      <th style={{ padding: 8 }}>Ass 3</th>
-                      <th style={{ padding: 8 }}>Final Exam</th>
-                      <th style={{ padding: 8 }}>Overall Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((s) => (
-                      <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: 8, fontWeight: 700 }}>{s.name}</td>
-                        <td style={{ padding: 8 }}>{s.ass1}</td>
-                        <td style={{ padding: 8 }}>{s.ass2}</td>
-                        <td style={{ padding: 8 }}>{s.ass3}</td>
-                        <td style={{ padding: 8 }}>{s.finalExam || '—'}</td>
-                        <td style={{ padding: 8, fontWeight: 700 }}>{s.overallScore}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            </div>
-          )}
-
-          {/* TAB 6: CERTIFICATE DELIVERY */}
-          {activeTab === 'certificates' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <SectionHeader title="📜 Certificate Logistics & Delivery tracking" />
-              
-              <Card style={{ padding: 18 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Logistics Delivery Status
-                      </label>
-                      <select
-                        className="kvj-select"
-                        value={certificateStatus}
-                        onChange={(e) => setCertificateStatus(e.target.value as any)}
-                      >
-                        <option value="Generated">Generated</option>
-                        <option value="Printed">Printed</option>
-                        <option value="Dispatched">Dispatched</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Received">Received</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Expected/Delivered Date
-                      </label>
-                      <input
-                        type="date"
-                        className="kvj-input"
-                        value={certificateDeliveryDate}
-                        onChange={(e) => setCertificateDeliveryDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Courier Name
-                      </label>
-                      <input
-                        type="text"
-                        className="kvj-input"
-                        value={courierName}
-                        onChange={(e) => setCourierName(e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Tracking reference ID
-                      </label>
-                      <input
-                        type="text"
-                        className="kvj-input"
-                        value={trackingNumber}
-                        onChange={(e) => setTrackingNumber(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                      Signed Courier Receipt Document
-                    </label>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setSignedReceiptUploaded(true);
-                          toast({ variant: 'success', title: 'Receipt Uploaded', message: 'Signed receipt has been linked successfully.' });
-                        }}
-                      >
-                        {signedReceiptUploaded ? '✅ Change Uploaded Document' : '📤 Upload Signed Receipt'}
-                      </Button>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        {signedReceiptUploaded ? 'receipt_christ_signed_co.pdf' : 'Pending upload'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* TAB 7: COMMUNICATIONS LOG */}
-          {activeTab === 'communication' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <SectionHeader title="📧 Coordinator Communications & Email Logs" />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {emailLogs.map((log) => (
-                  <Card key={log.id} style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong>{log.subject}</strong>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>To: {log.to} · Sent: {log.sentAt}</div>
-                      </div>
-                      <Badge tone={log.status === 'Read' ? 'success' : 'progress'}>
-                        {log.status}
-                      </Badge>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 8: DOCUMENT CENTER */}
-          {activeTab === 'documents' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <SectionHeader title="📁 Document Center & Material Archives" />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {documents.map((doc) => (
-                  <Card key={doc.id} style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong>📄 {doc.name}</strong>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Uploaded: {doc.uploadedAt} · Size: {doc.size}</div>
-                      </div>
-                      <Button size="sm" variant="secondary" onClick={() => toast({ variant: 'info', title: 'File Downloading', message: `Dispatched ${doc.name} to downloads.` })}>
-                        Download
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 9: ACTIVITY TIMELINE */}
-          {activeTab === 'timeline' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <SectionHeader title="🕒 Activity Logs & Audit Timeline" />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {timeline.map((item) => (
-                  <div key={item.id} style={{ display: 'flex', gap: 12, fontSize: 13 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--brand)', marginTop: 4 }} />
-                    <div>
-                      <strong>{item.action}</strong>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
-                        Triggered by: {item.user} · Timestamp: {item.timestamp}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
-
-      </div>
 
       {/* EMAIL COMPOSER MODAL */}
       {emailComposerOpen && (
@@ -3727,17 +2917,58 @@ export function BatchManagement() {
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                College Coordinator
-              </label>
-              <input
-                type="text"
-                className="kvj-input"
-                required
-                value={editForm.coordinator}
-                onChange={(e) => setEditForm({ ...editForm, coordinator: e.target.value })}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 1 Name
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  value={editForm.coordinator}
+                  onChange={(e) => setEditForm({ ...editForm, coordinator: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 1 Email
+                </label>
+                <input
+                  type="email"
+                  className="kvj-input"
+                  required
+                  value={editForm.coordinatorEmail}
+                  onChange={(e) => setEditForm({ ...editForm, coordinatorEmail: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 2 Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  value={editForm.coordinator2}
+                  onChange={(e) => setEditForm({ ...editForm, coordinator2: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 2 Email (Optional)
+                </label>
+                <input
+                  type="email"
+                  className="kvj-input"
+                  value={editForm.coordinatorEmail2}
+                  onChange={(e) => setEditForm({ ...editForm, coordinatorEmail2: e.target.value })}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
@@ -3988,26 +3219,26 @@ export function BatchManagement() {
           <form onSubmit={handleCreateBatchSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Batch Code / Name
+                Generated Batch Code (Automatic)
               </label>
               <input
                 type="text"
                 className="kvj-input"
-                required
-                placeholder="e.g. Christ BCOM B2"
+                readOnly
+                disabled
+                style={{ background: 'var(--bg-sunken)', cursor: 'not-allowed', opacity: 0.8 }}
                 value={newBatchForm.code}
-                onChange={(e) => setNewBatchForm({ ...newBatchForm, code: e.target.value })}
               />
             </div>
 
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Training Course Title
+                Training Course Title (Program)
               </label>
               <input
                 type="text"
                 className="kvj-input"
-                placeholder="e.g. Power BI & Advanced Analytics"
+                placeholder="e.g. Excel Expert 365"
                 value={newBatchForm.trainingName}
                 onChange={(e) => setNewBatchForm({ ...newBatchForm, trainingName: e.target.value })}
               />
@@ -4022,6 +3253,7 @@ export function BatchManagement() {
                   type="text"
                   className="kvj-input"
                   required
+                  placeholder="e.g. Christ Irinjalakkuda"
                   value={newBatchForm.college}
                   onChange={(e) => setNewBatchForm({ ...newBatchForm, college: e.target.value })}
                 />
@@ -4029,40 +3261,115 @@ export function BatchManagement() {
 
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Academic Year
+                  College Course
                 </label>
                 <input
                   type="text"
                   className="kvj-input"
                   required
-                  value={newBatchForm.academicYear}
-                  onChange={(e) => setNewBatchForm({ ...newBatchForm, academicYear: e.target.value })}
+                  placeholder="e.g. BCOM Self"
+                  value={newBatchForm.collegeCourse}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, collegeCourse: e.target.value })}
                 />
               </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                College Coordinator Name
-              </label>
-              <input
-                type="text"
-                className="kvj-input"
-                required
-                value={newBatchForm.coordinator}
-                onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinator: e.target.value })}
-              />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Start Date
+                  Academic Year (Year)
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  placeholder="e.g. 2026-2027"
+                  value={newBatchForm.academicYear}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, academicYear: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Batch Number / Name (Batch)
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  placeholder="e.g. Batch 2"
+                  value={newBatchForm.batchName}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, batchName: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 1 Name
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  placeholder="e.g. Prof. Anil Kumar"
+                  value={newBatchForm.coordinator}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinator: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 1 Email
+                </label>
+                <input
+                  type="email"
+                  className="kvj-input"
+                  required
+                  placeholder="e.g. anil@christcollege.edu"
+                  value={newBatchForm.coordinatorEmail}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinatorEmail: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 2 Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  placeholder="e.g. Dr. Priya Nair"
+                  value={newBatchForm.coordinator2}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinator2: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  College Coordinator 2 Email (Optional)
+                </label>
+                <input
+                  type="email"
+                  className="kvj-input"
+                  placeholder="e.g. priya@christcollege.edu"
+                  value={newBatchForm.coordinatorEmail2}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinatorEmail2: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Start Date (Optional)
                 </label>
                 <input
                   type="date"
                   className="kvj-input"
-                  required
                   value={newBatchForm.startDate}
                   onChange={(e) => setNewBatchForm({ ...newBatchForm, startDate: e.target.value })}
                 />
@@ -4070,12 +3377,11 @@ export function BatchManagement() {
 
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  End Date
+                  End Date (Optional)
                 </label>
                 <input
                   type="date"
                   className="kvj-input"
-                  required
                   value={newBatchForm.endDate}
                   onChange={(e) => setNewBatchForm({ ...newBatchForm, endDate: e.target.value })}
                 />

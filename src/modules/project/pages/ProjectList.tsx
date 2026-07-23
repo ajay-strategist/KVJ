@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageHeader, Button, Card, SectionHeader, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+
+import { useProject } from '../hooks/useProject';
+import { useEmployee } from '../../employee/hooks/useEmployee';
+import type { UUID } from '../../../core/types';
 
 export interface ProjectCardData {
   id: string;
@@ -26,26 +30,6 @@ interface TaskItem {
   dueDate: string;
 }
 
-const mockProjectTasks: Record<string, TaskItem[]> = {
-  p1: [
-    { name: 'Configure supabase clients and tenants', assignee: 'Linto George', status: 'Completed', dueDate: '2026-07-25' },
-    { name: 'Implement real-time replication listener', assignee: 'Ajay Kumar', status: 'Completed', dueDate: '2026-07-27' },
-    { name: 'Write dashboard analytics charts', assignee: 'Anju V', status: 'In Progress', dueDate: '2026-07-30' },
-  ],
-  p2: [
-    { name: 'Setup sync cron job for payroll', assignee: 'Linto George', status: 'Not Started', dueDate: '2026-07-26' },
-    { name: 'Integrate biometric attendance API', assignee: 'Sankar M', status: 'In Progress', dueDate: '2026-07-28' },
-  ],
-  p3: [
-    { name: 'Build OCR text parser', assignee: 'Ajay Kumar', status: 'Completed', dueDate: '2026-07-24' },
-    { name: 'Train custom layout model', assignee: 'Anju V', status: 'In Progress', dueDate: '2026-07-29' },
-  ],
-  p4: [
-    { name: 'Archive partition table data', assignee: 'Linto George', status: 'Completed', dueDate: '2026-07-20' },
-    { name: 'Deploy archive backup servers', assignee: 'Sankar M', status: 'Completed', dueDate: '2026-07-21' },
-  ],
-};
-
 export function ProjectList() {
   const { toast } = useNotifications();
 
@@ -61,6 +45,53 @@ export function ProjectList() {
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
+  const { projects, clients, tasks, allocations, createProject, createTask } = useProject();
+  const { employees } = useEmployee();
+
+  const mappedProjects = useMemo(() => {
+    return projects.map((p) => {
+      const client = clients.find((c) => c.id === p.clientId);
+      const supervisorAlloc = allocations.find((a) => a.projectId === p.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager')));
+      const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : 'Manager (Operations)';
+
+      let status: 'Not Started' | 'In Progress' | 'Completed' = 'Not Started';
+      if (p.status === 'execution') status = 'In Progress';
+      else if (p.status === 'closure') status = 'Completed';
+
+      const pAllocations = allocations.filter((a) => a.projectId === p.id);
+      const members = pAllocations.map((a) => {
+        const emp = employees.find((e) => e.id === a.employeeId);
+        return {
+          name: emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member',
+          hours: 0,
+        };
+      });
+
+      const pTasks = tasks.filter((t) => t.projectId === p.id);
+      const tasksTotal = pTasks.length;
+      const tasksCompleted = pTasks.filter((t) => t.status === 'done').length;
+
+      return {
+        id: p.id,
+        code: p.code,
+        title: p.title,
+        client: client ? client.name : 'Independent',
+        supervisor: supervisorName,
+        status,
+        members,
+        totalHours: 0,
+        tasksTotal,
+        tasksCompleted,
+        milestonesCount: 0,
+      };
+    });
+  }, [projects, clients, tasks, allocations, employees]);
+
+  useEffect(() => {
+    setProjectsList(mappedProjects);
+  }, [mappedProjects]);
+
   // Filter based on selected checkboxes
   const filteredProjects = projectsList.filter((p) => selectedStatuses.includes(p.status));
 
@@ -69,43 +100,56 @@ export function ProjectList() {
     (p) => p.status === 'Not Started' || p.status === 'In Progress'
   ).length;
 
-  const handleCreateProject = (values: Record<string, unknown>) => {
-    const newProj: ProjectCardData = {
-      id: `p-${Date.now()}`,
-      code: (values.code as string) || `KVJ-PROJ-${Math.floor(100 + Math.random() * 900)}`,
+  const selectedProjectTasks = useMemo(() => {
+    if (!selectedProject) return [];
+    const pTasks = tasks.filter((t) => t.projectId === selectedProject.id);
+    return pTasks.map((t) => {
+      const assignee = employees.find((e) => e.id === t.assigneeId);
+      return {
+        name: t.title,
+        assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
+        status: t.status === 'done' ? 'Completed' : t.status === 'in_progress' ? 'In Progress' : 'Not Started',
+        dueDate: t.dueDate || '—',
+      };
+    });
+  }, [selectedProject, tasks, employees]);
+
+  const handleCreateProject = async (values: Record<string, unknown>) => {
+    const res = await createProject({
       title: values.title as string,
-      client: (values.client as string) || 'Independent',
-      supervisor: (values.supervisor as string) || 'Manager (Operations)',
-      status: (values.status as any) || 'Not Started',
-      members: [
-        { name: 'Linto George', hours: 0 },
-        { name: 'Ajay Kumar', hours: 0 },
-      ],
-      totalHours: 0,
-      tasksTotal: 0,
-      tasksCompleted: 0,
-      milestonesCount: 1,
-    };
-    setProjectsList((prev) => [newProj, ...prev]);
-    toast({ variant: 'success', title: 'Project Created', message: `${newProj.title} added successfully.` });
-    setCreateProjectOpen(false);
+      code: (values.code as string) || `KVJ-PROJ-${Math.floor(100 + Math.random() * 900)}`,
+      status: 'planning',
+      priority: 'medium',
+    });
+
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Project Created', message: `${res.value.title} added successfully.` });
+      setCreateProjectOpen(false);
+    } else {
+      toast({ variant: 'error', title: 'Creation Failed', message: res.error });
+    }
   };
 
-  const handleAddTaskSubmit = (values: Record<string, unknown>) => {
+  const handleAddTaskSubmit = async (values: Record<string, unknown>) => {
     if (!selectedProject) return;
-    setProjectsList((prev) =>
-      prev.map((p) =>
-        p.id === selectedProject.id
-          ? { ...p, tasksTotal: p.tasksTotal + 1 }
-          : p
-      )
-    );
-    toast({
-      variant: 'success',
-      title: 'New Task Created',
-      message: `Task "${values.title}" added to project ${selectedProject.code}.`,
+
+    const res = await createTask({
+      projectId: selectedProject.id as UUID,
+      title: values.title as string,
+      status: 'todo',
+      priority: 'medium',
     });
-    setAddTaskOpen(false);
+
+    if (res.ok) {
+      toast({
+        variant: 'success',
+        title: 'New Task Created',
+        message: `Task "${values.title}" added to project ${selectedProject.code}.`,
+      });
+      setAddTaskOpen(false);
+    } else {
+      toast({ variant: 'error', title: 'Creation Failed', message: res.error });
+    }
   };
 
   const toggleStatusFilter = (status: string) => {
@@ -116,7 +160,16 @@ export function ProjectList() {
 
   // PDF Export Logic with custom print layout and KVJ logo
   const exportReportToPDF = (p: ProjectCardData) => {
-    const tasks = mockProjectTasks[p.id] || [];
+    const pTasks = tasks.filter((t) => t.projectId === p.id);
+    const reportTasks: TaskItem[] = pTasks.map((t) => {
+      const assignee = employees.find((e) => e.id === t.assigneeId);
+      return {
+        name: t.title,
+        assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
+        status: t.status === 'done' ? 'Completed' : t.status === 'in_progress' ? 'In Progress' : 'Not Started',
+        dueDate: t.dueDate || '—',
+      };
+    });
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast({ variant: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups to export the PDF.' });
@@ -201,7 +254,7 @@ export function ProjectList() {
               </tr>
             </thead>
             <tbody>
-              ${tasks.length > 0 ? tasks.map(t => `
+              ${reportTasks.length > 0 ? reportTasks.map(t => `
                 <tr>
                   <td>${t.name}</td>
                   <td>👤 ${t.assignee}</td>
@@ -504,7 +557,7 @@ export function ProjectList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(mockProjectTasks[selectedProject.id] || []).map((t, idx) => (
+                  {selectedProjectTasks.map((t, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px dashed var(--border)' }}>
                       <td style={{ padding: 6 }}>{t.name}</td>
                       <td style={{ padding: 6 }}>👤 {t.assignee}</td>
@@ -523,7 +576,7 @@ export function ProjectList() {
                       <td style={{ padding: 6, color: 'var(--text-muted)' }}>{t.dueDate}</td>
                     </tr>
                   ))}
-                  {(mockProjectTasks[selectedProject.id] || []).length === 0 && (
+                  {selectedProjectTasks.length === 0 && (
                     <tr>
                       <td colSpan={4} style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
                         No tasks logged for this project yet.

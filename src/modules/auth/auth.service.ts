@@ -91,7 +91,7 @@ const DEFAULT_USERS: MockRecord[] = [
     designation: 'Chief Executive Officer',
     department: 'Executive Management',
     role: 'ADMIN',
-    password: 'AjayThomas',
+    password: '1944d7060c63125bafef3d1c1104d12b5668fd4eb413228c985933307ad3abc2',
     mustChangePassword: false,
   },
 ];
@@ -100,6 +100,13 @@ const USERS_STORAGE_KEY = 'kvj.users.db';
 const SESSION_KEY = 'kvj.session';
 const now = () => Date.now();
 const makeToken = (id: string) => `mock.${id}.${now().toString(36)}`;
+
+async function hashPassword(plainText: string): Promise<string> {
+  const msgUint8 = new TextEncoder().encode(plainText);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 function loadStoredUsers(): MockRecord[] {
   try {
@@ -154,7 +161,7 @@ export class MockAuthService implements IAuthService {
       designation: input.designation || 'System Administrator',
       department: input.department || 'Management',
       role: 'ADMIN',
-      password: input.password,
+      password: await hashPassword(input.password),
       mustChangePassword: false,
     };
 
@@ -184,7 +191,8 @@ export class MockAuthService implements IAuthService {
         (u.phone && u.phone.replace(/[^0-9+]/g, '') === key.replace(/[^0-9+]/g, ''))
     );
 
-    if (!rec || rec.password !== password) {
+    const inputHash = await hashPassword(password);
+    if (!rec || rec.password !== inputHash) {
       this.recordFailure(key);
       throw new AppError({
         code: 'UNAUTHENTICATED' as never,
@@ -222,7 +230,7 @@ export class MockAuthService implements IAuthService {
       fullName: input.fullName,
       email: input.email,
       role: input.role,
-      password: 'password', // Default password for new users
+      password: await hashPassword('password'),
       mustChangePassword: true,
     };
 
@@ -237,6 +245,8 @@ export class MockAuthService implements IAuthService {
     const users = this.getUsersList();
     let updatedRecord: MockRecord | undefined;
 
+    const pwHash = data.password ? await hashPassword(data.password) : undefined;
+
     const updated = users.map((u) => {
       if (u.id === userId) {
         updatedRecord = {
@@ -245,7 +255,7 @@ export class MockAuthService implements IAuthService {
           ...(data.fullName ? { fullName: data.fullName } : {}),
           ...(data.email ? { email: data.email } : {}),
           ...(data.role ? { role: data.role } : {}),
-          ...(data.password ? { password: data.password, mustChangePassword: false } : {}),
+          ...(pwHash ? { password: pwHash, mustChangePassword: false } : {}),
         };
         return updatedRecord;
       }
@@ -272,12 +282,14 @@ export class MockAuthService implements IAuthService {
     const users = this.getUsersList();
     let found = false;
 
+    const pwHash = await hashPassword(newPassword);
+
     const updated = users.map((u) => {
       if (u.id === userId) {
         found = true;
         return {
           ...u,
-          password: newPassword,
+          password: pwHash,
           mustChangePassword: false,
         };
       }
@@ -311,12 +323,14 @@ export class MockAuthService implements IAuthService {
     const users = this.getUsersList();
     let found = false;
 
+    const pwHash = await hashPassword('password');
+
     const updated = users.map((u) => {
       if (u.id === userId) {
         found = true;
         return {
           ...u,
-          password: 'password',
+          password: pwHash,
           mustChangePassword: true,
         };
       }

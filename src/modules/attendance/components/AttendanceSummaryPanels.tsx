@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, SectionHeader, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { container } from '../../../core/registry';
+import { ATTENDANCE_REPOSITORY_TOKEN } from '../attendance.repository';
+import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../finance/finance.repository';
+import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
+import type { Employee } from '../../employee/employee.repository';
+import type { AttendanceRecord } from '../attendance.repository';
+import type { ExpenseClaim } from '../../finance/finance.repository';
 
 export interface AttendanceSummaryPanelsProps {
   startDate: string;
@@ -30,36 +37,158 @@ export function AttendanceSummaryPanels({
   const [activeFilterPreset, setActiveFilterPreset] = useState('current_month');
   const [selectedEmployee, setSelectedEmployee] = useState(employeeName);
 
-  // Excel mock aggregated stats (matching screenshot specs)
-  const stats = {
-    workingDaysInMonth: 26,
-    daysToBeWorked: 26,
-    noOfLeaves: 1,
-    holidayWorked: 0,
-    workingDays: 25,
-    lateReporting: 1,
-    earlyLeaving: 0,
-    breakHrs: 0.73,
-    avgBreakTime: 0.02,
-    overBreakTime: '0 (0.73 hr)',
-    joinedDate: '01/12/24',
-    accumulatedLeave: 34,
-    accumulatedHolidayWorked: 2,
-    overallAvgDuration: 6.92,
-    totalExpenses: 4806.0,
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
+      if (r.ok) setEmployees(r.value);
+    });
+  }, []);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const attendanceRepo = container.resolve(ATTENDANCE_REPOSITORY_TOKEN);
+        const expenseRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
+        const range = { from: startDate, to: endDate };
+
+        let records: AttendanceRecord[] = [];
+        let claims: ExpenseClaim[] = [];
+
+        if (selectedEmployee === 'All Employees') {
+          const allRes = await attendanceRepo.findMany();
+          records = allRes.data.filter(r => r.workDate >= range.from && r.workDate <= range.to);
+          const allClaims = await expenseRepo.findMany();
+          claims = allClaims.data.filter(c => c.createdAt >= range.from && c.createdAt <= range.to);
+        } else {
+          const emp = employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployee);
+          const empId = emp?.id;
+          if (empId) {
+            records = await attendanceRepo.findHistory(empId, range);
+            const allClaims = await expenseRepo.findMany();
+            claims = allClaims.data.filter(c => c.employeeId === empId && c.createdAt >= range.from && c.createdAt <= range.to);
+          }
+        }
+        setAttendanceRecords(records);
+        setExpenseClaims(claims);
+      } catch (e) {
+        console.error('Error fetching attendance history:', e);
+      }
+    };
+    fetchHistory();
+  }, [startDate, endDate, selectedEmployee, employees]);
+
+  const parseTime = (timeStr?: string) => {
+    if (!timeStr) return null;
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return null;
+    let [_, hrs, mins, amp] = match;
+    let h = parseInt(hrs, 10);
+    const m = parseInt(mins, 10);
+    if (amp.toUpperCase() === 'PM' && h < 12) h += 12;
+    if (amp.toUpperCase() === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
   };
 
-  const orgBreakdown = [
-    { organization: 'Vimala College', avgDuration: 5.0 },
-    { organization: 'Office', avgDuration: 7.7 },
-    { organization: 'Nehru College', avgDuration: 8.0 },
-    { organization: 'Christ Irinjalakkuda', avgDuration: 8.5 },
-  ];
+  const isLate = (timeStr?: string) => {
+    const mins = parseTime(timeStr);
+    return mins !== null && mins > 9 * 60;
+  };
 
-  const classSupervisionSummary = [
-    { institution: 'Christ Irinjalakkuda', physicalClasses: 22, physicalSupervision: 0, totalPhysical: 22, onlineClasses: 0, physicalClassDuration: 187, physicalSupervisionDuration: 0, totalPhysicalDuration: 187, onlineDuration: 0 },
-    { institution: 'Vimala College', physicalClasses: 4, physicalSupervision: 0, totalPhysical: 4, onlineClasses: 0, physicalClassDuration: 20, physicalSupervisionDuration: 0, totalPhysicalDuration: 20, onlineDuration: 0 },
-  ];
+  const isEarly = (timeStr?: string) => {
+    const mins = parseTime(timeStr);
+    return mins !== null && mins < 17 * 60;
+  };
+
+  const dateList = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const list: string[] = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      list.push(d.toISOString().slice(0, 10));
+    }
+    return list;
+  }, [startDate, endDate]);
+
+  const stats = useMemo(() => {
+    const workingDaysInMonth = dateList.filter(d => new Date(d).getDay() !== 0).length;
+    const daysToBeWorked = workingDaysInMonth;
+    
+    const presentDates = new Set(attendanceRecords.map(r => r.workDate));
+    const noOfLeaves = dateList.filter(d => new Date(d).getDay() !== 0 && !presentDates.has(d)).length;
+
+    const workingDays = attendanceRecords.filter(r => r.status === 'present' || r.status === 'clocked_out').length;
+    const holidayWorked = attendanceRecords.filter(r => new Date(r.workDate).getDay() === 0).length;
+    
+    const lateReporting = attendanceRecords.filter(r => r.firstClockIn && isLate(new Date(r.firstClockIn).toLocaleTimeString())).length;
+    const earlyLeaving = attendanceRecords.filter(r => r.lastClockOut && isEarly(new Date(r.lastClockOut).toLocaleTimeString())).length;
+
+    const totalBreakHrs = attendanceRecords.reduce((sum, r) => sum + (r.totalBreakMinutes || 0), 0) / 60;
+
+    const totalExpenses = expenseClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
+
+    return {
+      workingDaysInMonth,
+      daysToBeWorked,
+      noOfLeaves,
+      holidayWorked,
+      workingDays,
+      lateReporting,
+      earlyLeaving,
+      breakHrs: Math.round(totalBreakHrs * 100) / 100,
+      avgBreakTime: workingDays > 0 ? Math.round((totalBreakHrs / workingDays) * 100) / 100 : 0,
+      overBreakTime: '0 hr',
+      joinedDate: '—',
+      accumulatedLeave: noOfLeaves,
+      accumulatedHolidayWorked: holidayWorked,
+      overallAvgDuration: workingDays > 0 ? Math.round((attendanceRecords.reduce((sum, r) => sum + (r.totalWorkingMinutes || 0), 0) / 60 / workingDays) * 100) / 100 : 0,
+      totalExpenses,
+    };
+  }, [dateList, attendanceRecords, expenseClaims]);
+
+  const orgBreakdown = useMemo(() => {
+    const orgMap: Record<string, { totalHrs: number; count: number }> = {};
+    attendanceRecords.forEach((r) => {
+      const loc = r.sessions?.[0]?.workType || 'Office';
+      const hrs = (r.totalWorkingMinutes || 0) / 60;
+      if (!orgMap[loc]) orgMap[loc] = { totalHrs: 0, count: 0 };
+      orgMap[loc].totalHrs += hrs;
+      orgMap[loc].count += 1;
+    });
+    return Object.entries(orgMap).map(([organization, data]) => ({
+      organization,
+      avgDuration: data.count > 0 ? Math.round((data.totalHrs / data.count) * 10) / 10 : 0,
+    }));
+  }, [attendanceRecords]);
+
+  const classSupervisionSummary = useMemo(() => {
+    const instMap: Record<string, { physicalCount: number; onlineCount: number; physicalDur: number; onlineDur: number }> = {};
+    attendanceRecords.forEach((r) => {
+      const loc = r.sessions?.[0]?.workType || 'Office';
+      if (loc === 'Office') return;
+      const hrs = (r.totalWorkingMinutes || 0) / 60;
+      if (!instMap[loc]) instMap[loc] = { physicalCount: 0, onlineCount: 0, physicalDur: 0, onlineDur: 0 };
+
+      const isOnline = r.sessions?.some((s) => s.notes?.toLowerCase().includes('online')) || false;
+      if (isOnline) {
+        instMap[loc].onlineCount += 1;
+        instMap[loc].onlineDur += hrs;
+      } else {
+        instMap[loc].physicalCount += 1;
+        instMap[loc].physicalDur += hrs;
+      }
+    });
+    return Object.entries(instMap).map(([institution, data]) => ({
+      institution,
+      physicalClasses: data.physicalCount,
+      onlineClasses: data.onlineCount,
+      physicalClassDuration: data.physicalDur,
+      onlineDuration: data.onlineDur,
+      totalPhysicalDuration: data.physicalDur + data.onlineDur,
+    }));
+  }, [attendanceRecords]);
 
   const handlePresetClick = (preset: string) => {
     setActiveFilterPreset(preset);

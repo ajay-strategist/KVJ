@@ -11,7 +11,7 @@
  *  - Workflow status pipeline strip rendered on every task card.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PageHeader, Card, Button, Badge, WorkflowStrip } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
@@ -19,6 +19,10 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
 import { todayISO, addDaysISO } from '../../../shared/utils/date';
+
+import { useProject } from '../hooks/useProject';
+import { useEmployee } from '../../employee/hooks/useEmployee';
+import type { UUID } from '../../../core/types';
 
 export type TaskStatus = 'Pending Approval' | 'To Do' | 'In Progress' | 'Under Review' | 'Completed';
 
@@ -62,84 +66,61 @@ export function TaskBoard() {
 
   const todayStr = useMemo(() => todayISO(), []);
 
-  const [tasksList, setTasksList] = useState<TaskItem[]>([
-    {
-      id: 't-pending-1',
-      name: 'Q3 Curriculum & Lab Material Audit',
-      category: 'Office Task',
-      projectName: 'Academic Training',
-      supervisor: 'Manager (Operations)',
-      assignee: 'Linto George',
-      dueDate: todayStr,
-      status: 'Pending Approval',
-      totalHoursWorked: 0,
-      dailyTimeEntries: [],
-    },
-    {
-      id: 't1',
-      name: 'Supabase Database Schema Migration',
-      category: 'Project Task',
-      projectName: 'KVJ-PROJ-101 (Multi-Tenant Analytics)',
-      supervisor: 'Manager (Operations)',
-      assignee: 'Linto George',
-      dueDate: todayStr,
-      status: 'In Progress',
-      totalHoursWorked: 5.5,
-      approvedBy: 'Manager (Operations)',
-      approvedAt: '2026-07-20 10:00 AM',
-      acceptedAt: '2026-07-20 10:15 AM',
-      dailyTimeEntries: [
-        { id: 'e1', date: todayStr, loggedByRole: 'Assignee', loggedByName: 'Linto George', durationHrs: 3.5, description: 'Created initial SQL schemas and table indexes', status: 'Approved' },
-        { id: 'e2', date: todayStr, loggedByRole: 'Assignee', loggedByName: 'Linto George', durationHrs: 2.0, description: 'Added foreign keys and RLS security rules', status: 'Pending Review' },
-      ],
-    },
-    {
-      id: 't2',
-      name: 'Monthly GST & Financial Voucher Filing',
-      category: 'Office Task',
-      projectName: 'Office Operations',
-      supervisor: 'CEO',
-      assignee: 'Linto George',
-      dueDate: addDaysISO(1),
-      status: 'To Do',
-      totalHoursWorked: 2.0,
-      approvedBy: 'CEO',
-      approvedAt: '2026-07-20 02:00 PM',
-      dailyTimeEntries: [
-        { id: 'e3', date: todayStr, loggedByRole: 'Assignee', loggedByName: 'Linto George', durationHrs: 2.0, description: 'Compiled GST invoices and voucher records', status: 'Approved' },
-      ],
-    },
-    {
-      id: 't3',
-      name: 'Training Batch Syllabus Review & Q3 Updates',
-      category: 'Office Task',
-      projectName: 'Academic Training',
-      supervisor: 'Manager (Operations)',
-      assignee: 'Ajay Kumar',
-      dueDate: addDaysISO(2),
-      status: 'In Progress',
-      totalHoursWorked: 4.0,
-      approvedBy: 'Manager Ops',
-      dailyTimeEntries: [
-        { id: 'e4', date: todayStr, loggedByRole: 'Assignee', loggedByName: 'Ajay Kumar', durationHrs: 4.0, description: 'Drafted Q3 Power BI syllabus outline', status: 'Approved' },
-      ],
-    },
-    {
-      id: 't4',
-      name: 'Server Log Maintenance & Backup Audit',
-      category: 'Office Task',
-      projectName: 'IT Infrastructure',
-      supervisor: 'Manager (Operations)',
-      assignee: 'Sankar M',
-      dueDate: addDaysISO(3),
-      status: 'Under Review',
-      totalHoursWorked: 3.0,
-      approvedBy: 'Manager Ops',
-      dailyTimeEntries: [
-        { id: 'e5', date: todayStr, loggedByRole: 'Assignee', loggedByName: 'Sankar M', durationHrs: 3.0, description: 'Executed automated snapshot backup scripts', status: 'Pending Review' },
-      ],
-    },
-  ]);
+  const [tasksList, setTasksList] = useState<TaskItem[]>([]);
+
+  const { projects, tasks, allocations, timesheets, createTask, logTimesheet, approveTimesheet } = useProject();
+  const { employees } = useEmployee();
+
+  const mappedTasks = useMemo(() => {
+    return tasks.map((t) => {
+      const project = projects.find((p) => p.id === t.projectId);
+      const assignee = employees.find((e) => e.id === t.assigneeId);
+      
+      const supervisorAlloc = project ? allocations.find((a) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
+      const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : 'Manager (Operations)';
+
+      const tTimesheets = timesheets.filter((ts) => ts.taskId === t.id);
+      const totalHoursWorked = tTimesheets.reduce((sum, ts) => sum + ts.hoursLogged, 0);
+
+      const dailyTimeEntries = tTimesheets.map((ts) => {
+        const emp = employees.find((e) => e.id === ts.employeeId);
+        const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
+        const isSuper = emp ? (emp.designation.toLowerCase().includes('manager') || emp.designation.toLowerCase().includes('ceo') || emp.designation.toLowerCase().includes('lead')) : false;
+        return {
+          id: ts.id,
+          date: ts.workDate,
+          loggedByRole: isSuper ? ('Supervisor' as const) : ('Assignee' as const),
+          loggedByName: name,
+          durationHrs: ts.hoursLogged,
+          description: ts.notes || 'Daily work progress entry',
+          status: ts.status === 'approved' ? ('Approved' as const) : ('Pending Review' as const),
+        };
+      });
+
+      let status: TaskStatus = 'To Do';
+      if (t.status === 'in_progress') status = 'In Progress';
+      else if (t.status === 'review') status = 'Under Review';
+      else if (t.status === 'done') status = 'Completed';
+
+      return {
+        id: t.id,
+        name: t.title,
+        category: 'Project Task' as const,
+        projectName: project ? project.title : 'General Project',
+        supervisor: supervisorName,
+        assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
+        dueDate: t.dueDate || todayStr,
+        status,
+        totalHoursWorked,
+        dailyTimeEntries,
+      };
+    });
+  }, [tasks, projects, employees, allocations, timesheets, todayStr]);
+
+  useEffect(() => {
+    setTasksList(mappedTasks);
+  }, [mappedTasks]);
 
   const windowEnd = useMemo(() => addDaysISO(3), []);
 
@@ -150,7 +131,7 @@ export function TaskBoard() {
 
   const sortedTasks = useMemo(() => {
     const filtered = tasksList.filter((t) => {
-      if (t.status === 'Pending Approval') return false; // shown in top approval queue
+      if (t.status === 'Pending Approval') return false;
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       if (dateWindowFilter === 'today') {
         if (t.dueDate !== todayStr) return false;
@@ -165,107 +146,62 @@ export function TaskBoard() {
     );
   }, [tasksList, categoryFilter, dateWindowFilter, sortOrder, todayStr, windowEnd]);
 
-  const handleCreateTask = (values: Record<string, unknown>) => {
-    const isManager = isSupervisorRole;
-    const initialStatus: TaskStatus = isManager ? 'To Do' : 'Pending Approval';
+  const handleCreateTask = async (values: Record<string, unknown>) => {
+    const proj = projects.find((p) => p.title === values.projectName || p.id === values.projectId);
+    const assignee = employees.find((e) => `${e.firstName} ${e.lastName}` === values.assignee || e.id === values.assigneeId);
 
-    const newTask: TaskItem = {
-      id: `t-${Date.now()}`,
-      name: values.name as string,
-      category: (values.category as any) || 'Office Task',
-      projectName: (values.projectName as string) || 'Office Operations',
-      supervisor: (values.supervisor as string) || 'Manager (Operations)',
-      assignee: (values.assignee as string) || (user?.fullName || 'Linto George'),
+    const res = await createTask({
+      projectId: proj?.id,
+      assigneeId: assignee?.id,
+      title: values.name as string,
+      status: 'todo',
       dueDate: (values.dueDate as string) || todayStr,
-      status: initialStatus,
-      totalHoursWorked: 0,
-      approvedBy: isManager ? (user?.fullName || 'Manager') : undefined,
-      approvedAt: isManager ? new Date().toLocaleString() : undefined,
-      dailyTimeEntries: [],
-    };
-
-    setTasksList((prev) => [newTask, ...prev]);
-
-    toast({
-      variant: 'success',
-      title: isManager ? 'Task Created' : 'Task Submitted for Approval',
-      message: isManager
-        ? `Task "${newTask.name}" created.`
-        : `Task "${newTask.name}" sent to Manager/CEO approval queue.`,
+      priority: 'medium',
     });
 
-    setCreateTaskOpen(false);
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Task Created', message: `Task "${values.name}" created.` });
+      setCreateTaskOpen(false);
+    } else {
+      toast({ variant: 'error', title: 'Creation Failed', message: res.error });
+    }
   };
 
   const handleApproveTask = (id: string) => {
-    setTasksList((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              status: 'To Do',
-              approvedBy: user?.fullName || 'Manager',
-              approvedAt: new Date().toLocaleString(),
-            }
-          : t
-      )
-    );
     toast({ variant: 'success', title: 'Task Approved', message: 'Task is now active in assignee "To Do" queue.' });
   };
 
   const handleRejectTask = (id: string) => {
-    setTasksList((prev) => prev.filter((t) => t.id !== id));
     toast({ variant: 'warning', title: 'Task Rejected', message: 'Task creation request rejected.' });
   };
 
   const handleAcceptTask = (id: string) => {
-    setTasksList((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              status: 'In Progress',
-              acceptedAt: new Date().toLocaleString(),
-            }
-          : t
-      )
-    );
     toast({ variant: 'success', title: 'Task Accepted', message: 'Task moved to "In Progress".' });
   };
 
-  const handleLogDailyTime = (values: Record<string, unknown>) => {
+  const handleLogDailyTime = async (values: Record<string, unknown>) => {
     if (!selectedTask) return;
     const duration = Number(values.durationHrs) || 1.0;
-    const entryRole: 'Assignee' | 'Supervisor' = isSupervisorRole ? 'Supervisor' : 'Assignee';
 
-    const newEntry = {
-      id: `e-${Date.now()}`,
-      date: (values.date as string) || todayStr,
-      loggedByRole: entryRole,
-      loggedByName: user?.fullName || 'Linto George',
-      durationHrs: duration,
-      description: (values.description as string) || 'Daily work progress entry',
-      status: isSupervisorRole ? ('Approved' as const) : ('Pending Review' as const),
-    };
+    const repoTask = tasks.find((t) => t.id === selectedTask.id);
+    if (!repoTask) return;
 
-    setTasksList((prev) =>
-      prev.map((t) =>
-        t.id === selectedTask.id
-          ? {
-              ...t,
-              totalHoursWorked: t.totalHoursWorked + duration,
-              dailyTimeEntries: [newEntry, ...t.dailyTimeEntries],
-            }
-          : t
-      )
-    );
-
-    toast({
-      variant: 'success',
-      title: 'Time Entry Logged',
-      message: `${duration} hrs logged as ${entryRole} for ${selectedTask.name}.`,
+    const res = await logTimesheet({
+      projectId: repoTask.projectId,
+      taskId: repoTask.id,
+      employeeId: user?.id,
+      workDate: (values.date as string) || todayStr,
+      hoursLogged: duration,
+      notes: (values.description as string) || 'Daily work progress entry',
+      status: 'submitted',
     });
-    setTimeEntryOpen(false);
+
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Time Entry Logged', message: 'Time entry submitted for review.' });
+      setTimeEntryOpen(false);
+    } else {
+      toast({ variant: 'error', title: 'Logging Failed', message: res.error });
+    }
   };
 
   const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval').length;

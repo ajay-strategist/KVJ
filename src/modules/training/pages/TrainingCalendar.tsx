@@ -21,17 +21,9 @@ import {
   type ScheduleRangeResult, type ScheduleSession, type ScheduleConflict,
   type ConflictStatus, type PresetId,
 } from '../schedule.data';
+import { BATCH_REPOSITORY_TOKEN, COURSE_REPOSITORY_TOKEN, type Batch, type Course } from '../training.repository';
 
 const EMPTY: ScheduleRangeResult = { sessions: [], leaves: [], holidays: [], daysLoaded: 0 };
-
-const BATCH_PRESETS = [
-  { batchCode: 'MIM-B1-2026', name: 'MIM Power BI & DAX', college: 'MIM Kuttikkanam', course: 'Data Analytics', coordinator: 'Prof. Thomas Kurian', venue: 'Lab 402', mode: 'Offline' as const, studentCount: 45 },
-  { batchCode: 'CHRIST-B1-2026', name: 'Christ Data Analytics', college: 'Christ Irinjalakkuda', course: 'Data Analytics', coordinator: 'Dr. Meera Nair', venue: 'Lab 101', mode: 'Online' as const, studentCount: 43 },
-  { batchCode: 'RAJAGI-B4-2026', name: 'Rajagiri Advanced Excel', college: 'Rajagiri College', course: 'Advanced Excel 365', coordinator: 'Prof. Vinod Menon', venue: 'Room 205', mode: 'Offline' as const, studentCount: 67 },
-  { batchCode: 'SANTHI-B1-2026', name: 'Santhigiri Excel Expert', college: 'Santhigiri College', course: 'Excel 365', coordinator: 'Dr. Susan John', venue: 'Seminar Hall 1', mode: 'Offline' as const, studentCount: 50 },
-  { batchCode: 'NEHRU-B3-2026', name: 'Nehru PL-900 Power Platform', college: 'Nehru College', course: 'Power Platform PL-900', coordinator: 'Prof. Anoop Kumar', venue: 'Lab 3', mode: 'Offline' as const, studentCount: 38 },
-  { batchCode: 'VIMALA-B4-2026', name: 'Vimala Tally & GST', college: 'Vimala College', course: 'Tally & GST Compliance', coordinator: 'Dr. Radhika V', venue: 'Commerce Lab', mode: 'Offline' as const, studentCount: 42 },
-];
 
 const FROZEN = { date: 116, day: 56, holiday: 132 };
 const FROZEN_W = FROZEN.date + FROZEN.day + FROZEN.holiday;
@@ -117,24 +109,50 @@ export function TrainingCalendar() {
   }>({
     date: todayISO(),
     trainerId: '',
-    name: 'Power BI & DAX Session',
-    batchCode: 'MIM-B1-2026',
-    college: 'MIM Kuttikkanam',
-    course: 'Data Analytics',
-    academicYear: '2025-2026',
-    coordinator: 'Prof. Thomas Kurian',
+    name: '',
+    batchCode: '',
+    college: '',
+    course: '',
+    academicYear: '',
+    coordinator: '',
     startTime: '09:00',
     endTime: '12:00',
-    venue: 'Lab 402',
+    venue: '',
     mode: 'Offline',
-    studentCount: 20,
+    studentCount: 0,
   });
+
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
       if (r.ok) setTrainers(r.value);
     });
+
+    const batchRepo = container.resolve(BATCH_REPOSITORY_TOKEN);
+    const courseRepo = container.resolve(COURSE_REPOSITORY_TOKEN);
+    Promise.all([batchRepo.findMany(), courseRepo.findMany()]).then(([bRes, cRes]) => {
+      setBatches(bRes.data);
+      setCourses(cRes.data);
+    });
   }, []);
+
+  const dynamicBatchPresets = useMemo(() => {
+    return batches.map((b) => {
+      const course = courses.find((c) => c.id === b.courseId);
+      return {
+        batchCode: b.code,
+        name: b.trainingName || course?.title || b.code,
+        college: b.college || '—',
+        course: course?.title || '—',
+        coordinator: b.coordinator || '—',
+        venue: b.venue || '—',
+        mode: (b.onlineLink ? 'Online' : 'Offline') as 'Online' | 'Offline',
+        studentCount: b.capacity || 0,
+      };
+    });
+  }, [batches, courses]);
 
   const trainerIds = useMemo(() => trainers.map((t) => t.id), [trainers]);
   const trainerName = useCallback(
@@ -859,7 +877,7 @@ export function TrainingCalendar() {
                 value={assignForm.batchCode}
                 onChange={(e) => {
                   const bCode = e.target.value;
-                  const preset = BATCH_PRESETS.find((b) => b.batchCode === bCode);
+                  const preset = dynamicBatchPresets.find((b) => b.batchCode === bCode);
                   if (preset) {
                     setAssignForm((f) => ({
                       ...f,
@@ -878,11 +896,15 @@ export function TrainingCalendar() {
                 }}
                 style={{ width: '100%', padding: '9px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
               >
-                {BATCH_PRESETS.map((b) => (
-                  <option key={b.batchCode} value={b.batchCode}>
-                    {b.batchCode} — {b.name} ({b.college})
-                  </option>
-                ))}
+                {dynamicBatchPresets.length > 0 ? (
+                  dynamicBatchPresets.map((b) => (
+                    <option key={b.batchCode} value={b.batchCode}>
+                      {b.batchCode} — {b.name} ({b.college})
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No batches found</option>
+                )}
               </select>
             </div>
           </div>

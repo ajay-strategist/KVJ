@@ -66,6 +66,9 @@ export interface Batch extends Entity {
   academicYear?: string;   // e.g. "2026-2027"
   batchNo?: string;        // e.g. "Batch 2"
   coordinator?: string;
+  coordinatorEmail?: string;
+  coordinator2?: string;
+  coordinatorEmail2?: string;
   phase?: TrainingPhase;
   completedTasks?: number;
   totalTasks?: number;

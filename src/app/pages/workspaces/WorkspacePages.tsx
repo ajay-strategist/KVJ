@@ -4,15 +4,21 @@ import { DashboardGrid } from '../../../shared/dashboard/dashboard';
 import { PageHeader, Card, SectionHeader, StatCard, QuickActionCard, Badge, Timeline, ActivityCard, Button } from '../../../shared/ui/components';
 import { useAuth } from '../../../modules/auth/AuthProvider';
 import { ROLES } from '../../../shared/permissions/roles';
-import { mock } from '../../../shared/mock/factories';
-import { LineChart } from '../../widgets/demo-widgets';
 import { useAttendance } from '../../../modules/attendance/hooks/useAttendance';
+import { useCommunication } from '../../../modules/communication/hooks/useCommunication';
 import type { AttendanceRecord, WorkSessionType } from '../../../modules/attendance/attendance.repository';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, SelectField, TextField, useForm } from '../../../shared/forms/form';
+
+import { useProject } from '../../../modules/project/hooks/useProject';
+import { useEmployee } from '../../../modules/employee/hooks/useEmployee';
+import { container } from '../../../core/registry';
+import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attendance.repository';
+import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
+import { toLocalISODate } from '../../../shared/utils/date';
 
 function Greeting() {
   const { user } = useAuth();
@@ -850,84 +856,93 @@ export const TimelineWidget = memo(function TimelineWidget({
 
 export const AnnouncementWidget = memo(function AnnouncementWidget() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Real announcements from the communication module (empty until one is posted).
+  const { announcements, loading } = useCommunication();
 
-  const announcements = [
-    {
-      id: 'a1',
-      title: 'Q3 Training Calendar & Batch Schedule Release',
-      category: 'Schedule',
-      priority: 'High',
-      pinned: true,
-      content: 'The Training Calendar for Q3 has been finalized and uploaded. Please review your assigned batches under Batches -> Training Calendar. Any conflict or leave adjustments must be submitted to the college coordinator at least 48 hours prior.',
-      date: 'Today'
-    },
-    {
-      id: 'a2',
-      title: 'System Maintenance Window: Sunday',
-      category: 'IT Support',
-      priority: 'Normal',
-      pinned: false,
-      content: 'The primary database server will undergo scheduled security patching and maintenance on Sunday, July 26th between 02:00 AM and 05:00 AM. Access to the Attendance and Trainer scheduling portals will be temporarily offline during this period.',
-      date: 'Yesterday'
-    }
-  ];
+  // Newest first, using the scheduled time when present, otherwise created time.
+  const sorted = [...announcements].sort((a, b) => {
+    const ta = new Date(a.scheduledAt ?? a.createdAt).getTime();
+    const tb = new Date(b.scheduledAt ?? b.createdAt).getTime();
+    return tb - ta;
+  });
+
+  const targetLabel: Record<string, string> = {
+    organization: 'Organization',
+    department: 'Department',
+    project: 'Project',
+    training: 'Training',
+  };
 
   return (
     <Card>
       <SectionHeader title="Announcements & Notices" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {announcements.map((a) => {
-          const isExpanded = expandedId === a.id;
-          const tone = a.priority === 'High' ? 'danger' : 'neutral';
-          
-          return (
-            <div
-              key={a.id}
-              style={{
-                borderLeft: `4px solid ${a.priority === 'High' ? 'var(--status-danger)' : 'var(--brand)'}`,
-                background: 'var(--bg-sunken)',
-                padding: '12px 14px',
-                borderRadius: '0 8px 8px 0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {a.pinned && <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}>📌 Pinned</span>}
-                  <Badge tone={tone}>{a.category}</Badge>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.date}</span>
-              </div>
+      {sorted.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 2px' }}>
+          {loading ? 'Loading announcements…' : 'No announcements yet.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {sorted.map((a) => {
+            const isExpanded = expandedId === a.id;
+            const isHigh = a.priority === 'high';
+            const tone = isHigh ? 'danger' : 'neutral';
+            const when = new Date(a.scheduledAt ?? a.createdAt).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+            });
+            const content = a.content ?? '';
 
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{a.title}</div>
-              
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                {isExpanded ? a.content : `${a.content.slice(0, 95)}...`}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setExpandedId(isExpanded ? null : a.id)}
+            return (
+              <div
+                key={a.id}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--brand)',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  padding: 0,
-                  marginTop: 2,
+                  borderLeft: `4px solid ${isHigh ? 'var(--status-danger)' : 'var(--brand)'}`,
+                  background: 'var(--bg-sunken)',
+                  padding: '12px 14px',
+                  borderRadius: '0 8px 8px 0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
                 }}
               >
-                {isExpanded ? 'Read Less ▲' : 'Read More ▼'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {isHigh && <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}>📌 Pinned</span>}
+                    <Badge tone={tone}>{targetLabel[a.targetType] ?? a.targetType}</Badge>
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{when}</span>
+                </div>
+
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{a.title}</div>
+
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  {isExpanded || content.length <= 95 ? content : `${content.slice(0, 95)}...`}
+                </div>
+
+                {content.length > 95 && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--brand)',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      padding: 0,
+                      marginTop: 2,
+                    }}
+                  >
+                    {isExpanded ? 'Read Less ▲' : 'Read More ▼'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 });
@@ -1062,34 +1077,110 @@ export function MyDayPage() {
   );
 }
 
-/** Supervisor / Manager / CEO demo workspaces (same shell, different widgets). */
+/** Supervisor / Manager / CEO workspaces. */
 export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'employee'> }) {
-  const [projects] = useState(() => mock.projects(5));
-  const [attendanceTrend] = useState(() => mock.series(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']));
-  const [teamActivity] = useState(() => mock.activity(5));
+  const { projects, clients, timesheets } = useProject();
+  const { employees } = useEmployee();
+
+  const [presentCount, setPresentCount] = useState(0);
+  const [pendingExpenses, setPendingExpenses] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const fetchWorkspaceStats = async () => {
+      try {
+        const attRepo = container.resolve(ATTENDANCE_REPOSITORY_TOKEN);
+        const expRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
+
+        const today = toLocalISODate(new Date());
+        
+        // Find attendance for today
+        const attRes = await attRepo.findMany();
+        const todayPresent = attRes.data.filter((r) => r.workDate === today && r.firstClockIn).length;
+
+        // Find pending expenses (submitted status)
+        const expRes = await expRepo.findMany();
+        const pendingExp = expRes.data.filter((c) => c.status === 'submitted').length;
+
+        if (active) {
+          setPresentCount(todayPresent);
+          setPendingExpenses(pendingExp);
+        }
+      } catch (err) {
+        console.error('Failed to load workspace stats:', err);
+      }
+    };
+
+    fetchWorkspaceStats();
+    return () => { active = false; };
+  }, []);
+
+  const totalEmployees = employees.length;
+  const teamPresent = totalEmployees > 0 ? `${presentCount}/${totalEmployees}` : '0/0';
+
+  const pendingTimesheets = timesheets.filter((t) => t.status === 'submitted').length;
+  const pendingApprovals = pendingExpenses + pendingTimesheets;
+
+  // At-risk projects: count of planning/execution projects with high or critical priority
+  const atRiskProjects = projects.filter(
+    (p) =>
+      p.status !== 'closure' &&
+      p.status !== 'suspended' &&
+      (p.priority === 'high' || p.priority === 'critical')
+  ).length;
+
+  const mappedProjects = useMemo(() => {
+    return projects.map((p) => {
+      const client = clients.find((c) => c.id === p.clientId);
+      return {
+        id: p.id,
+        name: p.title,
+        client: client ? client.name : 'Unknown Client',
+        progress: 0,
+        health: p.status === 'suspended' ? 'Suspended' : p.status === 'execution' ? 'In Progress' : 'Planned',
+        healthTone: (p.status === 'suspended' ? 'danger' : p.status === 'execution' ? 'success' : 'neutral') as any,
+      };
+    });
+  }, [projects, clients]);
 
   const title = { supervisor: 'Supervisor Workspace', manager: 'Manager Workspace', ceo: 'CEO Workspace' }[role];
   return (
     <AppShell>
       <WorkspaceShell role={role} regions={{
-        greeting: <PageHeader title={title} subtitle="Demo workspace · mock data" />,
+        greeting: <PageHeader title={title} />,
         stats: <>
-          <StatCard label="Team present" value="18/22" tone="success" icon="●" />
-          <StatCard label="Utilization" value="82%" icon="◔" />
-          <StatCard label="Pending approvals" value="7" tone="warning" icon="⚑" />
-          <StatCard label="At-risk projects" value="2" tone="danger" icon="▲" />
+          <StatCard label="Team present" value={teamPresent} tone="success" icon="●" />
+          <StatCard label="Utilization" value="" icon="◔" />
+          <StatCard label="Pending approvals" value={pendingApprovals.toString()} tone={pendingApprovals > 0 ? 'warning' : 'neutral'} icon="⚑" />
+          <StatCard label="At-risk projects" value={atRiskProjects.toString()} tone={atRiskProjects > 0 ? 'danger' : 'neutral'} icon="▲" />
         </>,
         primary: <>
-          <Card><SectionHeader title="Projects" />{projects.map((p) => (
-            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div><div style={{ fontSize: 14, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.client} · {p.progress}%</div></div>
-              <Badge tone={p.health === 'On Track' ? 'success' : p.health === 'Needs Attention' ? 'warning' : 'danger'}>{p.health}</Badge>
-            </div>
-          ))}</Card>
-          <Card><SectionHeader title="Attendance trend" /><LineChart data={attendanceTrend} /></Card>
+          <Card>
+            <SectionHeader title="Projects" />
+            {mappedProjects.length > 0 ? (
+              mappedProjects.map((p) => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.client}</div>
+                  </div>
+                  <Badge tone={p.healthTone}>{p.health}</Badge>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' }}>No projects found</div>
+            )}
+          </Card>
+          <Card>
+            <SectionHeader title="Attendance trend" />
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' }}>No trend data available</div>
+          </Card>
         </>,
         side: <>
-          <Card><SectionHeader title="Team activity" />{teamActivity.map((a) => <ActivityCard key={a.id} actor={a.actor} action={a.action} time={a.time} />)}</Card>
+          <Card>
+            <SectionHeader title="Team activity" />
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' }}>No recent activity</div>
+          </Card>
         </>,
       }} />
     </AppShell>

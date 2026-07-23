@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageHeader, Card, SectionHeader, Badge, Button } from '../../../shared/ui/components';
 import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
+import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+
+import { useProject } from '../hooks/useProject';
+import { useEmployee } from '../../employee/hooks/useEmployee';
+import type { UUID } from '../../../core/types';
 
 export interface WorklogRecord {
   id: string;
@@ -19,7 +24,7 @@ export interface WorklogRecord {
 
 export function TaskWorklogView() {
   const { user } = useAuth();
-  // Approval rights via the central permission engine, not a hardcoded role list.
+  const { toast } = useNotifications();
   const { can } = usePermissions();
   const isSupervisor = can('task', 'approve');
 
@@ -27,91 +32,51 @@ export function TaskWorklogView() {
   const [filterCategory, setFilterCategory] = useState<'all' | 'Office Task' | 'Project Task'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'Approved' | 'Pending Review'>('all');
 
-  const [logs, setLogs] = useState<WorklogRecord[]>([
-    {
-      id: 'wl-1',
-      date: '2026-07-21',
-      taskName: 'Supabase Database Schema Migration',
-      projectName: 'KVJ-PROJ-101 (Multi-Tenant Analytics)',
-      category: 'Project Task',
-      employeeName: 'Linto George',
-      role: 'Assignee',
-      durationHrs: 3.5,
-      description: 'Created initial SQL schemas and table indexes',
-      reviewStatus: 'Approved',
-      supervisorName: 'Manager (Operations)',
-    },
-    {
-      id: 'wl-2',
-      date: '2026-07-21',
-      taskName: 'Supabase Database Schema Migration',
-      projectName: 'KVJ-PROJ-101 (Multi-Tenant Analytics)',
-      category: 'Project Task',
-      employeeName: 'Linto George',
-      role: 'Assignee',
-      durationHrs: 2.0,
-      description: 'Added foreign keys and RLS security rules',
-      reviewStatus: 'Pending Review',
-      supervisorName: 'Manager (Operations)',
-    },
-    {
-      id: 'wl-3',
-      date: '2026-07-21',
-      taskName: 'Monthly GST & Financial Voucher Filing',
-      projectName: 'Office Operations',
-      category: 'Office Task',
-      employeeName: 'Linto George',
-      role: 'Assignee',
-      durationHrs: 2.0,
-      description: 'Compiled GST invoices and voucher records',
-      reviewStatus: 'Approved',
-      supervisorName: 'CEO',
-    },
-    {
-      id: 'wl-4',
-      date: '2026-07-21',
-      taskName: 'Training Batch Syllabus Review & Q3 Updates',
-      projectName: 'Academic Training',
-      category: 'Office Task',
-      employeeName: 'Ajay Kumar',
-      role: 'Assignee',
-      durationHrs: 4.0,
-      description: 'Drafted Q3 Power BI syllabus outline',
-      reviewStatus: 'Approved',
-      supervisorName: 'Manager (Operations)',
-    },
-    {
-      id: 'wl-5',
-      date: '2026-07-21',
-      taskName: 'Server Log Maintenance & Backup Audit',
-      projectName: 'IT Infrastructure',
-      category: 'Office Task',
-      employeeName: 'Manager (Operations)',
-      role: 'Supervisor',
-      durationHrs: 1.5,
-      description: 'Supervised automated snapshot backup scripts and server logs',
-      reviewStatus: 'Approved',
-      supervisorName: 'CEO',
-    },
-    {
-      id: 'wl-6',
-      date: '2026-07-20',
-      taskName: 'AI OCR Model Validation & Benchmarking',
-      projectName: 'KVJ-PROJ-103 (AI OCR Pipeline)',
-      category: 'Project Task',
-      employeeName: 'Anju V',
-      role: 'Assignee',
-      durationHrs: 6.0,
-      description: 'Tested 100 sample document scans',
-      reviewStatus: 'Approved',
-      supervisorName: 'CEO',
-    },
-  ]);
+  const [logs, setLogs] = useState<WorklogRecord[]>([]);
 
-  const handleApprove = (id: string) => {
-    setLogs((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, reviewStatus: 'Approved' } : l))
-    );
+  const { projects, tasks, allocations, timesheets, approveTimesheet } = useProject();
+  const { employees } = useEmployee();
+
+  const mappedLogs = useMemo(() => {
+    return timesheets.map((ts) => {
+      const project = projects.find((p) => p.id === ts.projectId);
+      const task = tasks.find((t) => t.id === ts.taskId);
+      const emp = employees.find((e) => e.id === ts.employeeId);
+      const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
+      
+      const supervisorAlloc = project ? allocations.find((a) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
+      const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : 'Manager (Operations)';
+
+      const isSuper = emp ? (emp.designation.toLowerCase().includes('manager') || emp.designation.toLowerCase().includes('ceo') || emp.designation.toLowerCase().includes('lead')) : false;
+
+      return {
+        id: ts.id,
+        date: ts.workDate,
+        taskName: task ? task.title : 'General Tasks',
+        projectName: project ? project.title : 'General Project',
+        category: 'Project Task' as const,
+        employeeName: empName,
+        role: isSuper ? ('Supervisor' as const) : ('Assignee' as const),
+        durationHrs: ts.hoursLogged,
+        description: ts.notes || 'Daily work progress entry',
+        reviewStatus: ts.status === 'approved' ? ('Approved' as const) : ('Pending Review' as const),
+        supervisorName,
+      };
+    });
+  }, [timesheets, projects, tasks, employees, allocations]);
+
+  useEffect(() => {
+    setLogs(mappedLogs);
+  }, [mappedLogs]);
+
+  const handleApprove = async (id: string) => {
+    const res = await approveTimesheet(id as UUID);
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Worklog Approved', message: 'Time entry status updated to Approved.' });
+    } else {
+      toast({ variant: 'error', title: 'Approval Failed', message: res.error });
+    }
   };
 
   const filteredLogs = logs.filter((l) => {

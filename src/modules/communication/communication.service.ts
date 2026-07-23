@@ -12,6 +12,7 @@ import {
 import { ACTIVITY_ENGINE_TOKEN } from '../../core/engines/activity';
 import { AUDIT_ENGINE_TOKEN } from '../../core/engines/audit';
 import { NOTIFICATION_ENGINE_TOKEN } from '../../core/engines/notification';
+import { eventBus } from '../../core/event-bus';
 
 export interface ICommunicationService {
   createChannel(data: Partial<ChatChannel>, actor: Actor): Promise<Result<ChatChannel>>;
@@ -36,8 +37,69 @@ export class CommunicationService implements ICommunicationService {
   private get audit() { return container.resolve(AUDIT_ENGINE_TOKEN); }
   private get notification() { return container.resolve(NOTIFICATION_ENGINE_TOKEN); }
 
+  constructor() {
+    this.subscribeToEvents();
+  }
+
+  private subscribeToEvents() {
+    // Listen for attendance and leave application events to publish notifications to relevant channels
+    eventBus.on('attendance.clockIn' as any, async (payload: any) => {
+      const actor = { id: 'u-admin', role: 'ADMIN' };
+      await this.sendMessage({
+        channelId: 'c-hr' as UUID,
+        senderId: 'u-admin' as UUID,
+        text: `📅 **Clock In Alert**: Employee \`${payload.employeeId}\` has clocked in at ${new Date(payload.time).toLocaleTimeString()}.`,
+        attachments: []
+      }, actor);
+    });
+
+    eventBus.on('attendance.clockOut' as any, async (payload: any) => {
+      const actor = { id: 'u-admin', role: 'ADMIN' };
+      await this.sendMessage({
+        channelId: 'c-hr' as UUID,
+        senderId: 'u-admin' as UUID,
+        text: `📅 **Clock Out Alert**: Employee \`${payload.employeeId}\` has clocked out at ${new Date(payload.time).toLocaleTimeString()}.`,
+        attachments: []
+      }, actor);
+    });
+
+    eventBus.on('leave.applied' as any, async (payload: any) => {
+      const actor = { id: 'u-admin', role: 'ADMIN' };
+      await this.sendMessage({
+        channelId: 'c-hr' as UUID,
+        senderId: 'u-admin' as UUID,
+        text: `📝 **Leave Request**: Employee \`${payload.employeeId}\` has submitted a new leave application (Reference: \`${payload.leaveId}\`). Pending manager approval.`,
+        attachments: []
+      }, actor);
+    });
+
+    eventBus.on('leave.approved' as any, async (payload: any) => {
+      const actor = { id: 'u-admin', role: 'ADMIN' };
+      await this.sendMessage({
+        channelId: 'c-hr' as UUID,
+        senderId: 'u-admin' as UUID,
+        text: `✅ **Leave Approved**: Leave request \`${payload.leaveId}\` for Employee \`${payload.employeeId}\` has been approved.`,
+        attachments: []
+      }, actor);
+    });
+
+    eventBus.on('leave.rejected' as any, async (payload: any) => {
+      const actor = { id: 'u-admin', role: 'ADMIN' };
+      await this.sendMessage({
+        channelId: 'c-hr' as UUID,
+        senderId: 'u-admin' as UUID,
+        text: `❌ **Leave Rejected**: Leave request \`${payload.leaveId}\` for Employee \`${payload.employeeId}\` has been rejected.`,
+        attachments: []
+      }, actor);
+    });
+  }
+
   async createChannel(data: Partial<ChatChannel>, actor: Actor): Promise<Result<ChatChannel>> {
     try {
+      // Enforce creation rules: Employees cannot create Leadership/Admin channels
+      if (data.type === 'announcement' && actor.role === 'EMPLOYEE') {
+        return Err(AppError.forbidden('Only Administrators or CEOs can create announcement channels.'));
+      }
       const channel = await this.channelRepo.create(data, actor);
       await this.activity.log('communication', channel.id, actor, 'create', `Created chat channel: ${channel.name ?? 'DM'}`);
       return Ok(channel);
@@ -48,6 +110,18 @@ export class CommunicationService implements ICommunicationService {
 
   async sendMessage(data: Partial<ChatMessage>, actor: Actor): Promise<Result<ChatMessage>> {
     try {
+      // Enforce RBAC permission checks: Employees cannot send messages in Announcement channels
+      if (data.channelId === 'c-announcements') {
+        if (actor.role === 'EMPLOYEE') {
+          return Err(AppError.forbidden('Announcement channels are read-only for employees. Only Administrators, CEOs, and Managers can publish.'));
+        }
+      } else if (data.channelId) {
+        const channel = await this.channelRepo.findById(data.channelId);
+        if (channel?.type === 'announcement' && actor.role === 'EMPLOYEE') {
+          return Err(AppError.forbidden('Announcement channels are read-only for employees. Only Administrators, CEOs, and Managers can publish.'));
+        }
+      }
+
       const msg = await this.msgRepo.create(data, actor);
       await this.notification.send({
         recipientId: msg.senderId,
@@ -63,6 +137,9 @@ export class CommunicationService implements ICommunicationService {
 
   async postAnnouncement(data: Partial<Announcement>, actor: Actor): Promise<Result<Announcement>> {
     try {
+      if (actor.role === 'EMPLOYEE') {
+        return Err(AppError.forbidden('Only Managers and Executives can post announcements.'));
+      }
       const announcement = await this.announcementRepo.create(data, actor);
       await this.activity.log('communication', announcement.id, actor, 'create', `Posted announcement: ${announcement.title}`);
       await this.audit.log(actor, 'create', 'announcements', announcement.id, { newValues: announcement });

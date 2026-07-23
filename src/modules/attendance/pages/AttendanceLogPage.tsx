@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, Badge, Button } from '../../../shared/ui/components';
 import { Tabs } from '../../../shared/ui/Tabs';
@@ -7,6 +7,12 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
+import { container } from '../../../core/registry';
+import { ATTENDANCE_REPOSITORY_TOKEN, type AttendanceRecord } from '../attendance.repository';
+import { EXPENSE_CLAIM_REPOSITORY_TOKEN, type ExpenseClaim } from '../../finance/finance.repository';
+import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
+import type { Employee } from '../../employee/employee.repository';
+import { toLocalISODate, todayISO } from '../../../shared/utils/date';
 
 export function AttendanceLogPage() {
   const { user } = useAuth();
@@ -15,33 +21,87 @@ export function AttendanceLogPage() {
   const userRole = user?.role || 'EMPLOYEE';
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
 
+  const now = new Date();
+  const defaultStart = toLocalISODate(new Date(now.getFullYear(), now.getMonth(), 1));
+  const defaultEnd = toLocalISODate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+
   const [activeFilterPreset, setActiveFilterPreset] = useState<'current_month' | 'last_month' | 'last_1_year' | 'custom'>('current_month');
-  const [startDate, setStartDate] = useState('2026-06-01');
-  const [endDate, setEndDate] = useState('2026-06-30');
-  const [selectedEmployee, setSelectedEmployee] = useState<string>(user?.fullName || 'Linto George');
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>(user?.fullName || 'System Admin');
   const [submitDrawerOpen, setSubmitDrawerOpen] = useState(false);
   const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
   const [expenseRows, setExpenseRows] = useState<any[]>([]);
-
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
 
-  const employeeList = [
-    'System Admin',
-  ];
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
+      if (r.ok) setEmployees(r.value);
+    });
+  }, []);
+
+  const employeeNames = useMemo(() => {
+    return employees.map((e) => `${e.firstName} ${e.lastName}`);
+  }, [employees]);
+
+  const currentEmployee = useMemo(() => {
+    if (selectedEmployee === 'All Employees') return null;
+    return employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployee) || null;
+  }, [employees, selectedEmployee]);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setLoading(true);
+      try {
+        const attendanceRepo = container.resolve(ATTENDANCE_REPOSITORY_TOKEN);
+        const expenseRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
+        const range = { from: startDate, to: endDate };
+
+        let records: AttendanceRecord[] = [];
+        let claims: ExpenseClaim[] = [];
+
+        if (selectedEmployee === 'All Employees') {
+          const allRes = await attendanceRepo.findMany();
+          records = allRes.data.filter(r => r.workDate >= range.from && r.workDate <= range.to);
+          const allClaims = await expenseRepo.findMany();
+          claims = allClaims.data.filter(c => c.createdAt >= range.from && c.createdAt <= range.to);
+        } else {
+          const empId = currentEmployee?.id || user?.id;
+          if (empId) {
+            records = await attendanceRepo.findHistory(empId, range);
+            const allClaims = await expenseRepo.findMany();
+            claims = allClaims.data.filter(c => c.employeeId === empId && c.createdAt >= range.from && c.createdAt <= range.to);
+          }
+        }
+        setAttendanceRecords(records);
+        setExpenseClaims(claims);
+      } catch (e) {
+        console.error('Error fetching attendance history:', e);
+      }
+      setLoading(false);
+    };
+    fetchHistory();
+  }, [startDate, endDate, currentEmployee, selectedEmployee, user]);
 
   const handleFilterPreset = (preset: 'current_month' | 'last_month' | 'last_1_year' | 'custom') => {
     setActiveFilterPreset(preset);
+    const today = new Date();
     if (preset === 'current_month') {
-      setStartDate('2026-06-01');
-      setEndDate('2026-06-30');
+      setStartDate(toLocalISODate(new Date(today.getFullYear(), today.getMonth(), 1)));
+      setEndDate(toLocalISODate(new Date(today.getFullYear(), today.getMonth() + 1, 0)));
     } else if (preset === 'last_month') {
-      setStartDate('2026-05-01');
-      setEndDate('2026-05-31');
+      setStartDate(toLocalISODate(new Date(today.getFullYear(), today.getMonth() - 1, 1)));
+      setEndDate(toLocalISODate(new Date(today.getFullYear(), today.getMonth(), 0)));
     } else if (preset === 'last_1_year') {
-      setStartDate('2025-06-01');
-      setEndDate('2026-05-31');
+      setStartDate(toLocalISODate(new Date(today.getFullYear() - 1, today.getMonth(), 1)));
+      setEndDate(toLocalISODate(new Date(today.getFullYear(), today.getMonth(), 0)));
     }
   };
 
@@ -78,84 +138,121 @@ export function AttendanceLogPage() {
     setSelectedExpenses({});
   };
 
-  // Table View rows: empty default attendance data
-  const tableRows: any[] = [];
+  const calendarDays: CalendarDayDetail[] = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days: CalendarDayDetail[] = [];
 
-  // Calendar Days mapping: Grouping multiple training sessions together in single date tiles!
-  const calendarDays: CalendarDayDetail[] = Array.from({ length: 30 }, (_, i) => {
-    const dayNum = i + 1;
-    const dayOfWeekIdx = (1 + i) % 7;
-    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = toLocalISODate(d);
+      const dayNum = d.getDate();
+      const dayOfWeekIdx = d.getDay();
+      const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
 
-    let status: 'present' | 'absent' | 'leave' | 'holiday' = 'present';
-    let location = 'Office';
-    let startTime: string | undefined = '08:30 AM';
-    let endTime: string | undefined = '05:00 PM';
-    let sessions: any[] | undefined = undefined;
-    let tasks: Array<{ title: string; duration: string }> = [
-      { title: 'Power BI Session', duration: '3.0h' },
-    ];
-    let hoursWorked = '8h 30m';
-    let expenses = '₹ 150.00';
+      const record = attendanceRecords.find(r => r.workDate === dateStr);
+      const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === dateStr);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
 
-    if (dayOfWeekIdx === 0) {
-      status = 'holiday';
-      location = '';
-      startTime = undefined;
-      endTime = undefined;
-      tasks = [];
-      hoursWorked = '';
-      expenses = '';
-    } else if (dayNum === 1) {
-      // Day 1 has grouped multiple training sessions!
-      status = 'present';
-      sessions = [
-        { location: 'Christ Irinjalakkuda', type: 'Training', startTime: '08:30 AM', endTime: '12:00 PM', tasks: [{ title: 'Power BI Syllabus Unit 1', duration: '3.5h' }] },
-        { location: 'SB College', type: 'Training', startTime: '01:30 PM', endTime: '05:00 PM', tasks: [{ title: 'MBA Batch 1 Orientation', duration: '3.5h' }] },
-      ];
-      hoursWorked = '7h 00m';
-      expenses = '₹ 150.00';
-    } else if (dayNum === 5) {
-      // Day 5 has grouped training + supervision sessions!
-      status = 'present';
-      sessions = [
-        { location: 'Christ Irinjalakkuda', type: 'Training', startTime: '08:30 AM', endTime: '01:00 PM', tasks: [{ title: 'Weekly Batch Test Evaluation', duration: '4.5h' }] },
-        { location: 'Vimala College', type: 'Supervision', startTime: '02:00 PM', endTime: '05:00 PM', tasks: [{ title: 'Lab Supervision Session', duration: '3.0h' }] },
-      ];
-      hoursWorked = '7h 30m';
-      expenses = '₹ 120.00';
-    } else if (dayNum === 13) {
-      status = 'leave';
-      location = '';
-      startTime = undefined;
-      endTime = undefined;
-      tasks = [];
-      hoursWorked = '';
-      expenses = '';
-    } else if (dayNum === 24 || dayNum === 25) {
-      location = dayNum === 24 ? 'Vimala College' : 'Nehru College';
-      startTime = dayNum === 24 ? '10:00 AM' : '09:00 AM';
-      endTime = dayNum === 24 ? '03:00 PM' : '05:00 PM';
-      tasks = [{ title: 'College Marketing Presentation', duration: '5.0h' }];
-    } else if (dayNum <= 10) {
-      location = 'Christ Irinjalakkuda';
-      tasks = [{ title: 'Batch Training Session', duration: '6.0h' }];
+      if (record) {
+        const sessions = record.sessions?.map(s => ({
+          location: s.workType,
+          type: s.workType,
+          startTime: s.clockIn ? new Date(s.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+          endTime: s.clockOut ? new Date(s.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+          tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
+        })) || [];
+
+        const totalHrs = Math.floor(record.totalWorkingMinutes / 60);
+        const totalMins = record.totalWorkingMinutes % 60;
+
+        days.push({
+          dateNum: dayNum,
+          dayName,
+          fullDate: dateStr.split('-').reverse().join('/'),
+          status: 'present',
+          location: record.sessions?.[0]?.workType || 'Office',
+          startTime: record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+          endTime: record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+          sessions,
+          tasks: record.sessions?.map(s => ({ title: s.notes || 'Task', duration: '' })) || [],
+          hoursWorked: `${totalHrs}h ${totalMins}m`,
+          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '',
+        });
+      } else {
+        const isSunday = dayOfWeekIdx === 0;
+        days.push({
+          dateNum: dayNum,
+          dayName,
+          fullDate: dateStr.split('-').reverse().join('/'),
+          status: isSunday ? 'holiday' : 'absent',
+          location: '',
+          startTime: undefined,
+          endTime: undefined,
+          sessions: [],
+          tasks: [],
+          hoursWorked: '',
+          expenses: '',
+        });
+      }
     }
+    return days;
+  }, [startDate, endDate, attendanceRecords, expenseClaims]);
 
-    return {
-      dateNum: dayNum,
-      dayName,
-      fullDate: `${String(dayNum).padStart(2, '0')}/06/2026`,
-      status,
-      location,
-      startTime,
-      endTime,
-      sessions,
-      tasks,
-      hoursWorked,
-      expenses,
-    };
-  });
+  const tableRows = useMemo(() => {
+    return attendanceRecords.map((record) => {
+      const start = record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+      const end = record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+      const duration = `${Math.floor(record.totalWorkingMinutes / 60)}h ${record.totalWorkingMinutes % 60}m`;
+      const breakTime = `${Math.floor(record.totalBreakMinutes / 60)}h ${record.totalBreakMinutes % 60}m`;
+
+      const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === record.workDate);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
+
+      const emp = employees.find(e => e.id === record.employeeId);
+      const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'System Admin';
+
+      return {
+        date: record.workDate.split('-').reverse().join('/'),
+        name: empName,
+        holiday: new Date(record.workDate).getDay() === 0 ? 'Sunday' : '',
+        org: record.sessions?.[0]?.workType || 'Office',
+        location: record.sessions?.[0]?.workType || 'Office',
+        type: (record.sessions?.[0]?.workType || 'Office') as string,
+        mode: 'Offline',
+        start,
+        end,
+        duration,
+        expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+        note: record.sessions?.[0]?.notes || '',
+        break: breakTime,
+        tasks: record.sessions?.map(s => s.notes).filter(Boolean) as string[] || [],
+      };
+    });
+  }, [attendanceRecords, expenseClaims, employees]);
+
+  const mappedExpenseRows = useMemo(() => {
+    return expenseClaims.map((claim) => {
+      const emp = employees.find((e) => e.id === claim.employeeId);
+      const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'System Admin';
+      return {
+        id: claim.id,
+        date: claim.createdAt.slice(0, 10),
+        employee: empName,
+        category: claim.category,
+        batch: (claim as any).projectName || (claim as any).batchName || 'Office Operations',
+        amount: claim.amount,
+        status: claim.status === 'approved' ? 'Approved' : 'Pending Approval',
+      };
+    });
+  }, [expenseClaims, employees]);
+
+  useEffect(() => {
+    setExpenseRows(mappedExpenseRows);
+  }, [mappedExpenseRows]);
+
+  const totalExpenseSum = useMemo(() => {
+    return expenseRows.reduce((sum, r) => sum + (r.amount || 0), 0);
+  }, [expenseRows]);
 
   const selectedEmployeeDisplay = selectedEmployee === 'All Employees' ? 'All Employees' : selectedEmployee;
 
@@ -175,15 +272,14 @@ export function AttendanceLogPage() {
       label: '📊 Table View',
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Top Monthly & FY Summaries ONLY */}
           <AttendanceCalendarView
-            days={[]}
+            days={calendarDays}
             showTopSummaries={true}
             showBottomSummaries={false}
+            showCalendarGrid={false}
             selectedEmployeeName={selectedEmployeeDisplay}
           />
 
-          {/* Table View Grid showing multiple training entries as separate rows */}
           <Card>
             <SectionHeader title={`Attendance Details Log — ${selectedEmployeeDisplay}`} />
             <div style={{ overflowX: 'auto' }}>
@@ -214,94 +310,40 @@ export function AttendanceLogPage() {
                     const isExpanded = !!expandedRows[i];
 
                     return (
-                      <>
-                        <tr key={i} style={{ background: bg, borderBottom: '1px solid var(--border)', color: isHoliday || isLeave ? 'var(--status-danger)' : 'inherit' }}>
-                          <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                            {r.tasks && r.tasks.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleRowExpand(i)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--brand)' }}
-                              >
-                                {isExpanded ? '▼' : '▶'}
-                              </button>
-                            ) : (
-                              <span style={{ color: 'var(--text-muted)' }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.date}</td>
-                          <td style={{ padding: '8px 10px' }}>{r.name}</td>
-                          <td style={{ padding: '8px 10px' }}>{r.holiday}</td>
-                          <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.org}</td>
-                          <td style={{ padding: '8px 10px', fontWeight: 500, color: 'var(--brand)' }}>{r.location || '-'}</td>
-                          <td style={{ padding: '8px 10px' }}>
-                            {r.type && (
-                              <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : r.type === 'Leave' ? 'danger' : 'neutral'}>
-                                {r.type}
-                              </Badge>
-                            )}
-                          </td>
-                          <td style={{ padding: '8px 10px' }}>{r.mode}</td>
-                          <td style={{ padding: '8px 10px' }}>{r.start}</td>
-                          <td style={{ padding: '8px 10px' }}>{r.end}</td>
-                          <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
-                          <td style={{ padding: '8px 10px' }}>{r.expenses}</td>
-                          <td style={{ padding: '8px 10px', color: 'var(--status-warning)', fontWeight: 600 }}>{r.note}</td>
-                          <td style={{ padding: '8px 10px' }}>{r.break}</td>
-                        </tr>
-
-                        {/* View Tasks & Location Details Expanded Sub-row */}
-                        {isExpanded && (
-                          <tr key={`exp-${i}`} style={{ background: 'var(--bg-sunken)' }}>
-                            <td colSpan={14} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                                
-                                {/* Left: Completed Tasks */}
-                                <div>
-                                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 6 }}>
-                                    📋 Completed Tasks ({r.org || 'Office'}):
-                                  </div>
-                                  {r.tasks && r.tasks.length > 0 ? (
-                                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                                      {r.tasks.map((taskStr: string, tIdx: number) => (
-                                        <li key={tIdx}>{taskStr}</li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No tasks logged.</span>
-                                  )}
-                                </div>
-
-                                {/* Right: Multiple GPS Logins History */}
-                                <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
-                                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 6 }}>
-                                    📍 GPS Clock In History (Multiple Logins):
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                                    {r.type === 'Training' || r.type === 'Work' || r.type === 'Marketing' ? (
-                                      <>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border)' }}>
-                                          <span>⏱ <strong>{r.start}</strong> (Clock In 1)</span>
-                                          <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>📍 KVJ Kochi HQ Workspace (9.9841°, 76.2745°)</span>
-                                        </div>
-                                        {r.org && (
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                                            <span>⏱ <strong>01:30 PM</strong> (Clock In 2)</span>
-                                            <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>📍 {r.org} Campus (9.9240°, 76.3120°)</span>
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <span style={{ color: 'var(--text-muted)' }}>No location logs for off-duty days.</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
+                      <tr key={i} style={{ background: bg, borderBottom: '1px solid var(--border)', color: isHoliday || isLeave ? 'var(--status-danger)' : 'inherit' }}>
+                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          {r.tasks && r.tasks.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleRowExpand(i)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--brand)' }}
+                            >
+                              {isExpanded ? '▼' : '▶'}
+                            </button>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.date}</td>
+                        <td style={{ padding: '8px 10px' }}>{r.name}</td>
+                        <td style={{ padding: '8px 10px' }}>{r.holiday}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.org}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 500, color: 'var(--brand)' }}>{r.location || '-'}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          {r.type && (
+                            <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : r.type === 'Leave' ? 'danger' : 'neutral'}>
+                              {r.type}
+                            </Badge>
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>{r.mode}</td>
+                        <td style={{ padding: '8px 10px' }}>{r.start}</td>
+                        <td style={{ padding: '8px 10px' }}>{r.end}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
+                        <td style={{ padding: '8px 10px' }}>{r.expenses}</td>
+                        <td style={{ padding: '8px 10px', color: 'var(--status-warning)', fontWeight: 600 }}>{r.note}</td>
+                        <td style={{ padding: '8px 10px' }}>{r.break}</td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -309,11 +351,11 @@ export function AttendanceLogPage() {
             </div>
           </Card>
 
-          {/* Bottom Summaries ONLY: Organization vs Avg Duration & Class Supervision Summary */}
           <AttendanceCalendarView
-            days={[]}
+            days={calendarDays}
             showTopSummaries={false}
             showBottomSummaries={true}
+            showCalendarGrid={false}
             selectedEmployeeName={selectedEmployeeDisplay}
           />
         </div>
@@ -324,7 +366,6 @@ export function AttendanceLogPage() {
       label: '💰 Expense Summary',
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Prominent Total Expense Banner */}
           <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -332,7 +373,7 @@ export function AttendanceLogPage() {
                   Total Claimed Expenses — {selectedEmployeeDisplay}
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
-                  ₹ 4,806.00
+                  ₹ {totalExpenseSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               {isManagement && (
@@ -347,7 +388,6 @@ export function AttendanceLogPage() {
             </div>
           </Card>
 
-          {/* Detailed Expense Item Log with Bulk Approval Checkboxes */}
           <Card>
             <SectionHeader title="Detailed Expense Items Log" />
             <div style={{ overflowX: 'auto' }}>
@@ -388,43 +428,10 @@ export function AttendanceLogPage() {
                       <td style={{ padding: 10, fontWeight: 500, color: 'var(--brand)' }}>{exp.batch}</td>
                       <td style={{ padding: 10, fontWeight: 700 }}>₹ {exp.amount.toFixed(2)}</td>
                       <td style={{ padding: 10 }}>
-                        <button
-                          type="button"
-                          onClick={() => setReceiptModalUrl('/logo.png')}
-                          style={{
-                            background: 'var(--bg-sunken)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius-xs)',
-                            fontSize: 11, fontWeight: 600,
-                            padding: '3px 8px', cursor: 'pointer',
-                            color: 'var(--brand)',
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                          }}
-                        >
-                          📎 Receipt
-                        </button>
-                      </td>
-                      <td style={{ padding: 10 }}>
                         <Badge tone={exp.status === 'Approved' ? 'success' : 'warning'}>
                           {exp.status}
                         </Badge>
                       </td>
-                      {isManagement && (
-                        <td style={{ padding: 10 }}>
-                          {exp.status === 'Pending Approval' && (
-                            <Button
-                              size="xs"
-                              variant="success"
-                              onClick={() => {
-                                setExpenseRows((prev) => prev.map((r) => (r.id === exp.id ? { ...r, status: 'Approved' } : r)));
-                                toast({ variant: 'success', title: 'Expense Approved', message: `Claim for ${exp.employee} (${exp.category}) approved.` });
-                              }}
-                            >
-                              Approve
-                            </Button>
-                          )}
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -444,12 +451,9 @@ export function AttendanceLogPage() {
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* 1. Global Consolidated Filter Panel (Sleek Single Row) */}
         <Card style={{ padding: '12px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            {/* Left Group: Date Filter Dropdown + Custom Range + Employee Scope */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-              {/* Consolidated Date Filter Dropdown */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>📅 Date Filter:</span>
                 <select
@@ -465,7 +469,6 @@ export function AttendanceLogPage() {
                 </select>
               </div>
 
-              {/* Custom Date Range Pickers (shown if Custom Range selected) */}
               {activeFilterPreset === 'custom' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-sunken)', padding: '4px 10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
                   <input
@@ -486,10 +489,8 @@ export function AttendanceLogPage() {
                 </div>
               )}
 
-              {/* Vertical separator */}
               <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
-              {/* Employee Selection Dropdown */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Employee:</span>
                 {isManagement ? (
@@ -499,32 +500,29 @@ export function AttendanceLogPage() {
                     onChange={(e) => setSelectedEmployee(e.target.value)}
                     style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
                   >
-                    <option value={user?.fullName || 'Linto George'}>Me ({user?.fullName || 'Personal'})</option>
+                    <option value={user?.fullName || 'System Admin'}>Me ({user?.fullName || 'Personal'})</option>
                     <option value="All Employees">All Employees (Manager Access)</option>
-                    {employeeList.filter((e) => e !== user?.fullName).map((e) => (
-                      <option key={e} value={e}>{e}</option>
+                    {employeeNames.filter((name) => name !== user?.fullName).map((name) => (
+                      <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
                 ) : (
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
-                    👤 {user?.fullName || 'Linto George'}
+                    👤 {user?.fullName || 'System Admin'}
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Right Action Button: Submit Attendance */}
             <Button onClick={() => setSubmitDrawerOpen(true)} style={{ padding: '6px 16px', fontSize: 12 }}>
               📋 Submit Attendance
             </Button>
           </div>
         </Card>
 
-        {/* 2. Middle Section: Sub-Tabs */}
         <Tabs items={tabs} />
       </div>
 
-      {/* Submit Attendance Drawer Modal */}
       <Drawer open={submitDrawerOpen} onClose={() => setSubmitDrawerOpen(false)} title="Submit / Claim Attendance Request">
         <Form
           initial={{
