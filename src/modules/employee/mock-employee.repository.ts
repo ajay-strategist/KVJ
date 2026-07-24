@@ -35,15 +35,6 @@ export class MockEmployeeRepository
 {
   constructor() {
     super({ defaultStatus: 'active', pageSize: 20 }, INITIAL_EMPLOYEES, 'MockEmployeeRepository');
-
-    // Enforce production mode: purge non-admin employee records cached in localStorage
-    const list = Array.from(this.store.values());
-    const hasNonAdmin = list.some((e) => e.id !== 'u-admin' && e.email !== 'admin@kvjanalytics.com');
-    if (hasNonAdmin) {
-      this.store.clear();
-      INITIAL_EMPLOYEES.forEach((e) => this.store.set(e.id, e));
-      this.persist();
-    }
   }
 
   async findByEmail(email: string): Promise<Employee | null> {

@@ -30,8 +30,8 @@ export class EmployeeService implements IEmployeeService {
     try {
       const emp = await this.repo.create(data, actor);
       return Ok(emp);
-    } catch (err) {
-      return Err(AppError.internal());
+    } catch (err: any) {
+      return Err(AppError.internal(err?.message || 'Failed to create employee.'));
     }
   }
 

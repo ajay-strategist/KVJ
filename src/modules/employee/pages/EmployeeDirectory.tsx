@@ -56,7 +56,7 @@ export function EmployeeDirectory() {
         dateOfJoining: new Date().toISOString().split('T')[0],
       });
     } else {
-      toast({ variant: 'error', title: 'Error', message: res.error });
+      toast({ variant: 'error', title: 'Employee Creation Failed', message: res.error || 'Could not save employee. Check email format and network connection.' });
     }
   };
 
