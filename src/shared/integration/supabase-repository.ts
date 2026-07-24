@@ -38,6 +38,30 @@ export function toCamelCaseObject<T extends Record<string, any>>(obj: T): T {
   return result as T;
 }
 
+/**
+ * Guard against the silent-failure mode that made database problems invisible.
+ *
+ * Without an authenticated session every RLS policy evaluates false, and
+ * PostgREST answers a SELECT with an EMPTY RESULT AND NO ERROR. The UI then
+ * renders "no data" — identical to a genuinely empty table — so a total data
+ * outage looked like normal operation.
+ *
+ * Reads therefore assert a session first and fail loudly instead. Writes
+ * already surface RLS rejection as a real Postgres error, so they need no guard.
+ */
+async function assertAuthenticated(tableName: string): Promise<void> {
+  const { data } = await supabase.auth.getSession(); // in-memory, no network call
+  if (!data.session) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED' as never,
+      message:
+        `Cannot read ${tableName}: you are not signed in, or your session has expired. ` +
+        `Please sign in again.`,
+      severity: 'warning',
+    });
+  }
+}
+
 export class SupabaseRepository<T extends Entity> implements IRepository<T> {
   constructor(protected tableName: string) {}
 
@@ -77,6 +101,7 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
   }
 
   async findById(id: UUID, opts?: { includeDeleted?: boolean }): Promise<T | null> {
+    await assertAuthenticated(this.tableName);
     let query = supabase.from(this.tableName).select().eq('id', id);
     if (!opts?.includeDeleted) {
       query = query.is('deleted_at', null);
@@ -151,6 +176,7 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
   }
 
   async findMany(query: QuerySpec = {}): Promise<Page<T>> {
+    await assertAuthenticated(this.tableName);
     let select = supabase.from(this.tableName).select('*', { count: 'exact' });
 
     if (!query.includeDeleted) {

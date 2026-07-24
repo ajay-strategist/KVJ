@@ -1,166 +1,355 @@
-import { supabase } from '../../shared/integration/supabase';
-import { AppError } from '../../core/result';
+/**
+ * KVJ Analytics — Authentication service (Supabase Auth implementation)
+ * Layer: Service (business) + Auth implementation.
+ *
+ * Implements the SAME IAuthService contract as MockAuthService, so the login
+ * screen, AuthProvider, route guards, role model and permission model are
+ * unchanged — only the implementation behind the DI token differs.
+ *
+ * Identity model (as assumed by supabase/migrations/20260720000000_roles_and_rls.sql):
+ *   auth.users.id === employees.id
+ * The ROLE IS READ FROM THE employees TABLE, never from user_metadata: metadata
+ * is writable by the user it belongs to, so trusting it would let any account
+ * promote itself to ADMIN. employees.role is the same value the RLS helpers
+ * current_role() / is_full_control() read, so frontend and backend always agree.
+ *
+ * There is deliberately NO fallback to the localStorage auth service. A fallback
+ * would keep the forgeable-session bypass alive, which is the defect this class
+ * exists to remove. If Supabase is unreachable, login fails loudly.
+ *
+ * Operations that require the Supabase service_role key (creating or deleting
+ * auth credentials, resetting another user's password) CANNOT be performed from
+ * a browser without exposing that key. Those methods raise an explicit,
+ * actionable error instead of silently reporting success.
+ */
+
 import type { RoleKey } from '../../shared/permissions/roles';
-import {
-  MockAuthService,
-  type AuthUser,
-  type BootstrapAdminInput,
-  type Credentials,
-  type IAuthService,
-  type NewUserInput,
-  type Session,
+import { AppError } from '../../core/result';
+import { businessRules } from '../../config/business-rules';
+import { supabase } from '../../shared/integration/supabase';
+import type {
+  AuthUser,
+  BootstrapAdminInput,
+  Credentials,
+  IAuthService,
+  NewUserInput,
+  Session,
 } from './auth.service';
 
-export class SupabaseAuthService implements IAuthService {
-  private fallbackMock = new MockAuthService();
+/** Columns needed to build an AuthUser from an employee row. */
+const PROFILE_COLUMNS =
+  'id, employee_id, username, first_name, last_name, email, phone, designation, role, avatar_url, must_change_password, departments(name)';
 
-  private mapSupabaseUserToAuthUser(sbUser: any, userMetadata: any = {}): AuthUser {
-    const meta = userMetadata || sbUser?.user_metadata || {};
-    const role: RoleKey = meta.role || (sbUser?.email?.toLowerCase() === 'admin@kvjanalytics.com' ? 'ADMIN' : 'EMPLOYEE');
-    
+interface EmployeeProfileRow {
+  id: string;
+  employee_id: string | null;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  designation: string | null;
+  role: string | null;
+  avatar_url: string | null;
+  must_change_password: boolean | null;
+  departments?: { name: string | null } | { name: string | null }[] | null;
+}
+
+function departmentName(row: EmployeeProfileRow): string | undefined {
+  const d = row.departments;
+  if (!d) return undefined;
+  const rec = Array.isArray(d) ? d[0] : d;
+  return rec?.name ?? undefined;
+}
+
+function toAuthUser(row: EmployeeProfileRow, fallbackEmail: string): AuthUser {
+  const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
+  return {
+    id: row.id,
+    username: row.username ?? undefined,
+    fullName: fullName || row.email || fallbackEmail,
+    email: row.email ?? fallbackEmail,
+    phone: row.phone ?? undefined,
+    designation: row.designation ?? undefined,
+    department: departmentName(row),
+    role: (row.role ?? 'EMPLOYEE') as RoleKey,
+    avatarUrl: row.avatar_url ?? undefined,
+    mustChangePassword: row.must_change_password ?? false,
+  };
+}
+
+/** Error raised for operations that need the service_role key (server-side only). */
+function serverSideOnly(operation: string): AppError {
+  return new AppError({
+    code: 'FORBIDDEN' as never,
+    message:
+      `${operation} requires Supabase service-role privileges and cannot run in the browser. ` +
+      `Create or modify the account from the Supabase dashboard (Authentication → Users), ` +
+      `then manage the profile here.`,
+    severity: 'error',
+  });
+}
+
+/** Generic failure for a bad identifier/password — never discloses which was wrong. */
+function invalidCredentials(): AppError {
+  return new AppError({
+    code: 'UNAUTHENTICATED' as never,
+    message: 'Invalid username/email or password.',
+    severity: 'warning',
+  });
+}
+
+export class SupabaseAuthService implements IAuthService {
+  /**
+   * Resolve a login identifier (email, username or phone) to the account email.
+   * Uses a SECURITY DEFINER function because the caller is not yet authenticated
+   * and therefore cannot read `employees` under RLS.
+   */
+  private async resolveIdentifierToEmail(identifier: string): Promise<string> {
+    const raw = identifier.trim();
+    if (raw.includes('@')) return raw.toLowerCase();
+
+    const { data, error } = await supabase.rpc('resolve_login_email', { identifier: raw });
+    if (error || !data) throw invalidCredentials();
+    return String(data).toLowerCase();
+  }
+
+  /** Load the employee profile that backs the authenticated auth.users row. */
+  private async loadProfile(userId: string, fallbackEmail: string): Promise<AuthUser> {
+    const { data, error } = await supabase
+      .from('employees')
+      .select(PROFILE_COLUMNS)
+      .eq('id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (error) {
+      throw AppError.internal(
+        `Signed in, but the employee profile could not be read: ${error.message}`,
+      );
+    }
+    if (!data) {
+      throw new AppError({
+        code: 'NOT_FOUND' as never,
+        message:
+          'Signed in, but no employee record is linked to this account. An administrator must ' +
+          'create an employees row whose id matches this auth user.',
+        severity: 'error',
+      });
+    }
+    return toAuthUser(data as unknown as EmployeeProfileRow, fallbackEmail);
+  }
+
+  /** Build the app Session from a Supabase session + employee profile. */
+  private async buildSession(
+    accessToken: string,
+    expiresAtSeconds: number | undefined,
+    userId: string,
+    email: string,
+    rememberMe: boolean,
+  ): Promise<Session> {
+    const user = await this.loadProfile(userId, email);
+    const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
     return {
-      id: sbUser.id,
-      username: meta.username || sbUser.email?.split('@')[0] || 'User',
-      fullName: meta.full_name || meta.fullName || sbUser.email?.split('@')[0] || 'User',
-      email: sbUser.email || '',
-      phone: sbUser.phone || meta.phone || '',
-      designation: meta.designation || (role === 'ADMIN' ? 'Chief Executive Officer' : 'Staff Member'),
-      department: meta.department || (role === 'ADMIN' ? 'Executive Management' : 'Operations'),
-      role,
-      avatarUrl: meta.avatar_url || meta.avatarUrl,
-      mustChangePassword: meta.must_change_password || false,
+      user,
+      token: accessToken,
+      issuedAt: Date.now(),
+      expiresAt: expiresAtSeconds ? expiresAtSeconds * 1000 : Date.now() + fallbackTtlMs,
+      rememberMe,
     };
   }
 
-  async login(creds: Credentials): Promise<Session> {
-    try {
-      const email = creds.email.includes('@') ? creds.email : `${creds.email.toLowerCase()}@kvjanalytics.com`;
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: creds.password,
-      });
+  async login({ email: identifier, password, rememberMe }: Credentials): Promise<Session> {
+    const email = await this.resolveIdentifierToEmail(identifier);
 
-      if (error || !data.session || !data.user) {
-        // Fallback to local auth engine if Supabase Auth credentials or connection fail
-        return await this.fallbackMock.login(creds);
-      }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-      const user = this.mapSupabaseUserToAuthUser(data.user, data.user.user_metadata);
-      const session: Session = {
-        user,
-        token: data.session.access_token,
-        issuedAt: Date.now(),
-        expiresAt: data.session.expires_at ? data.session.expires_at * 1000 : Date.now() + 86400000,
-        rememberMe: !!creds.rememberMe,
-      };
+    if (error || !data.session || !data.user) throw invalidCredentials();
 
-      return session;
-    } catch {
-      return await this.fallbackMock.login(creds);
-    }
+    return this.buildSession(
+      data.session.access_token,
+      data.session.expires_at,
+      data.user.id,
+      data.user.email ?? email,
+      !!rememberMe,
+    );
   }
 
   async logout(): Promise<void> {
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // Ignore network errors on logout
-    }
-    await this.fallbackMock.logout();
+    await supabase.auth.signOut();
   }
 
   async getSession(): Promise<Session | null> {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error || !data.session || !data.session.user) {
-        return await this.fallbackMock.getSession();
-      }
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) return null;
 
-      const user = this.mapSupabaseUserToAuthUser(data.session.user, data.session.user.user_metadata);
-      return {
-        user,
-        token: data.session.access_token,
-        issuedAt: Date.now(),
-        expiresAt: data.session.expires_at ? data.session.expires_at * 1000 : Date.now() + 86400000,
-        rememberMe: true,
-      };
+    const s = data.session;
+    try {
+      return await this.buildSession(
+        s.access_token,
+        s.expires_at,
+        s.user.id,
+        s.user.email ?? '',
+        true,
+      );
     } catch {
-      return await this.fallbackMock.getSession();
+      // A valid credential with no linked employee row must not strand the app
+      // on a permanent loading state.
+      await supabase.auth.signOut();
+      return null;
     }
   }
 
   async refresh(): Promise<Session | null> {
-    try {
-      const { data, error } = await supabase.auth.refreshSession();
-      if (error || !data.session || !data.session.user) {
-        return await this.fallbackMock.refresh();
-      }
-
-      const user = this.mapSupabaseUserToAuthUser(data.session.user, data.session.user.user_metadata);
-      return {
-        user,
-        token: data.session.access_token,
-        issuedAt: Date.now(),
-        expiresAt: data.session.expires_at ? data.session.expires_at * 1000 : Date.now() + 86400000,
-        rememberMe: true,
-      };
-    } catch {
-      return await this.fallbackMock.refresh();
-    }
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session || !data.user) return null;
+    return this.buildSession(
+      data.session.access_token,
+      data.session.expires_at,
+      data.user.id,
+      data.user.email ?? '',
+      true,
+    );
   }
 
   async requestPasswordReset(email: string): Promise<{ sent: boolean }> {
-    try {
-      await supabase.auth.resetPasswordForEmail(email);
-    } catch {
-      // Fallback
-    }
-    return await this.fallbackMock.requestPasswordReset(email);
+    // Supabase sends the recovery mail. Always report success so this cannot be
+    // used to enumerate which accounts exist.
+    await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    return { sent: true };
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ ok: boolean }> {
-    try {
-      await supabase.auth.updateUser({ password: newPassword });
-    } catch {
-      // Fallback
-    }
-    return await this.fallbackMock.resetPassword(token, newPassword);
-  }
-
-  async createUser(input: NewUserInput): Promise<AuthUser> {
-    return this.fallbackMock.createUser(input);
-  }
-
-  async updateUser(userId: string, data: Partial<NewUserInput & { password?: string }>): Promise<AuthUser> {
-    return this.fallbackMock.updateUser(userId, data);
-  }
-
-  async deleteUser(userId: string): Promise<{ ok: boolean }> {
-    return this.fallbackMock.deleteUser(userId);
-  }
-
-  async updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }> {
-    try {
-      await supabase.auth.updateUser({ password: newPassword });
-    } catch {
-      // Fallback
-    }
-    return this.fallbackMock.updateUserPassword(userId, newPassword);
-  }
-
-  async resetToDefaultPassword(userId: string): Promise<{ ok: boolean }> {
-    return this.fallbackMock.resetToDefaultPassword(userId);
+  /**
+   * Completes a recovery flow. The Supabase client establishes a temporary
+   * session from the emailed link, so the new password applies to that session's
+   * user; the token is consumed by the client, not passed through here.
+   */
+  async resetPassword(_token: string, newPassword: string): Promise<{ ok: boolean }> {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw AppError.internal(error.message);
+    return { ok: true };
   }
 
   async getUsers(): Promise<AuthUser[]> {
-    return this.fallbackMock.getUsers();
+    const { data, error } = await supabase
+      .from('employees')
+      .select(PROFILE_COLUMNS)
+      .is('deleted_at', null)
+      .order('first_name', { ascending: true });
+
+    if (error) throw AppError.internal(error.message);
+    return (data ?? []).map((row) => toAuthUser(row as unknown as EmployeeProfileRow, ''));
   }
 
+  /**
+   * Reports whether any user exists. The login screen calls this BEFORE
+   * authenticating, when the client is still anonymous — and RLS correctly hides
+   * `employees` from anonymous callers, so the question cannot be answered
+   * truthfully at that point.
+   *
+   * It therefore fails safe and always reports true, which shows the normal
+   * login form. Returning false would show the initial-admin bootstrap screen,
+   * and that screen is a dead end here: creating an auth credential requires
+   * service-role privileges (see bootstrapInitialAdmin). The first administrator
+   * is provisioned once via supabase/provision-admin.sql.
+   *
+   * This must never throw: LoginPage consumes it without a .catch(), so a
+   * rejection would leave the page stuck on "Initializing system authentication".
+   */
   async hasUsers(): Promise<boolean> {
-    return this.fallbackMock.hasUsers();
+    return true;
   }
 
-  async bootstrapInitialAdmin(input: BootstrapAdminInput): Promise<AuthUser> {
-    return this.fallbackMock.bootstrapInitialAdmin(input);
+  /**
+   * Updates the employee profile (name, role, contact). Changing the login
+   * credential itself is a service-role operation and is rejected explicitly.
+   */
+  async updateUser(
+    userId: string,
+    data: Partial<NewUserInput & { password?: string }>,
+  ): Promise<AuthUser> {
+    if (data.password) throw serverSideOnly("Setting another user's password");
+
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.username) patch.username = data.username;
+    if (data.email) patch.email = data.email;
+    if (data.role) patch.role = data.role;
+    if (data.designation) patch.designation = data.designation;
+    if (data.phone) patch.phone = data.phone;
+    if (data.fullName) {
+      const [first, ...rest] = data.fullName.trim().split(/\s+/);
+      patch.first_name = first;
+      patch.last_name = rest.join(' ');
+    }
+
+    const { data: updated, error } = await supabase
+      .from('employees')
+      .update(patch)
+      .eq('id', userId)
+      .select(PROFILE_COLUMNS)
+      .maybeSingle();
+
+    if (error) throw AppError.internal(error.message);
+    if (!updated) {
+      throw new AppError({
+        code: 'NOT_FOUND' as never,
+        message: 'User not found, or you do not have permission to update it.',
+        severity: 'warning',
+      });
+    }
+    return toAuthUser(updated as unknown as EmployeeProfileRow, data.email ?? '');
+  }
+
+  /** Changes the CURRENT user's own password. Other users require service-role. */
+  async updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentId = sessionData.session?.user.id;
+
+    if (!currentId || currentId !== userId) {
+      throw serverSideOnly("Changing another user's password");
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw AppError.internal(error.message);
+
+    // Clear the forced-reset flag now that a real password has been set.
+    await supabase
+      .from('employees')
+      .update({ must_change_password: false, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    return { ok: true };
+  }
+
+  /** Soft-deletes the employee record; removing the credential needs service-role. */
+  async deleteUser(userId: string): Promise<{ ok: boolean }> {
+    const ts = new Date().toISOString();
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    const { error } = await supabase
+      .from('employees')
+      .update({
+        deleted_at: ts,
+        deleted_by: sessionData.session?.user.id ?? null,
+        updated_at: ts,
+      })
+      .eq('id', userId);
+
+    if (error) throw AppError.internal(error.message);
+    return { ok: true };
+  }
+
+  async createUser(_input: NewUserInput): Promise<AuthUser> {
+    throw serverSideOnly('Creating a login credential');
+  }
+
+  async resetToDefaultPassword(_userId: string): Promise<{ ok: boolean }> {
+    throw serverSideOnly('Resetting a user to the default password');
+  }
+
+  async bootstrapInitialAdmin(_input: BootstrapAdminInput): Promise<AuthUser> {
+    throw serverSideOnly('Bootstrapping the initial administrator');
   }
 }

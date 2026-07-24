@@ -2,8 +2,15 @@
  * KVJ Analytics — Authentication service
  * Layer: Service (business) + Auth implementation.
  *
- * Supports Admin login (Username: Admin, Password: AjayThomas), Admin user creation
- * (default password: "password", mustChangePassword: true), and first-time forced password reset.
+ * NOTE: MockAuthService is a LOCAL-DEVELOPMENT-ONLY implementation, retained so
+ * the app can run with no backend. It is NOT used when
+ * appConfig.integrations.supabaseEnabled is true — see supabase-auth.service.ts,
+ * which is the production implementation. It must never be re-enabled in a
+ * deployed environment: it stores users in localStorage and its session is
+ * unsigned, so it cannot enforce identity.
+ *
+ * Credentials are never hardcoded here. The seed record below has NO usable
+ * password; a local developer must set one via bootstrapInitialAdmin().
  */
 
 import type { RoleKey } from '../../shared/permissions/roles';
@@ -91,8 +98,11 @@ const DEFAULT_USERS: MockRecord[] = [
     designation: 'Chief Executive Officer',
     department: 'Executive Management',
     role: 'ADMIN',
-    password: '359e232b848e968620b34f64db0f4ce970e85edc2fcae9edc8d3200464bff223', // AjayThomas@1
-    mustChangePassword: false,
+    // Intentionally unmatchable: hashPassword() always returns 64 hex chars, so
+    // no input can ever equal this value. Local devs call bootstrapInitialAdmin()
+    // to set a real password. Never commit a credential here.
+    password: 'NO_PASSWORD_SET',
+    mustChangePassword: true,
   },
 ];
 
@@ -418,7 +428,9 @@ export class MockAuthService implements IAuthService {
   async resetPassword(_token: string, newPassword: string): Promise<{ ok: boolean }> {
     const users = this.getUsersList();
     if (users.length > 0) {
-      users[0].password = newPassword;
+      // Must be hashed: login compares against hashPassword(input), so storing
+      // the raw value here previously made the account impossible to log into.
+      users[0].password = await hashPassword(newPassword);
       users[0].mustChangePassword = false;
       saveStoredUsers(users);
     }
