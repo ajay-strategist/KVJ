@@ -14,7 +14,7 @@
 -- Check if auth user already exists
 SELECT id, email, email_confirmed_at, created_at
 FROM auth.users
-WHERE email = 'admin@kvjanalytics.com';
+WHERE email = 'mail@thestrategist.co.in';
 
 -- =============================================================================
 -- STEP 2 — After step 1 confirms auth user exists, run this block to link it:
@@ -49,7 +49,7 @@ SELECT
   'active',
   false
 FROM auth.users u
-WHERE u.email = 'admin@kvjanalytics.com'
+WHERE u.email = 'mail@thestrategist.co.in'
 ON CONFLICT (id) DO UPDATE
   SET role               = 'ADMIN',
       username           = 'Ajaythomas',
@@ -70,24 +70,24 @@ SELECT
   email_confirmed_at IS NOT NULL AS confirmed,
   created_at
 FROM auth.users
-WHERE email = 'admin@kvjanalytics.com';
+WHERE email = 'mail@thestrategist.co.in';
 
 -- 2) Employee row exists with correct role and username
 SELECT id, email, role, username, status, must_change_password
 FROM public.employees
-WHERE email = 'admin@kvjanalytics.com';
+WHERE email = 'mail@thestrategist.co.in';
 
 -- 3) IDs match (this is what makes RLS work) — must return TRUE
 SELECT EXISTS (
   SELECT 1
   FROM auth.users u
   JOIN public.employees e ON e.id = u.id
-  WHERE u.email = 'admin@kvjanalytics.com'
+  WHERE u.email = 'mail@thestrategist.co.in'
 ) AS identity_linked;
 
 -- 4) resolve_login_email function works for username login
 SELECT public.resolve_login_email('Ajaythomas') AS resolved_email;
--- Expected result: admin@kvjanalytics.com
+-- Expected result: mail@thestrategist.co.in
 
 -- =============================================================================
 -- OPTIONAL: Fix the legacy 'students' table (showing UNRESTRICTED in dashboard)

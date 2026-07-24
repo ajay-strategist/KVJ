@@ -6,12 +6,11 @@
 --
 -- STEP 1 — Create the login credential (Supabase Dashboard)
 --   Authentication → Users → "Add user" → "Create new user"
---     Email:          admin@kvjanalytics.com
---     Password:       <choose a NEW strong password>
+--     Email:          mail@thestrategist.co.in
+--     Password:       <set via Supabase Dashboard — never store in code>
 --     Auto Confirm User: ON     ← required, or login fails until email confirmed
 --
---   IMPORTANT: do NOT reuse the previous password. It was committed to source
---   and to git history and must be treated as compromised.
+--   IMPORTANT: Never commit passwords to source control or git history.
 --
 -- STEP 2 — Link that credential to an employee row (run the SQL below in
 --          Supabase → SQL Editor). It reads the id created in step 1, so the
@@ -47,7 +46,7 @@ SELECT
   'active',
   false
 FROM auth.users u
-WHERE u.email = 'admin@kvjanalytics.com'
+WHERE u.email = 'mail@thestrategist.co.in'
 ON CONFLICT (id) DO UPDATE
   SET role       = 'ADMIN',
       status     = 'active',
@@ -62,17 +61,17 @@ ON CONFLICT (id) DO UPDATE
 -- 1) The credential exists and is confirmed.
 SELECT id, email, email_confirmed_at IS NOT NULL AS confirmed
 FROM auth.users
-WHERE email = 'admin@kvjanalytics.com';
+WHERE email = 'mail@thestrategist.co.in';
 
 -- 2) The employee row exists with the SAME id and an ADMIN role.
 SELECT id, email, role, username, status
 FROM public.employees
-WHERE email = 'admin@kvjanalytics.com';
+WHERE email = 'mail@thestrategist.co.in';
 
 -- 3) The ids match (this is what makes RLS work). Expect: true
 SELECT EXISTS (
   SELECT 1
   FROM auth.users u
   JOIN public.employees e ON e.id = u.id
-  WHERE u.email = 'admin@kvjanalytics.com'
+  WHERE u.email = 'mail@thestrategist.co.in'
 ) AS identity_linked;

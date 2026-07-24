@@ -1095,7 +1095,7 @@ SELECT
   '+91 9876543210', 'Chief Executive Officer', CURRENT_DATE,
   'ADMIN', 'Ajaythomas', 'active', false
 FROM auth.users u
-WHERE u.email = 'admin@kvjanalytics.com'
+WHERE u.email = 'mail@thestrategist.co.in'
 ON CONFLICT (id) DO UPDATE
   SET role = 'ADMIN', username = 'Ajaythomas',
       status = 'active', must_change_password = false,
@@ -1109,17 +1109,17 @@ ON CONFLICT (id) DO UPDATE
 
 -- 1) Auth credential exists and is confirmed
 SELECT id, email, email_confirmed_at IS NOT NULL AS confirmed
-FROM auth.users WHERE email = 'admin@kvjanalytics.com';
+FROM auth.users WHERE email = 'mail@thestrategist.co.in';
 
 -- 2) Employee row linked correctly
 SELECT id, email, role, username, status
-FROM public.employees WHERE email = 'admin@kvjanalytics.com';
+FROM public.employees WHERE email = 'mail@thestrategist.co.in';
 
 -- 3) IDs match (critical for RLS)
 SELECT EXISTS (
   SELECT 1 FROM auth.users u
   JOIN public.employees e ON e.id = u.id
-  WHERE u.email = 'admin@kvjanalytics.com'
+  WHERE u.email = 'mail@thestrategist.co.in'
 ) AS identity_linked;
 
 -- 4) Username login resolution works

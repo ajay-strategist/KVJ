@@ -38,7 +38,7 @@ import {
 
 /** Columns needed to build an AuthUser from an employee row. */
 const PROFILE_COLUMNS =
-  'id, employee_id, username, first_name, last_name, email, phone, designation, role, avatar_url, must_change_password, departments(name)';
+  'id, employee_id, username, first_name, last_name, email, phone, designation, role, avatar_url, must_change_password, departments!department_id(name)';
 
 interface EmployeeProfileRow {
   id: string;
