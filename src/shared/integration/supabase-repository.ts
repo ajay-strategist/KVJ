@@ -19,7 +19,7 @@ export function toSnakeCaseObject<T extends Record<string, any>>(obj: T): Record
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) {
-      result[camelToSnake(key)] = value;
+      result[camelToSnake(key)] = value === '' ? null : value;
     }
   }
   return result;
