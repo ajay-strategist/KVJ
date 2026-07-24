@@ -180,9 +180,12 @@ CREATE TABLE IF NOT EXISTS public.courses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL,
-    category TEXT NOT NULL,
+    category TEXT DEFAULT 'training',
     description TEXT,
     duration_hours INTEGER DEFAULT 40,
+    max_marks INTEGER DEFAULT 100,
+    pass_percentage INTEGER DEFAULT 50,
+    checklist JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     created_by UUID,
@@ -190,6 +193,10 @@ CREATE TABLE IF NOT EXISTS public.courses (
     deleted_at TIMESTAMPTZ,
     deleted_by UUID
 );
+
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS max_marks INTEGER DEFAULT 100;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS pass_percentage INTEGER DEFAULT 50;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'::jsonb;
 
 -- 3. TRAINING BATCHES
 CREATE TABLE IF NOT EXISTS public.batches (
