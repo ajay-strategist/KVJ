@@ -71,9 +71,9 @@ export function ProjectList() {
 
       const pTasks = tasks.filter((t) => t.projectId === p.id);
       const pTaskIds = new Set(pTasks.map((t) => t.id));
-      const pTimesheets = timesheets.filter((ts) => pTaskIds.has(ts.taskId));
+      const pTimesheets = timesheets.filter((ts) => ts.taskId && pTaskIds.has(ts.taskId));
 
-      const totalProjectHours = pTimesheets.reduce((sum, ts) => sum + Number(ts.hours || 0), 0) ||
+      const totalProjectHours = pTimesheets.reduce((sum, ts) => sum + Number(ts.hoursLogged || 0), 0) ||
         pTasks.reduce((sum, t) => sum + Number(t.actualHours || 0), 0);
 
       const pAllocations = allocations.filter((a) => a.projectId === p.id);
@@ -85,7 +85,7 @@ export function ProjectList() {
         const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
         const empHours = pTimesheets
           .filter((ts) => ts.employeeId === a.employeeId)
-          .reduce((sum, ts) => sum + Number(ts.hours || 0), 0);
+          .reduce((sum, ts) => sum + Number(ts.hoursLogged || 0), 0);
         membersMap.set(name, { name, hours: empHours });
       });
 
@@ -96,14 +96,14 @@ export function ProjectList() {
         if (!membersMap.has(name)) {
           const empHours = pTimesheets
             .filter((t) => t.employeeId === ts.employeeId)
-            .reduce((sum, t) => sum + Number(t.hours || 0), 0);
+            .reduce((sum, t) => sum + Number(t.hoursLogged || 0), 0);
           membersMap.set(name, { name, hours: empHours });
         }
       });
 
       const members = Array.from(membersMap.values());
       const tasksTotal = pTasks.length;
-      const tasksCompleted = pTasks.filter((t) => t.status === 'done' || t.status === 'Completed').length;
+      const tasksCompleted = pTasks.filter((t) => t.status === 'done' || (t.status as any) === 'Completed').length;
 
       return {
         id: p.id,
@@ -139,12 +139,12 @@ export function ProjectList() {
     return pTasks.map((t) => {
       const assignee = employees.find((e) => e.id === t.assigneeId);
       const tTimesheets = timesheets.filter((ts) => ts.taskId === t.id);
-      const hoursLogged = tTimesheets.reduce((sum, ts) => sum + Number(ts.hours || 0), 0) || Number(t.actualHours || 0);
+      const hoursLogged = tTimesheets.reduce((sum, ts) => sum + Number(ts.hoursLogged || 0), 0) || Number(t.actualHours || 0);
 
       return {
         name: t.title,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (t.assigneeId as string || 'Unassigned'),
-        status: t.status === 'done' || t.status === 'Completed' ? 'Completed' : t.status === 'in_progress' || t.status === 'In Progress' ? 'In Progress' : 'Not Started',
+        status: t.status === 'done' || (t.status as any) === 'Completed' ? 'Completed' : t.status === 'in_progress' || (t.status as any) === 'In Progress' ? 'In Progress' : 'Not Started',
         hoursLogged: Math.round(hoursLogged * 10) / 10,
         dueDate: t.dueDate || '—',
       };

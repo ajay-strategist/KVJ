@@ -10,7 +10,7 @@
  *  - Approval lock: Approved claims show lock icon and become read-only with audit log.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
@@ -30,6 +30,7 @@ export interface ExpenseRecord {
   vehicle?: 'Bike' | 'Car';
   km?: number;
   route?: string;
+  notes?: string;
   amount: number;
   receipt?: string;
   status: 'submitted' | 'approved' | 'rejected';
@@ -48,7 +49,7 @@ function DynamicExpenseForm({
 }: {
   bikeRate: number;
   carRate: number;
-  batches: Array<{ id: string; name: string; batchCode?: string }>;
+  batches: Array<any>;
   customExpenseTypes: string[];
   onRegisterNewType: (name: string) => Promise<void>;
   onSubmit: (vals: any) => void;
@@ -69,11 +70,15 @@ function DynamicExpenseForm({
   const calculatedAmount = isSelfTravel ? kmVal * rate : Number(values.amount || 0);
 
   const batchOptions = useMemo(() => {
-    if (batches.length > 0) {
-      return batches.map((b) => ({
-        value: `${b.name} (${b.batchCode || 'Batch'})`,
-        label: `${b.name} (${b.batchCode || 'Batch'})`,
-      }));
+    if (batches && batches.length > 0) {
+      return batches.map((b: any) => {
+        const name = b.name || 'Batch';
+        const code = b.batchCode || b.code || 'Batch';
+        return {
+          value: `${name} (${code})`,
+          label: `${name} (${code})`,
+        };
+      });
     }
     return [
       { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
@@ -224,7 +229,7 @@ function DynamicExpenseForm({
                 color: 'var(--status-success)',
                 display: 'flex',
                 alignItems: 'center',
-                justify: 'space-between',
+                justifyContent: 'space-between',
               }}>
                 <span>📄 {receiptFile.name} ({(receiptFile.size / 1024).toFixed(1)} KB) — Ready for Google Sheet Sync</span>
                 <span style={{ fontSize: 10, background: 'var(--status-success)', color: '#fff', padding: '2px 6px', borderRadius: 4 }}>Uploaded</span>
