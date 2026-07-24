@@ -22,6 +22,7 @@ import {
   type ConflictStatus, type PresetId,
 } from '../schedule.data';
 import { BATCH_REPOSITORY_TOKEN, COURSE_REPOSITORY_TOKEN, type Batch, type Course } from '../training.repository';
+import { supabase } from '../../../shared/integration/supabase';
 
 const EMPTY: ScheduleRangeResult = { sessions: [], leaves: [], holidays: [], daysLoaded: 0 };
 
@@ -70,8 +71,63 @@ export function TrainingCalendar() {
   const [data, setData] = useState<ScheduleRangeResult>(EMPTY);
   const [loading, setLoading] = useState(false);
 
-  // Additional user-created sessions in state
-  const [customSessions, setCustomSessions] = useState<ScheduleSession[]>([]);
+  // Additional user-created sessions in state with LocalStorage persistence
+  const [customSessions, setCustomSessions] = useState<ScheduleSession[]>(() => {
+    try {
+      const saved = localStorage.getItem('kvj_schedule_sessions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kvj_schedule_sessions', JSON.stringify(customSessions));
+    } catch {}
+  }, [customSessions]);
+
+  // Load schedule sessions from Supabase schedule_sessions table on mount
+  useEffect(() => {
+    async function loadDbSessions() {
+      try {
+        const { data: rows, error } = await supabase
+          .from('schedule_sessions')
+          .select('*')
+          .is('deleted_at', null);
+
+        if (!error && rows && rows.length > 0) {
+          const dbSess: ScheduleSession[] = rows.map((r: any) => ({
+            id: r.id,
+            trainerId: r.trainer_id || '',
+            date: r.date,
+            name: r.session_title || 'Training Session',
+            batchCode: r.topic || 'KVJ Batch',
+            college: 'College',
+            course: r.topic || 'Training',
+            academicYear: '2026-27',
+            coordinator: 'Coordinator',
+            startTime: r.start_time || '09:00',
+            endTime: r.end_time || '16:00',
+            venue: r.venue || 'Campus',
+            mode: (r.mode === 'Online' ? 'Online' : 'Offline') as any,
+            studentCount: 30,
+            status: (r.status || 'Scheduled') as any,
+            color: '#3b82f6',
+          }));
+
+          setCustomSessions((prev) => {
+            const existingIds = new Set(prev.map((s) => s.id));
+            const newFromDb = dbSess.filter((s) => !existingIds.has(s.id));
+            return [...prev, ...newFromDb];
+          });
+        }
+      } catch (e) {
+        console.warn('Could not load DB schedule_sessions:', e);
+      }
+    }
+    loadDbSessions();
+  }, []);
 
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [savedFilters, setSavedFilters] = useState<Record<string, FilterState>>(() => {
@@ -387,7 +443,7 @@ export function TrainingCalendar() {
     setIsAssignDrawerOpen(true);
   };
 
-  const handleSaveSession = () => {
+  const handleSaveSession = async () => {
     if (!assignForm.trainerId) {
       toast({ variant: 'error', title: 'Trainer Required', message: 'Please select a trainer for the schedule.' });
       return;
@@ -397,69 +453,77 @@ export function TrainingCalendar() {
     const finalBatchCode = assignForm.batchCode.trim() || firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI';
     const finalName = assignForm.name.trim() || firstPreset?.name || 'Power BI';
 
-    if (editingSessionId) {
-      const updatedSession: ScheduleSession = {
-        id: editingSessionId,
-        trainerId: assignForm.trainerId,
-        date: assignForm.date,
-        name: finalName,
-        batchCode: finalBatchCode,
-        college: assignForm.college,
-        course: assignForm.course,
-        academicYear: assignForm.academicYear,
-        coordinator: assignForm.coordinator,
-        startTime: assignForm.startTime,
-        endTime: assignForm.endTime,
-        venue: assignForm.venue,
-        mode: assignForm.mode,
-        studentCount: Number(assignForm.studentCount) || 20,
-        status: 'Scheduled',
-        color: '#3b82f6',
-      };
+    const targetSessionId = editingSessionId || `custom-sess-${Date.now()}`;
+    const sessionObj: ScheduleSession = {
+      id: targetSessionId,
+      trainerId: assignForm.trainerId,
+      date: assignForm.date,
+      name: finalName,
+      batchCode: finalBatchCode,
+      college: assignForm.college,
+      course: assignForm.course,
+      academicYear: assignForm.academicYear,
+      coordinator: assignForm.coordinator,
+      startTime: assignForm.startTime,
+      endTime: assignForm.endTime,
+      venue: assignForm.venue,
+      mode: assignForm.mode,
+      studentCount: Number(assignForm.studentCount) || 20,
+      status: 'Scheduled',
+      color: '#3b82f6',
+    };
 
+    if (editingSessionId) {
       setCustomSessions((prev) =>
-        prev.map((sess) => (sess.id === editingSessionId ? updatedSession : sess))
+        prev.map((sess) => (sess.id === editingSessionId ? sessionObj : sess))
       );
       toast({
         variant: 'success',
         title: 'Schedule Updated',
-        message: `Updated schedule for ${updatedSession.batchCode} on ${updatedSession.date}`,
+        message: `Updated schedule for ${sessionObj.batchCode} on ${sessionObj.date}`,
       });
     } else {
-      const newSession: ScheduleSession = {
-        id: `custom-sess-${Date.now()}`,
-        trainerId: assignForm.trainerId,
-        date: assignForm.date,
-        name: finalName,
-        batchCode: finalBatchCode,
-        college: assignForm.college,
-        course: assignForm.course,
-        academicYear: assignForm.academicYear,
-        coordinator: assignForm.coordinator,
-        startTime: assignForm.startTime,
-        endTime: assignForm.endTime,
-        venue: assignForm.venue,
-        mode: assignForm.mode,
-        studentCount: Number(assignForm.studentCount) || 20,
-        status: 'Scheduled',
-        color: '#3b82f6',
-      };
-
-      setCustomSessions((prev) => [...prev, newSession]);
+      setCustomSessions((prev) => [...prev, sessionObj]);
       toast({
         variant: 'success',
         title: 'Schedule Assigned',
-        message: `Assigned ${newSession.name} (${newSession.batchCode}) to ${trainerName(newSession.trainerId)} on ${newSession.date}`,
+        message: `Assigned ${sessionObj.name} (${sessionObj.batchCode}) to ${trainerName(sessionObj.trainerId)} on ${sessionObj.date}`,
       });
+    }
+
+    // Persist to Supabase schedule_sessions DB table
+    try {
+      await supabase.from('schedule_sessions').upsert({
+        id: targetSessionId.startsWith('custom-sess-') ? undefined : targetSessionId,
+        date: sessionObj.date,
+        session_title: sessionObj.name,
+        topic: sessionObj.batchCode,
+        trainer_id: sessionObj.trainerId,
+        start_time: sessionObj.startTime,
+        end_time: sessionObj.endTime,
+        venue: sessionObj.venue,
+        mode: sessionObj.mode,
+        status: sessionObj.status,
+      });
+    } catch (e) {
+      console.warn('Supabase schedule_sessions save warning:', e);
     }
 
     setIsAssignDrawerOpen(false);
     setEditingSessionId(null);
   };
 
-  const handleDeleteSession = () => {
+  const handleDeleteSession = async () => {
     if (!editingSessionId) return;
-    setCustomSessions((prev) => prev.filter((s) => s.id !== editingSessionId));
+    const deletedId = editingSessionId;
+    setCustomSessions((prev) => prev.filter((s) => s.id !== deletedId));
+
+    try {
+      await supabase.from('schedule_sessions').delete().eq('id', deletedId);
+    } catch (e) {
+      console.warn('Supabase schedule_sessions delete warning:', e);
+    }
+
     setIsAssignDrawerOpen(false);
     setEditingSessionId(null);
     toast({ variant: 'info', title: 'Schedule Removed', message: 'Assigned schedule deleted.' });

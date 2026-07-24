@@ -57,8 +57,9 @@ export function TaskBoard() {
   const isSupervisorRole = can('task', 'approve');
 
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Task' | 'Project Task'>('all');
-  const [dateWindowFilter, setDateWindowFilter] = useState<'next_3_days' | 'today' | 'all'>('next_3_days');
+  const [dateWindowFilter, setDateWindowFilter] = useState<'next_3_days' | 'today' | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [timeEntryOpen, setTimeEntryOpen] = useState(false);
@@ -130,6 +131,7 @@ export function TaskBoard() {
   );
 
   const sortedTasks = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     const filtered = tasksList.filter((t) => {
       if (t.status === 'Pending Approval') return false;
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
@@ -138,13 +140,19 @@ export function TaskBoard() {
       } else if (dateWindowFilter === 'next_3_days') {
         if (t.dueDate < todayStr || t.dueDate > windowEnd) return false;
       }
+      if (query) {
+        const matchesName = t.name.toLowerCase().includes(query);
+        const matchesAssignee = t.assignee.toLowerCase().includes(query);
+        const matchesProj = (t.projectName || '').toLowerCase().includes(query);
+        if (!matchesName && !matchesAssignee && !matchesProj) return false;
+      }
       return true;
     });
 
     return filtered.sort((a, b) =>
       sortOrder === 'asc' ? a.dueDate.localeCompare(b.dueDate) : b.dueDate.localeCompare(a.dueDate)
     );
-  }, [tasksList, categoryFilter, dateWindowFilter, sortOrder, todayStr, windowEnd]);
+  }, [tasksList, categoryFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
     const proj = projects.find((p) => p.title === values.projectName || p.id === values.projectId);
@@ -284,40 +292,96 @@ export function TaskBoard() {
       </div>
 
       {/* Filters Bar */}
-      <Card style={{ padding: '12px 18px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Card style={{ padding: '14px 18px', background: 'var(--bg-surface)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <div style={{ flex: '1 1 240px', minWidth: 200 }}>
+            <input
+              type="text"
+              placeholder="🔍 Search tasks, assignees, or projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 14px',
+                fontSize: 13,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-sunken)',
+                color: 'var(--text-primary)',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <select
-              className="kvj-select"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as any)}
-              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 150 }}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
             >
-              <option value="all">All Categories</option>
-              <option value="Office Task">Office Task</option>
-              <option value="Project Task">Project Task</option>
+              <option value="all">📂 All Categories</option>
+              <option value="Office Task">🏢 Office Task</option>
+              <option value="Project Task">🚀 Project Task</option>
             </select>
 
             <select
-              className="kvj-select"
               value={dateWindowFilter}
               onChange={(e) => setDateWindowFilter(e.target.value as any)}
-              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 170 }}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
             >
-              <option value="next_3_days">Next 3 Days Window</option>
-              <option value="today">Due Today</option>
-              <option value="all">All Tasks</option>
+              <option value="all">📅 All Tasks</option>
+              <option value="next_3_days">⏳ Next 3 Days Window</option>
+              <option value="today">📌 Due Today</option>
             </select>
 
             <select
-              className="kvj-select"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as any)}
-              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 150 }}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
             >
-              <option value="asc">DueDate: Ascending</option>
-              <option value="desc">DueDate: Descending</option>
+              <option value="asc">DueDate: Ascending ⬆</option>
+              <option value="desc">DueDate: Descending ⬇</option>
             </select>
+
+            {(searchQuery || categoryFilter !== 'all' || dateWindowFilter !== 'all') && (
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={() => {
+                  setSearchQuery('');
+                  setCategoryFilter('all');
+                  setDateWindowFilter('all');
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
         </div>
       </Card>

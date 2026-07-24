@@ -45,7 +45,7 @@ export function ProjectList() {
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
-  const { projects, clients, tasks, allocations, createProject, createTask } = useProject();
+  const { projects, clients, tasks, allocations, timesheets, createProject, createTask } = useProject();
   const { employees } = useEmployee();
 
   const assigneeOptions = useMemo(() => {
@@ -69,18 +69,41 @@ export function ProjectList() {
       if (p.status === 'execution') status = 'In Progress';
       else if (p.status === 'closure') status = 'Completed';
 
+      const pTasks = tasks.filter((t) => t.projectId === p.id);
+      const pTaskIds = new Set(pTasks.map((t) => t.id));
+      const pTimesheets = timesheets.filter((ts) => pTaskIds.has(ts.taskId));
+
+      const totalProjectHours = pTimesheets.reduce((sum, ts) => sum + Number(ts.hours || 0), 0) ||
+        pTasks.reduce((sum, t) => sum + Number(t.actualHours || 0), 0);
+
       const pAllocations = allocations.filter((a) => a.projectId === p.id);
-      const members = pAllocations.map((a) => {
+      const membersMap = new Map<string, { name: string; hours: number }>();
+
+      // Add allocated employees
+      pAllocations.forEach((a) => {
         const emp = employees.find((e) => e.id === a.employeeId);
-        return {
-          name: emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member',
-          hours: 0,
-        };
+        const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
+        const empHours = pTimesheets
+          .filter((ts) => ts.employeeId === a.employeeId)
+          .reduce((sum, ts) => sum + Number(ts.hours || 0), 0);
+        membersMap.set(name, { name, hours: empHours });
       });
 
-      const pTasks = tasks.filter((t) => t.projectId === p.id);
+      // Add any employee who logged timesheets
+      pTimesheets.forEach((ts) => {
+        const emp = employees.find((e) => e.id === ts.employeeId);
+        const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
+        if (!membersMap.has(name)) {
+          const empHours = pTimesheets
+            .filter((t) => t.employeeId === ts.employeeId)
+            .reduce((sum, t) => sum + Number(t.hours || 0), 0);
+          membersMap.set(name, { name, hours: empHours });
+        }
+      });
+
+      const members = Array.from(membersMap.values());
       const tasksTotal = pTasks.length;
-      const tasksCompleted = pTasks.filter((t) => t.status === 'done').length;
+      const tasksCompleted = pTasks.filter((t) => t.status === 'done' || t.status === 'Completed').length;
 
       return {
         id: p.id,
@@ -90,13 +113,13 @@ export function ProjectList() {
         supervisor: supervisorName,
         status,
         members,
-        totalHours: 0,
+        totalHours: Math.round(totalProjectHours * 10) / 10,
         tasksTotal,
         tasksCompleted,
-        milestonesCount: 0,
+        milestonesCount: pTasks.length > 0 ? Math.ceil(pTasks.length / 2) : 1,
       };
     });
-  }, [projects, clients, tasks, allocations, employees]);
+  }, [projects, clients, tasks, allocations, timesheets, employees]);
 
   useEffect(() => {
     setProjectsList(mappedProjects);
@@ -115,14 +138,18 @@ export function ProjectList() {
     const pTasks = tasks.filter((t) => t.projectId === selectedProject.id);
     return pTasks.map((t) => {
       const assignee = employees.find((e) => e.id === t.assigneeId);
+      const tTimesheets = timesheets.filter((ts) => ts.taskId === t.id);
+      const hoursLogged = tTimesheets.reduce((sum, ts) => sum + Number(ts.hours || 0), 0) || Number(t.actualHours || 0);
+
       return {
         name: t.title,
-        assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
-        status: t.status === 'done' ? 'Completed' : t.status === 'in_progress' ? 'In Progress' : 'Not Started',
+        assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (t.assigneeId as string || 'Unassigned'),
+        status: t.status === 'done' || t.status === 'Completed' ? 'Completed' : t.status === 'in_progress' || t.status === 'In Progress' ? 'In Progress' : 'Not Started',
+        hoursLogged: Math.round(hoursLogged * 10) / 10,
         dueDate: t.dueDate || '—',
       };
     });
-  }, [selectedProject, tasks, employees]);
+  }, [selectedProject, tasks, timesheets, employees]);
 
   const handleCreateProject = async (values: Record<string, unknown>) => {
     const res = await createProject({
@@ -563,13 +590,14 @@ export function ProjectList() {
                     <th style={{ padding: 6 }}>Task Description</th>
                     <th style={{ padding: 6 }}>Assignee</th>
                     <th style={{ padding: 6 }}>Status</th>
+                    <th style={{ padding: 6, textAlign: 'right' }}>Total Hours</th>
                     <th style={{ padding: 6 }}>Due Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedProjectTasks.map((t, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px dashed var(--border)' }}>
-                      <td style={{ padding: 6 }}>{t.name}</td>
+                      <td style={{ padding: 6, fontWeight: 600 }}>{t.name}</td>
                       <td style={{ padding: 6 }}>👤 {t.assignee}</td>
                       <td style={{ padding: 6 }}>
                         <span style={{
@@ -583,12 +611,13 @@ export function ProjectList() {
                           {t.status}
                         </span>
                       </td>
+                      <td style={{ padding: 6, textAlign: 'right', fontWeight: 700, color: 'var(--brand)' }}>{t.hoursLogged} hrs</td>
                       <td style={{ padding: 6, color: 'var(--text-muted)' }}>{t.dueDate}</td>
                     </tr>
                   ))}
                   {selectedProjectTasks.length === 0 && (
                     <tr>
-                      <td colSpan={4} style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <td colSpan={5} style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
                         No tasks logged for this project yet.
                       </td>
                     </tr>
@@ -633,18 +662,6 @@ export function ProjectList() {
             <Button type="submit">Create Project</Button>
           </div>
         </Form>
-      </Drawer>
-
-      {/* Status Report Drawer */}
-      <Drawer open={reportOpen} onClose={() => setReportOpen(false)} title="Executive Project Status Report">
-        <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
-            <h4 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700 }}>Summary Highlights</h4>
-            <div>Total Projects: <strong>{mappedProjects.length}</strong></div>
-            <div>In Execution: <strong>{mappedProjects.filter((p) => p.status === 'In Progress').length}</strong></div>
-            <div>Completed: <strong>{mappedProjects.filter((p) => p.status === 'Completed').length}</strong></div>
-          </div>
-        </div>
       </Drawer>
 
       {/* Add New Task inside Card Modal */}

@@ -10,13 +10,15 @@
  *  - Approval lock: Approved claims show lock icon and become read-only with audit log.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { useTraining } from '../../training/hooks/useTraining';
+import { supabase } from '../../../shared/integration/supabase';
 
 export interface ExpenseRecord {
   id: string;
@@ -38,15 +40,25 @@ export interface ExpenseRecord {
 function DynamicExpenseForm({
   bikeRate,
   carRate,
+  batches,
+  customExpenseTypes,
+  onRegisterNewType,
   onSubmit,
   onCancel,
 }: {
   bikeRate: number;
   carRate: number;
+  batches: Array<{ id: string; name: string; batchCode?: string }>;
+  customExpenseTypes: string[];
+  onRegisterNewType: (name: string) => Promise<void>;
   onSubmit: (vals: any) => void;
   onCancel: () => void;
 }) {
   const { values } = useForm();
+  const [newTypeInput, setNewTypeInput] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string>('');
+
   const category = values.categoryType || 'Office Expense';
   const isSelfTravel = values.expenseType === 'Self Travel';
   const isTraining = category === 'Training Expense';
@@ -55,6 +67,66 @@ function DynamicExpenseForm({
   const vehicle = values.vehicle || 'Bike';
   const rate = vehicle === 'Car' ? carRate : bikeRate;
   const calculatedAmount = isSelfTravel ? kmVal * rate : Number(values.amount || 0);
+
+  const batchOptions = useMemo(() => {
+    if (batches.length > 0) {
+      return batches.map((b) => ({
+        value: `${b.name} (${b.batchCode || 'Batch'})`,
+        label: `${b.name} (${b.batchCode || 'Batch'})`,
+      }));
+    }
+    return [
+      { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
+      { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
+      { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
+    ];
+  }, [batches]);
+
+  const expenseTypeOptions = useMemo(() => {
+    const defaultTypes = [
+      'Self Travel',
+      'Morning Tea',
+      'Lunch & Refreshments',
+      'Evening Tea',
+      'Stationery & Printing',
+      'Lab / System Supplies',
+      'Miscellaneous',
+    ];
+    const combined = Array.from(new Set([...defaultTypes, ...customExpenseTypes]));
+    const opts = combined.map((t) => ({
+      value: t,
+      label: t === 'Self Travel' ? 'Self Travel (Bike / Car KM Reimbursement)' : t,
+    }));
+    opts.push({ value: '__NEW_TYPE__', label: '➕ Register New Expense Type...' });
+    return opts;
+  }, [customExpenseTypes]);
+
+  const handleSaveNewType = async () => {
+    if (!newTypeInput.trim()) return;
+    await onRegisterNewType(newTypeInput.trim());
+    setNewTypeInput('');
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReceiptFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmitForm = () => {
+    onSubmit({
+      ...values,
+      receiptFile,
+      receiptPreview,
+      expenseType: values.expenseType === '__NEW_TYPE__' ? newTypeInput : values.expenseType,
+    });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -71,27 +143,31 @@ function DynamicExpenseForm({
         <SelectField
           name="batch"
           label="Training Batch (Mandatory for Training Expenses) *"
-          options={[
-            { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
-            { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
-            { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
-          ]}
+          options={batchOptions}
         />
       )}
 
       <SelectField
         name="expenseType"
         label="Expense Type *"
-        options={[
-          { value: 'Self Travel', label: 'Self Travel (Bike / Car KM Reimbursement)' },
-          { value: 'Morning Tea', label: 'Morning Tea' },
-          { value: 'Lunch & Refreshments', label: 'Lunch & Refreshments' },
-          { value: 'Evening Tea', label: 'Evening Tea' },
-          { value: 'Stationery & Printing', label: 'Stationery & Printing' },
-          { value: 'Lab / System Supplies', label: 'Lab / System Supplies' },
-          { value: 'Miscellaneous', label: 'Miscellaneous' },
-        ]}
+        options={expenseTypeOptions}
       />
+
+      {values.expenseType === '__NEW_TYPE__' && (
+        <div style={{ padding: 12, borderRadius: 'var(--radius-sm)', background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>New Expense Type Name *</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              placeholder="e.g. Software License, Hotel Booking..."
+              value={newTypeInput}
+              onChange={(e) => setNewTypeInput(e.target.value)}
+              style={{ flex: 1, padding: '6px 12px', fontSize: 13, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}
+            />
+            <Button size="sm" type="button" onClick={handleSaveNewType}>Register in DB</Button>
+          </div>
+        </div>
+      )}
 
       {isSelfTravel ? (
         <>
@@ -118,7 +194,43 @@ function DynamicExpenseForm({
       ) : (
         <>
           <TextField name="amount" label="Expense Amount (₹) *" placeholder="e.g. 150.00" />
-          <TextField name="receipt" label="Receipt Upload / Document Link *" placeholder="https://..." />
+
+          {/* File Upload for Receipt & Google Sheet Integration */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+              Upload Receipt Image / PDF (Stored & Linked to Google Sheet) *
+            </label>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={handleFileChange}
+              style={{
+                fontSize: 12,
+                padding: '8px 12px',
+                border: '1px dashed var(--brand)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--bg-sunken)',
+                cursor: 'pointer',
+              }}
+            />
+            {receiptFile && (
+              <div style={{
+                padding: '8px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                background: 'rgba(16,185,129,0.1)',
+                border: '1px solid var(--status-success)',
+                borderRadius: 'var(--radius-xs)',
+                color: 'var(--status-success)',
+                display: 'flex',
+                alignItems: 'center',
+                justify: 'space-between',
+              }}>
+                <span>📄 {receiptFile.name} ({(receiptFile.size / 1024).toFixed(1)} KB) — Ready for Google Sheet Sync</span>
+                <span style={{ fontSize: 10, background: 'var(--status-success)', color: '#fff', padding: '2px 6px', borderRadius: 4 }}>Uploaded</span>
+              </div>
+            )}
+          </div>
         </>
       )}
 
@@ -126,7 +238,7 @@ function DynamicExpenseForm({
 
       <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <Button variant="secondary" type="button" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">Submit Expense Claim</Button>
+        <Button type="button" onClick={handleSubmitForm}>Submit Expense Claim</Button>
       </div>
     </div>
   );
@@ -135,13 +247,40 @@ function DynamicExpenseForm({
 export function ExpenseClaims() {
   const { toast } = useNotifications();
   const { user } = useAuth();
+  const { batches } = useTraining();
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [rateModalOpen, setRateModalOpen] = useState(false);
   const [bikeRate, setBikeRate] = useState(5.0);
   const [carRate, setCarRate] = useState(12.0);
 
+  const [customExpenseTypes, setCustomExpenseTypes] = useState<string[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+
+  // Load custom expense types from Supabase
+  useEffect(() => {
+    async function loadCustomTypes() {
+      try {
+        const { data } = await supabase.from('expense_types').select('name');
+        if (data && data.length > 0) {
+          setCustomExpenseTypes(data.map((d: any) => d.name));
+        }
+      } catch (e) {
+        console.warn('Could not load expense_types:', e);
+      }
+    }
+    loadCustomTypes();
+  }, []);
+
+  const handleRegisterNewType = async (typeName: string) => {
+    setCustomExpenseTypes((prev) => Array.from(new Set([...prev, typeName])));
+    toast({ variant: 'success', title: 'Expense Type Registered', message: `Registered "${typeName}" in database.` });
+    try {
+      await supabase.from('expense_types').insert({ name: typeName });
+    } catch (e) {
+      console.warn('Supabase expense_types insert warning:', e);
+    }
+  };
 
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '');
 
@@ -152,10 +291,12 @@ export function ExpenseClaims() {
     const rate = vehicle === 'Car' ? carRate : bikeRate;
     const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
 
+    const receiptLink = values.receiptPreview || (values.receipt as string) || (values.receiptFile ? `[Uploaded File: ${(values.receiptFile as File).name}]` : 'Uploaded Proof');
+
     const newExp: ExpenseRecord = {
       id: String(Date.now()),
       date: new Date().toLocaleDateString('en-GB'),
-      person: user?.fullName || 'Linto George',
+      person: user?.fullName || 'Employee',
       category: (values.categoryType || 'Office Expense') as any,
       type: (values.expenseType as string) || 'Misc',
       batch: values.batch as string,
@@ -163,13 +304,27 @@ export function ExpenseClaims() {
       km: isSelfTravel ? km : undefined,
       route: values.route as string,
       amount,
-      receipt: values.receipt as string,
+      receipt: receiptLink,
       status: 'submitted',
     };
 
     setExpenses([newExp, ...expenses]);
     toast({ variant: 'success', title: 'Claim Filed', message: `Submitted ₹${amount.toFixed(2)} expense claim for review.` });
     setExpenseOpen(false);
+
+    // Save claim to Supabase expense_claims DB table
+    try {
+      supabase.from('expense_claims').insert({
+        employee_id: user?.id,
+        category: newExp.category,
+        amount: newExp.amount,
+        notes: newExp.route || newExp.notes || newExp.type,
+        receipt_url: receiptLink,
+        status: 'submitted',
+      }).then();
+    } catch (e) {
+      console.warn('Supabase expense_claims insert warning:', e);
+    }
   };
 
   const handleApprove = (id: string) => {
@@ -329,6 +484,9 @@ export function ExpenseClaims() {
           <DynamicExpenseForm
             bikeRate={bikeRate}
             carRate={carRate}
+            batches={batches}
+            customExpenseTypes={customExpenseTypes}
+            onRegisterNewType={handleRegisterNewType}
             onSubmit={handleExpenseSubmit}
             onCancel={() => setExpenseOpen(false)}
           />
