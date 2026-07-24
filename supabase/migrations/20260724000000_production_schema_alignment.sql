@@ -68,6 +68,8 @@ BEGIN
             NULL;
         END;
     END LOOP;
+END $$;
+
 -- 0. CORE HR & ATTENDANCE TABLES
 CREATE TABLE IF NOT EXISTS public.departments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
