@@ -103,6 +103,16 @@ export function useProject() {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const updateTask = useCallback(async (taskId: UUID, data: Partial<Task>): Promise<CallbackResult<Task>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.updateTask(taskId, data, { id: user.id, role: user.role });
+    if (res.ok) {
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? res.value : t)));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
   const logTimesheet = useCallback(async (data: Partial<TimesheetRecord>): Promise<CallbackResult<TimesheetRecord>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.logTimesheet(data, { id: user.id, role: user.role });
@@ -140,6 +150,7 @@ export function useProject() {
     addMilestone,
     allocateResource,
     createTask,
+    updateTask,
     logTimesheet,
     approveTimesheet,
     refresh: fetchAll,

@@ -23,6 +23,7 @@ export interface IProjectService {
   addMilestone(projectId: UUID, title: string, dueDate: string, actor: Actor): Promise<Result<Milestone>>;
   allocateResource(projectId: UUID, employeeId: UUID, role: string, capacity: number, actor: Actor): Promise<Result<ResourceAllocation>>;
   createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>>;
+  updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>>;
   logTimesheet(data: Partial<TimesheetRecord>, actor: Actor): Promise<Result<TimesheetRecord>>;
   approveTimesheet(timesheetId: UUID, actor: Actor): Promise<Result<TimesheetRecord>>;
 }
@@ -112,6 +113,18 @@ export class ProjectService implements IProjectService {
         });
       }
       return Ok(task);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>> {
+    try {
+      const updated = await this.taskRepo.update(taskId, patch, actor);
+      if (updated) {
+        await this.activity.log('project', updated.projectId, actor, 'update', `Updated task: ${updated.title}`);
+      }
+      return Ok(updated);
     } catch (e: any) {
       return Err(AppError.internal(e.message));
     }

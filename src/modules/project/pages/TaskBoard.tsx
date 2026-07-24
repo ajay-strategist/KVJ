@@ -63,13 +63,15 @@ export function TaskBoard() {
 
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [timeEntryOpen, setTimeEntryOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
+  const [editTaskOpen, setEditTaskOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
 
   const todayStr = useMemo(() => todayISO(), []);
 
   const [tasksList, setTasksList] = useState<TaskItem[]>([]);
 
-  const { projects, tasks, allocations, timesheets, createTask, logTimesheet, approveTimesheet } = useProject();
+  const { projects, tasks, allocations, timesheets, createTask, updateTask, logTimesheet, approveTimesheet } = useProject();
   const { employees } = useEmployee();
 
   const mappedTasks = useMemo(() => {
@@ -210,6 +212,58 @@ export function TaskBoard() {
     } else {
       toast({ variant: 'error', title: 'Logging Failed', message: res.error });
     }
+  };
+
+  const handleUpdateTaskSubmit = async (values: Record<string, unknown>) => {
+    if (!editingTask) return;
+    const updatedName = (values.name as string) || editingTask.name;
+    const updatedCategory = (values.category as any) || editingTask.category;
+    const updatedProjectName = (values.projectName as string) || editingTask.projectName;
+    const updatedAssignee = (values.assignee as string) || editingTask.assignee;
+    const updatedSupervisor = (values.supervisor as string) || editingTask.supervisor;
+    const updatedDueDate = (values.dueDate as string) || editingTask.dueDate;
+    const updatedStatus = (values.status as TaskStatus) || editingTask.status;
+
+    setTasksList((prev) =>
+      prev.map((t) =>
+        t.id === editingTask.id
+          ? {
+              ...t,
+              name: updatedName,
+              category: updatedCategory,
+              projectName: updatedProjectName,
+              assignee: updatedAssignee,
+              supervisor: updatedSupervisor,
+              dueDate: updatedDueDate,
+              status: updatedStatus,
+            }
+          : t
+      )
+    );
+
+    const dbStatusMap: Record<string, 'todo' | 'in_progress' | 'review' | 'done'> = {
+      'Pending Approval': 'todo',
+      'To Do': 'todo',
+      'In Progress': 'in_progress',
+      'Under Review': 'review',
+      'Completed': 'done',
+    };
+
+    try {
+      const assigneeEmp = employees.find((e) => `${e.firstName} ${e.lastName}` === updatedAssignee);
+      await updateTask(editingTask.id, {
+        title: updatedName,
+        dueDate: updatedDueDate,
+        assigneeId: assigneeEmp ? assigneeEmp.id : undefined,
+        status: dbStatusMap[updatedStatus] || 'todo',
+      });
+    } catch (e) {
+      console.warn('DB task update warning:', e);
+    }
+
+    toast({ variant: 'success', title: 'Task Updated', message: `Task "${updatedName}" updated successfully.` });
+    setEditTaskOpen(false);
+    setEditingTask(null);
   };
 
   const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval').length;
@@ -450,6 +504,18 @@ export function TaskBoard() {
                         ✓ Mark Complete
                       </Button>
                     )}
+
+                    {/* Action: Edit Task */}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setEditingTask(t);
+                        setEditTaskOpen(true);
+                      }}
+                    >
+                      ✏️ Edit
+                    </Button>
                   </div>
                 </div>
 
@@ -519,6 +585,57 @@ export function TaskBoard() {
             <Button type="submit">Log Time Entry</Button>
           </div>
         </Form>
+      </Drawer>
+
+      {/* Edit Task Drawer */}
+      <Drawer open={editTaskOpen} onClose={() => { setEditTaskOpen(false); setEditingTask(null); }} title={`Edit Task: ${editingTask?.name ?? ''}`}>
+        {editingTask && (
+          <Form
+            initial={{
+              name: editingTask.name,
+              category: editingTask.category,
+              projectName: editingTask.projectName || '',
+              assignee: editingTask.assignee || '',
+              supervisor: editingTask.supervisor || '',
+              dueDate: editingTask.dueDate || todayStr,
+              status: editingTask.status,
+            }}
+            onSubmit={handleUpdateTaskSubmit}
+          >
+            <TextField name="name" label="Task Title *" placeholder="Task title..." />
+            <SelectField
+              name="category"
+              label="Category *"
+              options={[
+                { value: 'Office Task', label: 'Office Task' },
+                { value: 'Project Task', label: 'Project Task' },
+              ]}
+            />
+            <TextField name="projectName" label="Project Name / Department" placeholder="Project name..." />
+            <SelectField
+              name="assignee"
+              label="Assignee Name"
+              options={employees.length > 0 ? employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` })) : [{ value: editingTask.assignee, label: editingTask.assignee }]}
+            />
+            <TextField name="supervisor" label="Supervisor Name" placeholder="Supervisor..." />
+            <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
+            <SelectField
+              name="status"
+              label="Task Status *"
+              options={[
+                { value: 'Pending Approval', label: 'Pending Approval' },
+                { value: 'To Do', label: 'Approved (To Do)' },
+                { value: 'In Progress', label: 'In Progress' },
+                { value: 'Under Review', label: 'Under Review' },
+                { value: 'Completed', label: 'Completed' },
+              ]}
+            />
+            <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button variant="secondary" type="button" onClick={() => { setEditTaskOpen(false); setEditingTask(null); }}>Cancel</Button>
+              <Button type="submit">Save Task Changes</Button>
+            </div>
+          </Form>
+        )}
       </Drawer>
     </div>
   );
