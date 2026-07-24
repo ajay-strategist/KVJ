@@ -89,11 +89,18 @@ export function isPageEnabled(key: keyof FeatureFlags['pages']): boolean {
   return featureFlags.pages[key];
 }
 
+export function isSupabaseConfigured(): boolean {
+  const metaEnv = (import.meta as { env?: Record<string, string> }).env ?? {};
+  const url = metaEnv.VITE_SUPABASE_URL || '';
+  const key = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+  return !!url && url !== 'https://mock-project.supabase.co' && !url.includes('mock-project') && !!key && key !== 'mock-anon-key';
+}
+
 /**
  * True when a module should resolve its Supabase repositories instead of the
- * mock ones. Requires BOTH the master integration switch and that module's
+ * mock ones. Requires BOTH the master integration switch, valid configuration, and that module's
  * own cutover flag, so a half-migrated database can never take the app down.
  */
 export function usesSupabase(key: keyof FeatureFlags['supabaseModules']): boolean {
-  return featureFlags.integrations.supabase && featureFlags.supabaseModules[key];
+  return featureFlags.integrations.supabase && featureFlags.supabaseModules[key] && isSupabaseConfigured();
 }
