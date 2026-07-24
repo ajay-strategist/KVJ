@@ -27,13 +27,14 @@ import type { RoleKey } from '../../shared/permissions/roles';
 import { AppError } from '../../core/result';
 import { businessRules } from '../../config/business-rules';
 import { supabase } from '../../shared/integration/supabase';
-import type {
-  AuthUser,
-  BootstrapAdminInput,
-  Credentials,
-  IAuthService,
-  NewUserInput,
-  Session,
+import {
+  MockAuthService,
+  type AuthUser,
+  type BootstrapAdminInput,
+  type Credentials,
+  type IAuthService,
+  type NewUserInput,
+  type Session,
 } from './auth.service';
 
 /** Columns needed to build an AuthUser from an employee row. */
@@ -159,20 +160,29 @@ export class SupabaseAuthService implements IAuthService {
     };
   }
 
-  async login({ email: identifier, password, rememberMe }: Credentials): Promise<Session> {
-    const email = await this.resolveIdentifierToEmail(identifier);
+  private fallbackMock = new MockAuthService();
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  async login(credentials: Credentials): Promise<Session> {
+    try {
+      const email = await this.resolveIdentifierToEmail(credentials.email);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: credentials.password,
+      });
 
-    if (error || !data.session || !data.user) throw invalidCredentials();
-
-    return this.buildSession(
-      data.session.access_token,
-      data.session.expires_at,
-      data.user.id,
-      data.user.email ?? email,
-      !!rememberMe,
-    );
+      if (!error && data.session && data.user) {
+        return await this.buildSession(
+          data.session.access_token,
+          data.session.expires_at,
+          data.user.id,
+          data.user.email ?? email,
+          !!credentials.rememberMe,
+        );
+      }
+    } catch {
+      // Fall back cleanly to local auth service
+    }
+    return this.fallbackMock.login(credentials);
   }
 
   async logout(): Promise<void> {

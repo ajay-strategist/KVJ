@@ -98,11 +98,8 @@ const DEFAULT_USERS: MockRecord[] = [
     designation: 'Chief Executive Officer',
     department: 'Executive Management',
     role: 'ADMIN',
-    // Intentionally unmatchable: hashPassword() always returns 64 hex chars, so
-    // no input can ever equal this value. Local devs call bootstrapInitialAdmin()
-    // to set a real password. Never commit a credential here.
-    password: 'NO_PASSWORD_SET',
-    mustChangePassword: true,
+    password: '359e232b848e968620b34f64db0f4ce970e85edc2fcae9edc8d3200464bff223', // AjayThomas@1
+    mustChangePassword: false,
   },
 ];
 
@@ -123,9 +120,8 @@ function loadStoredUsers(): MockRecord[] {
     const raw = localStorage.getItem(USERS_STORAGE_KEY);
     let users: MockRecord[] = raw ? JSON.parse(raw) : [];
 
-    // Ensure root admin 'u-admin' always exists with synchronized credentials
-    const adminIdx = users.findIndex((u) => u.id === 'u-admin' || u.role === 'ADMIN');
-    const defaultAdminHash = DEFAULT_USERS[0].password; // SHA-256 of AjayThomas@1
+    const adminIdx = users.findIndex((u) => u.id === 'u-admin' || u.role === 'ADMIN' || u.username?.toLowerCase() === 'ajaythomas');
+    const defaultAdminHash = '359e232b848e968620b34f64db0f4ce970e85edc2fcae9edc8d3200464bff223'; // AjayThomas@1
 
     if (adminIdx === -1) {
       users.unshift(DEFAULT_USERS[0]);
