@@ -23,7 +23,7 @@ interface AuthContextValue {
   updateUser: (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string }>) => Promise<import('./auth.service').AuthUser>;
   deleteUser: (userId: string) => Promise<{ ok: boolean }>;
   updateUserPassword: (userId: string, newPassword: string) => Promise<{ ok: boolean }>;
-  resetToDefaultPassword: (userId: string) => Promise<{ ok: boolean }>;
+  resetToDefaultPassword: (userIdOrEmail: string, fullName?: string) => Promise<{ ok: boolean }>;
   getUsers: () => Promise<import('./auth.service').AuthUser[]>;
   hasUsers: () => Promise<boolean>;
   bootstrapInitialAdmin: (input: import('./auth.service').BootstrapAdminInput) => Promise<import('./auth.service').AuthUser>;
@@ -104,8 +104,8 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     return res;
   }, [authService, session]);
 
-  const resetToDefaultPassword = useCallback(async (userId: string) => {
-    return authService.resetToDefaultPassword(userId);
+  const resetToDefaultPassword = useCallback(async (userIdOrEmail: string, fullName?: string) => {
+    return authService.resetToDefaultPassword(userIdOrEmail, fullName);
   }, [authService]);
 
   const getUsers = useCallback(async () => {

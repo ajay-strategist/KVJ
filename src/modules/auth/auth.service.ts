@@ -78,7 +78,7 @@ export interface IAuthService {
   updateUser(userId: string, data: Partial<NewUserInput & { password?: string }>): Promise<AuthUser>;
   deleteUser(userId: string): Promise<{ ok: boolean }>;
   updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }>;
-  resetToDefaultPassword(userId: string): Promise<{ ok: boolean }>;
+  resetToDefaultPassword(userIdOrEmail: string, fullName?: string): Promise<{ ok: boolean }>;
   getUsers(): Promise<AuthUser[]>;
   hasUsers(): Promise<boolean>;
   bootstrapInitialAdmin(input: BootstrapAdminInput): Promise<AuthUser>;
@@ -357,14 +357,18 @@ export class MockAuthService implements IAuthService {
     return { ok: true };
   }
 
-  async resetToDefaultPassword(identifier: string): Promise<{ ok: boolean }> {
+  async resetToDefaultPassword(identifier: string, fullName?: string): Promise<{ ok: boolean }> {
     const users = this.getUsersList();
     let found = false;
 
     const pwHash = await hashPassword('password');
 
     const updated = users.map((u) => {
-      if (u.id === identifier || u.email.toLowerCase() === identifier.toLowerCase() || u.username?.toLowerCase() === identifier.toLowerCase()) {
+      if (
+        u.id === identifier ||
+        u.email.toLowerCase() === identifier.toLowerCase() ||
+        u.username?.toLowerCase() === identifier.toLowerCase()
+      ) {
         found = true;
         return {
           ...u,
@@ -376,7 +380,16 @@ export class MockAuthService implements IAuthService {
     });
 
     if (!found) {
-      throw new AppError({ code: 'NOT_FOUND' as never, message: 'User not found', severity: 'warning' });
+      const newUser: MockRecord = {
+        id: `u-${Date.now()}`,
+        username: identifier,
+        fullName: fullName || identifier.split('@')[0],
+        email: identifier.toLowerCase().includes('@') ? identifier : `${identifier}@kvjanalytics.com`,
+        role: 'EMPLOYEE',
+        password: pwHash,
+        mustChangePassword: true,
+      };
+      updated.push(newUser);
     }
 
     saveStoredUsers(updated);

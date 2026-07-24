@@ -135,7 +135,7 @@ export function EmployeeDirectory() {
           onClick={async (e) => {
             e.stopPropagation();
             try {
-              await resetToDefaultPassword(r.email);
+              await resetToDefaultPassword(r.email, `${r.firstName} ${r.lastName}`);
               toast({
                 variant: 'success',
                 title: 'Password Reset',
