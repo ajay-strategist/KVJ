@@ -711,18 +711,29 @@ export const TaskWidget = memo(function TaskWidget({
     return `${h}h ${m}m ${s}s`;
   };
 
-  const handleDragStart = (idx: number) => {
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDraggedIndex(idx);
+    e.dataTransfer.setData('text/plain', String(idx));
+    e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === targetIdx) return;
-    const updated = [...tasks];
-    const [moved] = updated.splice(draggedIndex, 1);
-    updated.splice(targetIdx, 0, moved);
-    setDraggedIndex(targetIdx);
-    setTasks(updated);
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    const sourceIdxStr = e.dataTransfer.getData('text/plain');
+    const sourceIdx = sourceIdxStr !== '' ? parseInt(sourceIdxStr, 10) : draggedIndex;
+
+    if (sourceIdx !== null && !isNaN(sourceIdx) && sourceIdx !== targetIdx) {
+      const updated = [...tasks];
+      const [moved] = updated.splice(sourceIdx, 1);
+      updated.splice(targetIdx, 0, moved);
+      setTasks(updated);
+    }
+    setDraggedIndex(null);
   };
 
   return (
@@ -730,11 +741,16 @@ export const TaskWidget = memo(function TaskWidget({
       <SectionHeader title="Today's Tasks (Drag & Drop Reorder)" />
       <style>{`
         .task-card-hover {
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
+          transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
         }
         .task-card-hover:hover {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+        }
+        .task-card-dragging {
+          opacity: 0.5;
+          border: 2px dashed var(--brand) !important;
+          background: var(--bg-sunken) !important;
         }
       `}</style>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -747,14 +763,15 @@ export const TaskWidget = memo(function TaskWidget({
           <div
             key={t.id}
             draggable
-            onDragStart={() => handleDragStart(idx)}
-            onDragOver={(e) => handleDragOver(e, idx)}
+            onDragStart={(e) => handleDragStart(e, idx)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, idx)}
             onDragEnd={() => setDraggedIndex(null)}
-            className="task-card-hover"
+            className={`task-card-hover ${draggedIndex === idx ? 'task-card-dragging' : ''}`}
             style={{
               padding: 16,
               border: '1px solid var(--border)',
-              background: draggedIndex === idx ? 'var(--bg-hover)' : 'var(--bg-surface)',
+              background: 'var(--bg-surface)',
               borderRadius: 10,
               cursor: 'grab',
               display: 'flex',

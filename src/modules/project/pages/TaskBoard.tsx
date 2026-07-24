@@ -170,6 +170,19 @@ export function TaskBoard() {
     });
 
     if (res.ok) {
+      const newTaskItem: TaskItem = {
+        id: res.value.id,
+        name: res.value.title,
+        category: (values.category as any) || 'Project Task',
+        projectName: proj ? proj.title : (values.projectName as string) || 'General Project',
+        supervisor: (values.supervisor as string) || 'Manager (Operations)',
+        assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (values.assignee as string) || user?.fullName || 'Unassigned',
+        dueDate: res.value.dueDate || todayStr,
+        status: 'To Do',
+        totalHoursWorked: 0,
+        dailyTimeEntries: [],
+      };
+      setTasksList((prev) => [newTaskItem, ...prev]);
       toast({ variant: 'success', title: 'Task Created', message: `Task "${values.name}" created.` });
       setCreateTaskOpen(false);
     } else {
@@ -177,16 +190,69 @@ export function TaskBoard() {
     }
   };
 
-  const handleApproveTask = (id: string) => {
-    toast({ variant: 'success', title: 'Task Approved', message: 'Task is now active in assignee "To Do" queue.' });
+  const handleApproveTask = async (id: string) => {
+    setTasksList((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, status: 'To Do' } : x))
+    );
+    try {
+      await updateTask(id, { status: 'todo' });
+    } catch (e) {}
+    toast({ variant: 'success', title: 'Task Approved', message: 'Task is now active in To Do queue.' });
   };
 
-  const handleRejectTask = (id: string) => {
+  const handleRejectTask = async (id: string) => {
+    setTasksList((prev) => prev.filter((x) => x.id !== id));
     toast({ variant: 'warning', title: 'Task Rejected', message: 'Task creation request rejected.' });
   };
 
-  const handleAcceptTask = (id: string) => {
-    toast({ variant: 'success', title: 'Task Accepted', message: 'Task moved to "In Progress".' });
+  const handleStartTask = async (task: TaskItem) => {
+    const updatedAssignee = (task.assignee && task.assignee !== 'Unassigned') ? task.assignee : (user?.fullName || 'Assigned User');
+    setTasksList((prev) =>
+      prev.map((x) => (x.id === task.id ? { ...x, status: 'In Progress', assignee: updatedAssignee } : x))
+    );
+    try {
+      await updateTask(task.id, { status: 'in_progress' });
+    } catch (e) {
+      console.warn('Update task error:', e);
+    }
+    toast({ variant: 'success', title: 'Task Started', message: `Task "${task.name}" is now In Progress.` });
+  };
+
+  const handleAssignToMe = async (task: TaskItem) => {
+    const myName = user?.fullName || 'Admin User';
+    setTasksList((prev) =>
+      prev.map((x) => (x.id === task.id ? { ...x, assignee: myName } : x))
+    );
+    try {
+      await updateTask(task.id, { assigneeId: user?.id });
+    } catch (e) {
+      console.warn('Update task error:', e);
+    }
+    toast({ variant: 'success', title: 'Task Assigned', message: `Assigned task "${task.name}" to ${myName}.` });
+  };
+
+  const handleMarkComplete = async (task: TaskItem) => {
+    setTasksList((prev) =>
+      prev.map((x) => (x.id === task.id ? { ...x, status: 'Completed' } : x))
+    );
+    try {
+      await updateTask(task.id, { status: 'done' });
+    } catch (e) {
+      console.warn('Update task error:', e);
+    }
+    toast({ variant: 'success', title: 'Task Completed', message: `Task "${task.name}" marked complete.` });
+  };
+
+  const handleReopenTask = async (task: TaskItem) => {
+    setTasksList((prev) =>
+      prev.map((x) => (x.id === task.id ? { ...x, status: 'In Progress' } : x))
+    );
+    try {
+      await updateTask(task.id, { status: 'in_progress' });
+    } catch (e) {
+      console.warn('Update task error:', e);
+    }
+    toast({ variant: 'info', title: 'Task Reopened', message: `Task "${task.name}" moved back to In Progress.` });
   };
 
   const handleLogDailyTime = async (values: Record<string, unknown>) => {
@@ -477,35 +543,42 @@ export function TaskBoard() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Action: Accept Task */}
-                    {t.status === 'To Do' && isAssignee && (
-                      <Button size="sm" variant="success" onClick={() => handleAcceptTask(t.id)}>
-                        ✋ Accept Task
+                    {/* Action 1: Assign to Me */}
+                    {t.assignee === 'Unassigned' && (
+                      <Button size="sm" variant="secondary" onClick={() => handleAssignToMe(t)}>
+                        👤 Assign to Me
                       </Button>
                     )}
 
-                    {/* Action: Log Hours */}
+                    {/* Action 2: Start / Accept Task */}
+                    {(t.status === 'To Do' || t.status === 'Pending Approval') && (
+                      <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
+                        ▶️ Start Task
+                      </Button>
+                    )}
+
+                    {/* Action 3: Log Hours */}
                     {t.status === 'In Progress' && (
                       <Button size="sm" onClick={() => { setSelectedTask(t); setTimeEntryOpen(true); }}>
                         ⏱ Log Time
                       </Button>
                     )}
 
-                    {/* Action: Mark Complete */}
-                    {t.status === 'In Progress' && isSupervisorRole && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setTasksList((prev) => prev.map((x) => x.id === t.id ? { ...x, status: 'Completed' } : x));
-                          toast({ variant: 'success', title: 'Task Completed', message: `Task "${t.name}" marked complete.` });
-                        }}
-                      >
+                    {/* Action 4: Mark Complete */}
+                    {t.status === 'In Progress' && (
+                      <Button size="sm" variant="secondary" onClick={() => handleMarkComplete(t)}>
                         ✓ Mark Complete
                       </Button>
                     )}
 
-                    {/* Action: Edit Task */}
+                    {/* Action 5: Reopen Task */}
+                    {t.status === 'Completed' && (
+                      <Button size="sm" variant="secondary" onClick={() => handleReopenTask(t)}>
+                        ↩️ Reopen
+                      </Button>
+                    )}
+
+                    {/* Action 6: Edit Task */}
                     <Button
                       size="sm"
                       variant="secondary"
