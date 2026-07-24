@@ -83,14 +83,15 @@ export function Authorize({ roles, resource, action, fallback = null, children }
   return <>{byRole && byPerm ? children : fallback}</>;
 }
 
-/** Route guard: requires auth, and optionally a permission. Redirects otherwise. */
-export function ProtectedRoute({ resource, action, redirectTo = '/login', children }: {
-  resource?: Resource; action?: Action; redirectTo?: string; children: ReactNode;
+/** Route guard: requires auth, feature flag check, and optionally a permission. Redirects otherwise. */
+export function ProtectedRoute({ resource, action, featureFlag, redirectTo = '/login', children }: {
+  resource?: Resource; action?: Action; featureFlag?: boolean; redirectTo?: string; children: ReactNode;
 }) {
   const { status } = useAuth();
   const { can } = usePermissions();
   if (status === 'loading') return <AuthSplash />; // never a blank screen while auth resolves
   if (status === 'unauthenticated') return <Navigate to={redirectTo} replace />;
+  if (featureFlag === false) return <Navigate to="/app" replace />;
   if (resource && action && !can(resource, action)) return <Navigate to="/403" replace />;
   return <>{children}</>;
 }

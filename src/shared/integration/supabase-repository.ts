@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { IRepository } from '../../core/repository';
 import type { Actor, Entity, Page, QuerySpec, UUID } from '../../core/types';
-import { AppError } from '../../core/result';
+import { AppError, ErrorCode } from '../../core/result';
 
 /** Helper function to convert camelCase keys to snake_case */
 export function camelToSnake(str: string): string {
@@ -62,6 +62,15 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
 
     if (error) {
       console.error(`Supabase create error on ${this.tableName}:`, error);
+      if (error.code === 'PGRST301' || error.message.includes('JWT') || error.message.includes('expired')) {
+        throw new AppError({ code: ErrorCode.UNAUTHENTICATED, message: 'Authentication expired. Please log in again.', severity: 'warning' });
+      }
+      if (error.code === '42501' || error.message.includes('permission') || error.message.includes('policy')) {
+        throw new AppError({ code: ErrorCode.FORBIDDEN, message: 'Permission denied. You do not have permission for this database operation.', severity: 'warning' });
+      }
+      if (error.message.includes('fetch') || error.message.includes('network')) {
+        throw new AppError({ code: ErrorCode.INTEGRATION, message: 'Database connection or network error. Please verify your connection.', severity: 'error' });
+      }
       throw AppError.internal(error.message);
     }
     return toCamelCaseObject(inserted) as T;

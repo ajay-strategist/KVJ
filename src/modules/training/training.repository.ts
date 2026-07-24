@@ -138,9 +138,19 @@ export interface AlumniProfile extends Entity {
   testimonial?: string;
 }
 
+export interface College extends Entity {
+  code: string;
+  name: string;
+  location?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  isActive?: boolean;
+}
+
 export interface IStudentRepository extends IRepository<Student> {}
 export interface ICourseRepository extends IRepository<Course> {}
 export interface IBatchRepository extends IRepository<Batch> {}
+export interface ICollegeRepository extends IRepository<College> {}
 export interface IEnrollmentRepository extends IRepository<Enrollment> {}
 export interface ISessionAttendanceRepository extends IRepository<SessionAttendanceRecord> {
   findByBatch(batchId: UUID, dateStr: string): Promise<SessionAttendanceRecord[]>;
@@ -156,6 +166,7 @@ export interface IAlumniRepository extends IRepository<AlumniProfile> {}
 export const STUDENT_REPOSITORY_TOKEN = createToken<IStudentRepository>('StudentRepository');
 export const COURSE_REPOSITORY_TOKEN = createToken<ICourseRepository>('CourseRepository');
 export const BATCH_REPOSITORY_TOKEN = createToken<IBatchRepository>('BatchRepository');
+export const COLLEGE_REPOSITORY_TOKEN = createToken<ICollegeRepository>('CollegeRepository');
 export const ENROLLMENT_REPOSITORY_TOKEN = createToken<IEnrollmentRepository>('EnrollmentRepository');
 export const SESSION_ATTENDANCE_REPOSITORY_TOKEN = createToken<ISessionAttendanceRepository>('SessionAttendanceRepository');
 export const ASSESSMENT_REPOSITORY_TOKEN = createToken<IAssessmentRepository>('AssessmentRepository');

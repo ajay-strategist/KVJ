@@ -7,6 +7,8 @@ import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
+import { STUDENT_REPOSITORY_TOKEN } from '../training.repository';
+import type { Page } from '../../../core/types';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { usePermissions } from '../../../shared/permissions/react';
 import { todayISO } from '../../../shared/utils/date';
@@ -922,7 +924,7 @@ export function BatchManagement() {
     }
   };
 
-  // Student list state — initialized from and saved to localStorage
+  // Student list state — initialized from and saved to localStorage with DB sync fallback
   const [students, setStudents] = useState<StudentRecord[]>(() => {
     try {
       const saved = localStorage.getItem('kvj.batch.students');
@@ -931,6 +933,41 @@ export function BatchManagement() {
       return [];
     }
   });
+
+  useEffect(() => {
+    let active = true;
+    try {
+      const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
+      repo.findMany().then((p: Page<any>) => {
+        if (!active) return;
+        if (p.data && p.data.length > 0) {
+          const mapped: StudentRecord[] = p.data.map((s: any) => ({
+            id: s.id,
+            name: s.fullName || `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student',
+            photo: s.photoUrl || s.photo || '🎓',
+            photoUrl: s.photoUrl,
+            phone: s.phone || '',
+            email: s.email || '',
+            college: s.college || 'Christ Irinjalakkuda',
+            department: s.department || 'BBA',
+            attendancePct: s.attendancePct ?? 100,
+            attendanceStatus: s.attendanceStatus || 'Regular',
+            ass1: s.ass1 ?? 0,
+            ass2: s.ass2 ?? 0,
+            ass3: s.ass3 ?? 0,
+            project: s.project ?? 0,
+            finalExam: s.finalExam ?? 0,
+            overallScore: s.overallScore ?? 0,
+            voucherId: s.voucherId || 'VOUCH-001',
+            voucherStatus: s.voucherStatus || 'unassigned',
+            certificateStatus: s.certificateStatus || 'unissued',
+          }));
+          setStudents(mapped);
+        }
+      }).catch(() => {});
+    } catch {}
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem('kvj.batch.students', JSON.stringify(students)); } catch {}

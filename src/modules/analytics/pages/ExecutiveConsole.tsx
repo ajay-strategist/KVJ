@@ -66,7 +66,7 @@ export function ExecutiveConsole() {
         </div>
         <p style={{ lineHeight: 1.6, color: 'var(--text-primary)', margin: 0, fontSize: 13.5 }}>
           {aiSummary ||
-            'Operations run at 94.2% efficiency across 12 active training batches. Attendance correlates strongly (+0.84) with final assessment scores. Top performance recorded at Christ University B3.'}
+            'Executive Operations Console: Monitor real-time training efficiency, student attendance, assessment results, and operational performance metrics.'}
         </p>
       </Card>
 
@@ -74,29 +74,25 @@ export function ExecutiveConsole() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <StatCard
           label="ACTIVE TRAINING BATCHES"
-          value={metrics?.activeCourses ?? 12}
-          delta={{ value: '+14% vs last mo', up: true }}
+          value={metrics?.activeCourses !== undefined ? metrics.activeCourses : 'No data available'}
           tone="progress"
           icon="🎓"
         />
         <StatCard
-          label="AVERAGE ATTENDANCE RATE"
-          value="93.8%"
-          delta={{ value: '+2.4% vs benchmark', up: true }}
+          label="ACTIVE CLIENT PROJECTS"
+          value={metrics?.activeProjects !== undefined ? metrics.activeProjects : 'No data available'}
           tone="success"
           icon="📊"
         />
         <StatCard
-          label="ASSESSMENT PASS RATE"
-          value="89.2%"
-          delta={{ value: '+4.1% vs last quarter', up: true }}
+          label="TOTAL STAFF & EMPLOYEES"
+          value={metrics?.totalEmployees !== undefined ? metrics.totalEmployees : 'No data available'}
           tone="purple"
           icon="📝"
         />
         <StatCard
-          label="ON-TIME CERTIFICATE DELIVERY"
-          value="96.5%"
-          delta={{ value: '+1.2%', up: true }}
+          label="TOTAL BUDGET ALLOCATED"
+          value={metrics?.totalBudgetsAllocated !== undefined ? `₹${metrics.totalBudgetsAllocated.toLocaleString()}` : 'No data available'}
           tone="info"
           icon="📜"
         />

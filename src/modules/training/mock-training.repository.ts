@@ -4,6 +4,7 @@ import type {
   Student, IStudentRepository,
   Course, ICourseRepository,
   Batch, IBatchRepository,
+  College, ICollegeRepository,
   Enrollment, IEnrollmentRepository,
   SessionAttendanceRecord, ISessionAttendanceRepository,
   AssessmentRecord, IAssessmentRepository,
@@ -135,4 +136,8 @@ export class MockReferralRepository extends MemoryRepository<ReferralRecord> imp
 
 export class MockAlumniRepository extends MemoryRepository<AlumniProfile> implements IAlumniRepository {
   constructor() { super({ defaultStatus: 'placed', pageSize: 20 }, [], 'MockAlumniRepository'); }
+}
+
+export class MockCollegeRepository extends MemoryRepository<College> implements ICollegeRepository {
+  constructor() { super({ defaultStatus: 'active', pageSize: 20 }, [], 'MockCollegeRepository'); }
 }

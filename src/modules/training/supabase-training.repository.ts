@@ -5,6 +5,7 @@ import type {
   Student, IStudentRepository,
   Course, ICourseRepository,
   Batch, IBatchRepository,
+  College, ICollegeRepository,
   Enrollment, IEnrollmentRepository,
   SessionAttendanceRecord, ISessionAttendanceRepository,
   AssessmentRecord, IAssessmentRepository,
@@ -24,6 +25,10 @@ export class SupabaseCourseRepository extends SupabaseRepository<Course> impleme
 
 export class SupabaseBatchRepository extends SupabaseRepository<Batch> implements IBatchRepository {
   constructor() { super('batches'); }
+}
+
+export class SupabaseCollegeRepository extends SupabaseRepository<College> implements ICollegeRepository {
+  constructor() { super('colleges'); }
 }
 
 export class SupabaseEnrollmentRepository extends SupabaseRepository<Enrollment> implements IEnrollmentRepository {

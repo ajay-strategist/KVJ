@@ -1,6 +1,8 @@
 import { container } from '../core/registry';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../modules/employee/employee.repository';
 import { AUTH_SERVICE_TOKEN, MockAuthService } from '../modules/auth/auth.service';
+import { SupabaseAuthService } from '../modules/auth/supabase-auth.service';
+import { appConfig } from '../config/app-config';
 import { registerDemoWidgets } from './widgets/demo-widgets';
 import { MockEmployeeRepository } from '../modules/employee/mock-employee.repository';
 import { EMPLOYEE_SERVICE_TOKEN, EmployeeService } from '../modules/employee/employee.service';
@@ -39,6 +41,7 @@ import {
   STUDENT_REPOSITORY_TOKEN,
   COURSE_REPOSITORY_TOKEN,
   BATCH_REPOSITORY_TOKEN,
+  COLLEGE_REPOSITORY_TOKEN,
   ENROLLMENT_REPOSITORY_TOKEN,
   SESSION_ATTENDANCE_REPOSITORY_TOKEN,
   ASSESSMENT_REPOSITORY_TOKEN,
@@ -51,6 +54,7 @@ import {
   MockStudentRepository,
   MockCourseRepository,
   MockBatchRepository,
+  MockCollegeRepository,
   MockEnrollmentRepository,
   MockSessionAttendanceRepository,
   MockAssessmentRepository,
@@ -63,6 +67,7 @@ import {
   SupabaseStudentRepository,
   SupabaseCourseRepository,
   SupabaseBatchRepository,
+  SupabaseCollegeRepository,
   SupabaseEnrollmentRepository,
   SupabaseSessionAttendanceRepository,
   SupabaseAssessmentRepository,
@@ -207,6 +212,7 @@ export function bootstrap() {
   container.register(STUDENT_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseStudentRepository() : new MockStudentRepository());
   container.register(COURSE_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseCourseRepository() : new MockCourseRepository());
   container.register(BATCH_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseBatchRepository() : new MockBatchRepository());
+  container.register(COLLEGE_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseCollegeRepository() : new MockCollegeRepository());
   container.register(ENROLLMENT_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseEnrollmentRepository() : new MockEnrollmentRepository());
   container.register(SESSION_ATTENDANCE_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseSessionAttendanceRepository() : new MockSessionAttendanceRepository());
   container.register(ASSESSMENT_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseAssessmentRepository() : new MockAssessmentRepository());
@@ -253,8 +259,7 @@ export function bootstrap() {
   container.register(PROJECT_SERVICE_TOKEN, () => new ProjectService());
   container.register(FINANCE_SERVICE_TOKEN, () => new FinanceService());
   container.register(COMMUNICATION_SERVICE_TOKEN, () => new CommunicationService());
-  container.register(ANALYTICS_SERVICE_TOKEN, () => new AnalyticsService());
-  container.register(AUTH_SERVICE_TOKEN, () => new MockAuthService());
+  container.register(AUTH_SERVICE_TOKEN, () => (appConfig.integrations.supabaseEnabled ? new SupabaseAuthService() : new MockAuthService()));
 
   // Register platform engines
   container.register(WORKFLOW_ENGINE_TOKEN, () => new WorkflowEngine());
