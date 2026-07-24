@@ -20,6 +20,7 @@ import { container } from '../../../core/registry';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attendance.repository';
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
 import { toLocalISODate } from '../../../shared/utils/date';
+import { supabase } from '../../../shared/integration/supabase';
 
 function Greeting() {
   const { user } = useAuth();
@@ -824,16 +825,86 @@ export const TaskWidget = memo(function TaskWidget({
 
 export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
   const [selectedDay, setSelectedDay] = useState<number>(0);
+  const { tasks } = useProject();
+  const [dbSchedules, setDbSchedules] = useState<any[]>([]);
 
-  const upcoming7Days = [
-    { day: 'Day 1 (Today)', events: [{ id: 'e1', time: '10:00 AM', title: 'Power BI Session - Christ 3BBA', type: 'Training' }] },
-    { day: 'Day 2 (Tomorrow)', events: [{ id: 'e2', time: '11:30 AM', title: 'Monthly Expense Approval Deadline', type: 'Finance' }] },
-    { day: 'Day 3 (Thu)', events: [{ id: 'e3', time: '02:00 PM', title: 'Rajagiri College Marketing Presentation', type: 'Marketing' }] },
-    { day: 'Day 4 (Fri)', events: [{ id: 'e4', time: '09:30 AM', title: 'Client Requirement Sync - Apex Analytics', type: 'Projects' }] },
-    { day: 'Day 5 (Sat)', events: [{ id: 'e5', time: '04:00 PM', title: 'Weekly Sprint & Progress Standup', type: 'Office' }] },
-    { day: 'Day 6 (Sun)', events: [{ id: 'e6', time: 'Off Day', title: 'Sunday Weekly Rest', type: 'Holiday' }] },
-    { day: 'Day 7 (Mon)', events: [{ id: 'e7', time: '10:00 AM', title: 'New Training Batch Orientation (Vimala College)', type: 'Training' }] },
-  ];
+  useEffect(() => {
+    async function loadSchedules() {
+      try {
+        const saved = localStorage.getItem('kvj_schedule_sessions');
+        let local: any[] = saved ? JSON.parse(saved) : [];
+        const { data } = await supabase.from('schedule_sessions').select('*').is('deleted_at', null);
+        const mergedMap = new Map();
+        local.forEach((s) => mergedMap.set(s.id, s));
+        if (data) {
+          data.forEach((r: any) => {
+            mergedMap.set(r.id, {
+              id: r.id,
+              date: r.date,
+              startTime: r.start_time || '09:00 AM',
+              title: r.session_title || r.topic || 'Training Session',
+              type: 'Training',
+            });
+          });
+        }
+        setDbSchedules(Array.from(mergedMap.values()));
+      } catch (e) {}
+    }
+    loadSchedules();
+  }, []);
+
+  const upcoming7Days = useMemo(() => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const result = [];
+    const today = new Date();
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+      const isoDate = toLocalISODate(d);
+
+      let dayLabel = `Day ${i + 1} (${dayNames[d.getDay()]})`;
+      if (i === 0) dayLabel = 'Day 1 (Today)';
+      else if (i === 1) dayLabel = 'Day 2 (Tomorrow)';
+
+      // 1. Gather tasks due on this date
+      const dayTasks = tasks.filter((t) => t.dueDate === isoDate).map((t) => ({
+        id: `task-${t.id}`,
+        time: t.status === 'done' ? 'Completed' : 'Due Today',
+        title: `Task: ${t.title}`,
+        type: 'Projects' as const,
+      }));
+
+      // 2. Gather training schedules on this date
+      const daySchedules = dbSchedules.filter((s) => s.date === isoDate).map((s) => ({
+        id: `sched-${s.id}`,
+        time: s.startTime || s.time || '09:00 AM',
+        title: s.name || s.title || 'Training Session',
+        type: 'Training' as const,
+      }));
+
+      const isSunday = d.getDay() === 0;
+      const combinedEvents = [...dayTasks, ...daySchedules];
+
+      if (combinedEvents.length === 0 && isSunday) {
+        combinedEvents.push({
+          id: `sun-${isoDate}`,
+          time: 'Off Day',
+          title: 'Sunday Weekly Rest',
+          type: 'Holiday' as any,
+        });
+      }
+
+      result.push({
+        day: dayLabel,
+        isoDate,
+        events: combinedEvents,
+      });
+    }
+
+    return result;
+  }, [tasks, dbSchedules]);
+
+  const currentDayEvents = upcoming7Days[selectedDay]?.events || [];
 
   return (
     <Card>
@@ -862,15 +933,21 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {upcoming7Days[selectedDay].events.map((e) => (
-          <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>🕒 {e.time}</div>
-            </div>
-            <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Finance' ? 'warning' : e.type === 'Marketing' ? 'progress' : 'success'}>{e.type}</Badge>
+        {currentDayEvents.length === 0 ? (
+          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            No scheduled events or tasks due on this day.
           </div>
-        ))}
+        ) : (
+          currentDayEvents.map((e) => (
+            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>🕒 {e.time}</div>
+              </div>
+              <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Projects' ? 'progress' : 'neutral'}>{e.type}</Badge>
+            </div>
+          ))
+        )}
       </div>
     </Card>
   );
