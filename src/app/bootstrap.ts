@@ -15,7 +15,7 @@ import { LEAVE_SERVICE_TOKEN, LeaveService } from '../modules/leave/leave.servic
 import { SupabaseEmployeeRepository } from '../modules/employee/supabase-employee.repository';
 import { SupabaseAttendanceRepository } from '../modules/attendance/supabase-attendance.repository';
 import { SupabaseLeaveRepository } from '../modules/leave/supabase-leave.repository';
-import { usesSupabase } from '../config/feature-flags';
+import { usesSupabase, isSupabaseConfigured } from '../config/feature-flags';
 
 // Import platform engines
 import { WORKFLOW_ENGINE_TOKEN, WorkflowEngine } from '../core/engines/workflow';
@@ -186,6 +186,14 @@ import {
 
 
 export function bootstrap() {
+  if (isSupabaseConfigured()) {
+    console.info('[Nexus Platform] Live Supabase PostgreSQL database persistence is ACTIVE.');
+  } else {
+    console.warn(
+      '[Nexus Platform] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY environment variables are unconfigured or pointing to mock-project. Running in Local Storage Fallback Mode to prevent crashes.'
+    );
+  }
+
   // Per-module cutover: a module resolves Supabase only when the master switch
   // AND its own flag are on (i.e. once its tables actually exist). Everything
   // else keeps using the in-memory mocks, so a partly-migrated database can
