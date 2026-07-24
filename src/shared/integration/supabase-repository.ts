@@ -71,11 +71,32 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
     };
     const dbPayload = toSnakeCaseObject(rawPayload);
 
-    const { data: inserted, error } = await supabase
+    let { data: inserted, error } = await supabase
       .from(this.tableName)
       .insert(dbPayload)
       .select()
       .single();
+
+    // Self-healing schema retry: if Supabase table is missing an optional column, strip it and retry
+    let retries = 5;
+    while (error && error.message.includes('Could not find the') && retries > 0) {
+      retries--;
+      const match = error.message.match(/Could not find the '([^']+)' column/);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Supabase table ${this.tableName} missing column '${missingCol}'. Stripping and retrying.`);
+        delete dbPayload[missingCol];
+        const retryRes = await supabase
+          .from(this.tableName)
+          .insert(dbPayload)
+          .select()
+          .single();
+        inserted = retryRes.data;
+        error = retryRes.error;
+      } else {
+        break;
+      }
+    }
 
     if (error) {
       console.error(`Supabase create error on ${this.tableName}:`, error);
@@ -116,12 +137,34 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
     };
     const dbPayload = toSnakeCaseObject(rawPayload);
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from(this.tableName)
       .update(dbPayload)
       .eq('id', id)
       .select()
       .single();
+
+    // Self-healing schema retry for update
+    let retries = 5;
+    while (error && error.message.includes('Could not find the') && retries > 0) {
+      retries--;
+      const match = error.message.match(/Could not find the '([^']+)' column/);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Supabase table ${this.tableName} missing column '${missingCol}'. Stripping and retrying.`);
+        delete dbPayload[missingCol];
+        const retryRes = await supabase
+          .from(this.tableName)
+          .update(dbPayload)
+          .eq('id', id)
+          .select()
+          .single();
+        data = retryRes.data;
+        error = retryRes.error;
+      } else {
+        break;
+      }
+    }
 
     if (error) {
       console.error(`Supabase update error on ${this.tableName}:`, error);
