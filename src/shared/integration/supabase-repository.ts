@@ -87,12 +87,24 @@ function stripInvalidId(payload: Record<string, unknown>): Record<string, unknow
   return payload;
 }
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export class SupabaseRepository<T extends Entity> implements IRepository<T> {
   constructor(protected tableName: string) {}
 
   async create(data: Partial<T>, actor: Actor): Promise<T> {
     const ts = new Date().toISOString();
     const rawPayload = {
+      id: data.id || generateUUID(),
       ...data,
       createdAt: ts,
       updatedAt: ts,
