@@ -347,7 +347,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   return (
     <AppShell>
       <PageHeader
-        title={activeTab === 'colleges' ? 'Colleges Catalog' : 'Courses Catalog'}
+        title="Courses & Colleges"
         subtitle={
           activeTab === 'colleges'
             ? 'Manage affiliated colleges, locations, head details, and contact information'
