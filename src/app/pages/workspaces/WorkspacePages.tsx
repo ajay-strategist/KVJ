@@ -1103,10 +1103,35 @@ function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; l
 export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
+  const { tasks: projectTasks, projects, createTask } = useProject();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
+
+  useEffect(() => {
+    const todayStr = toLocalISODate(new Date());
+    const mapped: TaskItem[] = projectTasks
+      .filter((t) => t.dueDate === todayStr || t.status === 'in_progress' || t.status === 'todo')
+      .map((t) => {
+        const proj = projects.find((p) => p.id === t.projectId);
+        return {
+          id: t.id,
+          title: t.title,
+          project: proj ? proj.title : 'General Project',
+          due: t.dueDate || todayStr,
+          priority: t.priority === 'high' ? 'High' : 'Normal',
+          active: t.status === 'in_progress',
+          underReview: t.status === 'review',
+          secondsToday: (t.actualHours || 0) * 3600,
+        };
+      });
+
+    if (mapped.length > 0) {
+      setTasks(mapped);
+    }
+  }, [projectTasks, projects]);
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1142,6 +1167,35 @@ export function MyDayPage() {
     handleActivityLog(`Submitted for Manager Review: ${taskTitle}`, 'success');
   };
 
+  const handleCreateTaskSubmit = async (values: Record<string, unknown>) => {
+    const todayStr = toLocalISODate(new Date());
+    const title = (values.name as string) || 'New Task';
+    const projName = (values.projectName as string) || 'General Project';
+
+    const proj = projects.find((p) => p.title === projName || p.id === values.projectId);
+    const res = await createTask({
+      projectId: proj?.id,
+      title,
+      dueDate: todayStr,
+      status: 'todo',
+      priority: 'medium',
+    });
+
+    const newTaskItem: TaskItem = {
+      id: res.ok ? res.value.id : String(Date.now()),
+      title,
+      project: projName,
+      due: todayStr,
+      priority: 'Normal',
+      active: false,
+      secondsToday: 0,
+    };
+
+    setTasks((prev) => [newTaskItem, ...prev]);
+    toast({ variant: 'success', title: 'Task Created', message: `Task "${title}" added to Today's Tasks.` });
+    setCreateTaskOpen(false);
+  };
+
   useEffect(() => {
     if (!loading) {
       setIsInitialLoad(false);
@@ -1162,7 +1216,7 @@ export function MyDayPage() {
 
       {/* Quick Actions + Resized Metrics. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-        <ResizedQuickAction icon="✓" label="Add Task" />
+        <ResizedQuickAction icon="✓" label="Add Task" onClick={() => setCreateTaskOpen(true)} />
         <ResizedQuickAction icon="₹" label="Submit Expense" />
         <ResizedQuickAction icon="🗓" label="Request Leave" />
         <ResizedStatPill label="Tasks Due" value={`${tasks.filter(t => !t.underReview).length}`} tone="warning" icon="◧" />
@@ -1202,6 +1256,18 @@ export function MyDayPage() {
           <TimelineWidget entries={timelineEntries} />
         </div>
       </div>
+
+      {/* Create Task Drawer */}
+      <Drawer open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Create New Task">
+        <Form initial={{ category: 'Office Task' }} onSubmit={handleCreateTaskSubmit}>
+          <TextField name="name" label="Task Title *" placeholder="e.g. Cross check each features" />
+          <TextField name="projectName" label="Project Name / Department" placeholder="e.g. Flow Desk" />
+          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
+            <Button type="submit">Create Task</Button>
+          </div>
+        </Form>
+      </Drawer>
     </AppShell>
   );
 }
