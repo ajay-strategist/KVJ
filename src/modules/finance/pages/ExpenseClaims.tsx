@@ -287,7 +287,21 @@ export function ExpenseClaims() {
     }
   };
 
-  const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '');
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>(isManagement ? 'all' : (user?.fullName || 'me'));
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((exp) => {
+      if (!isManagement) {
+        return exp.person.toLowerCase() === (user?.fullName || '').toLowerCase();
+      }
+      if (selectedPersonFilter !== 'all') {
+        return exp.person.toLowerCase() === selectedPersonFilter.toLowerCase();
+      }
+      return true;
+    });
+  }, [expenses, isManagement, selectedPersonFilter, user]);
 
   const handleExpenseSubmit = (values: Record<string, unknown>) => {
     const isSelfTravel = values.expenseType === 'Self Travel';
@@ -403,6 +417,34 @@ export function ExpenseClaims() {
 
       {/* Expense Claims Table */}
       <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+            📋 Expense Claims ({filteredExpenses.length})
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Filter Employee:</span>
+            {isManagement ? (
+              <select
+                className="kvj-select"
+                value={selectedPersonFilter}
+                onChange={(e) => setSelectedPersonFilter(e.target.value)}
+                style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
+              >
+                <option value="all">👥 All Employees (Expenses)</option>
+                {user?.fullName && <option value={user.fullName}>👤 My Claims ({user.fullName})</option>}
+                {Array.from(new Set(expenses.map((e) => e.person))).map((person) => {
+                  if (person === user?.fullName) return null;
+                  return <option key={person} value={person}>{person}</option>;
+                })}
+              </select>
+            ) : (
+              <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-xs)', background: 'var(--bg-sunken)', border: '1px solid var(--border)', color: 'var(--brand)' }}>
+                👤 {user?.fullName || 'My Claims Only'}
+              </span>
+            )}
+          </div>
+        </div>
+
         <div style={{ overflowX: 'auto' }}>
           <table className="kvj-table">
             <thead>
@@ -419,7 +461,7 @@ export function ExpenseClaims() {
               </tr>
             </thead>
             <tbody>
-              {expenses.map((exp) => {
+              {filteredExpenses.map((exp) => {
                 const isLocked = exp.status === 'approved';
                 return (
                   <tr key={exp.id}>

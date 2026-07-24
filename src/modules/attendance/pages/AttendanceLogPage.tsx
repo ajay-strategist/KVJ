@@ -67,7 +67,7 @@ export function AttendanceLogPage() {
         let records: AttendanceRecord[] = [];
         let claims: ExpenseClaim[] = [];
 
-        if (selectedEmployee === 'All Employees') {
+        if (isManagement && selectedEmployee === 'All Employees') {
           const allRes = await attendanceRepo.findMany();
           records = allRes.data.filter(r => r.workDate >= range.from && r.workDate <= range.to);
           const allClaims = await expenseRepo.findMany();

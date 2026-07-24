@@ -125,6 +125,10 @@ export function TaskBoard() {
     setTasksList(mappedTasks);
   }, [mappedTasks]);
 
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const [selectedAssignee, setSelectedAssignee] = useState<string>(isManagement ? 'all' : (user?.fullName || 'me'));
+
   const windowEnd = useMemo(() => addDaysISO(3), []);
 
   const pendingApprovalTasks = useMemo(
@@ -134,8 +138,26 @@ export function TaskBoard() {
 
   const sortedTasks = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
+    const myName = (user?.fullName || '').toLowerCase();
+
     const filtered = tasksList.filter((t) => {
       if (t.status === 'Pending Approval') return false;
+
+      // User-level filtering: regular employees see only their assigned/supervised tasks
+      if (!isManagement) {
+        const isMyTask =
+          t.assignee.toLowerCase() === myName ||
+          t.supervisor.toLowerCase() === myName ||
+          t.approvedBy?.toLowerCase() === myName;
+        if (!isMyTask) return false;
+      } else if (selectedAssignee !== 'all') {
+        const target = selectedAssignee.toLowerCase();
+        const matchesTarget =
+          t.assignee.toLowerCase() === target ||
+          t.supervisor.toLowerCase() === target;
+        if (!matchesTarget) return false;
+      }
+
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       if (dateWindowFilter === 'today') {
         if (t.dueDate !== todayStr) return false;
@@ -154,7 +176,7 @@ export function TaskBoard() {
     return filtered.sort((a, b) =>
       sortOrder === 'asc' ? a.dueDate.localeCompare(b.dueDate) : b.dueDate.localeCompare(a.dueDate)
     );
-  }, [tasksList, categoryFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
+  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
     const proj = projects.find((p) => p.title === values.projectName || p.id === values.projectId);
@@ -433,6 +455,34 @@ export function TaskBoard() {
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {isManagement ? (
+              <select
+                value={selectedAssignee}
+                onChange={(e) => setSelectedAssignee(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">👥 All Employees (Tasks)</option>
+                {user?.fullName && <option value={user.fullName}>👤 My Tasks ({user.fullName})</option>}
+                {employees.map((e) => {
+                  const name = `${e.firstName} ${e.lastName}`;
+                  if (name === user?.fullName) return null;
+                  return <option key={e.id} value={name}>{name}</option>;
+                })}
+              </select>
+            ) : (
+              <span style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-sunken)', border: '1px solid var(--border)', color: 'var(--brand)' }}>
+                👤 {user?.fullName || 'My Tasks Only'}
+              </span>
+            )}
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as any)}

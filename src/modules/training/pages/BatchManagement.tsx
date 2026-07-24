@@ -12,6 +12,7 @@ import { normalizeStudentKey } from '../supabase-training.repository';
 import type { Page } from '../../../core/types';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { usePermissions } from '../../../shared/permissions/react';
+import { useAuth } from '../../auth/AuthProvider';
 import { todayISO } from '../../../shared/utils/date';
 import { makeDailyReportFixture } from '../report/daily-report.fixture';
 import { DailyReportBuilderModal } from '../report/DailyReportBuilderModal';
@@ -108,6 +109,9 @@ interface DocumentItem {
 
 export function BatchManagement() {
   const { can } = usePermissions();
+  const { user } = useAuth();
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const canCreateBatch = ['ADMIN', 'MANAGER', 'CEO'].includes(userRole);
   const canViewDailyReport = can('training', 'view');
   const { batches, courses, createBatch } = useTraining();
   const { toast } = useNotifications();
@@ -2860,9 +2864,11 @@ export function BatchManagement() {
           </p>
         </div>
 
-        <Button onClick={() => setCreateBatchModalOpen(true)}>
-          ➕ Add New Batch
-        </Button>
+        {canCreateBatch && (
+          <Button onClick={() => setCreateBatchModalOpen(true)}>
+            ➕ Add New Batch
+          </Button>
+        )}
       </div>
 
       {/* Training Batch Overview Carousel — one card per assigned batch.
