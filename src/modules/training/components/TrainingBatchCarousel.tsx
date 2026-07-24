@@ -54,6 +54,7 @@ export interface BatchCardVM {
   completedTasks: number;
   totalTasks: number;
   progress: number; // 0–100
+  courseChecklist?: string[];
 }
 
 export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): BatchCardVM {
@@ -77,6 +78,7 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
     completedTasks: done,
     totalTasks:     total,
     progress:       total > 0 ? Math.round((done / total) * 100) : 0,
+    courseChecklist: course?.checklist && course.checklist.length > 0 ? course.checklist : undefined,
   };
 }
 
@@ -89,17 +91,43 @@ function loadPrefs(): Prefs {
 
 // ── Workflow Checklist Items (per card) ────────────────────────────
 interface ChecklistTask { id: string; label: string; done: boolean }
-function defaultChecklist(batchId: string): ChecklistTask[] {
-  return [
-    { id: `${batchId}-cl-1`, label: 'College Confirmation Form Signed', done: false },
-    { id: `${batchId}-cl-2`, label: 'Trainer Assigned',                  done: false },
-    { id: `${batchId}-cl-3`, label: 'Student Registry Uploaded',          done: false },
-    { id: `${batchId}-cl-4`, label: 'Syllabus Dispatched',                done: false },
-    { id: `${batchId}-cl-5`, label: 'Daily Sessions Logged',              done: false },
-    { id: `${batchId}-cl-6`, label: 'Final Report Generated',             done: false },
-    { id: `${batchId}-cl-7`, label: 'Certificates Dispatched',            done: false },
-    { id: `${batchId}-cl-8`, label: 'Signed Receipt Uploaded',            done: false },
-  ];
+
+const DEFAULT_FALLBACK_CHECKLIST = [
+  'College Confirmation Form Signed',
+  'Trainer Assigned',
+  'Student Registry Uploaded',
+  'Syllabus Dispatched',
+  'Daily Sessions Logged',
+  'Final Report Generated',
+  'Certificates Dispatched',
+  'Signed Receipt Uploaded',
+];
+
+function getBatchChecklist(batchId: string, courseChecklist?: string[]): ChecklistTask[] {
+  const items = (courseChecklist && courseChecklist.length > 0)
+    ? courseChecklist
+    : DEFAULT_FALLBACK_CHECKLIST;
+
+  return items.map((label, idx) => ({
+    id: `${batchId}-cl-${idx + 1}`,
+    label,
+    done: false,
+  }));
+}
+
+const CHECKLIST_DONE_KEY = 'kvj.batchCards.checklistDone.v1';
+function loadChecklistDoneState(batchId: string): Record<string, boolean> {
+  try {
+    const all = JSON.parse(localStorage.getItem(CHECKLIST_DONE_KEY) ?? '{}');
+    return all[batchId] ?? {};
+  } catch { return {}; }
+}
+function saveChecklistDoneState(batchId: string, state: Record<string, boolean>) {
+  try {
+    const all = JSON.parse(localStorage.getItem(CHECKLIST_DONE_KEY) ?? '{}');
+    all[batchId] = state;
+    localStorage.setItem(CHECKLIST_DONE_KEY, JSON.stringify(all));
+  } catch { /* noop */ }
 }
 
 // ── Individual Batch Card Component (Side-by-Side with Right Checklist Panel) ──
@@ -118,7 +146,18 @@ const BatchCard = memo(function BatchCard({
   onEdit?: (id: string) => void;
 }) {
   const [showAllChecklist, setShowAllChecklist] = useState(true);
-  const [checklist, setChecklist] = useState(() => defaultChecklist(vm.id));
+  const [checklist, setChecklist] = useState(() => {
+    const base = getBatchChecklist(vm.id, vm.courseChecklist);
+    const saved = loadChecklistDoneState(vm.id);
+    return base.map((t) => ({ ...t, done: saved[t.label] ?? false }));
+  });
+
+  useEffect(() => {
+    const base = getBatchChecklist(vm.id, vm.courseChecklist);
+    const saved = loadChecklistDoneState(vm.id);
+    setChecklist(base.map((t) => ({ ...t, done: saved[t.label] ?? false })));
+  }, [vm.id, vm.courseChecklist]);
+
   const tone = PHASE_TONE[vm.phase];
 
   const visibleChecklist = showAllChecklist
@@ -128,7 +167,13 @@ const BatchCard = memo(function BatchCard({
   const totalCount = checklist.length;
 
   const toggleTask = (id: string) => {
-    setChecklist((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
+    setChecklist((prev) => {
+      const next = prev.map((t) => t.id === id ? { ...t, done: !t.done } : t);
+      const stateObj: Record<string, boolean> = {};
+      next.forEach((t) => { stateObj[t.label] = t.done; });
+      saveChecklistDoneState(vm.id, stateObj);
+      return next;
+    });
   };
 
   const borderColor = active
