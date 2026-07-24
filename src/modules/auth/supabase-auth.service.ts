@@ -38,7 +38,7 @@ import {
 
 /** Columns needed to build an AuthUser from an employee row. */
 const PROFILE_COLUMNS =
-  'id, employee_id, username, first_name, last_name, email, phone, designation, role, avatar_url, must_change_password, departments!department_id(name)';
+  'id, employee_id, username, first_name, last_name, email, phone, designation, role, avatar_url, must_change_password';
 
 interface EmployeeProfileRow {
   id: string;
@@ -52,14 +52,6 @@ interface EmployeeProfileRow {
   role: string | null;
   avatar_url: string | null;
   must_change_password: boolean | null;
-  departments?: { name: string | null } | { name: string | null }[] | null;
-}
-
-function departmentName(row: EmployeeProfileRow): string | undefined {
-  const d = row.departments;
-  if (!d) return undefined;
-  const rec = Array.isArray(d) ? d[0] : d;
-  return rec?.name ?? undefined;
 }
 
 function toAuthUser(row: EmployeeProfileRow, fallbackEmail: string): AuthUser {
@@ -71,7 +63,6 @@ function toAuthUser(row: EmployeeProfileRow, fallbackEmail: string): AuthUser {
     email: row.email ?? fallbackEmail,
     phone: row.phone ?? undefined,
     designation: row.designation ?? undefined,
-    department: departmentName(row),
     role: (row.role ?? 'EMPLOYEE') as RoleKey,
     avatarUrl: row.avatar_url ?? undefined,
     mustChangePassword: row.must_change_password ?? false,
