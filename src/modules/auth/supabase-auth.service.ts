@@ -28,7 +28,6 @@ import { AppError } from '../../core/result';
 import { businessRules } from '../../config/business-rules';
 import { supabase } from '../../shared/integration/supabase';
 import {
-  MockAuthService,
   type AuthUser,
   type BootstrapAdminInput,
   type Credentials,
@@ -160,29 +159,35 @@ export class SupabaseAuthService implements IAuthService {
     };
   }
 
-  private fallbackMock = new MockAuthService();
-
+  /**
+   * There is deliberately NO fallback to MockAuthService here.
+   *
+   * A fallback re-creates two defects at once:
+   *  1. SECURITY — the mock keeps its user list in localStorage and issues an
+   *     unsigned session, so anyone could forge an ADMIN login.
+   *  2. DATA — the mock issues ids like 'u-admin', which are not UUIDs. Those
+   *     flow into created_by/updated_by and every write dies with
+   *     'invalid input syntax for type uuid: "u-admin"'.
+   *
+   * If Supabase is unreachable, login must fail loudly rather than silently
+   * downgrade to an identity the database cannot accept.
+   */
   async login(credentials: Credentials): Promise<Session> {
-    try {
-      const email = await this.resolveIdentifierToEmail(credentials.email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: credentials.password,
-      });
+    const email = await this.resolveIdentifierToEmail(credentials.email);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: credentials.password,
+    });
 
-      if (!error && data.session && data.user) {
-        return await this.buildSession(
-          data.session.access_token,
-          data.session.expires_at,
-          data.user.id,
-          data.user.email ?? email,
-          !!credentials.rememberMe,
-        );
-      }
-    } catch {
-      // Fall back cleanly to local auth service
-    }
-    return this.fallbackMock.login(credentials);
+    if (error || !data.session || !data.user) throw invalidCredentials();
+
+    return this.buildSession(
+      data.session.access_token,
+      data.session.expires_at,
+      data.user.id,
+      data.user.email ?? email,
+      !!credentials.rememberMe,
+    );
   }
 
   async logout(): Promise<void> {

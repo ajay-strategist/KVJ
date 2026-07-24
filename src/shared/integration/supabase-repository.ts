@@ -55,6 +55,38 @@ async function assertAuthenticated(_tableName: string): Promise<void> {
   return;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Returns the value only when it is a real UUID, otherwise null.
+ *
+ * Audit columns (created_by / updated_by / deleted_by) are `uuid`. A legacy
+ * non-UUID actor id such as 'u-admin' made PostgreSQL reject the entire
+ * statement — "invalid input syntax for type uuid" — which broke writes in
+ * EVERY module, not just the screen being used. Recording an unknown author as
+ * NULL is correct; failing the whole write is not.
+ */
+function asUuidOrNull(value: unknown): string | null {
+  return typeof value === 'string' && UUID_RE.test(value) ? value : null;
+}
+
+/**
+ * Drops a client-generated primary key that is not a UUID.
+ *
+ * Several screens build ids like `col-${Date.now()}` or `s-${Date.now()}`.
+ * Every table declares `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, so the
+ * correct behaviour is to omit `id` and let the database assign it.
+ * (`employees` supplies its id deliberately — it must equal auth.users.id — and
+ * that is always a real UUID, so it passes through untouched.)
+ */
+function stripInvalidId(payload: Record<string, unknown>): Record<string, unknown> {
+  if ('id' in payload && !asUuidOrNull(payload.id)) {
+    const { id: _discard, ...rest } = payload;
+    return rest;
+  }
+  return payload;
+}
+
 export class SupabaseRepository<T extends Entity> implements IRepository<T> {
   constructor(protected tableName: string) {}
 
@@ -64,12 +96,12 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
       ...data,
       createdAt: ts,
       updatedAt: ts,
-      createdBy: actor?.id ?? null,
-      updatedBy: actor?.id ?? null,
+      createdBy: asUuidOrNull(actor?.id),
+      updatedBy: asUuidOrNull(actor?.id),
       deletedAt: null,
       deletedBy: null,
     };
-    const dbPayload = toSnakeCaseObject(rawPayload);
+    const dbPayload = stripInvalidId(toSnakeCaseObject(rawPayload));
 
     let { data: inserted, error } = await supabase
       .from(this.tableName)
@@ -107,7 +139,15 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
         throw new AppError({ code: ErrorCode.FORBIDDEN, message: 'Permission denied. You do not have permission for this database operation.', severity: 'warning' });
       }
       if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
-        return { ...rawPayload, id: (data as any)?.id || `local-${Date.now()}` } as T;
+        // Must NOT fabricate a saved record here. Returning a synthetic row with
+        // a `local-...` id made the UI report success while the data was never
+        // persisted — it vanished on refresh, and the fake id is not a UUID so
+        // any follow-up write referencing it failed too.
+        throw new AppError({
+          code: ErrorCode.INTERNAL,
+          message: `Could not save to ${this.tableName}: the database is unreachable. Your changes were NOT saved. Check your connection and try again.`,
+          severity: 'error',
+        });
       }
       throw AppError.internal(error.message);
     }
@@ -133,7 +173,7 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
     const rawPayload = {
       ...patch,
       updatedAt: ts,
-      updatedBy: actor?.id ?? null,
+      updatedBy: asUuidOrNull(actor?.id),
     };
     const dbPayload = toSnakeCaseObject(rawPayload);
 
@@ -179,7 +219,7 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
       .from(this.tableName)
       .update({
         deleted_at: ts,
-        deleted_by: actor?.id ?? null,
+        deleted_by: asUuidOrNull(actor?.id),
         updated_at: ts,
       })
       .eq('id', id);
@@ -198,7 +238,7 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
         deleted_at: null,
         deleted_by: null,
         updated_at: ts,
-        updated_by: actor?.id ?? null,
+        updated_by: asUuidOrNull(actor?.id),
       })
       .eq('id', id)
       .select()

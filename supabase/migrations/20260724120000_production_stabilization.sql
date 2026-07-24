@@ -17,19 +17,70 @@
 
 
 -- -----------------------------------------------------------------------------
--- 1. ROLE ENUM COMPLETION
+-- 1. ROLE ENUM  (self-sufficient — does not assume earlier migrations ran)
 --
--- DEFECT: supabase/migrations/20260720000000_roles_and_rls.sql created
+-- DEFECT A: 20260720000000_roles_and_rls.sql creates
 --   CREATE TYPE user_role AS ENUM ('ADMIN','CEO','MANAGER','EMPLOYEE');
--- but src/shared/permissions/roles.ts defines SIX roles. Assigning COORDINATOR
--- or TRAINER to an employee currently fails with invalid input value for enum.
+-- but src/shared/permissions/roles.ts defines SIX roles, so COORDINATOR and
+-- TRAINER could never be assigned.
 --
--- FIX: add the two missing values. ADD VALUE is additive and cannot affect
--- existing rows. Role NAMES are unchanged — this makes the database match the
--- application's existing role model, it does not alter the RBAC design.
+-- DEFECT B: that migration may never have been applied at all — running this
+-- file against such a database failed with
+--   ERROR 42704: type "user_role" does not exist
+-- so the enum is now CREATED when absent instead of assumed.
+--
+-- Role NAMES are unchanged; this only makes the database match the application's
+-- existing role model.
 -- -----------------------------------------------------------------------------
-ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'COORDINATOR';
-ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'TRAINER';
+DO $$
+DECLARE
+  v text;
+  wanted text[] := ARRAY['ADMIN', 'CEO', 'MANAGER', 'COORDINATOR', 'TRAINER', 'EMPLOYEE'];
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'user_role' AND n.nspname = 'public'
+  ) THEN
+    -- Type absent: create it complete, in the app's own precedence order.
+    CREATE TYPE public.user_role AS ENUM
+      ('ADMIN', 'CEO', 'MANAGER', 'COORDINATOR', 'TRAINER', 'EMPLOYEE');
+  ELSE
+    -- Type present: top it up with any values it is missing.
+    FOREACH v IN ARRAY wanted LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON t.oid = e.enumtypid
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'user_role' AND n.nspname = 'public' AND e.enumlabel = v
+      ) THEN
+        EXECUTE format('ALTER TYPE public.user_role ADD VALUE %L', v);
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+
+-- -----------------------------------------------------------------------------
+-- 1b. employees.role
+--
+-- Added by 20260720000000; recreated here because that migration may not have
+-- run. src/modules/auth/supabase-auth.service.ts reads employees.role on every
+-- login, so without this column nobody can sign in.
+-- -----------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'employees'
+  ) THEN
+    RAISE EXCEPTION
+      'Table public.employees does not exist. Apply 20260718000000_employee_attendance.sql first.';
+  END IF;
+
+  ALTER TABLE public.employees
+    ADD COLUMN IF NOT EXISTS role public.user_role NOT NULL DEFAULT 'EMPLOYEE';
+END $$;
 
 
 -- -----------------------------------------------------------------------------

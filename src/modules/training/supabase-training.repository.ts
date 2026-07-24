@@ -15,8 +15,62 @@ import type {
   AlumniProfile, IAlumniRepository
 } from './training.repository';
 
+/**
+ * Normalise a phone number to the last 10 digits — the canonical form of the
+ * student business key. Strips spaces, dashes, +91 country codes etc. so that
+ * "+91 98470 12345", "098470-12345" and "9847012345" all resolve to one key.
+ */
+export function normalizeStudentKey(phone: string | undefined | null): string {
+  const digits = String(phone ?? '').replace(/\D/g, '');
+  return digits.slice(-10);
+}
+
 export class SupabaseStudentRepository extends SupabaseRepository<Student> implements IStudentRepository {
   constructor() { super('student_records'); }
+
+  /**
+   * BUSINESS RULE (locked): register_no IS the student's phone number and is the
+   * unique business identifier. It is derived here rather than trusted from the
+   * caller, so every write path — manual add, Excel/Sheet import, enrollment —
+   * produces the same key and the UNIQUE NOT NULL constraint always holds.
+   */
+  private applyBusinessKey(data: Partial<Student>): Partial<Student> {
+    // Prefer the phone; fall back to an already-supplied registerNo so an update
+    // that only touches other fields does not blank the key.
+    const source = data.phone ?? data.registerNo;
+    if (source === undefined) return data;
+
+    const key = normalizeStudentKey(source);
+    if (!key) {
+      throw new Error(
+        'A student requires a valid phone number: it is the unique business ' +
+        'identifier (register_no) and cannot be empty.',
+      );
+    }
+    return { ...data, registerNo: key };
+  }
+
+  async create(data: Partial<Student>, actor: Parameters<SupabaseRepository<Student>['create']>[1]) {
+    return super.create(this.applyBusinessKey(data), actor);
+  }
+
+  async update(id: UUID, patch: Partial<Student>, actor: Parameters<SupabaseRepository<Student>['update']>[2]) {
+    return super.update(id, this.applyBusinessKey(patch), actor);
+  }
+
+  /** Look a student up by their business key (phone number). */
+  async findByRegisterNo(phone: string): Promise<Student | null> {
+    const key = normalizeStudentKey(phone);
+    if (!key) return null;
+    const { data, error } = await supabase
+      .from('student_records')
+      .select('*')
+      .eq('register_no', key)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? (toCamelCaseObject(data) as Student) : null;
+  }
 }
 
 export class SupabaseCourseRepository extends SupabaseRepository<Course> implements ICourseRepository {

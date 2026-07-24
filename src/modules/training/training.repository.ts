@@ -6,7 +6,21 @@ export type EnrollmentStatus = 'registered' | 'admitted' | 'deferred' | 'cancell
 export type TrainingCategory = 'corporate' | 'college' | 'public' | 'individual';
 export type TrainingType = 'online' | 'hybrid' | 'workshop' | 'bootcamp' | 'certification';
 
+/**
+ * BUSINESS RULE (locked): a student's unique business identifier is their PHONE
+ * NUMBER, stored in student_records.register_no (TEXT UNIQUE NOT NULL).
+ *
+ * `registerNo` therefore always holds the normalised phone number — it is not a
+ * college register number, and no separate student_code / admission_no /
+ * college_register_no identifier exists anywhere in the system.
+ *
+ * `phone` remains the display/contact value; `registerNo` is the key derived
+ * from it. SupabaseStudentRepository derives and normalises it on every write,
+ * so the two can never drift apart.
+ */
 export interface Student extends Entity {
+  /** Unique business identifier = normalised phone number (see note above). */
+  registerNo: string;
   firstName: string;
   lastName: string;
   email: string;

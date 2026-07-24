@@ -8,6 +8,7 @@ import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
 import { STUDENT_REPOSITORY_TOKEN } from '../training.repository';
+import { normalizeStudentKey } from '../supabase-training.repository';
 import type { Page } from '../../../core/types';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { usePermissions } from '../../../shared/permissions/react';
@@ -641,8 +642,12 @@ export function BatchManagement() {
         const email = (row[1] || row[6] || '').trim();
         const college = (row[2] || 'MIM Kuttikkanam').trim();
         const batch = (row[3] || 'Batch 1').trim();
-        const registerNo = (row[4] || '').trim();
+        // BUSINESS RULE (locked): register_no IS the phone number and is the
+        // unique student identifier. The sheet's own "Register No." column
+        // (row[4]) is deliberately NOT used — a college register number is not
+        // an identifier in this system.
         const phone = (row[5] || '').trim();
+        const registerNo = normalizeStudentKey(phone);
         const name = (row[7] || '').trim();
         const gender = (row[8] || '').trim();
         const qualification = (row[9] || '').trim();
