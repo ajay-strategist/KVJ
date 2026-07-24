@@ -1,4 +1,4 @@
-import { SupabaseRepository } from '../../shared/integration/supabase-repository';
+import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import type { UUID } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 import type {
@@ -26,11 +26,11 @@ export class SupabaseMilestoneRepository extends SupabaseRepository<Milestone> i
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('projectId', projectId)
-      .is('deletedAt', null);
+      .eq('project_id', projectId)
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return (data ?? []) as Milestone[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as Milestone);
   }
 }
 
@@ -41,22 +41,22 @@ export class SupabaseResourceAllocationRepository extends SupabaseRepository<Res
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('projectId', projectId)
-      .is('deletedAt', null);
+      .eq('project_id', projectId)
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return (data ?? []) as ResourceAllocation[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as ResourceAllocation);
   }
 
   async findByEmployee(employeeId: UUID): Promise<ResourceAllocation[]> {
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('employeeId', employeeId)
-      .is('deletedAt', null);
+      .eq('employee_id', employeeId)
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return (data ?? []) as ResourceAllocation[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as ResourceAllocation);
   }
 }
 
@@ -67,11 +67,11 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('projectId', projectId)
-      .is('deletedAt', null);
+      .eq('project_id', projectId)
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return (data ?? []) as Task[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as Task);
   }
 }
 
@@ -82,14 +82,15 @@ export class SupabaseTimesheetRepository extends SupabaseRepository<TimesheetRec
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('employeeId', employeeId)
-      .is('deletedAt', null);
+      .eq('employee_id', employeeId)
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return (data ?? []) as TimesheetRecord[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as TimesheetRecord);
   }
 }
 
 export class SupabaseClientMeetingRepository extends SupabaseRepository<ClientMeeting> implements IClientMeetingRepository {
   constructor() { super('client_meetings'); }
 }
+

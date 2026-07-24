@@ -148,9 +148,16 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
         
         {/* Top Header Row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            {/* KVJ LOGO ONLY */}
-            <img src="/logo.png" alt="KVJ Logo" style={{ height: 44, width: 'auto', display: 'block' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/logo.png" alt="Nexus Logo" style={{ height: 44, width: 'auto', display: 'block' }} />
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                Nexus <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>by KVJ</span>
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', marginTop: 1 }}>
+                Enterprise Operations Platform
+              </div>
+            </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ display: 'inline-block', background: isFinalReport ? '#f0fdf4' : '#eff6ff', border: `1px solid ${isFinalReport ? '#86efac' : '#bfdbfe'}`, color: isFinalReport ? '#166534' : '#1e40af', fontSize: 9.5, fontWeight: 800, padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
@@ -237,11 +244,13 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontWeight: 800, color: '#1e40af' }}>KVJ Analytics</span>
+          <span style={{ fontWeight: 900, color: '#1e40af' }}>Nexus by KVJ</span>
           <span>·</span>
-          <span>Generated on {data.reportDate} at {new Date().toLocaleTimeString()}</span>
+          <span>Enterprise Operations Platform</span>
           <span>·</span>
-          <span>By {data.trainerName}</span>
+          <span style={{ color: '#2563eb', fontWeight: 600 }}>Connect. Manage. Transform.</span>
+          <span>·</span>
+          <span>Developed by KVJ Analytics</span>
         </div>
         <div style={{ fontWeight: 800, color: '#0f172a', letterSpacing: '0.02em' }}>
           CONFIDENTIAL · {isFinalReport ? 'FINAL CERTIFICATION REPORT' : 'EXECUTIVE TRAINING INTELLIGENCE REPORT'}

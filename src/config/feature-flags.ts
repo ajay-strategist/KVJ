@@ -66,14 +66,14 @@ export const featureFlags = {
   },
 
   supabaseModules: {
-    employee: true,   // Table public.employees exists in Supabase
-    attendance: true, // Table public.attendance_records exists in Supabase
-    leave: true,      // Table public.leave_records exists in Supabase
-    training: false,  // Uses persistent MemoryRepository/LocalStorage until remote DB migration
-    project: false,
-    finance: false,
-    communication: false,
-    analytics: false,
+    employee: true,   // Table public.employees
+    attendance: true, // Table public.attendance_records
+    leave: true,      // Table public.leave_records
+    training: true,   // Table public.courses, batches, student_records, etc.
+    project: true,    // Table public.projects, tasks, milestones, etc.
+    finance: true,    // Table public.expense_claims, budgets, assets, etc.
+    communication: true, // Table public.chat_channels, chat_messages, announcements
+    analytics: true,  // Table public.kpi_definitions, saved_reports
   },
 } as const;
 

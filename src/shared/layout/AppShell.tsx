@@ -172,7 +172,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             overflow: 'hidden',
           }}>
 
-            {/* Logo */}
+            {/* Logo & Product Branding */}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: collapsed && !isMobile ? 'center' : 'flex-start',
               padding: collapsed && !isMobile ? '14px 8px' : '14px 16px',
@@ -180,14 +180,29 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             }}>
               <img
                 src="/logo.png"
-                alt="KVJ Analytics Logo"
+                alt="Nexus by KVJ Logo"
                 style={{
-                  height: collapsed && !isMobile ? 28 : 36,
+                  height: collapsed && !isMobile ? 28 : 34,
                   maxWidth: '100%',
                   objectFit: 'contain',
                   flexShrink: 0
                 }}
               />
+              {(!collapsed || isMobile) && (
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                    <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
+                      Nexus
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+                      by KVJ
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.03em', marginTop: 2 }}>
+                    Connect. Manage. Transform.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Nav */}
@@ -526,6 +541,30 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             overflowY: 'auto',
           }}>
             {children}
+            <footer style={{
+              marginTop: 'auto',
+              paddingTop: 24,
+              paddingBottom: 8,
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 12,
+              color: 'var(--text-secondary)',
+              gap: 12
+            }}>
+              <div>
+                <span style={{ fontWeight: 900, color: 'var(--text-primary)' }}>Nexus</span>{' '}
+                <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>by KVJ</span>{' '}
+                <span style={{ color: 'var(--border)', margin: '0 6px' }}>|</span>{' '}
+                <span>Enterprise Operations Platform</span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--brand)', fontWeight: 600, fontSize: 11 }}>Connect. Manage. Transform.</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>© 2026 KVJ Analytics. All Rights Reserved.</span>
+              </div>
+            </footer>
           </main>
         </div>
       </div>

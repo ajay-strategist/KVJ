@@ -38,8 +38,9 @@ export class MockNotificationService implements INotificationService {
   async list(): Promise<NotificationItem[]> {
     const t = Date.now();
     return [
-      { id: 'n1', title: 'Welcome to Workspace', message: 'Your workspace is ready.', category: 'system', priority: 'normal', read: false, createdAt: t - 60000 },
-      { id: 'n2', title: 'Approval pending', message: 'An expense claim needs review.', category: 'approval', priority: 'high', read: false, createdAt: t - 3600000, action: { label: 'Review' } },
+      { id: 'n1', title: 'Nexus Notification: Welcome to Workspace', message: 'Your Nexus enterprise platform is ready.', category: 'system', priority: 'normal', read: false, createdAt: t - 60000 },
+      { id: 'n2', title: 'Nexus Notification: Expense Approval Pending', message: 'An expense claim requires your management authorization.', category: 'approval', priority: 'high', read: false, createdAt: t - 3600000, action: { label: 'Review' } },
+      { id: 'n3', title: 'Nexus Notification: Task Assigned', message: 'New project deliverable has been assigned to you.', category: 'task', priority: 'normal', read: false, createdAt: t - 7200000 },
     ];
   }
 }

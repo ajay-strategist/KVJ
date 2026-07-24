@@ -19,8 +19,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: 'u-admin',
     employeeId: 'EMP-001',
-    firstName: 'System',
-    lastName: 'Admin',
+    firstName: 'Ajay',
+    lastName: 'thomas',
     email: 'admin@kvjanalytics.com',
     designation: 'Super Administrator',
     dateOfJoining: '2022-01-01',

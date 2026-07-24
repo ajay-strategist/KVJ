@@ -23,9 +23,17 @@ import { toLocalISODate } from '../../../shared/utils/date';
 
 function Greeting() {
   const { user } = useAuth();
-  const hour = new Date().getHours();
-  const part = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-  return <PageHeader title={`Good ${part}, ${user?.fullName?.split(' ')[0] ?? 'there'}`} subtitle={new Date().toDateString()} />;
+  return (
+    <PageHeader
+      title="Welcome to Nexus by KVJ"
+      subtitle="Connect. Manage. Transform."
+      actions={
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+          {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </div>
+      }
+    />
+  );
 }
 
 const statusMap = {

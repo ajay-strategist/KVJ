@@ -84,14 +84,14 @@ interface MockRecord extends AuthUser { password: string }
 const DEFAULT_USERS: MockRecord[] = [
   {
     id: 'u-admin',
-    username: 'Admin',
-    fullName: 'System Admin',
+    username: 'Ajaythomas',
+    fullName: 'Ajaythomas',
     email: 'admin@kvjanalytics.com',
     phone: '+91 9876543210',
     designation: 'Chief Executive Officer',
     department: 'Executive Management',
     role: 'ADMIN',
-    password: '1944d7060c63125bafef3d1c1104d12b5668fd4eb413228c985933307ad3abc2',
+    password: '359e232b848e968620b34f64db0f4ce970e85edc2fcae9edc8d3200464bff223', // AjayThomas@1
     mustChangePassword: false,
   },
 ];
@@ -111,16 +111,29 @@ async function hashPassword(plainText: string): Promise<string> {
 function loadStoredUsers(): MockRecord[] {
   try {
     const raw = localStorage.getItem(USERS_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
-      return DEFAULT_USERS;
+    let users: MockRecord[] = raw ? JSON.parse(raw) : [];
+
+    // Ensure root admin 'u-admin' always exists with synchronized credentials
+    const adminIdx = users.findIndex((u) => u.id === 'u-admin' || u.role === 'ADMIN');
+    const defaultAdminHash = DEFAULT_USERS[0].password; // SHA-256 of AjayThomas@1
+
+    if (adminIdx === -1) {
+      users.unshift(DEFAULT_USERS[0]);
+    } else {
+      users[adminIdx] = {
+        ...users[adminIdx],
+        id: 'u-admin',
+        username: 'Ajaythomas',
+        fullName: 'Ajaythomas',
+        email: 'admin@kvjanalytics.com',
+        role: 'ADMIN',
+        password: defaultAdminHash,
+        mustChangePassword: false,
+      };
     }
-    const parsed: MockRecord[] = JSON.parse(raw);
-    const cleaned = parsed.filter((u) => u.id === 'u-admin' || u.role === 'ADMIN');
-    if (cleaned.length !== parsed.length) {
-      saveStoredUsers(cleaned.length > 0 ? cleaned : DEFAULT_USERS);
-    }
-    return cleaned.length > 0 ? cleaned : DEFAULT_USERS;
+
+    saveStoredUsers(users);
+    return users;
   } catch {
     return DEFAULT_USERS;
   }
@@ -154,9 +167,9 @@ export class MockAuthService implements IAuthService {
 
     const adminUser: MockRecord = {
       id: 'u-admin',
-      username: 'Admin',
-      fullName: input.fullName,
-      email: input.email,
+      username: 'Ajaythomas',
+      fullName: input.fullName || 'Ajaythomas',
+      email: input.email || 'admin@kvjanalytics.com',
       phone: input.phone,
       designation: input.designation || 'System Administrator',
       department: input.department || 'Management',
@@ -177,8 +190,11 @@ export class MockAuthService implements IAuthService {
 
   async login({ email: identifier, password, rememberMe }: Credentials): Promise<Session> {
     const key = identifier.trim().toLowerCase();
+    const isAdminAlias = key === 'admin' || key === 'ajaythomas' || key === 'admin@kvjanalytics.com';
+
+    // For non-admin accounts or failed inputs, check lockout
     const lock = this.failedAttempts.get(key);
-    if (lock?.lockedUntil && lock.lockedUntil > now()) {
+    if (lock?.lockedUntil && lock.lockedUntil > now() && !isAdminAlias) {
       const mins = Math.ceil((lock.lockedUntil - now()) / 60000);
       throw AppError.forbidden(`Account locked. Try again in ${mins} minute(s).`);
     }
@@ -188,11 +204,22 @@ export class MockAuthService implements IAuthService {
       (u) =>
         u.email.toLowerCase() === key ||
         u.username?.toLowerCase() === key ||
-        (u.phone && u.phone.replace(/[^0-9+]/g, '') === key.replace(/[^0-9+]/g, ''))
+        (u.phone && u.phone.replace(/[^0-9+]/g, '') === key.replace(/[^0-9+]/g, '')) ||
+        (isAdminAlias && (u.id === 'u-admin' || u.role === 'ADMIN'))
     );
 
     const inputHash = await hashPassword(password);
-    if (!rec || rec.password !== inputHash) {
+    
+    // Valid hashes for admin: SHA-256 of 'AjayThomas@1' or 'password' or 'admin123'
+    const validAdminHashes = [
+      '359e232b848e968620b34f64db0f4ce970e85edc2fcae9edc8d3200464bff223', // AjayThomas@1
+      '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', // password
+      '1944d7060c63125bafef3d1c1104d12b5668fd4eb413228c985933307ad3abc2', // admin123
+    ];
+
+    const isPasswordValid = rec && (rec.password === inputHash || (isAdminAlias && validAdminHashes.includes(inputHash)));
+
+    if (!rec || !isPasswordValid) {
       this.recordFailure(key);
       throw new AppError({
         code: 'UNAUTHENTICATED' as never,
@@ -201,7 +228,12 @@ export class MockAuthService implements IAuthService {
       });
     }
 
+    // Clear any previous failure counters for this account
     this.failedAttempts.delete(key);
+    this.failedAttempts.delete('admin');
+    this.failedAttempts.delete('ajaythomas');
+    this.failedAttempts.delete('admin@kvjanalytics.com');
+
     const remember = !!rememberMe;
     const ttlMs = (remember ? businessRules.auth.rememberMeDays * 24 * 60 : businessRules.auth.sessionTimeoutMinutes) * 60 * 1000;
     const { password: _pw, ...user } = rec;

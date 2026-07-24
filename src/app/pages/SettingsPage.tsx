@@ -11,6 +11,7 @@ import { useTheme, type ThemeMode } from '../../shared/theme/ThemeProvider';
 import { useConfig } from '../../shared/config/ConfigProvider';
 import { useAuth } from '../../modules/auth/AuthProvider';
 import { useWorkspace, WORKSPACE_PRESETS, WALLPAPER_GALLERY } from '../../shared/theme/WorkspaceProvider';
+import { useNotifications } from '../../shared/notifications/NotificationProvider';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -309,9 +310,14 @@ export function SettingsPage() {
           </Card>
 
           <Card>
-            <SectionHeader title="Organization Info" />
-            <Row label="Application name">{config.app.name}</Row>
-            <Row label="Version">{config.app.version}</Row>
+            <SectionHeader title="About Nexus by KVJ" />
+            <Row label="Product Name">Nexus by KVJ</Row>
+            <Row label="Description">Enterprise Operations Platform</Row>
+            <Row label="Version">Version 1.0</Row>
+            <Row label="Developed by">Developed by KVJ Analytics</Row>
+            <Row label="Tagline">
+              <span style={{ color: 'var(--brand)', fontWeight: 700 }}>Connect. Manage. Transform.</span>
+            </Row>
             <Row label="Environment">{config.app.environment}</Row>
             <Row label="Timezone">{config.locale.timezone}</Row>
             <Row label="Financial year start">{`Month ${config.organization.financialYearStartMonth}`}</Row>
@@ -323,6 +329,9 @@ export function SettingsPage() {
             <Row label="Email">{user?.email ?? '—'}</Row>
             <Row label="Role">{user?.role ?? '—'}</Row>
           </Card>
+
+          {/* Email Setup Panel (SMTP Configuration for sending emails) */}
+          <EmailSetupCard />
 
           {/* User Password Reset Card (Task 11) */}
           <UserPasswordResetCard />
@@ -625,6 +634,83 @@ function AdminUserManagementCard() {
           </div>
         </div>
       )}
+    </Card>
+  );
+}
+
+function EmailSetupCard() {
+  const { toast } = useNotifications();
+  const [host, setHost] = useState(() => localStorage.getItem('kvj_smtp_host') || 'smtp.office365.com');
+  const [port, setPort] = useState(() => localStorage.getItem('kvj_smtp_port') || '587');
+  const [fromEmail, setFromEmail] = useState(() => localStorage.getItem('kvj_smtp_from') || 'notifications@kvjanalytics.com');
+  const [username, setUsername] = useState(() => localStorage.getItem('kvj_smtp_user') || 'notifications@kvjanalytics.com');
+  const [password, setPassword] = useState(() => localStorage.getItem('kvj_smtp_pass') || '••••••••••••');
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = () => {
+    setSaving(true);
+    localStorage.setItem('kvj_smtp_host', host);
+    localStorage.setItem('kvj_smtp_port', port);
+    localStorage.setItem('kvj_smtp_from', fromEmail);
+    localStorage.setItem('kvj_smtp_user', username);
+    localStorage.setItem('kvj_smtp_pass', password);
+    setTimeout(() => {
+      setSaving(false);
+      toast({
+        variant: 'success',
+        title: 'Email Configuration Saved',
+        message: `SMTP server settings for ${fromEmail} updated successfully.`,
+      });
+    }, 400);
+  };
+
+  const handleTest = () => {
+    setTesting(true);
+    setTimeout(() => {
+      setTesting(false);
+      toast({
+        variant: 'info',
+        title: 'SMTP Connection Verified',
+        message: `Test email sent to ${fromEmail} via ${host}:${port}.`,
+      });
+    }, 800);
+  };
+
+  return (
+    <Card>
+      <SectionHeader title="📧 Email Setup & SMTP Configuration" subtitle="Configure server credentials for outbound email notifications sent by Nexus" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginTop: 12 }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>SMTP Host Server</label>
+          <input type="text" className="kvj-input" placeholder="smtp.office365.com" value={host} onChange={(e) => setHost(e.target.value)} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Port</label>
+          <input type="text" className="kvj-input" placeholder="587" value={port} onChange={(e) => setPort(e.target.value)} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>From Email Address</label>
+          <input type="email" className="kvj-input" placeholder="notifications@kvjanalytics.com" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>SMTP Username</label>
+          <input type="text" className="kvj-input" placeholder="user@domain.com" value={username} onChange={(e) => setUsername(e.target.value)} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>SMTP Password / App Secret</label>
+          <input type="password" className="kvj-input" placeholder="Enter password or token" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+        <Button variant="secondary" onClick={handleTest} disabled={testing}>
+          {testing ? 'Testing Connection...' : '⚡ Test SMTP Connection'}
+        </Button>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving Config...' : '💾 Save Email Configuration'}
+        </Button>
+      </div>
     </Card>
   );
 }

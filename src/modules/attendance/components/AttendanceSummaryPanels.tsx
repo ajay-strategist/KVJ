@@ -202,7 +202,7 @@ export function AttendanceSummaryPanels({
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
 
   const employeeList = [
-    { id: 'u-admin', name: 'System Admin' },
+    { id: 'u-admin', name: 'Ajaythomas' },
   ];
 
   return (

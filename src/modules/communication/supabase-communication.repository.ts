@@ -1,4 +1,4 @@
-import { SupabaseRepository } from '../../shared/integration/supabase-repository';
+import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import type { UUID } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 import type {
@@ -20,12 +20,12 @@ export class SupabaseChatMessageRepository extends SupabaseRepository<ChatMessag
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('channelId', channelId)
-      .is('deletedAt', null)
-      .order('createdAt', { ascending: true });
+      .eq('channel_id', channelId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
 
     if (error) throw new Error(error.message);
-    return data as ChatMessage[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as ChatMessage);
   }
 }
 
@@ -41,10 +41,10 @@ export class SupabaseEmailLogRepository extends SupabaseRepository<EmailLog> imp
       .from(this.tableName)
       .select()
       .eq('status', 'pending')
-      .is('deletedAt', null);
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return data as EmailLog[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as EmailLog);
   }
 }
 
@@ -55,11 +55,12 @@ export class SupabaseNotificationPreferenceRepository extends SupabaseRepository
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('employeeId', employeeId)
-      .is('deletedAt', null)
+      .eq('user_id', employeeId)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    return data as NotificationPreference | null;
+    return data ? (toCamelCaseObject(data) as NotificationPreference) : null;
   }
 }
+

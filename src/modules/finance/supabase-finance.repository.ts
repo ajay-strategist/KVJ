@@ -1,4 +1,4 @@
-import { SupabaseRepository } from '../../shared/integration/supabase-repository';
+import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import type { UUID } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 import type {
@@ -42,11 +42,12 @@ export class SupabaseSalaryStructureRepository extends SupabaseRepository<Salary
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('employeeId', employeeId)
-      .is('deletedAt', null)
+      .eq('employee_id', employeeId)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    return data as SalaryStructure | null;
+    return data ? (toCamelCaseObject(data) as SalaryStructure) : null;
   }
 }
+

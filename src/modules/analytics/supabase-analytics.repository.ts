@@ -1,4 +1,4 @@
-import { SupabaseRepository } from '../../shared/integration/supabase-repository';
+import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import { supabase } from '../../shared/integration/supabase';
 import type {
   KpiDefinition, IKpiDefinitionRepository,
@@ -13,14 +13,15 @@ export class SupabaseKpiDefinitionRepository extends SupabaseRepository<KpiDefin
       .from(this.tableName)
       .select()
       .eq('code', code)
-      .is('deletedAt', null)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    return data as KpiDefinition | null;
+    return data ? (toCamelCaseObject(data) as KpiDefinition) : null;
   }
 }
 
 export class SupabaseSavedReportRepository extends SupabaseRepository<SavedReport> implements ISavedReportRepository {
   constructor() { super('saved_reports'); }
 }
+

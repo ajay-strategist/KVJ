@@ -134,25 +134,29 @@ export function LoginPage() {
     <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', placeItems: 'center', padding: 24 }}>
         <div style={{ width: 'min(420px, 100%)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 28 }}>📊</span>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>KVJ Analytics</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: 'var(--text-primary)' }}>Nexus</h1>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>by KVJ</span>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Enterprise Operations Platform</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--brand)', marginTop: 2 }}>Connect. Manage. Transform.</div>
             </div>
             <button onClick={toggle} aria-label="Toggle theme" style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderRadius: 10, width: 36, height: 36, cursor: 'pointer' }}>{theme === 'dark' ? '☀' : '☾'}</button>
           </div>
 
           <div className="kvj-card"><div className="kvj-card__body" style={{ padding: 28 }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>
               {view === 'login'
                 ? 'Welcome back'
                 : view === 'forgot'
                 ? 'Reset your password'
                 : '🔑 Reset Default Password'}
-            </h1>
+            </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: '0 0 20px' }}>
               {view === 'login'
-                ? 'Sign in to your training analytics workspace.'
+                ? 'Sign in to your Nexus enterprise platform.'
                 : view === 'forgot'
                 ? "We'll email you a reset link."
                 : 'Welcome! Your account uses a default password. Please choose a new secure password.'}
@@ -241,6 +245,10 @@ export function LoginPage() {
               </>
             )}
           </div></div>
+
+          <div style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+            © 2026 KVJ Analytics
+          </div>
         </div>
       </div>
     </div>

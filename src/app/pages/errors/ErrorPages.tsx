@@ -39,15 +39,37 @@ export function Offline() {
   return <Shell title="You're offline" message="Check your connection. The app will reconnect automatically when you're back online." />;
 }
 
-/** Route-level loading fallback (Suspense). */
+/** Route-level loading fallback (Suspense / Splash Screen). */
 export function RouteLoading() {
   return (
-    <div style={{ padding: 32, maxWidth: 1440, margin: '0 auto' }}>
-      <Skeleton width={220} height={28} style={{ marginBottom: 24 }} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} height={110} radius={16} />)}
+    <div style={{
+      minHeight: '80vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg-app)',
+      color: 'var(--text-primary)',
+      animation: 'kvjFadeIn 350ms cubic-bezier(0.16, 1, 0.3, 1)',
+      padding: 32,
+    }}>
+      <style>{`
+        @keyframes kvjFadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      <img src="/logo.png" alt="Nexus Logo" style={{ height: 48, width: 'auto', marginBottom: 16 }} />
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+        <h2 style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: 'var(--text-primary)' }}>Nexus</h2>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>by KVJ</span>
       </div>
-      <Skeleton height={320} radius={16} />
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', marginTop: 4, letterSpacing: '0.05em' }}>
+        Connect. Manage. Transform.
+      </div>
+      <div style={{ marginTop: 24, width: 180 }}>
+        <Skeleton height={4} radius={999} />
+      </div>
     </div>
   );
 }

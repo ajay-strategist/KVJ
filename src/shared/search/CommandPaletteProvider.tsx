@@ -81,7 +81,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       {open && (
         <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1250, background: 'rgba(2,6,23,.45)', display: 'grid', placeItems: 'start center', paddingTop: '12vh' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px,92%)', background: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--e4)', overflow: 'hidden' }}>
-            <input autoFocus value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search or run a command…  (⌘K)"
+            <input autoFocus value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search in Nexus...  (⌘K)"
               style={{ width: '100%', border: 'none', borderBottom: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', padding: '16px 18px', fontSize: 15, outline: 'none' }} />
             <div style={{ maxHeight: 360, overflowY: 'auto', padding: 8 }}>
               {results.length === 0 && (

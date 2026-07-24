@@ -1,4 +1,4 @@
-import { SupabaseRepository } from '../../shared/integration/supabase-repository';
+import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import type { UUID } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 import type {
@@ -15,7 +15,7 @@ import type {
 } from './training.repository';
 
 export class SupabaseStudentRepository extends SupabaseRepository<Student> implements IStudentRepository {
-  constructor() { super('students'); }
+  constructor() { super('student_records'); }
 }
 
 export class SupabaseCourseRepository extends SupabaseRepository<Course> implements ICourseRepository {
@@ -31,18 +31,18 @@ export class SupabaseEnrollmentRepository extends SupabaseRepository<Enrollment>
 }
 
 export class SupabaseSessionAttendanceRepository extends SupabaseRepository<SessionAttendanceRecord> implements ISessionAttendanceRepository {
-  constructor() { super('session_attendance'); }
+  constructor() { super('schedule_sessions'); }
 
   async findByBatch(batchId: UUID, dateStr: string): Promise<SessionAttendanceRecord[]> {
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('batchId', batchId)
-      .eq('sessionDate', dateStr)
-      .is('deletedAt', null);
+      .eq('batch_id', batchId)
+      .eq('date', dateStr)
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return (data ?? []) as SessionAttendanceRecord[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as SessionAttendanceRecord);
   }
 }
 
@@ -53,16 +53,16 @@ export class SupabaseAssessmentRepository extends SupabaseRepository<AssessmentR
     const { data, error } = await supabase
       .from(this.tableName)
       .select()
-      .eq('enrollmentId', enrollmentId)
-      .is('deletedAt', null);
+      .eq('enrollment_id', enrollmentId)
+      .is('deleted_at', null);
 
     if (error) throw new Error(error.message);
-    return (data ?? []) as AssessmentRecord[];
+    return (data ?? []).map((row) => toCamelCaseObject(row) as AssessmentRecord);
   }
 }
 
 export class SupabaseExamVoucherRepository extends SupabaseRepository<ExamVoucher> implements IExamVoucherRepository {
-  constructor() { super('exam_vouchers'); }
+  constructor() { super('vouchers'); }
 }
 
 export class SupabaseCertificateRepository extends SupabaseRepository<CertificateRecord> implements ICertificateRepository {
@@ -76,3 +76,4 @@ export class SupabaseReferralRepository extends SupabaseRepository<ReferralRecor
 export class SupabaseAlumniRepository extends SupabaseRepository<AlumniProfile> implements IAlumniRepository {
   constructor() { super('alumni_profiles'); }
 }
+

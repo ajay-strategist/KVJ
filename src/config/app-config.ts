@@ -9,9 +9,16 @@
 
 export const appConfig = {
   app: {
-    name: 'KVJ Analytics',                 // CONFIRM display name
-    shortName: 'KVJ',
-    version: '0.1.0-foundation',
+    name: 'Nexus by KVJ',                   // Official Product Brand
+    productName: 'Nexus by KVJ',
+    productTitle: 'Nexus',
+    byCompany: 'by KVJ',
+    tagline: 'Connect. Manage. Transform.',
+    description: 'Enterprise Operations Platform',
+    company: 'KVJ Analytics',
+    copyright: '© 2026 KVJ Analytics. All Rights Reserved.',
+    shortName: 'Nexus',
+    version: '1.0',
     environment: (import.meta as { env?: Record<string, string> }).env?.MODE ?? 'development',
   },
 
@@ -46,7 +53,7 @@ export const appConfig = {
       'Expense Receipts', 'Reports', 'Marketing', 'Temporary Uploads',
     ],
     powerBiEnabled: false,                 // Phase 2
-    supabaseEnabled: false,                // Phase 2 (mock services until then)
+    supabaseEnabled: true,                 // Production mode
   },
 } as const;
 
