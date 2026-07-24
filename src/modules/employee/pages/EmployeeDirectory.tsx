@@ -4,6 +4,7 @@ import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Avatar, SearchInput, Button } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useEmployee } from '../hooks/useEmployee';
+import { useAuth } from '../../auth/AuthProvider';
 import Drawer from '../../../shared/ui/Drawer';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Employee } from '../employee.repository';
@@ -11,6 +12,7 @@ import type { Employee } from '../employee.repository';
 export function EmployeeDirectory() {
   const navigate = useNavigate();
   const { employees, createEmployee, loading } = useEmployee();
+  const { createUser, resetToDefaultPassword } = useAuth();
   const { toast } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -44,7 +46,22 @@ export function EmployeeDirectory() {
     });
 
     if (res.ok) {
-      toast({ variant: 'success', title: 'Employee Created', message: `${form.firstName} ${form.lastName} has been added to the directory.` });
+      try {
+        await createUser({
+          username: form.email.trim(),
+          fullName: `${form.firstName.trim()} ${form.lastName.trim()}`,
+          email: form.email.trim(),
+          role: 'EMPLOYEE',
+        });
+      } catch (err) {
+        console.warn('Auth user creation note:', err);
+      }
+
+      toast({
+        variant: 'success',
+        title: 'Employee Created',
+        message: `${form.firstName} ${form.lastName} added. Default password is "password" (reset required on 1st login).`,
+      });
       setAddModalOpen(false);
       setForm({
         firstName: '',
@@ -106,6 +123,31 @@ export function EmployeeDirectory() {
         >
           {r.status}
         </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (r) => (
+        <Button
+          size="xs"
+          variant="secondary"
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              await resetToDefaultPassword(r.email);
+              toast({
+                variant: 'success',
+                title: 'Password Reset',
+                message: `Password for ${r.firstName} reset to default ("password"). Employee will be prompted to set new password on next login.`,
+              });
+            } catch (err) {
+              toast({ variant: 'error', title: 'Reset Failed', message: 'Could not reset password for this employee.' });
+            }
+          }}
+        >
+          🔑 Reset Password
+        </Button>
       ),
     },
   ];

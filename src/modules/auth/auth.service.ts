@@ -357,14 +357,14 @@ export class MockAuthService implements IAuthService {
     return { ok: true };
   }
 
-  async resetToDefaultPassword(userId: string): Promise<{ ok: boolean }> {
+  async resetToDefaultPassword(identifier: string): Promise<{ ok: boolean }> {
     const users = this.getUsersList();
     let found = false;
 
     const pwHash = await hashPassword('password');
 
     const updated = users.map((u) => {
-      if (u.id === userId) {
+      if (u.id === identifier || u.email.toLowerCase() === identifier.toLowerCase() || u.username?.toLowerCase() === identifier.toLowerCase()) {
         found = true;
         return {
           ...u,
