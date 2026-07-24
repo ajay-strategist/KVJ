@@ -599,34 +599,42 @@ export function ProjectList() {
       )}
 
       {/* Create Project Modal */}
-      <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create Master Project">
-        <Form initial={{ status: 'Not Started', supervisor: 'Manager (Operations)' }} onSubmit={handleCreateProject}>
-          <TextField name="title" label="Project Name / Title" placeholder="e.g. Supabase Multi-Tenant Analytics" />
-          <TextField name="code" label="Project Code" placeholder="e.g. KVJ-PROJ-105" />
-          <TextField name="client" label="Client Name" placeholder="e.g. Christ University" />
+      <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create New Project">
+        <Form initial={{ code: 'KVJ-PRJ-00', status: 'planning' }} onSubmit={handleCreateProjectSubmit}>
+          <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
+          <TextField name="name" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
           <SelectField
-            name="supervisor"
-            label="Supervisor"
-            options={[
-              { value: 'Manager (Operations)', label: 'Manager (Operations)' },
-              { value: 'CEO', label: 'CEO' },
-              { value: 'System Admin', label: 'System Admin' },
-            ]}
+            name="clientId"
+            label="Client Organization *"
+            options={clients.map((c) => ({ value: c.id, label: `${c.companyName} (${c.clientCode})` }))}
           />
           <SelectField
             name="status"
-            label="Initial Status"
+            label="Initial Phase *"
             options={[
-              { value: 'Not Started', label: 'Not Started' },
-              { value: 'In Progress', label: 'In Progress' },
-              { value: 'Completed', label: 'Completed' },
+              { value: 'planning', label: 'Planning / Kickoff' },
+              { value: 'execution', label: 'In Execution' },
+              { value: 'closure', label: 'Closure' },
             ]}
           />
+          <DatePickerField name="targetCompletion" label="Target Completion Date" />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateProjectOpen(false)}>Cancel</Button>
             <Button type="submit">Create Project</Button>
           </div>
         </Form>
+      </Drawer>
+
+      {/* Status Report Drawer */}
+      <Drawer open={reportOpen} onClose={() => setReportOpen(false)} title="Executive Project Status Report">
+        <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
+            <h4 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700 }}>Summary Highlights</h4>
+            <div>Total Projects: <strong>{mappedProjects.length}</strong></div>
+            <div>In Execution: <strong>{mappedProjects.filter((p) => p.status === 'In Progress').length}</strong></div>
+            <div>Completed: <strong>{mappedProjects.filter((p) => p.status === 'Completed').length}</strong></div>
+          </div>
+        </div>
       </Drawer>
 
       {/* Add New Task inside Card Modal */}
@@ -638,12 +646,7 @@ export function ProjectList() {
             <SelectField
               name="assignee"
               label="Assignee"
-              options={[
-                { value: 'Linto George', label: 'Linto George' },
-                { value: 'Ajay Kumar', label: 'Ajay Kumar' },
-                { value: 'Anju V', label: 'Anju V' },
-                { value: 'Sankar M', label: 'Sankar M' },
-              ]}
+              options={assigneeOptions}
             />
             <DatePickerField name="dueDate" label="Due Date" />
             <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

@@ -3,6 +3,8 @@ import { todayISO } from '../../shared/utils/date';
 import { AppError, Err, Ok, type Result } from '../../core/result';
 import type { Actor, GeoPoint, UUID, DateRange } from '../../core/types';
 import { eventBus } from '../../core/event-bus';
+import { supabase } from '../../shared/integration/supabase';
+import { toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import {
   ATTENDANCE_REPOSITORY_TOKEN,
   type AttendanceRecord,
@@ -253,8 +255,20 @@ export class AttendanceService implements IAttendanceService {
 
   async listPendingCorrections(): Promise<Result<any[]>> {
     try {
-      const all = [...this.corrections.values()].filter((c) => c.status === 'pending');
-      return Ok(all);
+      const { data, error } = await supabase
+        .from('attendance_corrections')
+        .select('*')
+        .eq('status', 'pending')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        const all = [...this.corrections.values()].filter((c) => c.status === 'pending');
+        return Ok(all);
+      }
+
+      const rows = (data ?? []).map((row) => toCamelCaseObject(row));
+      return Ok(rows);
     } catch {
       return Err(AppError.internal());
     }
@@ -262,19 +276,44 @@ export class AttendanceService implements IAttendanceService {
 
   async requestCorrection(recordId: UUID, field: string, proposed: string, reason: string, actor: Actor): Promise<Result<void>> {
     try {
-      const id = this.uuid();
-      const corr = {
-        id,
-        attendanceRecordId: recordId,
-        requestedBy: actor.id,
-        requestedDate: todayStr(),
-        fieldToCorrect: field,
-        proposedValue: proposed,
+      const record = await this.repo.findById(recordId);
+      const originalVal = record
+        ? field === 'firstClockIn'
+          ? record.firstClockIn || 'None'
+          : record.lastClockOut || 'None'
+        : 'None';
+
+      const payload = {
+        attendance_record_id: recordId,
+        requested_by: actor.id,
+        requested_date: todayStr(),
+        field_to_correct: field,
+        original_value: originalVal,
+        proposed_value: proposed,
         reason,
         status: 'pending',
-        createdAt: nowIso(),
       };
-      this.corrections.set(id, corr);
+
+      const { error } = await supabase
+        .from('attendance_corrections')
+        .insert(payload);
+
+      if (error) {
+        console.warn('Supabase attendance_corrections insert warning, using memory fallback:', error.message);
+        const id = this.uuid();
+        this.corrections.set(id, {
+          id,
+          attendanceRecordId: recordId,
+          requestedBy: actor.id,
+          requestedDate: todayStr(),
+          fieldToCorrect: field,
+          originalValue: originalVal,
+          proposedValue: proposed,
+          reason,
+          status: 'pending',
+          createdAt: nowIso(),
+        });
+      }
       return Ok(undefined);
     } catch {
       return Err(AppError.internal());
@@ -283,13 +322,27 @@ export class AttendanceService implements IAttendanceService {
 
   async approveCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>> {
     try {
-      const corr = this.corrections.get(correctionId);
+      const { data: corrData } = await supabase
+        .from('attendance_corrections')
+        .select('*')
+        .eq('id', correctionId)
+        .maybeSingle();
+
+      const corr = corrData ? toCamelCaseObject(corrData) : this.corrections.get(correctionId);
       if (!corr) return Err(AppError.notFound('Correction request not found.'));
 
-      corr.status = 'approved';
-      corr.approverId = actor.id;
-      corr.approverNotes = notes;
-      corr.approvedAt = nowIso();
+      await supabase
+        .from('attendance_corrections')
+        .update({
+          status: 'approved',
+          approver_id: actor.id,
+          approver_notes: notes || null,
+          approved_at: nowIso(),
+          updated_at: nowIso(),
+        })
+        .eq('id', correctionId);
+
+      this.corrections.delete(correctionId);
 
       const record = await this.repo.findById(corr.attendanceRecordId);
       if (record) {
