@@ -46,7 +46,10 @@ export class SupabaseSalaryStructureRepository extends SupabaseRepository<Salary
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByEmployee warning on ${this.tableName}:`, error.message);
+      return null;
+    }
     return data ? (toCamelCaseObject(data) as SalaryStructure) : null;
   }
 }

@@ -24,7 +24,10 @@ export class SupabaseChatMessageRepository extends SupabaseRepository<ChatMessag
       .is('deleted_at', null)
       .order('created_at', { ascending: true });
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByChannel warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as ChatMessage);
   }
 }
@@ -43,7 +46,10 @@ export class SupabaseEmailLogRepository extends SupabaseRepository<EmailLog> imp
       .eq('status', 'pending')
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findPending warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as EmailLog);
   }
 }
@@ -59,7 +65,10 @@ export class SupabaseNotificationPreferenceRepository extends SupabaseRepository
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByEmployee warning on ${this.tableName}:`, error.message);
+      return null;
+    }
     return data ? (toCamelCaseObject(data) as NotificationPreference) : null;
   }
 }

@@ -68,7 +68,95 @@ BEGIN
             NULL;
         END;
     END LOOP;
-END $$;
+-- 0. CORE HR & ATTENDANCE TABLES
+CREATE TABLE IF NOT EXISTS public.departments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT UNIQUE NOT NULL,
+    manager_id UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.employees (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id TEXT UNIQUE NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    status TEXT DEFAULT 'active',
+    department_id UUID,
+    designation TEXT NOT NULL,
+    reporting_manager_id UUID,
+    date_of_joining DATE DEFAULT CURRENT_DATE,
+    avatar_url TEXT,
+    google_drive_folder_id TEXT,
+    role TEXT DEFAULT 'EMPLOYEE',
+    username TEXT,
+    must_change_password BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID,
+    updated_by UUID,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+
+CREATE TABLE IF NOT EXISTS public.attendance_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL,
+    work_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    status TEXT DEFAULT 'clocked_out',
+    first_clock_in TIMESTAMPTZ,
+    last_clock_out TIMESTAMPTZ,
+    total_working_minutes INTEGER DEFAULT 0,
+    total_break_minutes INTEGER DEFAULT 0,
+    approved_by UUID,
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID,
+    updated_by UUID,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+
+CREATE TABLE IF NOT EXISTS public.leave_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL,
+    leave_type TEXT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    half_day BOOLEAN DEFAULT FALSE,
+    reason TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    medical_cert_url TEXT,
+    current_step TEXT DEFAULT 'ReportingManager',
+    approver_id UUID,
+    approver_notes TEXT,
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID,
+    updated_by UUID,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+
+CREATE TABLE IF NOT EXISTS public.work_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    attendance_record_id UUID NOT NULL,
+    clock_in TIMESTAMPTZ NOT NULL,
+    clock_out TIMESTAMPTZ,
+    work_type TEXT DEFAULT 'Office',
+    notes TEXT,
+    clock_in_geo JSONB,
+    clock_out_geo JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID,
+    updated_by UUID
+);
 
 -- 1. COLLEGES
 CREATE TABLE IF NOT EXISTS public.colleges (

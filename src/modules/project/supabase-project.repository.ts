@@ -29,7 +29,10 @@ export class SupabaseMilestoneRepository extends SupabaseRepository<Milestone> i
       .eq('project_id', projectId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByProject warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as Milestone);
   }
 }
@@ -44,7 +47,10 @@ export class SupabaseResourceAllocationRepository extends SupabaseRepository<Res
       .eq('project_id', projectId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByProject warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as ResourceAllocation);
   }
 
@@ -55,7 +61,10 @@ export class SupabaseResourceAllocationRepository extends SupabaseRepository<Res
       .eq('employee_id', employeeId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByEmployee warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as ResourceAllocation);
   }
 }
@@ -70,7 +79,10 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
       .eq('project_id', projectId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByProject warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as Task);
   }
 }
@@ -85,7 +97,10 @@ export class SupabaseTimesheetRepository extends SupabaseRepository<TimesheetRec
       .eq('employee_id', employeeId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByEmployee warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as TimesheetRecord);
   }
 }

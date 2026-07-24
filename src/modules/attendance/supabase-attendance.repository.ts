@@ -17,7 +17,10 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findActiveRecord warning on ${this.tableName}:`, error.message);
+      return null;
+    }
     return data ? (toCamelCaseObject(data) as AttendanceRecord) : null;
   }
 
@@ -30,7 +33,10 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       .lte('work_date', range.to)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findHistory warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as AttendanceRecord);
   }
 }

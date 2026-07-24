@@ -90,8 +90,9 @@ export function LeaveBoard() {
   // Exactly two leave types.
   const leaveTypes = businessRules.leave.types.map((t) => ({ value: t, label: t }));
 
-  const pendingCount = leaves.filter((l) => l.status === 'pending').length;
-  const approvedCount = leaves.filter((l) => l.status === 'approved').length;
+  const safeLeaves = Array.isArray(leaves) ? leaves : [];
+  const pendingCount = safeLeaves.filter((l) => l && l.status === 'pending').length;
+  const approvedCount = safeLeaves.filter((l) => l && l.status === 'approved').length;
 
   return (
     <AppShell>
@@ -104,11 +105,11 @@ export function LeaveBoard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
         <StatCard label="Pending Applications" value={pendingCount} tone="warning" icon="⚑" />
         <StatCard label="Approved Leaves" value={approvedCount} tone="success" icon="✓" />
-        <StatCard label="Total Leaves Taken" value={leaves.filter((l) => l.status === 'approved').length} icon="🗓" />
+        <StatCard label="Total Leaves Taken" value={safeLeaves.filter((l) => l && l.status === 'approved').length} icon="🗓" />
       </div>
 
       <SectionHeader title="My Leave History" />
-      <DataTable columns={columns} rows={leaves} rowKey={(r) => r.id} loading={loading} />
+      <DataTable columns={columns} rows={safeLeaves} rowKey={(r) => r.id} loading={loading} />
 
       {/* Apply Leave Drawer */}
       <Drawer open={applyOpen} onClose={() => setApplyOpen(false)} title="Apply for Leave">

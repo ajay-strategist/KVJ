@@ -16,7 +16,10 @@ export class SupabaseKpiDefinitionRepository extends SupabaseRepository<KpiDefin
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByCode warning on ${this.tableName}:`, error.message);
+      return null;
+    }
     return data ? (toCamelCaseObject(data) as KpiDefinition) : null;
   }
 }

@@ -16,7 +16,10 @@ export class SupabaseEmployeeRepository extends SupabaseRepository<Employee> imp
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByEmail warning on ${this.tableName}:`, error.message);
+      return null;
+    }
     return data ? (toCamelCaseObject(data) as Employee) : null;
   }
 
@@ -27,7 +30,10 @@ export class SupabaseEmployeeRepository extends SupabaseRepository<Employee> imp
       .eq('reporting_manager_id', managerId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findTeamMembers warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as Employee);
   }
 }

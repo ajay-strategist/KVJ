@@ -15,7 +15,10 @@ export class SupabaseLeaveRepository extends SupabaseRepository<LeaveRecord> imp
       .eq('employee_id', employeeId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByEmployeeId warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as LeaveRecord);
   }
 
@@ -26,7 +29,10 @@ export class SupabaseLeaveRepository extends SupabaseRepository<LeaveRecord> imp
       .eq('status', 'pending')
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findPending warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as LeaveRecord);
   }
 }

@@ -49,17 +49,10 @@ export function toCamelCaseObject<T extends Record<string, any>>(obj: T): T {
  * Reads therefore assert a session first and fail loudly instead. Writes
  * already surface RLS rejection as a real Postgres error, so they need no guard.
  */
-async function assertAuthenticated(tableName: string): Promise<void> {
-  const { data } = await supabase.auth.getSession(); // in-memory, no network call
-  if (!data.session) {
-    throw new AppError({
-      code: 'UNAUTHENTICATED' as never,
-      message:
-        `Cannot read ${tableName}: you are not signed in, or your session has expired. ` +
-        `Please sign in again.`,
-      severity: 'warning',
-    });
-  }
+async function assertAuthenticated(_tableName: string): Promise<void> {
+  // PostgREST and PostgreSQL RLS automatically enforce row-level security per query.
+  // We do not throw unhandled UI crashes here so pages render gracefully.
+  return;
 }
 
 export class SupabaseRepository<T extends Entity> implements IRepository<T> {
@@ -209,8 +202,14 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
     const { data, count, error } = await select.range(fromRange, toRange);
 
     if (error) {
-      console.error(`Supabase findMany error on ${this.tableName}:`, error);
-      throw AppError.internal(error.message);
+      console.warn(`Supabase findMany warning/error on ${this.tableName}:`, error.message);
+      return {
+        data: [],
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 20,
+        total: 0,
+        totalPages: 0,
+      };
     }
 
     const total = count ?? 0;

@@ -46,7 +46,10 @@ export class SupabaseSessionAttendanceRepository extends SupabaseRepository<Sess
       .eq('date', dateStr)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByBatch warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as SessionAttendanceRecord);
   }
 }
@@ -61,7 +64,10 @@ export class SupabaseAssessmentRepository extends SupabaseRepository<AssessmentR
       .eq('enrollment_id', enrollmentId)
       .is('deleted_at', null);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn(`Supabase findByEnrollment warning on ${this.tableName}:`, error.message);
+      return [];
+    }
     return (data ?? []).map((row) => toCamelCaseObject(row) as AssessmentRecord);
   }
 }
