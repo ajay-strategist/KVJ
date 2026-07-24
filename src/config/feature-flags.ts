@@ -91,8 +91,8 @@ export function isPageEnabled(key: keyof FeatureFlags['pages']): boolean {
 
 export function isSupabaseConfigured(): boolean {
   const metaEnv = (import.meta as { env?: Record<string, string> }).env ?? {};
-  const url = metaEnv.VITE_SUPABASE_URL || '';
-  const key = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+  const url = metaEnv.VITE_SUPABASE_URL || 'https://yzlyeuikvbwhgjrjntvi.supabase.co';
+  const key = metaEnv.VITE_SUPABASE_ANON_KEY || 'sb_publishable_he_GbjYhcIO6KjiUQDdaoA_xHnDKG1z';
   return !!url && url !== 'https://mock-project.supabase.co' && !url.includes('mock-project') && !!key && key !== 'mock-anon-key';
 }
 
