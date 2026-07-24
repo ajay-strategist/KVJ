@@ -296,7 +296,12 @@ export function ExpenseClaims() {
     const rate = vehicle === 'Car' ? carRate : bikeRate;
     const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
 
-    const receiptLink = values.receiptPreview || (values.receipt as string) || (values.receiptFile ? `[Uploaded File: ${(values.receiptFile as File).name}]` : 'Uploaded Proof');
+    const receiptLink: string =
+      (typeof values.receiptPreview === 'string' && values.receiptPreview)
+        ? values.receiptPreview
+        : (typeof values.receipt === 'string' && values.receipt)
+        ? values.receipt
+        : (values.receiptFile ? `[Uploaded File: ${(values.receiptFile as File).name}]` : 'Uploaded Proof');
 
     const newExp: ExpenseRecord = {
       id: String(Date.now()),
