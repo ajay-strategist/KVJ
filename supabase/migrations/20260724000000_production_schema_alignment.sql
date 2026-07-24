@@ -718,36 +718,32 @@ ALTER TABLE public.kpi_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saved_reports ENABLE ROW LEVEL SECURITY;
 
 -- Standard authenticated policy helper
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'colleges') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.colleges FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'courses') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.courses FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'batches') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.batches FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'schedule_sessions') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.schedule_sessions FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'student_records') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.student_records FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'expense_claims') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.expense_claims FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'tasks') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.tasks FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'projects') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.projects FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow full access for authenticated users' AND tablename = 'chat_messages') THEN
-        CREATE POLICY "Allow full access for authenticated users" ON public.chat_messages FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-END $$;
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.colleges;
+CREATE POLICY "Allow full access for authenticated users" ON public.colleges FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.courses;
+CREATE POLICY "Allow full access for authenticated users" ON public.courses FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.batches;
+CREATE POLICY "Allow full access for authenticated users" ON public.batches FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.schedule_sessions;
+CREATE POLICY "Allow full access for authenticated users" ON public.schedule_sessions FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.student_records;
+CREATE POLICY "Allow full access for authenticated users" ON public.student_records FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.expense_claims;
+CREATE POLICY "Allow full access for authenticated users" ON public.expense_claims FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.tasks;
+CREATE POLICY "Allow full access for authenticated users" ON public.tasks FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.projects;
+CREATE POLICY "Allow full access for authenticated users" ON public.projects FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.chat_messages;
+CREATE POLICY "Allow full access for authenticated users" ON public.chat_messages FOR ALL USING (auth.role() = 'authenticated');
 
 -- 16. INDEXES FOR HIGH PERFORMANCE
 CREATE INDEX IF NOT EXISTS idx_batches_college ON public.batches(college_id);
@@ -759,30 +755,26 @@ CREATE INDEX IF NOT EXISTS idx_expenses_emp ON public.expense_claims(employee_id
 CREATE INDEX IF NOT EXISTS idx_chat_msg_channel ON public.chat_messages(channel_id, created_at);
 
 -- 17. RE-APPLY FOREIGN KEY CONSTRAINTS
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'batches_college_id_fkey') THEN
-        ALTER TABLE public.batches ADD CONSTRAINT batches_college_id_fkey FOREIGN KEY (college_id) REFERENCES public.colleges(id) ON DELETE CASCADE;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'batches_course_id_fkey') THEN
-        ALTER TABLE public.batches ADD CONSTRAINT batches_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'student_records_batch_id_fkey') THEN
-        ALTER TABLE public.student_records ADD CONSTRAINT student_records_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.batches(id) ON DELETE CASCADE;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'enrollments_student_id_fkey') THEN
-        ALTER TABLE public.enrollments ADD CONSTRAINT enrollments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.student_records(id) ON DELETE CASCADE;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'enrollments_batch_id_fkey') THEN
-        ALTER TABLE public.enrollments ADD CONSTRAINT enrollments_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.batches(id) ON DELETE CASCADE;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'assessments_enrollment_id_fkey') THEN
-        ALTER TABLE public.assessments ADD CONSTRAINT assessments_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollments(id) ON DELETE CASCADE;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'tasks_project_id_fkey') THEN
-        ALTER TABLE public.tasks ADD CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'chat_messages_channel_id_fkey') THEN
-        ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_channel_id_fkey FOREIGN KEY (channel_id) REFERENCES public.chat_channels(id) ON DELETE CASCADE;
-    END IF;
-END $$;
+ALTER TABLE public.batches DROP CONSTRAINT IF EXISTS batches_college_id_fkey;
+ALTER TABLE public.batches ADD CONSTRAINT batches_college_id_fkey FOREIGN KEY (college_id) REFERENCES public.colleges(id) ON DELETE CASCADE;
+
+ALTER TABLE public.batches DROP CONSTRAINT IF EXISTS batches_course_id_fkey;
+ALTER TABLE public.batches ADD CONSTRAINT batches_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE;
+
+ALTER TABLE public.student_records DROP CONSTRAINT IF EXISTS student_records_batch_id_fkey;
+ALTER TABLE public.student_records ADD CONSTRAINT student_records_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.batches(id) ON DELETE CASCADE;
+
+ALTER TABLE public.enrollments DROP CONSTRAINT IF EXISTS enrollments_student_id_fkey;
+ALTER TABLE public.enrollments ADD CONSTRAINT enrollments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.student_records(id) ON DELETE CASCADE;
+
+ALTER TABLE public.enrollments DROP CONSTRAINT IF EXISTS enrollments_batch_id_fkey;
+ALTER TABLE public.enrollments ADD CONSTRAINT enrollments_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.batches(id) ON DELETE CASCADE;
+
+ALTER TABLE public.assessments DROP CONSTRAINT IF EXISTS assessments_enrollment_id_fkey;
+ALTER TABLE public.assessments ADD CONSTRAINT assessments_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollments(id) ON DELETE CASCADE;
+
+ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_project_id_fkey;
+ALTER TABLE public.tasks ADD CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE;
+
+ALTER TABLE public.chat_messages DROP CONSTRAINT IF EXISTS chat_messages_channel_id_fkey;
+ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_channel_id_fkey FOREIGN KEY (channel_id) REFERENCES public.chat_channels(id) ON DELETE CASCADE;
