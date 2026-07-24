@@ -48,6 +48,16 @@ export function ProjectList() {
   const { projects, clients, tasks, allocations, createProject, createTask } = useProject();
   const { employees } = useEmployee();
 
+  const assigneeOptions = useMemo(() => {
+    if (employees.length > 0) {
+      return employees.map((e) => {
+        const name = `${e.firstName} ${e.lastName}`.trim();
+        return { value: name, label: e.designation ? `${name} (${e.designation})` : name };
+      });
+    }
+    return [{ value: 'Unassigned', label: 'Unassigned' }];
+  }, [employees]);
+
   const mappedProjects = useMemo(() => {
     return projects.map((p) => {
       const client = clients.find((c) => c.id === p.clientId);
