@@ -142,9 +142,20 @@ export function BatchManagement() {
     e.preventDefault();
     if (!newBatchForm.code.trim()) return;
 
-    const courseId = newBatchForm.selectedCourseId || courses[0]?.id || 'c-1';
+    const courseId = newBatchForm.selectedCourseId || courses[0]?.id;
     const selectedCourse = courses.find(c => c.id === courseId);
-    const trainerId = trainers[0]?.id || 'u-admin';
+    const trainerId = trainers[0]?.id;
+
+    // Both courseId and trainerId must be real UUIDs before sending to Supabase
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!courseId || !UUID_RE.test(courseId)) {
+      toast({ variant: 'error', title: 'No Course Selected', message: 'Please select a valid course before creating a batch.' });
+      return;
+    }
+    if (!trainerId || !UUID_RE.test(trainerId)) {
+      toast({ variant: 'error', title: 'No Trainer Available', message: 'Please ensure at least one trainer employee exists before creating a batch.' });
+      return;
+    }
 
     const res = await createBatch({
       code: newBatchForm.code,
@@ -162,6 +173,7 @@ export function BatchManagement() {
       batchNo: newBatchForm.batchName,
       phase: 'Scheduled',
     });
+
 
     if (res.ok) {
       toast({

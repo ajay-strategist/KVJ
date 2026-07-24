@@ -257,31 +257,34 @@ export function ChatChannels() {
 
   // Star, Pin, Archive channel triggers
   const handleToggleStarChannel = async (cId: string) => {
+    if (!user?.id) return;
     const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
     const target = await channelRepo.findById(cId as UUID);
     if (target) {
       target.isStarred = !target.isStarred;
-      await channelRepo.update(cId as UUID, target, { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' });
+      await channelRepo.update(cId as UUID, target, { id: user.id, role: user.role });
       toast({ variant: 'success', title: target.isStarred ? 'Channel Starred' : 'Channel Unstarred' });
     }
   };
 
   const handleToggleArchiveChannel = async (cId: string) => {
+    if (!user?.id) return;
     const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
     const target = await channelRepo.findById(cId as UUID);
     if (target) {
       target.isArchived = !target.isArchived;
-      await channelRepo.update(cId as UUID, target, { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' });
+      await channelRepo.update(cId as UUID, target, { id: user.id, role: user.role });
       toast({ variant: 'success', title: target.isArchived ? 'Channel Archived' : 'Channel Unarchived' });
     }
   };
 
   const handleToggleMuteChannel = async (cId: string) => {
+    if (!user?.id) return;
     const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
     const target = await channelRepo.findById(cId as UUID);
     if (target) {
       target.isMuted = !target.isMuted;
-      await channelRepo.update(cId as UUID, target, { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' });
+      await channelRepo.update(cId as UUID, target, { id: user.id, role: user.role });
       toast({ variant: 'success', title: target.isMuted ? 'Channel Muted' : 'Channel Unmuted' });
     }
   };

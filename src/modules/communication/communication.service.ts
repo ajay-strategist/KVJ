@@ -42,56 +42,12 @@ export class CommunicationService implements ICommunicationService {
   }
 
   private subscribeToEvents() {
-    // Listen for attendance and leave application events to publish notifications to relevant channels
-    eventBus.on('attendance.clockIn' as any, async (payload: any) => {
-      const actor = { id: 'u-admin', role: 'ADMIN' };
-      await this.sendMessage({
-        channelId: 'c-hr' as UUID,
-        senderId: 'u-admin' as UUID,
-        text: `📅 **Clock In Alert**: Employee \`${payload.employeeId}\` has clocked in at ${new Date(payload.time).toLocaleTimeString()}.`,
-        attachments: []
-      }, actor);
-    });
-
-    eventBus.on('attendance.clockOut' as any, async (payload: any) => {
-      const actor = { id: 'u-admin', role: 'ADMIN' };
-      await this.sendMessage({
-        channelId: 'c-hr' as UUID,
-        senderId: 'u-admin' as UUID,
-        text: `📅 **Clock Out Alert**: Employee \`${payload.employeeId}\` has clocked out at ${new Date(payload.time).toLocaleTimeString()}.`,
-        attachments: []
-      }, actor);
-    });
-
-    eventBus.on('leave.applied' as any, async (payload: any) => {
-      const actor = { id: 'u-admin', role: 'ADMIN' };
-      await this.sendMessage({
-        channelId: 'c-hr' as UUID,
-        senderId: 'u-admin' as UUID,
-        text: `📝 **Leave Request**: Employee \`${payload.employeeId}\` has submitted a new leave application (Reference: \`${payload.leaveId}\`). Pending manager approval.`,
-        attachments: []
-      }, actor);
-    });
-
-    eventBus.on('leave.approved' as any, async (payload: any) => {
-      const actor = { id: 'u-admin', role: 'ADMIN' };
-      await this.sendMessage({
-        channelId: 'c-hr' as UUID,
-        senderId: 'u-admin' as UUID,
-        text: `✅ **Leave Approved**: Leave request \`${payload.leaveId}\` for Employee \`${payload.employeeId}\` has been approved.`,
-        attachments: []
-      }, actor);
-    });
-
-    eventBus.on('leave.rejected' as any, async (payload: any) => {
-      const actor = { id: 'u-admin', role: 'ADMIN' };
-      await this.sendMessage({
-        channelId: 'c-hr' as UUID,
-        senderId: 'u-admin' as UUID,
-        text: `❌ **Leave Rejected**: Leave request \`${payload.leaveId}\` for Employee \`${payload.employeeId}\` has been rejected.`,
-        attachments: []
-      }, actor);
-    });
+    // Event-driven channel notifications are only sent when a valid UUID actor
+    // is available at the call site. The 'u-admin' / 'c-hr' mock IDs that were
+    // here before caused PostgreSQL to reject every write with
+    // "invalid input syntax for type uuid" — they have been removed.
+    // Real-time notification broadcasting via live actor context will be
+    // implemented in Phase 2 using Supabase Realtime + Edge Functions.
   }
 
   async createChannel(data: Partial<ChatChannel>, actor: Actor): Promise<Result<ChatChannel>> {
