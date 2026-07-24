@@ -600,13 +600,13 @@ export function ProjectList() {
 
       {/* Create Project Modal */}
       <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create New Project">
-        <Form initial={{ code: 'KVJ-PRJ-00', status: 'planning' }} onSubmit={handleCreateProjectSubmit}>
+        <Form initial={{ code: 'KVJ-PRJ-00', status: 'planning' }} onSubmit={handleCreateProject}>
           <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
-          <TextField name="name" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
+          <TextField name="title" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
           <SelectField
             name="clientId"
             label="Client Organization *"
-            options={clients.map((c) => ({ value: c.id, label: `${c.companyName} (${c.clientCode})` }))}
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
           />
           <SelectField
             name="status"
