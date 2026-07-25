@@ -104,7 +104,6 @@ export const AttendancePanel = memo(function AttendancePanel({
   const { toast } = useNotifications();
   const { batches, courses } = useTraining();
   const [clockInOpen, setClockInOpen] = useState(false);
-  const [breakOpen, setBreakOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState('Office');
 
@@ -218,13 +217,11 @@ export const AttendancePanel = memo(function AttendancePanel({
     }
   }, [confirm, clockOut, toast, onActivityLog]);
 
-  const handleStartBreakSubmit = useCallback(async (values: Record<string, unknown>) => {
-    const reason = values.reason as string;
-    const res = await startBreak(reason);
+  const handleDirectStartBreak = useCallback(async () => {
+    const res = await startBreak('Official Break');
     if (res.ok) {
-      toast({ variant: 'info', title: 'On Break', message: reason ? `Reason: ${reason}` : 'Enjoy your break.' });
-      if (onActivityLog) onActivityLog(`Started break: ${reason || 'Break'}`, 'info');
-      setBreakOpen(false);
+      toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
+      if (onActivityLog) onActivityLog('Started official break', 'info');
     } else {
       toast({ variant: 'error', title: 'Break Failed', message: res.error });
     }
@@ -364,7 +361,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 type="button"
                 className="kvj-btn"
                 disabled={loading}
-                onClick={() => setBreakOpen(true)}
+                onClick={handleDirectStartBreak}
                 style={{
                   background: '#f59e0b',
                   color: 'white',
@@ -655,16 +652,7 @@ export const AttendancePanel = memo(function AttendancePanel({
         </Form>
       </Drawer>
 
-      {/* Start Break Drawer */}
-      <Drawer open={breakOpen} onClose={() => setBreakOpen(false)} title="Start Break Session">
-        <Form initial={{ reason: '' }} onSubmit={handleStartBreakSubmit}>
-          <TextField name="reason" label="Reason for Break (Optional)" placeholder="Coffee, lunch, etc." />
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setBreakOpen(false)}>Cancel</Button>
-            <Button type="submit">Start Break</Button>
-          </div>
-        </Form>
-      </Drawer>
+
     </>
   );
 });
