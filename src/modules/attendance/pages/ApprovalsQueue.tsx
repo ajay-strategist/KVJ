@@ -312,7 +312,12 @@ export function ApprovalsQueue() {
     {
       key: 'field',
       header: 'Field',
-      accessor: (r) => r.fieldToCorrect === 'firstClockIn' ? 'First Clock In' : 'Last Clock Out',
+      accessor: (r) => {
+        if (r.fieldToCorrect === 'firstClockIn') return 'First Clock In';
+        if (r.fieldToCorrect === 'lastClockOut') return 'Last Clock Out';
+        if (r.fieldToCorrect === 'attendance_claim') return 'Attendance Claim';
+        return r.fieldToCorrect;
+      },
     },
     {
       key: 'proposed',
@@ -473,7 +478,13 @@ export function ApprovalsQueue() {
               <div>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Field to Correct</span>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>
-                  {selectedCorrection.fieldToCorrect === 'firstClockIn' ? 'First Clock In' : 'Last Clock Out'}
+                  {selectedCorrection.fieldToCorrect === 'firstClockIn'
+                    ? 'First Clock In'
+                    : selectedCorrection.fieldToCorrect === 'lastClockOut'
+                    ? 'Last Clock Out'
+                    : selectedCorrection.fieldToCorrect === 'attendance_claim'
+                    ? 'Attendance Claim'
+                    : selectedCorrection.fieldToCorrect}
                 </div>
               </div>
               <div>

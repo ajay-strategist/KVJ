@@ -8,15 +8,18 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { container } from '../../../core/registry';
+import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { ATTENDANCE_REPOSITORY_TOKEN, type AttendanceRecord } from '../attendance.repository';
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN, type ExpenseClaim } from '../../finance/finance.repository';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { toLocalISODate, todayISO } from '../../../shared/utils/date';
+import { useTraining } from '../../training/hooks/useTraining';
 
 export function AttendanceLogPage() {
   const { user } = useAuth();
   const { toast } = useNotifications();
+  const { batches } = useTraining();
 
   const userRole = user?.role || 'EMPLOYEE';
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
@@ -527,12 +530,29 @@ export function AttendanceLogPage() {
         <Form
           initial={{
             date: new Date().toISOString().slice(0, 10),
-            location: 'Christ 3BBA Data Analytics B1',
+            location: 'Office Work',
             startTime: '08:30 AM',
             endTime: '05:00 PM',
             notes: '',
           }}
-          onSubmit={(values) => {
+          onSubmit={async (values) => {
+            try {
+              const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
+              const locText = values.location || 'Office Work';
+              const isOffice = locText === 'Office Work';
+              const classification = isOffice ? 'Office' : 'Training';
+
+              await attService.requestCorrection(
+                String(Date.now()),
+                'attendance_claim',
+                `${values.date} (${values.startTime} - ${values.endTime})`,
+                `Classification: ${classification}, Location: ${locText}. ${values.notes || ''}`,
+                { id: user?.id || 'emp-user', role: user?.role || 'Employee' }
+              );
+            } catch (e) {
+              console.warn('Attendance correction request notice:', e);
+            }
+
             toast({
               variant: 'success',
               title: 'Attendance Claim Submitted',
@@ -547,9 +567,7 @@ export function AttendanceLogPage() {
             label="Location (Training Batch / Office)"
             options={[
               { value: 'Office Work', label: 'Office Work' },
-              { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
-              { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
-              { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
+              ...batches.map((b) => ({ value: b.code, label: b.code })),
             ]}
           />
           <TextField name="startTime" label="Start Time" placeholder="08:30 AM" />

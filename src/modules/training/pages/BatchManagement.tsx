@@ -14,10 +14,10 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { usePermissions } from '../../../shared/permissions/react';
 import { useAuth } from '../../auth/AuthProvider';
 import { todayISO } from '../../../shared/utils/date';
-import { makeDailyReportFixture } from '../report/daily-report.fixture';
 import { DailyReportBuilderModal } from '../report/DailyReportBuilderModal';
 import { DailyReportPreview } from '../report/DailyReportPreview';
-import type { DailyReportConfig } from '../report/daily-report.types';
+import type { DailyReportConfig, DailyReportData } from '../report/daily-report.types';
+import { useMemo } from 'react';
 
 // Workspace Navigation Tabs
 type WorkspaceTab =
@@ -113,9 +113,10 @@ export function BatchManagement() {
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const canCreateBatch = ['ADMIN', 'MANAGER', 'CEO'].includes(userRole);
   const canViewDailyReport = can('training', 'view');
-  const { batches, courses, createBatch } = useTraining();
+  const { batches, courses, createBatch, students: dbStudents, enrollments } = useTraining();
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
 
   // Create Batch Modal State
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
@@ -214,7 +215,53 @@ export function BatchManagement() {
   // Daily Report Builder & Preview States
   const [dailyReportBuilderOpen, setDailyReportBuilderOpen] = useState(false);
   const [dailyReportPreviewOpen, setDailyReportPreviewOpen] = useState(false);
-  const [dailyReportFixture] = useState(() => makeDailyReportFixture());
+
+  const dailyReportFixture = useMemo<DailyReportData>(() => {
+    const selectedBatch = batches.find((b) => b.id === selectedBatchId);
+    const batchStudents = dbStudents.filter((s) => {
+      return enrollments.some((e) => e.batchId === selectedBatchId && e.studentId === s.id);
+    });
+
+    return {
+      reportDate: todayISO(),
+      batchId: selectedBatchId,
+      batchCode: selectedBatch?.code || '',
+      batchName: selectedBatch?.trainingName || '',
+      collegeName: selectedBatch?.college || '',
+      courseName: selectedBatch?.courseId || '',
+      academicYear: '2026',
+      trainerName: 'Ajay V. Strategy',
+      coordinatorName: 'Ajay V. Strategy',
+      totalStudents: batchStudents.length,
+      courseMaxMarks: 100,
+      finalExamPassMarkPercent: 50,
+      assessments: [],
+      sessions: [],
+      students: batchStudents.map((s) => ({
+        id: s.id,
+        registerNo: s.registerNo || '',
+        phone: s.phone || '',
+        name: `${s.firstName} ${s.lastName}`,
+        email: s.email || '',
+        college: selectedBatch?.college || '',
+        batch: selectedBatch?.trainingName || '',
+        gender: (s.customFields?.gender || 'Female') as 'Male' | 'Female',
+        qualification: s.academicQualification || '',
+        hasComputer: (s.customFields?.hasComputer || 'Yes') as 'Yes' | 'No',
+        learnedBefore: (s.customFields?.learnedBefore || 'No') as 'Yes' | 'No',
+        attendancePct: 100,
+        totalPresent: 0,
+        totalSessions: 0,
+        assessmentScores: {},
+        assessmentStatus: 'Pending',
+        finalExamEligibility: 'Eligible',
+      })),
+      progressMilestones: [],
+      riskItems: [],
+      defaultTrainerNotes: 'No notes registered.',
+    };
+  }, [selectedBatchId, batches, dbStudents, enrollments]);
+
   const [dailyReportConfig, setDailyReportConfig] = useState<DailyReportConfig>(() => ({
     selectedSections: [
       'executive-summary',
@@ -223,13 +270,30 @@ export function BatchManagement() {
       'final-exam-eligibility',
       'student-data',
     ],
-    selectedAssessmentIds: ['ass-1', 'ass-2', 'ass-3', 'ass-4'],
-    selectedStudentColumns: ['studentName', 'gender', 'hasComputer', 'learnedBefore', 'attendancePct', 'ass-1', 'ass-2', 'ass-3', 'ass-4', 'assessmentStatus', 'finalExamEligibility'],
-    trainerNotes: makeDailyReportFixture().defaultTrainerNotes,
+    selectedAssessmentIds: [],
+    selectedStudentColumns: ['studentName', 'gender', 'hasComputer', 'learnedBefore', 'attendancePct', 'assessmentStatus', 'finalExamEligibility'],
+    trainerNotes: 'No notes registered.',
   }));
-  
-  // Batch selection
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+
+  useEffect(() => {
+    setDailyReportConfig((prev) => ({
+      ...prev,
+      trainerNotes: dailyReportFixture.defaultTrainerNotes,
+      selectedAssessmentIds: dailyReportFixture.assessments.map((a) => a.id),
+      selectedStudentColumns: [
+        'studentName',
+        'gender',
+        'hasComputer',
+        'learnedBefore',
+        'attendancePct',
+        ...dailyReportFixture.assessments.map((a) => a.id),
+        'assessmentStatus',
+        'finalExamEligibility',
+      ],
+    }));
+  }, [dailyReportFixture]);
+
+  // Batch selection - declared at the top of the component
   
   // Edit Batch modal state
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);

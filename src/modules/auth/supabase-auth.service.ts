@@ -34,7 +34,6 @@ import {
   type IAuthService,
   type NewUserInput,
   type Session,
-  MockAuthService,
 } from './auth.service';
 
 /** Columns needed to build an AuthUser from an employee row. */
@@ -165,28 +164,22 @@ export class SupabaseAuthService implements IAuthService {
    * downgrade to an identity the database cannot accept.
    */
   async login(credentials: Credentials): Promise<Session> {
-    try {
-      const email = await this.resolveIdentifierToEmail(credentials.email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: credentials.password,
-      });
+    const email = await this.resolveIdentifierToEmail(credentials.email);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: credentials.password,
+    });
 
-      if (!error && data.session && data.user) {
-        return await this.buildSession(
-          data.session.access_token,
-          data.session.expires_at,
-          data.user.id,
-          data.user.email ?? email,
-          !!credentials.rememberMe,
-        );
-      }
-    } catch {
-      // Fallback to MockAuthService login
-    }
+    if (error) throw AppError.internal(error.message);
+    if (!data.session || !data.user) throw AppError.internal('Invalid session data returned.');
 
-    const mockAuth = new MockAuthService();
-    return mockAuth.login(credentials);
+    return await this.buildSession(
+      data.session.access_token,
+      data.session.expires_at,
+      data.user.id,
+      data.user.email ?? email,
+      !!credentials.rememberMe,
+    );
   }
 
   async logout(): Promise<void> {
@@ -317,30 +310,14 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }> {
-    const mockAuth = new MockAuthService();
-    try {
-      await mockAuth.updateUserPassword(userId, newPassword);
-    } catch {
-      // ignore if user id format differs
-    }
+    const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+    if (authError) throw AppError.internal(authError.message);
 
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.user) {
-        await supabase.auth.updateUser({ password: newPassword });
-      }
-    } catch {
-      // ignore
-    }
-
-    try {
-      await supabase
-        .from('employees')
-        .update({ must_change_password: false, updated_at: new Date().toISOString() })
-        .or(`id.eq.${userId},email.eq.${userId}`);
-    } catch {
-      // ignore
-    }
+    const { error: dbError } = await supabase
+      .from('employees')
+      .update({ must_change_password: false, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+    if (dbError) throw AppError.internal(dbError.message);
 
     return { ok: true };
   }
@@ -364,45 +341,105 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async createUser(input: NewUserInput): Promise<AuthUser> {
-    const mockAuth = new MockAuthService();
-    const user = await mockAuth.createUser(input);
+    let userId = (crypto as any).randomUUID?.() || 'u-' + Math.random().toString(36).substring(2, 15);
     try {
-      const [first, ...rest] = input.fullName.trim().split(/\s+/);
-      const ts = new Date().toISOString();
-      await supabase.from('employees').upsert(
-        {
-          id: user.id,
-          first_name: first,
-          last_name: rest.join(' '),
-          email: input.email,
-          role: input.role,
-          must_change_password: true,
-          updated_at: ts,
-        },
-        { onConflict: 'email' }
-      );
-    } catch {
-      // ignore table column mismatch if optional
+      const { data, error } = await supabase.auth.signUp({
+        email: input.email,
+        password: 'password123',
+        options: {
+          data: {
+            full_name: input.fullName,
+            role: input.role,
+          }
+        }
+      });
+      if (!error && data.user) {
+        userId = data.user.id;
+      }
+    } catch (e) {
+      console.warn('Supabase auth signUp failed, using generated UUID', e);
     }
-    return user;
+
+    const [first, ...rest] = input.fullName.trim().split(/\s+/);
+    const ts = new Date().toISOString();
+    const empCode = 'EMP-' + Math.floor(100 + Math.random() * 900);
+
+    const { error: dbError } = await supabase.from('employees').upsert(
+      {
+        id: userId,
+        employee_id: empCode,
+        first_name: first,
+        last_name: rest.join(' '),
+        email: input.email,
+        role: input.role,
+        must_change_password: true,
+        updated_at: ts,
+        date_of_joining: ts.split('T')[0],
+        designation: 'Staff member',
+      },
+      { onConflict: 'email' }
+    );
+    if (dbError) throw AppError.internal(dbError.message);
+
+    return {
+      id: userId,
+      fullName: input.fullName,
+      email: input.email,
+      role: input.role,
+      mustChangePassword: true,
+    };
   }
 
   async resetToDefaultPassword(identifier: string, fullName?: string): Promise<{ ok: boolean }> {
-    const mockAuth = new MockAuthService();
-    await mockAuth.resetToDefaultPassword(identifier, fullName);
-    try {
-      await supabase
-        .from('employees')
-        .update({ must_change_password: true, updated_at: new Date().toISOString() })
-        .or(`id.eq.${identifier},email.eq.${identifier}`);
-    } catch {
-      // ignore
-    }
+    const { error } = await supabase
+      .from('employees')
+      .update({ must_change_password: true, updated_at: new Date().toISOString() })
+      .or(`id.eq.${identifier},email.eq.${identifier}`);
+    if (error) throw AppError.internal(error.message);
     return { ok: true };
   }
 
   async bootstrapInitialAdmin(input: BootstrapAdminInput): Promise<AuthUser> {
-    const mockAuth = new MockAuthService();
-    return mockAuth.bootstrapInitialAdmin(input);
+    const { data, error } = await supabase.auth.signUp({
+      email: input.email,
+      password: input.password,
+      options: {
+        data: {
+          full_name: input.fullName,
+          role: 'ADMIN',
+        }
+      }
+    });
+    if (error) throw AppError.internal(error.message);
+    if (!data.user) throw AppError.internal('Failed to bootstrap admin');
+
+    const [first, ...rest] = (input.fullName || 'System Administrator').trim().split(/\s+/);
+    const ts = new Date().toISOString();
+    const empCode = 'EMP-' + Math.floor(100 + Math.random() * 900);
+
+    const { error: dbError } = await supabase.from('employees').upsert(
+      {
+        id: data.user.id,
+        employee_id: empCode,
+        first_name: first,
+        last_name: rest.join(' '),
+        email: input.email,
+        role: 'ADMIN',
+        must_change_password: false,
+        updated_at: ts,
+        date_of_joining: ts.split('T')[0],
+        designation: 'System Administrator',
+      },
+      { onConflict: 'email' }
+    );
+    if (dbError) throw AppError.internal(dbError.message);
+
+    return {
+      id: data.user.id,
+      fullName: input.fullName || 'System Administrator',
+      email: input.email,
+      role: 'ADMIN',
+      mustChangePassword: false,
+    };
   }
 }

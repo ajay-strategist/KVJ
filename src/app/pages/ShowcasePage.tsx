@@ -13,7 +13,8 @@ import { DataTable, type Column } from '../../shared/ui/DataTable';
 import { Form, TextField, SelectField, SwitchField, validators } from '../../shared/forms/form';
 import { useDialog } from '../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../shared/notifications/NotificationProvider';
-import { mock, type MockEmployee } from '../../shared/mock/factories';
+export interface MockEmployee { id: string; name: string; role: string; department: string; status: string; attendancePct: number }
+export interface MockActivity { id: string; actor: string; action: string; time: string }
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -28,8 +29,8 @@ export function ShowcasePage() {
   const { confirm, alertSuccess } = useDialog();
   const { toast } = useNotifications();
   const [q, setQ] = useState('');
-  const [employees] = useState(() => mock.employees());
-  const [activities] = useState(() => mock.activity(3));
+  const [employees] = useState<MockEmployee[]>([]);
+  const [activities] = useState<MockActivity[]>([]);
   const cols: Column<MockEmployee>[] = [
     { key: 'name', header: 'Name', sortable: true, accessor: (r) => r.name, render: (r) => <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={r.name} size={26} />{r.name}</span> },
     { key: 'department', header: 'Department', accessor: (r) => r.department },

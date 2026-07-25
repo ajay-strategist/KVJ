@@ -351,21 +351,38 @@ export class AttendanceService implements IAttendanceService {
       const corr = corrData ? toCamelCaseObject(corrData) : this.corrections.get(correctionId);
       if (!corr) return Err(AppError.notFound('Correction request not found.'));
 
-      await supabase
-        .from('attendance_corrections')
-        .update({
-          status: 'approved',
-          approver_id: actor.id,
-          approver_notes: notes || null,
-          approved_at: nowIso(),
-          updated_at: nowIso(),
-        })
-        .eq('id', correctionId);
+      const parseTimeStr = (date: string, tStr: string): string | undefined => {
+        if (tStr.includes('T') && tStr.includes('Z')) return tStr;
+        const t = tStr.trim();
+        const match = t.match(/^(\d+)(?::(\d+))?(?::(\d+))?\s*(AM|PM)?$/i);
+        if (!match) return undefined;
+        
+        let hours = parseInt(match[1], 10);
+        const minutes = match[2] ? parseInt(match[2], 10) : 0;
+        const seconds = match[3] ? parseInt(match[3], 10) : 0;
+        const ampm = match[4]?.toUpperCase();
 
-      this.corrections.delete(correctionId);
+        if (ampm) {
+          if (ampm === 'PM' && hours < 12) hours += 12;
+          if (ampm === 'AM' && hours === 12) hours = 0;
+        }
+
+        const dateParts = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!dateParts) return undefined;
+        const y = parseInt(dateParts[1], 10);
+        const m = parseInt(dateParts[2], 10);
+        const d = parseInt(dateParts[3], 10);
+
+        try {
+          const localDate = new Date(y, m - 1, d, hours, minutes, seconds);
+          return localDate.toISOString();
+        } catch {
+          return undefined;
+        }
+      };
 
       let record = null;
-      if (corr.attendanceRecordId && !corr.attendanceRecordId.includes('-') && corr.attendanceRecordId.length === 36) {
+      if (corr.attendanceRecordId && corr.attendanceRecordId.length === 36) {
         try {
           record = await this.repo.findById(corr.attendanceRecordId);
         } catch {}
@@ -388,11 +405,15 @@ export class AttendanceService implements IAttendanceService {
         let lastClockOut = undefined;
 
         if (corr.fieldToCorrect === 'attendance_claim') {
-          const match = corr.proposedValue.match(/^([\d-]+)\s*\(([\d:]+)\s*-\s*([\d:]+)\)/);
-          if (match) {
-            workDate = match[1];
-            firstClockIn = match[2];
-            lastClockOut = match[3];
+          const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\(([^)]+)\)/);
+          if (claimMatch) {
+            workDate = claimMatch[1];
+            const timeRange = claimMatch[2];
+            const times = timeRange.split(/\s*-\s*/);
+            if (times.length === 2) {
+              firstClockIn = parseTimeStr(workDate, times[0]);
+              lastClockOut = parseTimeStr(workDate, times[1]);
+            }
           }
         }
 
@@ -418,21 +439,40 @@ export class AttendanceService implements IAttendanceService {
       } else {
         const patch: Partial<AttendanceRecord> = {};
         if (corr.fieldToCorrect === 'firstClockIn') {
-          patch.firstClockIn = corr.proposedValue;
+          patch.firstClockIn = parseTimeStr(record.workDate, corr.proposedValue) || corr.proposedValue;
         } else if (corr.fieldToCorrect === 'lastClockOut') {
-          patch.lastClockOut = corr.proposedValue;
+          patch.lastClockOut = parseTimeStr(record.workDate, corr.proposedValue) || corr.proposedValue;
         } else if (corr.fieldToCorrect === 'attendance_claim') {
-          const match = corr.proposedValue.match(/^([\d-]+)\s*\(([\d:]+)\s*-\s*([\d:]+)\)/);
-          if (match) {
-            patch.firstClockIn = match[2];
-            patch.lastClockOut = match[3];
+          const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\(([^)]+)\)/);
+          if (claimMatch) {
+            const workDate = claimMatch[1];
+            const timeRange = claimMatch[2];
+            const times = timeRange.split(/\s*-\s*/);
+            if (times.length === 2) {
+              patch.firstClockIn = parseTimeStr(workDate, times[0]);
+              patch.lastClockOut = parseTimeStr(workDate, times[1]);
+            }
           }
         }
         await this.repo.update(record.id, patch, actor);
       }
 
+      await supabase
+        .from('attendance_corrections')
+        .update({
+          status: 'approved',
+          approver_id: actor.id,
+          approver_notes: notes || null,
+          approved_at: nowIso(),
+          updated_at: nowIso(),
+        })
+        .eq('id', correctionId);
+
+      this.corrections.delete(correctionId);
+
       return Ok(undefined);
     } catch (e) {
+      console.error('Failed to approve attendance correction:', e);
       return Err(AppError.internal());
     }
   }

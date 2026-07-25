@@ -1,21 +1,15 @@
 import { container } from '../core/registry';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../modules/employee/employee.repository';
-import { AUTH_SERVICE_TOKEN, MockAuthService } from '../modules/auth/auth.service';
+import { AUTH_SERVICE_TOKEN } from '../modules/auth/auth.service';
 import { SupabaseAuthService } from '../modules/auth/supabase-auth.service';
-import { appConfig } from '../config/app-config';
-import { registerDemoWidgets } from './widgets/demo-widgets';
-import { MockEmployeeRepository } from '../modules/employee/mock-employee.repository';
 import { EMPLOYEE_SERVICE_TOKEN, EmployeeService } from '../modules/employee/employee.service';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../modules/attendance/attendance.repository';
-import { MockAttendanceRepository } from '../modules/attendance/mock-attendance.repository';
 import { ATTENDANCE_SERVICE_TOKEN, AttendanceService } from '../modules/attendance/attendance.service';
 import { LEAVE_REPOSITORY_TOKEN } from '../modules/leave/leave.repository';
-import { MockLeaveRepository } from '../modules/leave/mock-leave.repository';
 import { LEAVE_SERVICE_TOKEN, LeaveService } from '../modules/leave/leave.service';
 import { SupabaseEmployeeRepository } from '../modules/employee/supabase-employee.repository';
 import { SupabaseAttendanceRepository } from '../modules/attendance/supabase-attendance.repository';
 import { SupabaseLeaveRepository } from '../modules/leave/supabase-leave.repository';
-import { usesSupabase, isSupabaseConfigured } from '../config/feature-flags';
 
 // Import platform engines
 import { WORKFLOW_ENGINE_TOKEN, WorkflowEngine } from '../core/engines/workflow';
@@ -51,19 +45,6 @@ import {
   ALUMNI_REPOSITORY_TOKEN
 } from '../modules/training/training.repository';
 import {
-  MockStudentRepository,
-  MockCourseRepository,
-  MockBatchRepository,
-  MockCollegeRepository,
-  MockEnrollmentRepository,
-  MockSessionAttendanceRepository,
-  MockAssessmentRepository,
-  MockExamVoucherRepository,
-  MockCertificateRepository,
-  MockReferralRepository,
-  MockAlumniRepository
-} from '../modules/training/mock-training.repository';
-import {
   SupabaseStudentRepository,
   SupabaseCourseRepository,
   SupabaseBatchRepository,
@@ -82,10 +63,6 @@ import { FINANCE_SERVICE_TOKEN, FinanceService } from '../modules/finance/financ
 import { COMMUNICATION_SERVICE_TOKEN, CommunicationService } from '../modules/communication/communication.service';
 import { ANALYTICS_SERVICE_TOKEN, AnalyticsService } from '../modules/analytics/analytics.service';
 
-
-
-
-
 // Import Phase 4 repositories
 import {
   CLIENT_REPOSITORY_TOKEN,
@@ -96,15 +73,6 @@ import {
   TIMESHEET_REPOSITORY_TOKEN,
   CLIENT_MEETING_REPOSITORY_TOKEN
 } from '../modules/project/project.repository';
-import {
-  MockClientRepository,
-  MockProjectRepository,
-  MockMilestoneRepository,
-  MockResourceAllocationRepository,
-  MockTaskRepository,
-  MockTimesheetRepository,
-  MockClientMeetingRepository
-} from '../modules/project/mock-project.repository';
 import {
   SupabaseClientRepository,
   SupabaseProjectRepository,
@@ -126,15 +94,6 @@ import {
   SALARY_STRUCTURE_REPOSITORY_TOKEN
 } from '../modules/finance/finance.repository';
 import {
-  MockBudgetRepository,
-  MockExpenseClaimRepository,
-  MockTravelRequestRepository,
-  MockVendorRepository,
-  MockPurchaseOrderRepository,
-  MockAssetRepository,
-  MockSalaryStructureRepository
-} from '../modules/finance/mock-finance.repository';
-import {
   SupabaseBudgetRepository,
   SupabaseExpenseClaimRepository,
   SupabaseTravelRequestRepository,
@@ -153,13 +112,6 @@ import {
   NOTIFICATION_PREFERENCE_REPOSITORY_TOKEN
 } from '../modules/communication/communication.repository';
 import {
-  MockChatChannelRepository,
-  MockChatMessageRepository,
-  MockAnnouncementRepository,
-  MockEmailLogRepository,
-  MockNotificationPreferenceRepository
-} from '../modules/communication/mock-communication.repository';
-import {
   SupabaseChatChannelRepository,
   SupabaseChatMessageRepository,
   SupabaseAnnouncementRepository,
@@ -173,91 +125,63 @@ import {
   SAVED_REPORT_REPOSITORY_TOKEN
 } from '../modules/analytics/analytics.repository';
 import {
-  MockKpiDefinitionRepository,
-  MockSavedReportRepository
-} from '../modules/analytics/mock-analytics.repository';
-import {
   SupabaseKpiDefinitionRepository,
   SupabaseSavedReportRepository
 } from '../modules/analytics/supabase-analytics.repository';
 
-
-
-
-
 export function bootstrap() {
-  if (isSupabaseConfigured()) {
-    console.info('[Nexus Platform] Live Supabase PostgreSQL database persistence is ACTIVE.');
-  } else {
-    console.warn(
-      '[Nexus Platform] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY environment variables are unconfigured or pointing to mock-project. Running in Local Storage Fallback Mode to prevent crashes.'
-    );
-  }
-
-  // Per-module cutover: a module resolves Supabase only when the master switch
-  // AND its own flag are on (i.e. once its tables actually exist). Everything
-  // else keeps using the in-memory mocks, so a partly-migrated database can
-  // never take the whole app down.
-  const employeeSb = usesSupabase('employee');
-  const attendanceSb = usesSupabase('attendance');
-  const leaveSb = usesSupabase('leave');
-  const trainingSb = usesSupabase('training');
-  const projectSb = usesSupabase('project');
-  const financeSb = usesSupabase('finance');
-  const commSb = usesSupabase('communication');
-  const analyticsSb = usesSupabase('analytics');
+  console.info('[Nexus Platform] Live Supabase PostgreSQL database persistence is active unconditionally.');
 
   // Employee
-  container.register(EMPLOYEE_REPOSITORY_TOKEN, () => employeeSb ? new SupabaseEmployeeRepository() : new MockEmployeeRepository());
+  container.register(EMPLOYEE_REPOSITORY_TOKEN, () => new SupabaseEmployeeRepository());
 
   // Attendance
-  container.register(ATTENDANCE_REPOSITORY_TOKEN, () => attendanceSb ? new SupabaseAttendanceRepository() : new MockAttendanceRepository());
+  container.register(ATTENDANCE_REPOSITORY_TOKEN, () => new SupabaseAttendanceRepository());
 
   // Leave
-  container.register(LEAVE_REPOSITORY_TOKEN, () => leaveSb ? new SupabaseLeaveRepository() : new MockLeaveRepository());
+  container.register(LEAVE_REPOSITORY_TOKEN, () => new SupabaseLeaveRepository());
 
   // Training
-  container.register(STUDENT_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseStudentRepository() : new MockStudentRepository());
-  container.register(COURSE_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseCourseRepository() : new MockCourseRepository());
-  container.register(BATCH_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseBatchRepository() : new MockBatchRepository());
-  container.register(COLLEGE_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseCollegeRepository() : new MockCollegeRepository());
-  container.register(ENROLLMENT_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseEnrollmentRepository() : new MockEnrollmentRepository());
-  container.register(SESSION_ATTENDANCE_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseSessionAttendanceRepository() : new MockSessionAttendanceRepository());
-  container.register(ASSESSMENT_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseAssessmentRepository() : new MockAssessmentRepository());
-  container.register(EXAM_VOUCHER_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseExamVoucherRepository() : new MockExamVoucherRepository());
-  container.register(CERTIFICATE_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseCertificateRepository() : new MockCertificateRepository());
-  container.register(REFERRAL_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseReferralRepository() : new MockReferralRepository());
-  container.register(ALUMNI_REPOSITORY_TOKEN, () => trainingSb ? new SupabaseAlumniRepository() : new MockAlumniRepository());
+  container.register(STUDENT_REPOSITORY_TOKEN, () => new SupabaseStudentRepository());
+  container.register(COURSE_REPOSITORY_TOKEN, () => new SupabaseCourseRepository());
+  container.register(BATCH_REPOSITORY_TOKEN, () => new SupabaseBatchRepository());
+  container.register(COLLEGE_REPOSITORY_TOKEN, () => new SupabaseCollegeRepository());
+  container.register(ENROLLMENT_REPOSITORY_TOKEN, () => new SupabaseEnrollmentRepository());
+  container.register(SESSION_ATTENDANCE_REPOSITORY_TOKEN, () => new SupabaseSessionAttendanceRepository());
+  container.register(ASSESSMENT_REPOSITORY_TOKEN, () => new SupabaseAssessmentRepository());
+  container.register(EXAM_VOUCHER_REPOSITORY_TOKEN, () => new SupabaseExamVoucherRepository());
+  container.register(CERTIFICATE_REPOSITORY_TOKEN, () => new SupabaseCertificateRepository());
+  container.register(REFERRAL_REPOSITORY_TOKEN, () => new SupabaseReferralRepository());
+  container.register(ALUMNI_REPOSITORY_TOKEN, () => new SupabaseAlumniRepository());
 
   // Project
-  container.register(CLIENT_REPOSITORY_TOKEN, () => projectSb ? new SupabaseClientRepository() : new MockClientRepository());
-  container.register(PROJECT_REPOSITORY_TOKEN, () => projectSb ? new SupabaseProjectRepository() : new MockProjectRepository());
-  container.register(MILESTONE_REPOSITORY_TOKEN, () => projectSb ? new SupabaseMilestoneRepository() : new MockMilestoneRepository());
-  container.register(RESOURCE_ALLOCATION_REPOSITORY_TOKEN, () => projectSb ? new SupabaseResourceAllocationRepository() : new MockResourceAllocationRepository());
-  container.register(TASK_REPOSITORY_TOKEN, () => projectSb ? new SupabaseTaskRepository() : new MockTaskRepository());
-  container.register(TIMESHEET_REPOSITORY_TOKEN, () => projectSb ? new SupabaseTimesheetRepository() : new MockTimesheetRepository());
-  container.register(CLIENT_MEETING_REPOSITORY_TOKEN, () => projectSb ? new SupabaseClientMeetingRepository() : new MockClientMeetingRepository());
+  container.register(CLIENT_REPOSITORY_TOKEN, () => new SupabaseClientRepository());
+  container.register(PROJECT_REPOSITORY_TOKEN, () => new SupabaseProjectRepository());
+  container.register(MILESTONE_REPOSITORY_TOKEN, () => new SupabaseMilestoneRepository());
+  container.register(RESOURCE_ALLOCATION_REPOSITORY_TOKEN, () => new SupabaseResourceAllocationRepository());
+  container.register(TASK_REPOSITORY_TOKEN, () => new SupabaseTaskRepository());
+  container.register(TIMESHEET_REPOSITORY_TOKEN, () => new SupabaseTimesheetRepository());
+  container.register(CLIENT_MEETING_REPOSITORY_TOKEN, () => new SupabaseClientMeetingRepository());
 
   // Finance
-  container.register(BUDGET_REPOSITORY_TOKEN, () => financeSb ? new SupabaseBudgetRepository() : new MockBudgetRepository());
-  container.register(EXPENSE_CLAIM_REPOSITORY_TOKEN, () => financeSb ? new SupabaseExpenseClaimRepository() : new MockExpenseClaimRepository());
-  container.register(TRAVEL_REQUEST_REPOSITORY_TOKEN, () => financeSb ? new SupabaseTravelRequestRepository() : new MockTravelRequestRepository());
-  container.register(VENDOR_REPOSITORY_TOKEN, () => financeSb ? new SupabaseVendorRepository() : new MockVendorRepository());
-  container.register(PURCHASE_ORDER_REPOSITORY_TOKEN, () => financeSb ? new SupabasePurchaseOrderRepository() : new MockPurchaseOrderRepository());
-  container.register(ASSET_REPOSITORY_TOKEN, () => financeSb ? new SupabaseAssetRepository() : new MockAssetRepository());
-  container.register(SALARY_STRUCTURE_REPOSITORY_TOKEN, () => financeSb ? new SupabaseSalaryStructureRepository() : new MockSalaryStructureRepository());
+  container.register(BUDGET_REPOSITORY_TOKEN, () => new SupabaseBudgetRepository());
+  container.register(EXPENSE_CLAIM_REPOSITORY_TOKEN, () => new SupabaseExpenseClaimRepository());
+  container.register(TRAVEL_REQUEST_REPOSITORY_TOKEN, () => new SupabaseTravelRequestRepository());
+  container.register(VENDOR_REPOSITORY_TOKEN, () => new SupabaseVendorRepository());
+  container.register(PURCHASE_ORDER_REPOSITORY_TOKEN, () => new SupabasePurchaseOrderRepository());
+  container.register(ASSET_REPOSITORY_TOKEN, () => new SupabaseAssetRepository());
+  container.register(SALARY_STRUCTURE_REPOSITORY_TOKEN, () => new SupabaseSalaryStructureRepository());
 
   // Communication
-  container.register(CHAT_CHANNEL_REPOSITORY_TOKEN, () => commSb ? new SupabaseChatChannelRepository() : new MockChatChannelRepository());
-  container.register(CHAT_MESSAGE_REPOSITORY_TOKEN, () => commSb ? new SupabaseChatMessageRepository() : new MockChatMessageRepository());
-  container.register(ANNOUNCEMENT_REPOSITORY_TOKEN, () => commSb ? new SupabaseAnnouncementRepository() : new MockAnnouncementRepository());
-  container.register(EMAIL_LOG_REPOSITORY_TOKEN, () => commSb ? new SupabaseEmailLogRepository() : new MockEmailLogRepository());
-  container.register(NOTIFICATION_PREFERENCE_REPOSITORY_TOKEN, () => commSb ? new SupabaseNotificationPreferenceRepository() : new MockNotificationPreferenceRepository());
+  container.register(CHAT_CHANNEL_REPOSITORY_TOKEN, () => new SupabaseChatChannelRepository());
+  container.register(CHAT_MESSAGE_REPOSITORY_TOKEN, () => new SupabaseChatMessageRepository());
+  container.register(ANNOUNCEMENT_REPOSITORY_TOKEN, () => new SupabaseAnnouncementRepository());
+  container.register(EMAIL_LOG_REPOSITORY_TOKEN, () => new SupabaseEmailLogRepository());
+  container.register(NOTIFICATION_PREFERENCE_REPOSITORY_TOKEN, () => new SupabaseNotificationPreferenceRepository());
 
   // Analytics
-  container.register(KPI_DEFINITION_REPOSITORY_TOKEN, () => analyticsSb ? new SupabaseKpiDefinitionRepository() : new MockKpiDefinitionRepository());
-  container.register(SAVED_REPORT_REPOSITORY_TOKEN, () => analyticsSb ? new SupabaseSavedReportRepository() : new MockSavedReportRepository());
-
+  container.register(KPI_DEFINITION_REPOSITORY_TOKEN, () => new SupabaseKpiDefinitionRepository());
+  container.register(SAVED_REPORT_REPOSITORY_TOKEN, () => new SupabaseSavedReportRepository());
 
   // Register services
   container.register(EMPLOYEE_SERVICE_TOKEN, () => new EmployeeService());
@@ -267,7 +191,7 @@ export function bootstrap() {
   container.register(PROJECT_SERVICE_TOKEN, () => new ProjectService());
   container.register(FINANCE_SERVICE_TOKEN, () => new FinanceService());
   container.register(COMMUNICATION_SERVICE_TOKEN, () => new CommunicationService());
-  container.register(AUTH_SERVICE_TOKEN, () => (appConfig.integrations.supabaseEnabled ? new SupabaseAuthService() : new MockAuthService()));
+  container.register(AUTH_SERVICE_TOKEN, () => new SupabaseAuthService());
 
   // Register platform engines
   container.register(WORKFLOW_ENGINE_TOKEN, () => new WorkflowEngine());
@@ -287,14 +211,4 @@ export function bootstrap() {
   container.register(PREDICTION_ENGINE_TOKEN, () => new MockPredictionEngine());
   container.register(SUMMARY_ENGINE_TOKEN, () => new MockSummaryEngine());
   container.register(PROMPT_REGISTRY_TOKEN, () => new MockPromptRegistry());
-
-  // Register dashboard widgets once
-  registerDemoWidgets();
 }
-
-
-
-
-
-
-

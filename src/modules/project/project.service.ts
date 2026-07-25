@@ -20,6 +20,7 @@ import { NOTIFICATION_ENGINE_TOKEN } from '../../core/engines/notification';
 export interface IProjectService {
   createClient(data: Partial<Client>, actor: Actor): Promise<Result<Client>>;
   createProject(data: Partial<Project>, actor: Actor): Promise<Result<Project>>;
+  updateProject(projectId: UUID, patch: Partial<Project>, actor: Actor): Promise<Result<Project>>;
   addMilestone(projectId: UUID, title: string, dueDate: string, actor: Actor): Promise<Result<Milestone>>;
   allocateResource(projectId: UUID, employeeId: UUID, role: string, capacity: number, actor: Actor): Promise<Result<ResourceAllocation>>;
   createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>>;
@@ -64,6 +65,17 @@ export class ProjectService implements IProjectService {
       const project = await this.projectRepo.create(data, actor);
       await this.activity.log('project', project.id, actor, 'create', `Created project code ${project.code} - ${project.title}`);
       await this.audit.log(actor, 'create', 'projects', project.id, { newValues: project });
+      return Ok(project);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async updateProject(projectId: UUID, patch: Partial<Project>, actor: Actor): Promise<Result<Project>> {
+    try {
+      const project = await this.projectRepo.update(projectId, patch, actor);
+      await this.activity.log('project', project.id, actor, 'update', `Updated project code ${project.code} - ${project.title}`);
+      await this.audit.log(actor, 'update', 'projects', project.id, { newValues: project });
       return Ok(project);
     } catch (e: any) {
       return Err(AppError.internal(e.message));

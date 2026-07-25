@@ -43,6 +43,7 @@ export function ProjectList() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Not Started', 'In Progress']);
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectCardData | null>(null);
@@ -50,7 +51,7 @@ export function ProjectList() {
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
-  const { projects, clients, tasks, allocations, timesheets, createProject, createTask, updateTask, deleteTask } = useProject();
+  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, deleteTask } = useProject();
   const { employees } = useEmployee();
 
   const assigneeOptions = useMemo(() => {
@@ -131,6 +132,17 @@ export function ProjectList() {
     setProjectsList(mappedProjects);
   }, [mappedProjects]);
 
+  useEffect(() => {
+    if (selectedProject) {
+      const found = mappedProjects.find((p) => p.id === selectedProject.id);
+      if (found) {
+        if (JSON.stringify(found) !== JSON.stringify(selectedProject)) {
+          setSelectedProject(found);
+        }
+      }
+    }
+  }, [mappedProjects, selectedProject]);
+
   // Filter based on selected checkboxes
   const filteredProjects = projectsList.filter((p) => selectedStatuses.includes(p.status));
 
@@ -199,6 +211,31 @@ export function ProjectList() {
       setCreateProjectOpen(false);
     } else {
       toast({ variant: 'error', title: 'Creation Failed', message: res.error });
+    }
+  };
+
+  const handleEditProject = async (values: Record<string, unknown>) => {
+    if (!selectedProject) return;
+
+    const typedName = (clientNameInput || '').trim();
+    const matchedClient = clients.find((c) => c.name.toLowerCase() === typedName.toLowerCase());
+    const resolvedClientId = matchedClient ? matchedClient.id : undefined;
+
+    const res = await updateProject(selectedProject.id as UUID, {
+      title: values.title as string,
+      code: values.code as string,
+      clientId: resolvedClientId,
+      clientName: !matchedClient ? typedName : undefined,
+      status: values.status as any,
+      supervisorId: values.supervisorId as string,
+    } as any);
+
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Project Updated', message: `${res.value.title} updated successfully.` });
+      setClientNameInput('');
+      setEditProjectOpen(false);
+    } else {
+      toast({ variant: 'error', title: 'Update Failed', message: res.error });
     }
   };
 
@@ -678,11 +715,29 @@ export function ProjectList() {
                   <span>Supervisor: <strong>{selectedProject.supervisor}</strong></span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setReportOpen(false)}
-                style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}
-              >×</button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Button
+                  size="sm"
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                    fontWeight: 600,
+                    fontSize: 12
+                  }}
+                  onClick={() => {
+                    setClientNameInput(selectedProject.client);
+                    setEditProjectOpen(true);
+                  }}
+                >
+                  ✏️ Edit Details
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(false)}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}
+                >×</button>
+              </div>
             </div>
 
             {/* ── Scrollable Body ── */}
@@ -927,6 +982,72 @@ export function ProjectList() {
             <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button variant="secondary" type="button" onClick={() => setAddTaskOpen(false)}>Cancel</Button>
               <Button type="submit">Add Task to Project</Button>
+            </div>
+          </Form>
+        </Drawer>
+      )}
+
+      {/* Edit Project Modal */}
+      {selectedProject && (
+        <Drawer open={editProjectOpen} onClose={() => setEditProjectOpen(false)} title={`Edit Project: ${selectedProject.title}`}>
+          <Form
+            initial={{
+              code: selectedProject.code,
+              title: selectedProject.title,
+              status: selectedProject.status === 'Completed' ? 'closure' : selectedProject.status === 'In Progress' ? 'execution' : 'not_started',
+              supervisorId: projects.find((p) => p.id === selectedProject.id)?.supervisorId || '',
+            }}
+            onSubmit={handleEditProject}
+          >
+            <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
+            <TextField name="title" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
+
+            {/* Client: combobox */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client Organization *</label>
+              <input
+                list="client-datalist"
+                value={clientNameInput}
+                onChange={(e) => setClientNameInput(e.target.value)}
+                placeholder="Type or select client name…"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1.5px solid var(--border)',
+                  background: 'var(--bg-input, var(--bg-surface))',
+                  color: 'var(--text-primary)',
+                  fontSize: 14,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <datalist id="client-datalist">
+                {clients.map((c) => <option key={c.id} value={c.name} />)}
+              </datalist>
+            </div>
+
+            <SelectField
+              name="supervisorId"
+              label="Project Supervisor *"
+              options={employees.map((e) => ({
+                value: e.id,
+                label: `${e.firstName} ${e.lastName}${e.designation ? ` (${e.designation})` : ''}`,
+              }))}
+            />
+            <SelectField
+              name="status"
+              label="Phase *"
+              options={[
+                { value: 'not_started', label: 'Not Started' },
+                { value: 'planning', label: 'Planning / Kickoff' },
+                { value: 'execution', label: 'In Execution' },
+                { value: 'closure', label: 'Closure' },
+              ]}
+            />
+            <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button variant="secondary" type="button" onClick={() => setEditProjectOpen(false)}>Cancel</Button>
+              <Button type="submit">Save Changes</Button>
             </div>
           </Form>
         </Drawer>
