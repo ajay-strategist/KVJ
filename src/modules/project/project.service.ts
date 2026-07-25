@@ -24,6 +24,7 @@ export interface IProjectService {
   allocateResource(projectId: UUID, employeeId: UUID, role: string, capacity: number, actor: Actor): Promise<Result<ResourceAllocation>>;
   createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>>;
   updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>>;
+  deleteTask(taskId: UUID, actor: Actor): Promise<Result<void>>;
   logTimesheet(data: Partial<TimesheetRecord>, actor: Actor): Promise<Result<TimesheetRecord>>;
   approveTimesheet(timesheetId: UUID, actor: Actor): Promise<Result<TimesheetRecord>>;
 }
@@ -125,6 +126,15 @@ export class ProjectService implements IProjectService {
         await this.activity.log('project', updated.projectId, actor, 'update', `Updated task: ${updated.title}`);
       }
       return Ok(updated);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async deleteTask(taskId: UUID, actor: Actor): Promise<Result<void>> {
+    try {
+      await this.taskRepo.softDelete(taskId, actor);
+      return Ok(undefined as any);
     } catch (e: any) {
       return Err(AppError.internal(e.message));
     }

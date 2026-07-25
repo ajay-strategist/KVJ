@@ -50,7 +50,7 @@ export function ProjectList() {
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
-  const { projects, clients, tasks, allocations, timesheets, createProject, createTask, updateTask } = useProject();
+  const { projects, clients, tasks, allocations, timesheets, createProject, createTask, updateTask, deleteTask } = useProject();
   const { employees } = useEmployee();
 
   const assigneeOptions = useMemo(() => {
@@ -230,18 +230,24 @@ export function ProjectList() {
     );
   };
 
-  // PDF Export Logic with custom print layout and KVJ logo
+  // PDF Export Logic — full content: KPIs, member hours, all tasks with hours/status
   const exportReportToPDF = (p: ProjectCardData) => {
-    const pTasks = tasks.filter((t) => t.projectId === p.id);
-    const reportTasks: TaskItem[] = pTasks.map((t) => {
-      const assignee = employees.find((e) => e.id === t.assigneeId);
-      return {
-        name: t.title,
-        assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
-        status: t.status === 'done' ? 'Completed' : t.status === 'in_progress' ? 'In Progress' : 'Not Started',
-        dueDate: t.dueDate || '—',
+    const pTasks = tasks.filter((t) => t.projectId === p.id && !t.deletedAt);
+    const completionPct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
+    const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' });
+
+    const statusBadge = (status: string) => {
+      const map: Record<string, [string, string]> = {
+        done: ['#dcfce7', '#15803d'],
+        in_progress: ['#fef9c3', '#a16207'],
+        review: ['#ede9fe', '#6d28d9'],
+        todo: ['#f1f5f9', '#475569'],
       };
-    });
+      const [bg, fg] = map[status] ?? ['#f1f5f9', '#475569'];
+      const label = status === 'done' ? 'Completed' : status === 'in_progress' ? 'In Progress' : status === 'review' ? 'Under Review' : 'To Do';
+      return `<span style="background:${bg};color:${fg};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;">${label}</span>`;
+    };
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast({ variant: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups to export the PDF.' });
@@ -251,91 +257,142 @@ export function ProjectList() {
     const htmlContent = `
       <html>
         <head>
-          <title>Detailed Project Report - ${p.code}</title>
+          <title>Project Report — ${p.code}</title>
           <style>
-            body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; padding: 40px; line-height: 1.5; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
-            .logo-container { display: flex; align-items: center; gap: 10px; }
-            .logo-text { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
-            .project-title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0 0 8px 0; }
-            .project-meta { font-size: 13px; color: #64748b; margin-bottom: 24px; }
-            .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; background: #e0f2fe; color: #0369a1; }
-            .badge-completed { background: #dcfce7; color: #15803d; }
-            .badge-in-progress { background: #fef9c3; color: #a16207; }
-            .badge-not-started { background: #f1f5f9; color: #475569; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .metric-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; background: #f8fafc; }
-            .metric-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 4px; }
-            .metric-value { font-size: 18px; font-weight: 800; color: #0f172a; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 30px; }
-            th { background: #f1f5f9; color: #475569; font-weight: 700; text-align: left; padding: 10px 12px; font-size: 12px; border-bottom: 2px solid #e2e8f0; }
-            td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
-            .section-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 20px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; background: #fff; padding: 40px; line-height: 1.6; font-size: 13px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; margin-bottom: 28px; border-bottom: 3px solid #6366f1; }
+            .logo { font-size: 22px; font-weight: 800; color: #6366f1; letter-spacing: -0.5px; }
+            .logo span { color: #0f172a; }
+            .report-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #6366f1; letter-spacing: 1.5px; }
+            .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+            h1 { font-size: 26px; font-weight: 800; color: #0f172a; margin: 0; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin: 24px 0; }
+            .kpi { border-radius: 10px; padding: 14px 16px; }
+            .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+            .kpi-value { font-size: 20px; font-weight: 800; }
+            .progress-wrap { margin: 8px 0 28px; }
+            .progress-bar-bg { height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+            .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #7c3aed); border-radius: 5px; }
+            .progress-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+            .section-title { font-size: 14px; font-weight: 800; color: #0f172a; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+            thead tr { background: #6366f1; color: white; }
+            th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+            td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+            tr:nth-child(even) td { background: #f8fafc; }
+            .avatar { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#7c3aed); color: white; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; margin-right: 6px; }
+            .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; }
+            @media print { body { padding: 20px; } }
           </style>
         </head>
         <body>
+          <!-- Header -->
           <div class="header">
-            <div class="logo-container">
-              <img src="/logo.png" alt="Logo" style="height: 32px;" />
-            </div>
             <div>
-              <span class="badge ${p.status === 'Completed' ? 'badge-completed' : p.status === 'In Progress' ? 'badge-in-progress' : 'badge-not-started'}">${p.status}</span>
+              <div class="report-label">📊 Detailed Project Report</div>
+              <h1>${p.title}</h1>
+              <div class="meta">
+                Code: <strong>${p.code}</strong> &nbsp;·&nbsp;
+                Client: <strong>${p.client}</strong> &nbsp;·&nbsp;
+                Supervisor: <strong>${p.supervisor}</strong>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="logo">KVJ <span>Analytics</span></div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Generated: ${generatedAt}</div>
             </div>
           </div>
 
-          <h2 class="project-title">${p.title}</h2>
-          <div class="project-meta">Project Code: <strong>${p.code}</strong> &middot; Client: <strong>${p.client}</strong> &middot; Lead Supervisor: <strong>${p.supervisor}</strong></div>
-
-          <div class="grid">
-            <div class="metric-card">
-              <div class="metric-label">Total Logged Work</div>
-              <div class="metric-value">${p.totalHours} Hours</div>
+          <!-- KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi" style="background:#ede9fe;border-left:4px solid #6366f1;">
+              <div class="kpi-label" style="color:#6d28d9;">🏷️ Status</div>
+              <div class="kpi-value" style="color:#6366f1;font-size:16px;">${p.status}</div>
             </div>
-            <div class="metric-card">
-              <div class="metric-label">Task Progress</div>
-              <div class="metric-value">${p.tasksCompleted} / ${p.tasksTotal} Tasks Completed (${p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0}%)</div>
+            <div class="kpi" style="background:#e0f2fe;border-left:4px solid #0891b2;">
+              <div class="kpi-label" style="color:#0891b2;">⏱️ Total Hours</div>
+              <div class="kpi-value" style="color:#0284c7;">${p.totalHours} hrs</div>
+            </div>
+            <div class="kpi" style="background:#dcfce7;border-left:4px solid #16a34a;">
+              <div class="kpi-label" style="color:#15803d;">✅ Tasks Done</div>
+              <div class="kpi-value" style="color:#16a34a;">${p.tasksCompleted} / ${p.tasksTotal}</div>
+            </div>
+            <div class="kpi" style="background:#fef9c3;border-left:4px solid #ca8a04;">
+              <div class="kpi-label" style="color:#a16207;">🏁 Milestones</div>
+              <div class="kpi-value" style="color:#ca8a04;">${p.milestonesCount} Planned</div>
             </div>
           </div>
 
-          <div class="section-title">Member-Specific Logged Hours</div>
+          <!-- Progress Bar -->
+          <div class="progress-wrap">
+            <div class="progress-label">
+              <span>Overall Task Completion</span>
+              <span style="color:#6366f1;">${completionPct}%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" style="width:${completionPct}%;"></div>
+            </div>
+          </div>
+
+          <!-- Member Hours -->
+          <div class="section-title">👥 Team Member Logged Hours</div>
           <table>
             <thead>
               <tr>
                 <th>Team Member</th>
-                <th style="text-align: right;">Total Logged Hours</th>
+                <th style="text-align:right;">Logged Hours</th>
               </tr>
             </thead>
             <tbody>
-              ${p.members.map(m => `
+              ${p.members.length > 0 ? p.members.map(m => `
                 <tr>
-                  <td>👤 ${m.name}</td>
-                  <td style="text-align: right; font-weight: 700;">${m.hours} hrs</td>
+                  <td><span class="avatar">${m.name.charAt(0)}</span>${m.name}</td>
+                  <td style="text-align:right;font-weight:700;color:#6366f1;">${m.hours} hrs</td>
                 </tr>
-              `).join('')}
+              `).join('') : '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No members assigned.</td></tr>'}
             </tbody>
           </table>
 
-          <div class="section-title">Individual Task List</div>
+          <!-- Task List -->
+          <div class="section-title">📋 Individual Task List</div>
           <table>
             <thead>
               <tr>
+                <th>#</th>
                 <th>Task Description</th>
                 <th>Assignee</th>
                 <th>Status</th>
+                <th style="text-align:right;">Hours Logged</th>
                 <th>Due Date</th>
               </tr>
             </thead>
             <tbody>
-              ${reportTasks.length > 0 ? reportTasks.map(t => `
-                <tr>
-                  <td>${t.name}</td>
-                  <td>👤 ${t.assignee}</td>
-                  <td>${t.status}</td>
-                  <td>${t.dueDate}</td>
-                </tr>
-              `).join('') : `<tr><td colspan="4" style="text-align: center; color: #64748b;">No individual tasks logged.</td></tr>`}
+              ${pTasks.length > 0 ? pTasks.map((t, i) => {
+                const assignee = employees.find((e) => e.id === t.assigneeId);
+                const assigneeName = assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned';
+                const pTs = timesheets.filter((ts) => ts.taskId === t.id);
+                const hrs = pTs.reduce((sum, ts) => sum + (ts.hoursLogged || 0), 0);
+                return `
+                  <tr>
+                    <td style="color:#94a3b8;">${i + 1}</td>
+                    <td style="font-weight:600;">${t.title}</td>
+                    <td>${assigneeName}</td>
+                    <td>${statusBadge(t.status || 'todo')}</td>
+                    <td style="text-align:right;font-weight:700;color:#6366f1;">${Math.round(hrs * 10) / 10} hrs</td>
+                    <td style="color:#64748b;">${t.dueDate || '—'}</td>
+                  </tr>
+                `;
+              }).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No tasks found for this project.</td></tr>'}
             </tbody>
           </table>
+
+          <!-- Footer -->
+          <div class="footer">
+            <span>KVJ Analytics — Enterprise Operations Platform</span>
+            <span>Confidential · ${p.code} · ${generatedAt}</span>
+          </div>
         </body>
       </html>
     `;
@@ -343,7 +400,7 @@ export function ProjectList() {
     printWindow.document.write(htmlContent);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.print();
+    setTimeout(() => printWindow.print(), 500);
   };
 
   const tableColumns: Column<ProjectCardData>[] = [
@@ -577,216 +634,223 @@ export function ProjectList() {
         <DataTable columns={tableColumns} rows={filteredProjects} rowKey={(p) => p.id} />
       )}
 
-      {/* Detailed Project Report — Full-Screen Modal Popup */}
+      {/* Detailed Project Report — Premium Full-Screen Modal */}
       {selectedProject && reportOpen && (
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(8px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
-            animation: 'fadeIn 0.2s ease',
           }}
           onClick={(e) => { if (e.target === e.currentTarget) setReportOpen(false); }}
         >
           <div
             style={{
               background: 'var(--bg-card)',
-              borderRadius: 16,
-              boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
+              borderRadius: 20,
+              boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(99,102,241,0.15)',
               width: '100%',
-              maxWidth: 860,
-              maxHeight: '90vh',
+              maxWidth: 920,
+              maxHeight: '92vh',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
             }}
           >
-            {/* Modal Header */}
+            {/* ── Header ── */}
             <div style={{
-              padding: '18px 24px',
-              borderBottom: '1px solid var(--border)',
+              padding: '20px 28px',
+              background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #a855f7 100%)',
+              color: 'white',
               display: 'flex',
               alignItems: 'flex-start',
               justifyContent: 'space-between',
-              background: 'linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%)',
-              color: 'white',
+              flexShrink: 0,
             }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', opacity: 0.8, letterSpacing: 1 }}>📊 Detailed Report</div>
-                <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{selectedProject.title}</div>
-                <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>
-                  {selectedProject.code} &nbsp;·&nbsp; Client: <strong>{selectedProject.client}</strong> &nbsp;·&nbsp; Supervisor: <strong>{selectedProject.supervisor}</strong>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', opacity: 0.7, letterSpacing: 2, marginBottom: 4 }}>📊 Detailed Project Report</div>
+                <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{selectedProject.title}</div>
+                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ background: 'rgba(255,255,255,0.15)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>{selectedProject.code}</span>
+                  <span>Client: <strong>{selectedProject.client}</strong></span>
+                  <span>Supervisor: <strong>{selectedProject.supervisor}</strong></span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setReportOpen(false)}
-                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}
               >×</button>
             </div>
 
-            {/* Modal Body — scrollable */}
-            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* ── Scrollable Body ── */}
+            <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
 
               {/* KPI Strip */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
                 {[
-                  { label: 'Status', value: selectedProject.status, icon: '🏷️', color: selectedProject.status === 'Completed' ? '#10b981' : selectedProject.status === 'In Progress' ? '#f59e0b' : '#6366f1' },
-                  { label: 'Total Hours', value: `${selectedProject.totalHours} hrs`, icon: '⏱️', color: '#6366f1' },
-                  { label: 'Tasks Done', value: `${selectedProject.tasksCompleted} / ${selectedProject.tasksTotal}`, icon: '✅', color: '#10b981' },
-                  { label: 'Milestones', value: `${selectedProject.milestonesCount} Planned`, icon: '🏁', color: '#f59e0b' },
+                  { label: 'Status', value: selectedProject.status, icon: '🏷️', bg: '#ede9fe', border: '#6366f1', color: '#4f46e5' },
+                  { label: 'Total Hours', value: `${selectedProject.totalHours} hrs`, icon: '⏱️', bg: '#e0f2fe', border: '#0891b2', color: '#0284c7' },
+                  { label: 'Tasks Done', value: `${selectedProject.tasksCompleted} / ${selectedProject.tasksTotal}`, icon: '✅', bg: '#dcfce7', border: '#16a34a', color: '#15803d' },
+                  { label: 'Milestones', value: `${selectedProject.milestonesCount} Planned`, icon: '🏁', bg: '#fef9c3', border: '#ca8a04', color: '#a16207' },
                 ].map((kpi) => (
-                  <div key={kpi.label} style={{ background: 'var(--bg-sunken)', borderRadius: 10, padding: '12px 14px', borderLeft: `3px solid ${kpi.color}` }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: 0.5 }}>{kpi.icon} {kpi.label}</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: kpi.color, marginTop: 4 }}>{kpi.value}</div>
+                  <div key={kpi.label} style={{ background: kpi.bg, borderRadius: 12, padding: '14px 16px', borderLeft: `4px solid ${kpi.border}`, transition: 'transform 0.15s' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: kpi.color, letterSpacing: 0.8, marginBottom: 6 }}>{kpi.icon} {kpi.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
                   </div>
                 ))}
               </div>
 
               {/* Progress Bar */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-                  <span style={{ fontWeight: 700 }}>Overall Task Completion</span>
-                  <span style={{ color: 'var(--brand)', fontWeight: 700 }}>
-                    {selectedProject.tasksTotal > 0 ? Math.round((selectedProject.tasksCompleted / selectedProject.tasksTotal) * 100) : 0}%
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>
+                  <span>Overall Task Completion</span>
+                  <span style={{ color: '#4f46e5' }}>{selectedProject.tasksTotal > 0 ? Math.round((selectedProject.tasksCompleted / selectedProject.tasksTotal) * 100) : 0}%</span>
                 </div>
-                <div style={{ height: 8, background: 'var(--bg-sunken)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: 10, background: 'var(--bg-sunken)', borderRadius: 5, overflow: 'hidden' }}>
                   <div style={{
                     height: '100%',
                     width: `${selectedProject.tasksTotal > 0 ? Math.round((selectedProject.tasksCompleted / selectedProject.tasksTotal) * 100) : 0}%`,
-                    background: 'linear-gradient(90deg, var(--brand), #7c3aed)',
-                    borderRadius: 4,
-                    transition: 'width 0.5s ease',
+                    background: 'linear-gradient(90deg, #4f46e5, #a855f7)',
+                    borderRadius: 5,
+                    transition: 'width 0.6s ease',
+                    boxShadow: '0 0 8px rgba(99,102,241,0.4)',
                   }} />
                 </div>
               </div>
 
-              {/* Two-column layout: Members + Tasks */}
-              <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
+              {/* Two-column: Member panel left, Task table right */}
+              <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr', gap: 20, alignItems: 'start' }}>
 
-                {/* Member Hours */}
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Member Hours Panel */}
+                <div style={{ background: 'var(--bg-sunken)', borderRadius: 14, padding: '16px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, color: '#4f46e5', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                     👥 Team Hours
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {selectedProject.members.length === 0 && (
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>No members assigned yet.</div>
-                    )}
-                    {selectedProject.members.map((m, idx) => (
-                      <div key={idx} style={{ background: 'var(--bg-sunken)', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, var(--brand), #7c3aed)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 700 }}>
-                            {m.name.charAt(0)}
-                          </span>
-                          {m.name}
+                  {selectedProject.members.length === 0 ? (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>No members assigned yet.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {selectedProject.members.map((m, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ width: 30, height: 30, borderRadius: '50%', background: `hsl(${(idx * 67 + 240) % 360},60%,55%)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                              {m.name.charAt(0)}
+                            </span>
+                            <span style={{ fontSize: 12, fontWeight: 600 }}>{m.name}</span>
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: '#4f46e5', background: '#ede9fe', padding: '2px 8px', borderRadius: 6 }}>{m.hours}h</span>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)' }}>{m.hours}h</span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* Task List */}
+                {/* Task Management Table */}
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, color: '#4f46e5', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                     📋 Task Management
                   </div>
-              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                    <th style={{ padding: 6 }}>Task Description</th>
-                    <th style={{ padding: 6 }}>Assignee</th>
-                    <th style={{ padding: 6 }}>Status</th>
-                    <th style={{ padding: 6, textAlign: 'right' }}>Total Hours</th>
-                    <th style={{ padding: 6 }}>Due Date</th>
-                    <th style={{ padding: 6, textAlign: 'center' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedProjectTasks.map((t, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px dashed var(--border)' }}>
-                      <td style={{ padding: 6, fontWeight: 600 }}>{t.name}</td>
-                      <td style={{ padding: 6 }}>
-                        <select
-                          value={t.assigneeId || ''}
-                          onChange={async (e) => {
-                            const newAssigneeId = e.target.value;
-                            await updateTask(t.id, { assigneeId: newAssigneeId });
-                            toast({ variant: 'success', title: 'Assignee Updated' });
-                          }}
-                          style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
-                        >
-                          <option value="">Unassigned</option>
-                          {employees.map((emp) => (
-                            <option key={emp.id} value={emp.id}>
-                              {emp.firstName} {emp.lastName}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td style={{ padding: 6 }}>
-                        <select
-                          value={t.rawStatus || 'todo'}
-                          onChange={async (e) => {
-                            const newStatus = e.target.value;
-                            await updateTask(t.id, { status: newStatus as any });
-                            toast({ variant: 'success', title: 'Task Status Updated' });
-                          }}
-                          style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
-                        >
-                          <option value="todo">To Do</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="review">Under Review</option>
-                          <option value="done">Completed</option>
-                        </select>
-                      </td>
-                      <td style={{ padding: 6, textAlign: 'right', fontWeight: 700, color: 'var(--brand)' }}>{t.hoursLogged} hrs</td>
-                      <td style={{ padding: 6, color: 'var(--text-muted)' }}>{t.dueDate}</td>
-                      <td style={{ padding: 6, textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const ok = await confirm({ title: 'Delete Task?', message: `Are you sure you want to delete "${t.name}"?` });
-                            if (ok) {
-                              await updateTask(t.id, { deletedAt: new Date().toISOString() } as any);
-                              toast({ variant: 'warning', title: 'Task Deleted' });
-                            }
-                          }}
-                          style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: 14 }}
-                          title="Delete Task"
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {selectedProjectTasks.length === 0 && (
-                    <tr>
-                      <td colSpan={6} style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
-                        No tasks logged for this project yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: 'white', textAlign: 'left' }}>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Task</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Assignee</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Hrs</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Due</th>
+                          <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11 }}>Del</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedProjectTasks.map((t, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-sunken)', transition: 'background 0.15s' }}>
+                            <td style={{ padding: '9px 12px', fontWeight: 600, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.name}>{t.name}</td>
+                            <td style={{ padding: '6px 8px' }}>
+                              <select
+                                value={t.assigneeId || ''}
+                                onChange={async (e) => {
+                                  await updateTask(t.id, { assigneeId: e.target.value });
+                                  toast({ variant: 'success', title: 'Assignee Updated' });
+                                }}
+                                style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer', maxWidth: 110 }}
+                              >
+                                <option value="">Unassigned</option>
+                                {employees.map((emp) => (
+                                  <option key={emp.id} value={emp.id}>{emp.firstName} {emp.lastName}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={{ padding: '6px 8px' }}>
+                              <select
+                                value={t.rawStatus || 'todo'}
+                                onChange={async (e) => {
+                                  await updateTask(t.id, { status: e.target.value as any });
+                                  toast({ variant: 'success', title: 'Status Updated' });
+                                }}
+                                style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }}
+                              >
+                                <option value="todo">To Do</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="review">Under Review</option>
+                                <option value="done">Completed</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged} hrs</td>
+                            <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 11 }}>{t.dueDate}</td>
+                            <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                title="Delete Task"
+                                onClick={async () => {
+                                  const ok = await confirm({ title: 'Delete Task?', message: `Delete "${t.name}"? This cannot be undone.` });
+                                  if (ok) {
+                                    const res = await deleteTask(t.id as any);
+                                    if (res.ok) {
+                                      toast({ variant: 'warning', title: 'Task Deleted', message: `"${t.name}" has been removed.` });
+                                    } else {
+                                      toast({ variant: 'error', title: 'Delete Failed', message: res.error });
+                                    }
+                                  }
+                                }}
+                                style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, transition: 'all 0.15s' }}
+                              >🗑️</button>
+                            </td>
+                          </tr>
+                        ))}
+                        {selectedProjectTasks.length === 0 && (
+                          <tr>
+                            <td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: 13 }}>
+                              No tasks for this project yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, background: 'var(--bg-surface)' }}>
-              <Button variant="secondary" onClick={() => exportReportToPDF(selectedProject)}>
-                📄 Export PDF
-              </Button>
-              <Button onClick={() => setReportOpen(false)}>Close</Button>
+            {/* ── Footer ── */}
+            <div style={{ padding: '14px 28px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', flexShrink: 0 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {selectedProjectTasks.length} task{selectedProjectTasks.length !== 1 ? 's' : ''} &nbsp;·&nbsp; {selectedProject.members.length} team member{selectedProject.members.length !== 1 ? 's' : ''}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button variant="secondary" onClick={() => exportReportToPDF(selectedProject)}>
+                  📄 Export PDF
+                </Button>
+                <Button onClick={() => setReportOpen(false)}>Close</Button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
 
       {/* Create Project Modal */}
       <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create New Project">

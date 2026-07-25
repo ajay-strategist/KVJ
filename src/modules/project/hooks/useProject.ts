@@ -113,6 +113,16 @@ export function useProject() {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const deleteTask = useCallback(async (taskId: UUID): Promise<CallbackResult<void>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.deleteTask(taskId, { id: user.id, role: user.role });
+    if (res.ok) {
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      return { ok: true, value: undefined };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
   const logTimesheet = useCallback(async (data: Partial<TimesheetRecord>): Promise<CallbackResult<TimesheetRecord>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.logTimesheet(data, { id: user.id, role: user.role });
@@ -151,6 +161,7 @@ export function useProject() {
     allocateResource,
     createTask,
     updateTask,
+    deleteTask,
     logTimesheet,
     approveTimesheet,
     refresh: fetchAll,
