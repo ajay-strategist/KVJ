@@ -10,7 +10,7 @@
  *  - Approval lock: Approved claims show lock icon and become read-only with audit log.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
@@ -249,25 +249,6 @@ function DynamicExpenseForm({
   );
 }
 
-const EXPENSES_STORAGE_KEY = 'kvj_expenses_v1';
-
-const getStoredExpenses = (): ExpenseRecord[] => {
-  try {
-    const raw = localStorage.getItem(EXPENSES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveStoredExpenses = (records: ExpenseRecord[]) => {
-  try {
-    localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(records));
-  } catch (e) {
-    console.warn('Failed to save expenses to localStorage:', e);
-  }
-};
-
 export function ExpenseClaims() {
   const { toast } = useNotifications();
   const { user } = useAuth();
@@ -279,7 +260,11 @@ export function ExpenseClaims() {
   const [carRate, setCarRate] = useState(12.0);
 
   const [customExpenseTypes, setCustomExpenseTypes] = useState<string[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => getStoredExpenses());
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>(isManagement ? 'all' : (user?.fullName || 'me'));
 
   // Load custom expense types from Supabase
   useEffect(() => {
@@ -296,6 +281,44 @@ export function ExpenseClaims() {
     loadCustomTypes();
   }, []);
 
+  const loadClaims = useCallback(async () => {
+    if (!user) return;
+    try {
+      let query = supabase
+        .from('expense_claims')
+        .select('*');
+      
+      if (!isManagement) {
+        query = query.eq('employee_id', user.id);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (!error && data) {
+        const mapped: ExpenseRecord[] = data.map((r: any) => ({
+          id: r.id,
+          date: new Date(r.expense_date || r.created_at).toLocaleDateString('en-GB'),
+          person: r.person_name || 'Employee',
+          category: r.category || (r.is_office_expense ? 'Office Expense' : 'Training Expense'),
+          type: r.expense_type || 'Misc',
+          batch: r.batch_name,
+          notes: r.notes,
+          amount: Number(r.amount || 0),
+          receipt: r.receipt_url || r.receipt_file_name || '',
+          status: (r.status || 'submitted').toLowerCase() as any,
+          approvedBy: r.approved_by,
+          approvedAt: r.approved_at ? new Date(r.approved_at).toLocaleString() : undefined,
+        }));
+        setExpenses(mapped);
+      }
+    } catch (e) {
+      console.warn('Could not load expense_claims:', e);
+    }
+  }, [user, isManagement]);
+
+  useEffect(() => {
+    loadClaims();
+  }, [loadClaims]);
+
   const handleRegisterNewType = async (typeName: string) => {
     setCustomExpenseTypes((prev) => Array.from(new Set([...prev, typeName])));
     toast({ variant: 'success', title: 'Expense Type Registered', message: `Registered "${typeName}" in database.` });
@@ -305,10 +328,6 @@ export function ExpenseClaims() {
       console.warn('Supabase expense_types insert warning:', e);
     }
   };
-
-  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
-  const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
-  const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>(isManagement ? 'all' : (user?.fullName || 'me'));
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter((exp) => {
@@ -322,7 +341,7 @@ export function ExpenseClaims() {
     });
   }, [expenses, isManagement, selectedPersonFilter, user]);
 
-  const handleExpenseSubmit = (values: Record<string, unknown>) => {
+  const handleExpenseSubmit = async (values: Record<string, unknown>) => {
     const isSelfTravel = values.expenseType === 'Self Travel';
     const km = Number(values.km || 0);
     const vehicle = (values.vehicle || 'Bike') as 'Bike' | 'Car';
@@ -336,85 +355,95 @@ export function ExpenseClaims() {
         ? values.receipt
         : (values.receiptFile ? `[Uploaded File: ${(values.receiptFile as File).name}]` : 'Uploaded Proof');
 
-    const newExp: ExpenseRecord = {
-      id: String(Date.now()),
-      date: new Date().toLocaleDateString('en-GB'),
-      person: user?.fullName || 'Employee',
-      category: (values.categoryType || 'Office Expense') as any,
-      type: (values.expenseType as string) || 'Misc',
-      batch: values.batch as string,
-      vehicle: isSelfTravel ? vehicle : undefined,
-      km: isSelfTravel ? km : undefined,
-      route: values.route as string,
-      amount,
-      receipt: receiptLink,
-      status: 'submitted',
-    };
-
-    const updatedList = [newExp, ...expenses];
-    setExpenses(updatedList);
-    saveStoredExpenses(updatedList);
-    toast({ variant: 'success', title: 'Claim Filed', message: `Submitted ₹${amount.toFixed(2)} expense claim for review.` });
-    setExpenseOpen(false);
-
-    // Save claim to Supabase expense_claims DB table
     try {
-      supabase.from('expense_claims').insert({
+      const { error } = await supabase.from('expense_claims').insert({
         employee_id: user?.id,
-        category: newExp.category,
-        amount: newExp.amount,
-        notes: newExp.route || newExp.notes || newExp.type,
+        person_name: user?.fullName || 'Employee',
+        category: values.categoryType || 'Office Expense',
+        expense_type: values.expenseType === '__NEW_TYPE__' ? values.newTypeInput : values.expenseType,
+        amount,
+        expense_date: new Date().toISOString().split('T')[0],
+        batch_name: values.batch as string,
+        is_office_expense: values.categoryType === 'Office Expense',
+        notes: values.route || values.notes || values.expenseType,
         receipt_url: receiptLink,
         status: 'submitted',
-      }).then();
-    } catch (e) {
-      console.warn('Supabase expense_claims insert warning:', e);
+      });
+
+      if (error) {
+        toast({ variant: 'error', title: 'Claim Failed', message: error.message });
+      } else {
+        toast({ variant: 'success', title: 'Claim Filed', message: `Submitted ₹${amount.toFixed(2)} expense claim for review.` });
+        setExpenseOpen(false);
+        loadClaims();
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Claim Failed', message: e.message });
     }
   };
 
-  const handleApprove = (id: string) => {
-    setExpenses((prev) => {
-      const next = prev.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              status: 'approved' as const,
-              approvedBy: user?.fullName || 'Manager',
-              approvedAt: new Date().toLocaleString(),
-            }
-          : e
-      );
-      saveStoredExpenses(next);
-      return next;
-    });
-    toast({ variant: 'success', title: 'Claim Approved', message: 'Expense claim authorized and locked.' });
+  const handleApprove = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expense_claims')
+        .update({
+          status: 'approved',
+          approved_by: user?.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) {
+        toast({ variant: 'error', title: 'Approval Failed', message: error.message });
+      } else {
+        toast({ variant: 'success', title: 'Claim Approved', message: 'Expense claim authorized and locked.' });
+        loadClaims();
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Approval Failed', message: e.message });
+    }
   };
 
-  const handleReject = (id: string) => {
-    setExpenses((prev) => {
-      const next = prev.map((e) => (e.id === id ? { ...e, status: 'rejected' as const } : e));
-      saveStoredExpenses(next);
-      return next;
-    });
-    toast({ variant: 'warning', title: 'Claim Rejected', message: 'Expense claim status updated to rejected.' });
+  const handleReject = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expense_claims')
+        .update({
+          status: 'rejected',
+        })
+        .eq('id', id);
+
+      if (error) {
+        toast({ variant: 'error', title: 'Rejection Failed', message: error.message });
+      } else {
+        toast({ variant: 'warning', title: 'Claim Rejected', message: 'Expense claim status updated to rejected.' });
+        loadClaims();
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Rejection Failed', message: e.message });
+    }
   };
 
-  const handleBulkApprove = () => {
-    setExpenses((prev) => {
-      const next = prev.map((e) =>
-        e.status === 'submitted'
-          ? {
-              ...e,
-              status: 'approved' as const,
-              approvedBy: user?.fullName || 'Manager',
-              approvedAt: new Date().toLocaleString(),
-            }
-          : e
-      );
-      saveStoredExpenses(next);
-      return next;
-    });
-    toast({ variant: 'success', title: 'Bulk Approved', message: 'All pending expense claims authorized.' });
+  const handleBulkApprove = async () => {
+    try {
+      const { error } = await supabase
+        .from('expense_claims')
+        .update({
+          status: 'approved',
+          approved_by: user?.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('status', 'submitted');
+
+      if (error) {
+        toast({ variant: 'error', title: 'Bulk Approval Failed', message: error.message });
+      } else {
+        toast({ variant: 'success', title: 'Bulk Approved', message: 'All pending expense claims authorized.' });
+        loadClaims();
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Bulk Approval Failed', message: e.message });
+    }
   };
 
   return (

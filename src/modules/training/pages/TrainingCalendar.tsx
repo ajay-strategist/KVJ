@@ -71,21 +71,8 @@ export function TrainingCalendar() {
   const [data, setData] = useState<ScheduleRangeResult>(EMPTY);
   const [loading, setLoading] = useState(false);
 
-  // Additional user-created sessions in state with LocalStorage persistence
-  const [customSessions, setCustomSessions] = useState<ScheduleSession[]>(() => {
-    try {
-      const saved = localStorage.getItem('kvj_schedule_sessions');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('kvj_schedule_sessions', JSON.stringify(customSessions));
-    } catch {}
-  }, [customSessions]);
+  // Additional user-created sessions in state loaded from Supabase
+  const [customSessions, setCustomSessions] = useState<ScheduleSession[]>([]);
 
   // Load schedule sessions from Supabase schedule_sessions table on mount
   useEffect(() => {
@@ -116,11 +103,7 @@ export function TrainingCalendar() {
             color: '#3b82f6',
           }));
 
-          setCustomSessions((prev) => {
-            const existingIds = new Set(prev.map((s) => s.id));
-            const newFromDb = dbSess.filter((s) => !existingIds.has(s.id));
-            return [...prev, ...newFromDb];
-          });
+          setCustomSessions(dbSess);
         }
       } catch (e) {
         console.warn('Could not load DB schedule_sessions:', e);

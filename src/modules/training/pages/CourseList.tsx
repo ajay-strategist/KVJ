@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
@@ -8,6 +8,9 @@ import Tabs from '../../../shared/ui/Tabs';
 import { Form, TextField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Course } from '../training.repository';
+import { COLLEGE_REPOSITORY_TOKEN } from '../training.repository';
+import { container } from '../../../core/registry';
+import { useAuth } from '../../auth/AuthProvider';
 
 export interface College {
   id: string;
@@ -60,21 +63,25 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   const [openCourseModal, setOpenCourseModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
 
-  // Colleges Management State (Persisted in localStorage)
-  const [colleges, setColleges] = useState<College[]>(() => {
-    try {
-      const saved = localStorage.getItem('kvj.colleges');
-      return saved ? JSON.parse(saved) : INITIAL_COLLEGES;
-    } catch {
-      return INITIAL_COLLEGES;
-    }
-  });
+  const { user } = useAuth();
+  const collegeRepo = useMemo(() => container.resolve(COLLEGE_REPOSITORY_TOKEN), []);
+
+  // Colleges Management State (Persisted in Supabase)
+  const [colleges, setColleges] = useState<College[]>(INITIAL_COLLEGES);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('kvj.colleges', JSON.stringify(colleges));
-    } catch {}
-  }, [colleges]);
+    async function fetchColleges() {
+      try {
+        const p = await collegeRepo.findMany();
+        if (p.data && p.data.length > 0) {
+          setColleges(p.data as any);
+        }
+      } catch (e) {
+        console.warn('Could not fetch colleges from Supabase:', e);
+      }
+    }
+    fetchColleges();
+  }, [collegeRepo]);
 
   // College Modal State
   const [openCollegeModal, setOpenCollegeModal] = useState(false);
@@ -193,50 +200,53 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     setOpenCollegeModal(true);
   };
 
-  const handleSaveCollege = (e: React.FormEvent) => {
+  const handleSaveCollege = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!collegeForm.name.trim() || !collegeForm.code.trim()) {
       toast({ variant: 'error', title: 'Required Fields', message: 'College name and code are required.' });
       return;
     }
 
-    if (editingCollege) {
-      setColleges((prev) =>
-        prev.map((c) =>
-          c.id === editingCollege.id
-            ? {
-                ...c,
-                name: collegeForm.name.trim(),
-                code: collegeForm.code.trim().toUpperCase(),
-                location: collegeForm.location.trim(),
-                principalName: collegeForm.principalName.trim(),
-                contactEmail: collegeForm.contactEmail.trim(),
-                contactPhone: collegeForm.contactPhone.trim(),
-              }
-            : c
-        )
-      );
-      toast({ variant: 'success', title: 'College Updated', message: `${collegeForm.name} updated successfully.` });
-    } else {
-      const newCollege: College = {
-        id: `col-${Date.now()}`,
-        name: collegeForm.name.trim(),
-        code: collegeForm.code.trim().toUpperCase(),
-        location: collegeForm.location.trim(),
-        principalName: collegeForm.principalName.trim(),
-        contactEmail: collegeForm.contactEmail.trim(),
-        contactPhone: collegeForm.contactPhone.trim(),
-      };
-      setColleges((prev) => [newCollege, ...prev]);
-      toast({ variant: 'success', title: 'College Added', message: `${collegeForm.name} added to catalog successfully.` });
+    try {
+      if (editingCollege) {
+        const val = await collegeRepo.update(editingCollege.id, {
+          name: collegeForm.name.trim(),
+          code: collegeForm.code.trim().toUpperCase(),
+          location: collegeForm.location.trim(),
+          contactEmail: collegeForm.contactEmail.trim(),
+          contactPhone: collegeForm.contactPhone.trim(),
+        }, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+
+        setColleges((prev) => prev.map((c) => (c.id === editingCollege.id ? (val as any) : c)));
+        toast({ variant: 'success', title: 'College Updated', message: `${collegeForm.name} updated successfully.` });
+      } else {
+        const val = await collegeRepo.create({
+          name: collegeForm.name.trim(),
+          code: collegeForm.code.trim().toUpperCase(),
+          location: collegeForm.location.trim(),
+          contactEmail: collegeForm.contactEmail.trim(),
+          contactPhone: collegeForm.contactPhone.trim(),
+          isActive: true,
+        }, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+
+        setColleges((prev) => [val as any, ...prev]);
+        toast({ variant: 'success', title: 'College Added', message: `${collegeForm.name} added to catalog successfully.` });
+      }
+      setOpenCollegeModal(false);
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Save Failed', message: err.message || 'Error occurred.' });
     }
-    setOpenCollegeModal(false);
   };
 
-  const handleDeleteCollege = (id: string, name: string) => {
+  const handleDeleteCollege = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
-      setColleges((prev) => prev.filter((c) => c.id !== id));
-      toast({ variant: 'info', title: 'College Deleted', message: `${name} removed from catalog.` });
+      try {
+        await collegeRepo.softDelete(id, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+        setColleges((prev) => prev.filter((c) => c.id !== id));
+        toast({ variant: 'info', title: 'College Deleted', message: `${name} removed from catalog.` });
+      } catch (err: any) {
+        toast({ variant: 'error', title: 'Delete Failed', message: err.message || 'Error occurred.' });
+      }
     }
   };
 

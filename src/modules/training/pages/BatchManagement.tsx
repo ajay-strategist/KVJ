@@ -7,9 +7,10 @@ import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
-import { STUDENT_REPOSITORY_TOKEN } from '../training.repository';
+import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN } from '../training.repository';
 import { normalizeStudentKey } from '../supabase-training.repository';
 import type { Page } from '../../../core/types';
+import { supabase } from '../../../shared/integration/supabase';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { usePermissions } from '../../../shared/permissions/react';
 import { useAuth } from '../../auth/AuthProvider';
@@ -496,6 +497,19 @@ export function BatchManagement() {
     });
   };
 
+  const [dbColleges, setDbColleges] = useState<any[]>([]);
+
+  useEffect(() => {
+    try {
+      const repo = container.resolve(COLLEGE_REPOSITORY_TOKEN);
+      repo.findMany().then((p) => {
+        if (p.data && p.data.length > 0) {
+          setDbColleges(p.data);
+        }
+      });
+    } catch {}
+  }, []);
+
   const [examScheduleDates, setExamScheduleDates] = useState<Record<string, string>>({
     's-1': '2026-08-01',
     's-2': '2026-08-05',
@@ -504,53 +518,126 @@ export function BatchManagement() {
   });
 
   // Hour-based Multi-Date Attendance Column Matrix State
-  const [attendanceSessions, setAttendanceSessions] = useState<Array<{ id: string; date: string; hour: number }>>(() => {
-    try {
-      const saved = localStorage.getItem('kvj.batch.attendanceSessions');
-      return saved ? JSON.parse(saved) : [
-        { id: 'col-1', date: '2026-07-20', hour: 1 },
-        { id: 'col-2', date: '2026-07-20', hour: 2 },
-        { id: 'col-3', date: '2026-07-21', hour: 1 },
-        { id: 'col-4', date: '2026-07-22', hour: 1 },
-        { id: 'col-5', date: '2026-07-23', hour: 1 },
-      ];
-    } catch {
-      return [
-        { id: 'col-1', date: '2026-07-20', hour: 1 },
-        { id: 'col-2', date: '2026-07-20', hour: 2 },
-        { id: 'col-3', date: '2026-07-21', hour: 1 },
-        { id: 'col-4', date: '2026-07-22', hour: 1 },
-        { id: 'col-5', date: '2026-07-23', hour: 1 },
-      ];
-    }
+  const [attendanceSessions, setAttendanceSessions] = useState<Array<{ id: string; date: string; hour: number }>>([
+    { id: 'col-1', date: '2026-07-20', hour: 1 },
+    { id: 'col-2', date: '2026-07-20', hour: 2 },
+    { id: 'col-3', date: '2026-07-21', hour: 1 },
+    { id: 'col-4', date: '2026-07-22', hour: 1 },
+    { id: 'col-5', date: '2026-07-23', hour: 1 },
+  ]);
+
+  const [attendanceMatrix, setAttendanceMatrix] = useState<Record<string, Record<string, 'present' | 'absent' | 'late'>>>({
+    's-1': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+    's-2': { 'col-1': 'present', 'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+    's-3': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
+    's-4': { 'col-1': 'absent',  'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
   });
 
+  // Load attendance sessions and status matrix from schedule_sessions
   useEffect(() => {
-    try { localStorage.setItem('kvj.batch.attendanceSessions', JSON.stringify(attendanceSessions)); } catch {}
-  }, [attendanceSessions]);
-
-  const [attendanceMatrix, setAttendanceMatrix] = useState<Record<string, Record<string, 'present' | 'absent' | 'late'>>>(() => {
-    try {
-      const saved = localStorage.getItem('kvj.batch.attendanceMatrix');
-      return saved ? JSON.parse(saved) : {
-        's-1': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-        's-2': { 'col-1': 'present', 'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-        's-3': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-        's-4': { 'col-1': 'absent',  'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-      };
-    } catch {
-      return {
-        's-1': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-        's-2': { 'col-1': 'present', 'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-        's-3': { 'col-1': 'present', 'col-2': 'present', 'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-        's-4': { 'col-1': 'absent',  'col-2': 'absent',  'col-3': 'present', 'col-4': 'present', 'col-5': 'present' },
-      };
+    if (!selectedBatchId) return;
+    async function loadAttendanceFromDb() {
+      try {
+        const { data, error } = await supabase
+          .from('schedule_sessions')
+          .select('*')
+          .eq('batch_id', selectedBatchId);
+        
+        if (!error && data && data.length > 0) {
+          const sessionMap = new Map();
+          const matrix: Record<string, Record<string, 'present' | 'absent' | 'late'>> = {};
+          
+          data.forEach((row: any) => {
+            const dateStr = row.date;
+            let hourVal = 1;
+            if (row.session_title && row.session_title.startsWith('Hour ')) {
+              hourVal = parseInt(row.session_title.replace('Hour ', ''), 10) || 1;
+            }
+            const sessKey = `${dateStr}-h${hourVal}`;
+            
+            sessionMap.set(sessKey, {
+              id: sessKey,
+              date: dateStr,
+              hour: hourVal,
+            });
+            
+            if (row.student_id && row.status) {
+              if (!matrix[row.student_id]) {
+                matrix[row.student_id] = {};
+              }
+              const normalizedStatus = row.status.toLowerCase();
+              if (['present', 'absent', 'late'].includes(normalizedStatus)) {
+                matrix[row.student_id][sessKey] = normalizedStatus as any;
+              }
+            }
+          });
+          
+          if (sessionMap.size > 0) {
+            setAttendanceSessions(Array.from(sessionMap.values()));
+          }
+          if (Object.keys(matrix).length > 0) {
+            setAttendanceMatrix(matrix);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load attendance from schedule_sessions:', e);
+      }
     }
-  });
+    loadAttendanceFromDb();
+  }, [selectedBatchId]);
 
+  // Sync attendanceMatrix and attendanceSessions back to Supabase
   useEffect(() => {
-    try { localStorage.setItem('kvj.batch.attendanceMatrix', JSON.stringify(attendanceMatrix)); } catch {}
-  }, [attendanceMatrix]);
+    if (!selectedBatchId) return;
+    async function syncAttendance() {
+      try {
+        for (const studentId of Object.keys(attendanceMatrix)) {
+          const isRealUuid = studentId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
+          if (!isRealUuid) continue;
+          
+          const studentSessions = attendanceMatrix[studentId];
+          for (const colId of Object.keys(studentSessions)) {
+            const status = studentSessions[colId];
+            const col = attendanceSessions.find((c) => c.id === colId);
+            if (!col) continue;
+            
+            const sessionTitle = `Hour ${col.hour || 1}`;
+            const { data, error } = await supabase
+              .from('schedule_sessions')
+              .select('id')
+              .eq('batch_id', selectedBatchId)
+              .eq('student_id', studentId)
+              .eq('date', col.date)
+              .eq('session_title', sessionTitle)
+              .maybeSingle();
+              
+            if (!error) {
+              const payload = {
+                batch_id: selectedBatchId,
+                student_id: studentId,
+                date: col.date,
+                status: status.toUpperCase(),
+                topic: 'Batch Session',
+                session_title: sessionTitle,
+              };
+              
+              if (data?.id) {
+                await supabase.from('schedule_sessions').update(payload).eq('id', data.id);
+              } else {
+                await supabase.from('schedule_sessions').insert(payload);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to sync attendance to Supabase:', err);
+      }
+    }
+    
+    if (Object.keys(attendanceMatrix).length > 0) {
+      syncAttendance();
+    }
+  }, [attendanceMatrix, attendanceSessions, selectedBatchId]);
 
   const toggleSessionStatus = (studentId: string, colId: string, statusOverride?: 'present' | 'absent' | 'late') => {
     setAttendanceMatrix((prev) => {
@@ -1010,14 +1097,7 @@ export function BatchManagement() {
   };
 
   // Student list state — initialized from and saved to localStorage with DB sync fallback
-  const [students, setStudents] = useState<StudentRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('kvj.batch.students');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [students, setStudents] = useState<StudentRecord[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -1026,27 +1106,36 @@ export function BatchManagement() {
       repo.findMany().then((p: Page<any>) => {
         if (!active) return;
         if (p.data && p.data.length > 0) {
-          const mapped: StudentRecord[] = p.data.map((s: any) => ({
-            id: s.id,
-            name: s.fullName || `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student',
-            photo: s.photoUrl || s.photo || '🎓',
-            photoUrl: s.photoUrl,
-            phone: s.phone || '',
-            email: s.email || '',
-            college: s.college || 'Christ Irinjalakkuda',
-            department: s.department || 'BBA',
-            attendancePct: s.attendancePct ?? 100,
-            attendanceStatus: s.attendanceStatus || 'Regular',
-            ass1: s.ass1 ?? 0,
-            ass2: s.ass2 ?? 0,
-            ass3: s.ass3 ?? 0,
-            project: s.project ?? 0,
-            finalExam: s.finalExam ?? 0,
-            overallScore: s.overallScore ?? 0,
-            voucherId: s.voucherId || 'VOUCH-001',
-            voucherStatus: s.voucherStatus || 'unassigned',
-            certificateStatus: s.certificateStatus || 'unissued',
-          }));
+          const mapped: StudentRecord[] = p.data.map((s: any) => {
+            const fields = s.customFields || {};
+            return {
+              id: s.id,
+              name: s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.fullName || s.name || 'Student',
+              photo: s.photoUrl || s.photo || '🎓',
+              photoUrl: s.photoUrl,
+              phone: s.phone || '',
+              email: s.email || '',
+              college: fields.college || 'Christ Irinjalakkuda',
+              department: fields.department || 'BBA',
+              attendancePct: fields.attendancePct ?? 100,
+              attendanceStatus: fields.attendanceStatus || 'Regular',
+              ass1: fields.ass1 ?? 0,
+              ass2: fields.ass2 ?? 0,
+              ass3: fields.ass3 ?? 0,
+              project: fields.project ?? 0,
+              finalExam: fields.finalExam ?? 0,
+              overallScore: fields.overallScore ?? 0,
+              voucherId: fields.voucherId || '',
+              voucherStatus: fields.voucherStatus || 'unassigned',
+              certificateStatus: fields.certificateStatus || 'unissued',
+              examAttemptCount: fields.examAttemptCount ?? 1,
+              retestScore: fields.retestScore ?? 0,
+              retestApproved: fields.retestApproved ?? false,
+              retestPaymentStatus: fields.retestPaymentStatus || 'Unpaid',
+              retestCollectedAmount: fields.retestCollectedAmount ?? 0,
+              retestVoucherId: fields.retestVoucherId || '',
+            };
+          });
           setStudents(mapped);
         }
       }).catch(() => {});
@@ -1055,22 +1144,67 @@ export function BatchManagement() {
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem('kvj.batch.students', JSON.stringify(students)); } catch {}
+    let active = true;
+    async function syncToSupabase() {
+      try {
+        for (const s of students) {
+          const names = s.name.split(' ');
+          const firstName = names[0] || 'Student';
+          const lastName = names.slice(1).join(' ') || '';
+          
+          const isRealUuid = s.id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
+          
+          const payload = {
+            first_name: firstName,
+            last_name: lastName,
+            name: s.name,
+            phone: s.phone,
+            email: s.email,
+            notes: (s as any).notes,
+            custom_fields: {
+              college: s.college,
+              department: s.department,
+              ass1: s.ass1,
+              ass2: s.ass2,
+              ass3: s.ass3,
+              project: s.project,
+              finalExam: s.finalExam,
+              retestScore: s.retestScore,
+              examAttemptCount: s.examAttemptCount,
+              retestApproved: s.retestApproved,
+              retestPaymentStatus: s.retestPaymentStatus,
+              retestCollectedAmount: s.retestCollectedAmount,
+              voucherId: s.voucherId,
+              retestVoucherId: s.retestVoucherId,
+              voucherStatus: s.voucherStatus,
+              certificateStatus: s.certificateStatus,
+            }
+          };
+
+          if (isRealUuid) {
+            await supabase.from('student_records').update(payload).eq('id', s.id);
+          } else {
+            const { data, error } = await supabase.from('student_records').insert({
+              ...payload,
+              register_no: normalizeStudentKey(s.phone || '9876500000'),
+            }).select('id');
+            if (!error && data && data[0] && active) {
+              s.id = data[0].id;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to sync students to Supabase:', err);
+      }
+    }
+    
+    if (students.length > 0) {
+      syncToSupabase();
+    }
   }, [students]);
 
   // Final Exam student ID list — separate from master students array
-  const [finalExamStudentIds, setFinalExamStudentIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('kvj.batch.finalExamStudentIds');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try { localStorage.setItem('kvj.batch.finalExamStudentIds', JSON.stringify(finalExamStudentIds)); } catch {}
-  }, [finalExamStudentIds]);
+  const [finalExamStudentIds, setFinalExamStudentIds] = useState<string[]>([]);
 
   // Email communications log
   const [emailLogs, setEmailLogs] = useState<EmailHistoryItem[]>([]);
@@ -3425,15 +3559,11 @@ export function BatchManagement() {
                   College Name
                 </label>
                 {(() => {
-                  let savedColleges: Array<{ id: string; name: string; code: string }> = [
+                  const savedColleges = dbColleges.length > 0 ? dbColleges : [
                     { id: 'col-1', name: 'Christ Irinjalakkuda', code: 'CHRIST-IRK' },
                     { id: 'col-2', name: 'MIM Kuttikkanam', code: 'MIM-KUTT' },
                     { id: 'col-3', name: 'St. Thomas College', code: 'STC-THR' },
                   ];
-                  try {
-                    const raw = localStorage.getItem('kvj.colleges');
-                    if (raw) savedColleges = JSON.parse(raw);
-                  } catch {}
 
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
