@@ -46,6 +46,7 @@ export function ProjectList() {
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectCardData | null>(null);
+  const [clientNameInput, setClientNameInput] = useState('');
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
@@ -169,10 +170,16 @@ export function ProjectList() {
     const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
     const initialStatus = isMgmt ? ((values.status as any) || 'execution') : 'planning';
 
+    // Resolve client: match typed name to existing client, or pass name for new client creation
+    const typedName = (clientNameInput || '').trim();
+    const matchedClient = clients.find((c) => c.name.toLowerCase() === typedName.toLowerCase());
+    const resolvedClientId = matchedClient ? matchedClient.id : undefined;
+
     const res = await createProject({
       title: values.title as string,
       code: (values.code as string) || `KVJ-PRJ-${Math.floor(100 + Math.random() * 900)}`,
-      clientId: values.clientId as string,
+      clientId: resolvedClientId,
+      clientName: !matchedClient ? typedName : undefined,
       status: initialStatus as any,
       priority: 'medium',
       supervisorId: values.supervisorId as string,
@@ -188,6 +195,7 @@ export function ProjectList() {
       } else {
         toast({ variant: 'success', title: 'Project Created', message: `${res.value.title} created successfully.` });
       }
+      setClientNameInput('');
       setCreateProjectOpen(false);
     } else {
       toast({ variant: 'error', title: 'Creation Failed', message: res.error });
@@ -569,49 +577,125 @@ export function ProjectList() {
         <DataTable columns={tableColumns} rows={filteredProjects} rowKey={(p) => p.id} />
       )}
 
-      {/* Detailed Project Report Modal with Tasks List and PDF Export */}
-      {selectedProject && (
-        <Drawer open={reportOpen} onClose={() => setReportOpen(false)} title={`Detailed Report — ${selectedProject.code}`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, fontSize: 13 }}>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{selectedProject.title}</h3>
-              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>Client: {selectedProject.client} · Supervisor: {selectedProject.supervisor}</div>
-            </div>
-
-            <Card style={{ padding: 14, background: 'var(--bg-sunken)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>Status: <Badge tone="info">{selectedProject.status}</Badge></div>
-                <div>Milestones: <strong>{selectedProject.milestonesCount} Scheduled</strong></div>
-                <div>Total Logged Hours: <strong>{selectedProject.totalHours} hrs</strong></div>
-                <div>Task Progress: <strong>{selectedProject.tasksCompleted} / {selectedProject.tasksTotal} Completed</strong></div>
+      {/* Detailed Project Report — Full-Screen Modal Popup */}
+      {selectedProject && reportOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+            animation: 'fadeIn 0.2s ease',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setReportOpen(false); }}
+        >
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              borderRadius: 16,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
+              width: '100%',
+              maxWidth: 860,
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              background: 'linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%)',
+              color: 'white',
+            }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', opacity: 0.8, letterSpacing: 1 }}>📊 Detailed Report</div>
+                <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{selectedProject.title}</div>
+                <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>
+                  {selectedProject.code} &nbsp;·&nbsp; Client: <strong>{selectedProject.client}</strong> &nbsp;·&nbsp; Supervisor: <strong>{selectedProject.supervisor}</strong>
+                </div>
               </div>
-            </Card>
-
-            {/* Member Hours Log */}
-            <div>
-              <SectionHeader title="Member-Specific Hours Log" />
-              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginTop: 8 }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                    <th style={{ padding: 6 }}>Team Member</th>
-                    <th style={{ padding: 6, textAlign: 'right' }}>Logged Hours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedProject.members.map((m, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px dashed var(--border)' }}>
-                      <td style={{ padding: 6 }}>👤 {m.name}</td>
-                      <td style={{ padding: 6, textAlign: 'right', fontWeight: 700 }}>{m.hours} hrs</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <button
+                type="button"
+                onClick={() => setReportOpen(false)}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >×</button>
             </div>
 
-            {/* Individual Task List (Positioned below Member Hours) */}
-            <div>
-              <SectionHeader title="Individual Task List" />
-              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginTop: 8 }}>
+            {/* Modal Body — scrollable */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* KPI Strip */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                {[
+                  { label: 'Status', value: selectedProject.status, icon: '🏷️', color: selectedProject.status === 'Completed' ? '#10b981' : selectedProject.status === 'In Progress' ? '#f59e0b' : '#6366f1' },
+                  { label: 'Total Hours', value: `${selectedProject.totalHours} hrs`, icon: '⏱️', color: '#6366f1' },
+                  { label: 'Tasks Done', value: `${selectedProject.tasksCompleted} / ${selectedProject.tasksTotal}`, icon: '✅', color: '#10b981' },
+                  { label: 'Milestones', value: `${selectedProject.milestonesCount} Planned`, icon: '🏁', color: '#f59e0b' },
+                ].map((kpi) => (
+                  <div key={kpi.label} style={{ background: 'var(--bg-sunken)', borderRadius: 10, padding: '12px 14px', borderLeft: `3px solid ${kpi.color}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: 0.5 }}>{kpi.icon} {kpi.label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: kpi.color, marginTop: 4 }}>{kpi.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Progress Bar */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                  <span style={{ fontWeight: 700 }}>Overall Task Completion</span>
+                  <span style={{ color: 'var(--brand)', fontWeight: 700 }}>
+                    {selectedProject.tasksTotal > 0 ? Math.round((selectedProject.tasksCompleted / selectedProject.tasksTotal) * 100) : 0}%
+                  </span>
+                </div>
+                <div style={{ height: 8, background: 'var(--bg-sunken)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${selectedProject.tasksTotal > 0 ? Math.round((selectedProject.tasksCompleted / selectedProject.tasksTotal) * 100) : 0}%`,
+                    background: 'linear-gradient(90deg, var(--brand), #7c3aed)',
+                    borderRadius: 4,
+                    transition: 'width 0.5s ease',
+                  }} />
+                </div>
+              </div>
+
+              {/* Two-column layout: Members + Tasks */}
+              <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
+
+                {/* Member Hours */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    👥 Team Hours
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {selectedProject.members.length === 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>No members assigned yet.</div>
+                    )}
+                    {selectedProject.members.map((m, idx) => (
+                      <div key={idx} style={{ background: 'var(--bg-sunken)', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, var(--brand), #7c3aed)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 700 }}>
+                            {m.name.charAt(0)}
+                          </span>
+                          {m.name}
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)' }}>{m.hours}h</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Task List */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    📋 Task Management
+                  </div>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
                     <th style={{ padding: 6 }}>Task Description</th>
@@ -689,29 +773,55 @@ export function ProjectList() {
                   )}
                 </tbody>
               </table>
+                </div>
+              </div>
             </div>
 
-            {/* Action Buttons: Export to PDF & Close */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, background: 'var(--bg-surface)' }}>
               <Button variant="secondary" onClick={() => exportReportToPDF(selectedProject)}>
-                📄 Export PDF (with KVJ Logo)
+                📄 Export PDF
               </Button>
-              <Button onClick={() => setReportOpen(false)}>Close Report</Button>
+              <Button onClick={() => setReportOpen(false)}>Close</Button>
             </div>
           </div>
-        </Drawer>
+        </div>
       )}
 
       {/* Create Project Modal */}
       <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create New Project">
-        <Form initial={{ code: 'KVJ-PRJ-00', status: 'planning' }} onSubmit={handleCreateProject}>
+        <Form initial={{ code: 'KVJ-PRJ-00', status: 'not_started' }} onSubmit={handleCreateProject}>
           <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
           <TextField name="title" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
-          <SelectField
-            name="clientId"
-            label="Client Organization *"
-            options={clients.map((c) => ({ value: c.id, label: c.name }))}
-          />
+
+          {/* Client: combobox — type a new name or select from existing */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client Organization *</label>
+            <input
+              list="client-datalist"
+              value={clientNameInput}
+              onChange={(e) => setClientNameInput(e.target.value)}
+              placeholder="Type or select client name…"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1.5px solid var(--border)',
+                background: 'var(--bg-input, var(--bg-surface))',
+                color: 'var(--text-primary)',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <datalist id="client-datalist">
+              {clients.map((c) => <option key={c.id} value={c.name} />)}
+            </datalist>
+            {clientNameInput && !clients.find((c) => c.name.toLowerCase() === clientNameInput.toLowerCase()) && (
+              <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>⚡ New client will be registered: "{clientNameInput}"</div>
+            )}
+          </div>
+
           <SelectField
             name="supervisorId"
             label="Project Supervisor *"
@@ -724,6 +834,7 @@ export function ProjectList() {
             name="status"
             label="Initial Phase *"
             options={[
+              { value: 'not_started', label: 'Not Started' },
               { value: 'planning', label: 'Planning / Kickoff' },
               { value: 'execution', label: 'In Execution' },
               { value: 'closure', label: 'Closure' },
