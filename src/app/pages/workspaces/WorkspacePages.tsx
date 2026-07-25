@@ -11,13 +11,15 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, SelectField, TextField, useForm } from '../../../shared/forms/form';
+import { useLeave } from '../../../modules/leave/hooks/useLeave';
+import { Form, SelectField, TextField, DatePickerField, CheckboxField, FileUploadField, TextAreaField, useForm } from '../../../shared/forms/form';
 
 import { useProject } from '../../../modules/project/hooks/useProject';
 import { useEmployee } from '../../../modules/employee/hooks/useEmployee';
 import { useTraining } from '../../../modules/training/hooks/useTraining';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attendance.repository';
+import { ATTENDANCE_SERVICE_TOKEN } from '../../../modules/attendance/attendance.service';
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
 import { toLocalISODate } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
@@ -174,6 +176,13 @@ export const AttendancePanel = memo(function AttendancePanel({
     ? new Date(record.firstClockIn).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })
     : '--';
 
+  const [nowMs, setNowMs] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const completedBreakMs = (record?.breaks ?? []).reduce((sum: number, b: any) => {
     if (b.endTime) return sum + (new Date(b.endTime).getTime() - new Date(b.startTime).getTime());
     return sum;
@@ -185,13 +194,16 @@ export const AttendancePanel = memo(function AttendancePanel({
   }, 0);
 
   const activeSession = record?.sessions?.find((s: any) => !s.clockOut);
-  const activeSessionMs = activeSession ? (now - new Date(activeSession.clockIn).getTime()) : 0;
+  const startTimeStr = activeSession?.clockIn || record?.firstClockIn;
+  const activeSessionMs = (record?.status === 'present' || record?.status === 'on_break') && startTimeStr
+    ? Math.max(0, nowMs - new Date(startTimeStr).getTime())
+    : 0;
 
   const activeBreak = record?.breaks?.find((b: any) => !b.endTime);
-  const activeBreakMs = activeBreak ? (now - new Date(activeBreak.startTime).getTime()) : 0;
+  const activeBreakMs = activeBreak ? Math.max(0, nowMs - new Date(activeBreak.startTime).getTime()) : 0;
 
-  const totalWorkMs = completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs;
-  const totalBreakMs = completedBreakMs + activeBreakMs;
+  const totalWorkMs = Math.max(0, completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs);
+  const totalBreakMs = Math.max(0, completedBreakMs + activeBreakMs);
 
   const handleCustomClockInSubmit = useCallback(async () => {
     const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : 'Office';
@@ -614,16 +626,30 @@ export const AttendancePanel = memo(function AttendancePanel({
             endTime: '05:00 PM',
             notes: '',
           }}
-          onSubmit={(values) => {
+          onSubmit={async (values) => {
             const locText = values.classification === 'Training' 
               ? values.location 
               : values.classification === 'Marketing' 
               ? `Marketing: ${values.organisationsVisited}` 
               : 'Office Work';
+            
+            try {
+              const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
+              await attService.requestCorrection(
+                record?.id || String(Date.now()),
+                'attendance_claim',
+                `${values.date} (${values.startTime} - ${values.endTime})`,
+                `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
+                { id: record?.employeeId || 'emp-user', role: 'Employee' }
+              );
+            } catch (e) {
+              console.warn('Attendance correction request notice:', e);
+            }
+
             toast({
               variant: 'success',
               title: 'Attendance Request Submitted',
-              message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Manager/Admin review.`,
+              message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
             });
             if (onActivityLog) {
               onActivityLog(`Submitted attendance claim for ${values.date} (${locText})`, 'success');
@@ -1435,6 +1461,9 @@ export function MyDayPage() {
 
 
 
+  const { applyLeave } = useLeave();
+  const [applyLeaveOpen, setApplyLeaveOpen] = useState(false);
+
   return (
     <AppShell>
       <PageHeader
@@ -1469,9 +1498,7 @@ export function MyDayPage() {
         <ResizedQuickAction
           icon="📝"
           label="Apply Leave / Regularize"
-          onClick={() => {
-            toast({ variant: 'info', title: 'Leave Application', message: 'Opening Leave Request Module.' });
-          }}
+          onClick={() => setApplyLeaveOpen(true)}
         />
       </div>
 
@@ -1512,6 +1539,49 @@ export function MyDayPage() {
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
             <Button type="submit">Create Task</Button>
+          </div>
+        </Form>
+      </Drawer>
+
+      {/* Apply Leave Drawer on My Day */}
+      <Drawer open={applyLeaveOpen} onClose={() => setApplyLeaveOpen(false)} title="Apply for Leave">
+        <Form
+          initial={{ leaveType: 'Leave', startDate: new Date().toISOString().slice(0, 10), endDate: new Date().toISOString().slice(0, 10), reason: '', halfDay: false }}
+          onSubmit={async (values) => {
+            const res = await applyLeave(
+              (values.leaveType as string) || 'Leave',
+              (values.startDate as string) || new Date().toISOString().slice(0, 10),
+              (values.endDate as string) || new Date().toISOString().slice(0, 10),
+              (values.reason as string) || '',
+              Boolean(values.halfDay)
+            );
+            if (res.ok) {
+              toast({ variant: 'success', title: 'Leave Applied', message: 'Your leave application has been submitted successfully.' });
+              setApplyLeaveOpen(false);
+            } else {
+              toast({ variant: 'error', title: 'Application Failed', message: res.error });
+            }
+          }}
+        >
+          <SelectField
+            name="leaveType"
+            label="Leave Type *"
+            options={[
+              { value: 'Leave', label: 'Casual / Earned Leave' },
+              { value: 'Medical Leave', label: 'Medical Leave' },
+              { value: 'On Duty / Regularization', label: 'On Duty / Regularization' },
+              { value: 'Work From Home', label: 'Work From Home' },
+            ]}
+          />
+          <DatePickerField name="startDate" label="Start Date *" />
+          <DatePickerField name="endDate" label="End Date *" />
+          <CheckboxField name="halfDay" label="Apply for Half Day" />
+          <FileUploadField name="medCert" label="Medical Certificate (Optional upfront; can be uploaded after leave)" accept=".pdf,.png,.jpg" />
+          <TextAreaField name="reason" label="Reason for Leave" />
+
+          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button variant="secondary" type="button" onClick={() => setApplyLeaveOpen(false)}>Cancel</Button>
+            <Button type="submit">Submit Leave Request</Button>
           </div>
         </Form>
       </Drawer>

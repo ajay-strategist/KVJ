@@ -69,13 +69,43 @@ export function isSameMonth(iso: string, ref = new Date()): boolean {
  * the reference month. (One record per employee per day.)
  */
 export function hoursThisMonth(
-  records: Array<{ workDate: string; totalWorkingMinutes?: number }>,
+  records: Array<{
+    workDate: string;
+    totalWorkingMinutes?: number;
+    firstClockIn?: string;
+    sessions?: Array<{ clockIn: string; clockOut?: string }>;
+    breaks?: Array<{ startTime: string; endTime?: string }>;
+  }>,
   ref = new Date(),
   dp = 1,
 ): number {
   const mins = records
     .filter((r) => isSameMonth(r.workDate, ref))
-    .reduce((sum, r) => sum + (r.totalWorkingMinutes ?? 0), 0);
+    .reduce((sum, r) => {
+      if (r.totalWorkingMinutes && r.totalWorkingMinutes > 0) {
+        return sum + r.totalWorkingMinutes;
+      }
+      let workMs = 0;
+      if (r.sessions && r.sessions.length > 0) {
+        r.sessions.forEach((s) => {
+          const end = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+          const start = new Date(s.clockIn).getTime();
+          workMs += Math.max(0, end - start);
+        });
+      } else if (r.firstClockIn) {
+        workMs += Math.max(0, Date.now() - new Date(r.firstClockIn).getTime());
+      }
+      let breakMs = 0;
+      if (r.breaks && r.breaks.length > 0) {
+        r.breaks.forEach((b) => {
+          const end = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+          const start = new Date(b.startTime).getTime();
+          breakMs += Math.max(0, end - start);
+        });
+      }
+      const netMins = Math.round(Math.max(0, workMs - breakMs) / 60000);
+      return sum + netMins;
+    }, 0);
   return round(mins / 60, dp);
 }
 

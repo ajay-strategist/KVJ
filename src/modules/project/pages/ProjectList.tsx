@@ -4,6 +4,8 @@ import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { useDialog } from '../../../shared/feedback/DialogProvider';
+import { useAuth } from '../../auth/AuthProvider';
 
 import { useProject } from '../hooks/useProject';
 import { useEmployee } from '../../employee/hooks/useEmployee';
@@ -32,6 +34,8 @@ interface TaskItem {
 
 export function ProjectList() {
   const { toast } = useNotifications();
+  const { confirm } = useDialog();
+  const { user } = useAuth();
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
@@ -45,14 +49,14 @@ export function ProjectList() {
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
-  const { projects, clients, tasks, allocations, timesheets, createProject, createTask } = useProject();
+  const { projects, clients, tasks, allocations, timesheets, createProject, createTask, updateTask } = useProject();
   const { employees } = useEmployee();
 
   const assigneeOptions = useMemo(() => {
     if (employees.length > 0) {
       return employees.map((e) => {
         const name = `${e.firstName} ${e.lastName}`.trim();
-        return { value: name, label: e.designation ? `${name} (${e.designation})` : name };
+        return { value: e.id, label: e.designation ? `${name} (${e.designation})` : name };
       });
     }
     return [{ value: 'Unassigned', label: 'Unassigned' }];
@@ -62,7 +66,11 @@ export function ProjectList() {
     return projects.map((p) => {
       const client = clients.find((c) => c.id === p.clientId);
       const supervisorAlloc = allocations.find((a) => a.projectId === p.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager')));
-      const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
+      const supervisorEmp = (p as any).supervisorId
+        ? employees.find((e) => e.id === (p as any).supervisorId)
+        : supervisorAlloc
+        ? employees.find((e) => e.id === supervisorAlloc.employeeId)
+        : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : 'Manager (Operations)';
 
       let status: 'Not Started' | 'In Progress' | 'Completed' = 'Not Started';
@@ -89,16 +97,13 @@ export function ProjectList() {
         membersMap.set(name, { name, hours: empHours });
       });
 
-      // Add any employee who logged timesheets
-      pTimesheets.forEach((ts) => {
-        const emp = employees.find((e) => e.id === ts.employeeId);
-        const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
-        if (!membersMap.has(name)) {
-          const empHours = pTimesheets
-            .filter((t) => t.employeeId === ts.employeeId)
-            .reduce((sum, t) => sum + Number(t.hoursLogged || 0), 0);
-          membersMap.set(name, { name, hours: empHours });
-        }
+      // Add task assignees and timesheet loggers
+      pTasks.forEach((t) => {
+        const emp = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
+        const name = emp ? `${emp.firstName} ${emp.lastName}` : (t.assigneeId || 'Team Member');
+        const taskHours = Number(t.actualHours || 0);
+        const existing = membersMap.get(name) || { name, hours: 0 };
+        membersMap.set(name, { name, hours: Math.round((existing.hours + taskHours) * 10) / 10 });
       });
 
       const members = Array.from(membersMap.values());
@@ -137,14 +142,22 @@ export function ProjectList() {
     if (!selectedProject) return [];
     const pTasks = tasks.filter((t) => t.projectId === selectedProject.id);
     return pTasks.map((t) => {
-      const assignee = employees.find((e) => e.id === t.assigneeId);
+      const assignee = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
       const tTimesheets = timesheets.filter((ts) => ts.taskId === t.id);
       const hoursLogged = tTimesheets.reduce((sum, ts) => sum + Number(ts.hoursLogged || 0), 0) || Number(t.actualHours || 0);
 
+      let status = 'To Do';
+      if (t.status === 'done' || (t.status as any) === 'Completed') status = 'Completed';
+      else if (t.status === 'in_progress' || (t.status as any) === 'In Progress') status = 'In Progress';
+      else if (t.status === 'review' || (t.status as any) === 'Under Review') status = 'Under Review';
+
       return {
+        id: t.id,
         name: t.title,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (t.assigneeId as string || 'Unassigned'),
-        status: t.status === 'done' || (t.status as any) === 'Completed' ? 'Completed' : t.status === 'in_progress' || (t.status as any) === 'In Progress' ? 'In Progress' : 'Not Started',
+        assigneeId: t.assigneeId || '',
+        status,
+        rawStatus: t.status || 'todo',
         hoursLogged: Math.round(hoursLogged * 10) / 10,
         dueDate: t.dueDate || '—',
       };
@@ -152,15 +165,29 @@ export function ProjectList() {
   }, [selectedProject, tasks, timesheets, employees]);
 
   const handleCreateProject = async (values: Record<string, unknown>) => {
+    const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+    const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+    const initialStatus = isMgmt ? ((values.status as any) || 'execution') : 'planning';
+
     const res = await createProject({
       title: values.title as string,
-      code: (values.code as string) || `KVJ-PROJ-${Math.floor(100 + Math.random() * 900)}`,
-      status: 'planning',
+      code: (values.code as string) || `KVJ-PRJ-${Math.floor(100 + Math.random() * 900)}`,
+      clientId: values.clientId as string,
+      status: initialStatus as any,
       priority: 'medium',
-    });
+      supervisorId: values.supervisorId as string,
+    } as any);
 
     if (res.ok) {
-      toast({ variant: 'success', title: 'Project Created', message: `${res.value.title} added successfully.` });
+      if (!isMgmt) {
+        toast({
+          variant: 'info',
+          title: 'Project Submission Sent for Approval',
+          message: `Project "${values.title}" created and submitted for Admin/CEO/Manager approval.`,
+        });
+      } else {
+        toast({ variant: 'success', title: 'Project Created', message: `${res.value.title} created successfully.` });
+      }
       setCreateProjectOpen(false);
     } else {
       toast({ variant: 'error', title: 'Creation Failed', message: res.error });
@@ -592,32 +619,70 @@ export function ProjectList() {
                     <th style={{ padding: 6 }}>Status</th>
                     <th style={{ padding: 6, textAlign: 'right' }}>Total Hours</th>
                     <th style={{ padding: 6 }}>Due Date</th>
+                    <th style={{ padding: 6, textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedProjectTasks.map((t, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px dashed var(--border)' }}>
                       <td style={{ padding: 6, fontWeight: 600 }}>{t.name}</td>
-                      <td style={{ padding: 6 }}>👤 {t.assignee}</td>
                       <td style={{ padding: 6 }}>
-                        <span style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          background: t.status === 'Completed' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)',
-                          color: t.status === 'Completed' ? 'var(--status-success)' : 'var(--brand)',
-                        }}>
-                          {t.status}
-                        </span>
+                        <select
+                          value={t.assigneeId || ''}
+                          onChange={async (e) => {
+                            const newAssigneeId = e.target.value;
+                            await updateTask(t.id, { assigneeId: newAssigneeId });
+                            toast({ variant: 'success', title: 'Assignee Updated' });
+                          }}
+                          style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
+                        >
+                          <option value="">Unassigned</option>
+                          {employees.map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.firstName} {emp.lastName}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{ padding: 6 }}>
+                        <select
+                          value={t.rawStatus || 'todo'}
+                          onChange={async (e) => {
+                            const newStatus = e.target.value;
+                            await updateTask(t.id, { status: newStatus as any });
+                            toast({ variant: 'success', title: 'Task Status Updated' });
+                          }}
+                          style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
+                        >
+                          <option value="todo">To Do</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="review">Under Review</option>
+                          <option value="done">Completed</option>
+                        </select>
                       </td>
                       <td style={{ padding: 6, textAlign: 'right', fontWeight: 700, color: 'var(--brand)' }}>{t.hoursLogged} hrs</td>
                       <td style={{ padding: 6, color: 'var(--text-muted)' }}>{t.dueDate}</td>
+                      <td style={{ padding: 6, textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const ok = await confirm({ title: 'Delete Task?', message: `Are you sure you want to delete "${t.name}"?` });
+                            if (ok) {
+                              await updateTask(t.id, { deletedAt: new Date().toISOString() } as any);
+                              toast({ variant: 'warning', title: 'Task Deleted' });
+                            }
+                          }}
+                          style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: 14 }}
+                          title="Delete Task"
+                        >
+                          🗑️
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {selectedProjectTasks.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <td colSpan={6} style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
                         No tasks logged for this project yet.
                       </td>
                     </tr>
@@ -646,6 +711,14 @@ export function ProjectList() {
             name="clientId"
             label="Client Organization *"
             options={clients.map((c) => ({ value: c.id, label: c.name }))}
+          />
+          <SelectField
+            name="supervisorId"
+            label="Project Supervisor *"
+            options={employees.map((e) => ({
+              value: e.id,
+              label: `${e.firstName} ${e.lastName}${e.designation ? ` (${e.designation})` : ''}`,
+            }))}
           />
           <SelectField
             name="status"

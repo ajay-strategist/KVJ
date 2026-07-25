@@ -249,6 +249,25 @@ function DynamicExpenseForm({
   );
 }
 
+const EXPENSES_STORAGE_KEY = 'kvj_expenses_v1';
+
+const getStoredExpenses = (): ExpenseRecord[] => {
+  try {
+    const raw = localStorage.getItem(EXPENSES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredExpenses = (records: ExpenseRecord[]) => {
+  try {
+    localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(records));
+  } catch (e) {
+    console.warn('Failed to save expenses to localStorage:', e);
+  }
+};
+
 export function ExpenseClaims() {
   const { toast } = useNotifications();
   const { user } = useAuth();
@@ -260,7 +279,7 @@ export function ExpenseClaims() {
   const [carRate, setCarRate] = useState(12.0);
 
   const [customExpenseTypes, setCustomExpenseTypes] = useState<string[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => getStoredExpenses());
 
   // Load custom expense types from Supabase
   useEffect(() => {
@@ -332,7 +351,9 @@ export function ExpenseClaims() {
       status: 'submitted',
     };
 
-    setExpenses([newExp, ...expenses]);
+    const updatedList = [newExp, ...expenses];
+    setExpenses(updatedList);
+    saveStoredExpenses(updatedList);
     toast({ variant: 'success', title: 'Claim Filed', message: `Submitted ₹${amount.toFixed(2)} expense claim for review.` });
     setExpenseOpen(false);
 
@@ -352,39 +373,47 @@ export function ExpenseClaims() {
   };
 
   const handleApprove = (id: string) => {
-    setExpenses((prev) =>
-      prev.map((e) =>
+    setExpenses((prev) => {
+      const next = prev.map((e) =>
         e.id === id
           ? {
               ...e,
-              status: 'approved',
+              status: 'approved' as const,
               approvedBy: user?.fullName || 'Manager',
               approvedAt: new Date().toLocaleString(),
             }
           : e
-      )
-    );
+      );
+      saveStoredExpenses(next);
+      return next;
+    });
     toast({ variant: 'success', title: 'Claim Approved', message: 'Expense claim authorized and locked.' });
   };
 
   const handleReject = (id: string) => {
-    setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'rejected' } : e)));
+    setExpenses((prev) => {
+      const next = prev.map((e) => (e.id === id ? { ...e, status: 'rejected' as const } : e));
+      saveStoredExpenses(next);
+      return next;
+    });
     toast({ variant: 'warning', title: 'Claim Rejected', message: 'Expense claim status updated to rejected.' });
   };
 
   const handleBulkApprove = () => {
-    setExpenses((prev) =>
-      prev.map((e) =>
+    setExpenses((prev) => {
+      const next = prev.map((e) =>
         e.status === 'submitted'
           ? {
               ...e,
-              status: 'approved',
+              status: 'approved' as const,
               approvedBy: user?.fullName || 'Manager',
               approvedAt: new Date().toLocaleString(),
             }
           : e
-      )
-    );
+      );
+      saveStoredExpenses(next);
+      return next;
+    });
     toast({ variant: 'success', title: 'Bulk Approved', message: 'All pending expense claims authorized.' });
   };
 
