@@ -60,6 +60,13 @@ export interface Task extends Entity {
   estimatedHours?: number;
   actualHours?: number;
   checklist?: { item: string; done: boolean }[];
+  // Approval workflow extensions
+  approvalStatus?: 'pending_task_approval' | 'pending_assignment_approval' | 'rework' | 'approved' | null;
+  submittedAt?: string;
+  submittedBy?: UUID;
+  reworkNotes?: string;
+  reworkRequestedAt?: string;
+  assignedByEmployeeId?: UUID;
 }
 
 export interface TimesheetRecord extends Entity {

@@ -39,6 +39,9 @@ export interface TaskItem {
   approvedBy?: string;
   approvedAt?: string;
   acceptedAt?: string;
+  approvalStatus?: string | null;
+  reworkNotes?: string;
+  assigneeId?: string;
   dailyTimeEntries: Array<{
     id: string;
     date: string;
@@ -71,7 +74,68 @@ export function TaskBoard() {
 
   const [tasksList, setTasksList] = useState<TaskItem[]>([]);
 
-  const { projects, tasks, allocations, timesheets, createTask, updateTask, logTimesheet, approveTimesheet } = useProject();
+  const {
+    projects,
+    tasks,
+    allocations,
+    timesheets,
+    createTask,
+    updateTask,
+    submitTask,
+    requestRework,
+    approveTaskSubmission,
+    requestTaskAssignment,
+    approveTaskAssignment,
+    logTimesheet,
+    approveTimesheet
+  } = useProject();
+
+
+  // Active timers tracking in localStorage
+  const [timers, setTimers] = useState<Record<string, { startTime: number; elapsedMs: number; isRunning: boolean }>>(() => {
+    try {
+      const saved = localStorage.getItem('kvj_task_timers');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kvj_task_timers', JSON.stringify(timers));
+    } catch {}
+  }, [timers]);
+
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getTaskDurationString = (taskId: string) => {
+    const timer = timers[taskId];
+    if (!timer) return '00:00:00';
+    let totalMs = timer.elapsedMs;
+    if (timer.isRunning) {
+      totalMs += Date.now() - timer.startTime;
+    }
+    const totalSecs = Math.floor(totalMs / 1000);
+    const hrs = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
+    const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
+    const secs = (totalSecs % 60).toString().padStart(2, '0');
+    return `${hrs}:${mins}:${secs}`;
+  };
+
+  const getTaskDurationHours = (taskId: string) => {
+    const timer = timers[taskId];
+    if (!timer) return 0;
+    let totalMs = timer.elapsedMs;
+    if (timer.isRunning) {
+      totalMs += Date.now() - timer.startTime;
+    }
+    return Math.round((totalMs / 3600000) * 10) / 10;
+  };
   const { employees } = useEmployee();
 
   const mappedTasks = useMemo(() => {
@@ -102,7 +166,8 @@ export function TaskBoard() {
       });
 
       let status: TaskStatus = 'To Do';
-      if (t.status === 'in_progress') status = 'In Progress';
+      if (t.approvalStatus === 'pending_assignment_approval') status = 'Pending Approval';
+      else if (t.status === 'in_progress') status = 'In Progress';
       else if (t.status === 'review') status = 'Under Review';
       else if (t.status === 'done') status = 'Completed';
 
@@ -117,6 +182,9 @@ export function TaskBoard() {
         status,
         totalHoursWorked,
         dailyTimeEntries,
+        approvalStatus: t.approvalStatus,
+        reworkNotes: t.reworkNotes,
+        assigneeId: t.assigneeId,
       };
     });
   }, [tasks, projects, employees, allocations, timesheets, todayStr]);
@@ -182,6 +250,9 @@ export function TaskBoard() {
     const proj = projects.find((p) => p.title === values.projectName || p.id === values.projectId);
     const assignee = employees.find((e) => `${e.firstName} ${e.lastName}` === values.assignee || e.id === values.assigneeId);
 
+    const isOtherAssignee = assignee && assignee.id !== user?.id;
+    const approvalStatus = (!isManagement && isOtherAssignee) ? 'pending_assignment_approval' : null;
+
     const res = await createTask({
       projectId: proj?.id,
       assigneeId: assignee?.id,
@@ -189,9 +260,12 @@ export function TaskBoard() {
       status: 'todo',
       dueDate: (values.dueDate as string) || todayStr,
       priority: 'medium',
-    });
+      approvalStatus,
+      assignedByEmployeeId: user?.id,
+    } as any);
 
     if (res.ok) {
+      const statusLabel = approvalStatus ? 'Pending Approval' : 'To Do';
       const newTaskItem: TaskItem = {
         id: res.value.id,
         name: res.value.title,
@@ -200,12 +274,18 @@ export function TaskBoard() {
         supervisor: (values.supervisor as string) || 'Manager (Operations)',
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (values.assignee as string) || user?.fullName || 'Unassigned',
         dueDate: res.value.dueDate || todayStr,
-        status: 'To Do',
+        status: statusLabel as any,
         totalHoursWorked: 0,
         dailyTimeEntries: [],
       };
       setTasksList((prev) => [newTaskItem, ...prev]);
-      toast({ variant: 'success', title: 'Task Created', message: `Task "${values.name}" created.` });
+      toast({ 
+        variant: approvalStatus ? 'warning' : 'success', 
+        title: approvalStatus ? 'Assignment Pending' : 'Task Created', 
+        message: approvalStatus 
+          ? `Assignment request for "${values.name}" sent to manager queue.` 
+          : `Task "${values.name}" created.` 
+      });
       setCreateTaskOpen(false);
     } else {
       toast({ variant: 'error', title: 'Creation Failed', message: res.error });
@@ -232,12 +312,54 @@ export function TaskBoard() {
     setTasksList((prev) =>
       prev.map((x) => (x.id === task.id ? { ...x, status: 'In Progress', assignee: updatedAssignee } : x))
     );
+    setTimers(prev => ({
+      ...prev,
+      [task.id]: {
+        startTime: Date.now(),
+        elapsedMs: prev[task.id]?.elapsedMs || 0,
+        isRunning: true
+      }
+    }));
     try {
-      await updateTask(task.id, { status: 'in_progress' });
+      await updateTask(task.id, { status: 'in_progress', approvalStatus: null });
     } catch (e) {
       console.warn('Update task error:', e);
     }
     toast({ variant: 'success', title: 'Task Started', message: `Task "${task.name}" is now In Progress.` });
+  };
+
+  const handlePauseTask = (taskId: string) => {
+    const timer = timers[taskId];
+    if (!timer || !timer.isRunning) return;
+    setTimers(prev => ({
+      ...prev,
+      [taskId]: {
+        startTime: Date.now(),
+        elapsedMs: prev[taskId].elapsedMs + (Date.now() - prev[taskId].startTime),
+        isRunning: false
+      }
+    }));
+    toast({ variant: 'info', title: 'Task Paused', message: 'Work timer has been paused.' });
+  };
+
+  const handleSubmitTaskForApproval = async (task: TaskItem) => {
+    // Pause timer if running
+    if (timers[task.id]?.isRunning) {
+      setTimers(prev => ({
+        ...prev,
+        [task.id]: {
+          startTime: Date.now(),
+          elapsedMs: prev[task.id].elapsedMs + (Date.now() - prev[task.id].startTime),
+          isRunning: false
+        }
+      }));
+    }
+    const res = await submitTask(task.id as UUID, 'Submitted for review');
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Task Submitted', message: `Task "${task.name}" is now Under Review.` });
+    } else {
+      toast({ variant: 'error', title: 'Submission Failed', message: res.error });
+    }
   };
 
   const handleAssignToMe = async (task: TaskItem) => {
@@ -296,6 +418,12 @@ export function TaskBoard() {
 
     if (res.ok) {
       toast({ variant: 'success', title: 'Time Entry Logged', message: 'Time entry submitted for review.' });
+      // Reset timer on success
+      setTimers(prev => {
+        const next = { ...prev };
+        delete next[selectedTask.id];
+        return next;
+      });
       setTimeEntryOpen(false);
     } else {
       toast({ variant: 'error', title: 'Logging Failed', message: res.error });
@@ -357,7 +485,9 @@ export function TaskBoard() {
   const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval').length;
   const totalHoursSum = tasksList.reduce((acc, t) => acc + t.totalHoursWorked, 0);
 
-  const getWorkflowStep = (status: TaskStatus) => {
+  const getWorkflowStep = (status: TaskStatus, approvalStatus?: string | null) => {
+    if (approvalStatus === 'pending_assignment_approval') return 'Pending Approval';
+    if (approvalStatus === 'pending_task_approval') return 'Under Review';
     switch (status) {
       case 'Pending Approval': return 'Pending Approval';
       case 'To Do': return 'Approved (To Do)';
@@ -571,7 +701,7 @@ export function TaskBoard() {
                 <div style={{ marginBottom: 12 }}>
                   <WorkflowStrip
                     steps={['Pending Approval', 'Approved (To Do)', 'In Progress', 'Under Review', 'Completed']}
-                    current={getWorkflowStep(t.status)}
+                    current={getWorkflowStep(t.status, t.approvalStatus)}
                   />
                 </div>
 
@@ -581,6 +711,8 @@ export function TaskBoard() {
                       <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t.name}</h3>
                       <Badge tone={t.category === 'Project Task' ? 'info' : 'neutral'}>{t.category}</Badge>
                       {t.dueDate === todayStr && <Badge tone="danger">Due Today</Badge>}
+                      {t.approvalStatus === 'rework' && <Badge tone="danger">🔄 Rework</Badge>}
+                      {t.approvalStatus === 'pending_assignment_approval' && <Badge tone="warning">⏳ Pending Assignment Approval</Badge>}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                       Project: <strong>{t.projectName}</strong> · Assignee: <strong>{t.assignee}</strong> · Supervisor: <strong>{t.supervisor}</strong>
@@ -588,6 +720,19 @@ export function TaskBoard() {
                     {t.approvedBy && (
                       <div style={{ fontSize: 11, color: 'var(--status-success)', marginTop: 3 }}>
                         ✓ Approved by {t.approvedBy} {t.approvedAt && `(${t.approvedAt})`}
+                      </div>
+                    )}
+                    {/* Active Timer Display */}
+                    {t.status === 'In Progress' && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: timers[t.id]?.isRunning ? 'var(--status-success)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+                        <span>⏱️ Active Work Timer:</span>
+                        <span style={{ fontVariantNumeric: 'tabular-nums', background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>{getTaskDurationString(t.id)}</span>
+                        {timers[t.id]?.isRunning ? <span style={{ fontSize: 10 }}>● Running</span> : <span style={{ fontSize: 10 }}>Paused</span>}
+                      </div>
+                    )}
+                    {t.approvalStatus === 'rework' && t.reworkNotes && (
+                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, color: '#991b1b', fontSize: 12, fontWeight: 500 }}>
+                        <strong>🔄 Rework Reason:</strong> {t.reworkNotes}
                       </div>
                     )}
                   </div>
@@ -600,10 +745,24 @@ export function TaskBoard() {
                       </Button>
                     )}
 
-                    {/* Action 2: Start / Accept Task */}
-                    {(t.status === 'To Do' || t.status === 'Pending Approval') && (
+                    {/* Action 2: Start / Resume Task */}
+                    {(t.status === 'To Do' || t.status === 'Pending Approval' || t.approvalStatus === 'rework') && (
                       <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
-                        ▶️ Start Task
+                        ▶️ {timers[t.id]?.elapsedMs ? 'Resume' : 'Start'} Task
+                      </Button>
+                    )}
+
+                    {/* Action: Pause Task */}
+                    {t.status === 'In Progress' && timers[t.id]?.isRunning && (
+                      <Button size="sm" variant="secondary" onClick={() => handlePauseTask(t.id)}>
+                        ⏸️ Pause Task
+                      </Button>
+                    )}
+
+                    {/* Action: Resume Task */}
+                    {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
+                      <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
+                        ▶️ Resume Task
                       </Button>
                     )}
 
@@ -614,8 +773,15 @@ export function TaskBoard() {
                       </Button>
                     )}
 
-                    {/* Action 4: Mark Complete */}
+                    {/* Action: Submit Task for Review */}
                     {t.status === 'In Progress' && (
+                      <Button size="sm" variant="secondary" onClick={() => handleSubmitTaskForApproval(t)}>
+                        🚀 Submit Task
+                      </Button>
+                    )}
+
+                    {/* Action 4: Mark Complete */}
+                    {t.status === 'In Progress' && isManagement && (
                       <Button size="sm" variant="secondary" onClick={() => handleMarkComplete(t)}>
                         ✓ Mark Complete
                       </Button>

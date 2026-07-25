@@ -79,16 +79,17 @@ const INITIAL_SEED_TASKS: Task[] = [
     id: 'task-3',
     projectId: 'proj-flow-desk',
     title: 'Complete the Expense details',
-    status: 'todo',
+    status: 'in_progress',
     priority: 'medium',
     dueDate: new Date().toISOString().slice(0, 10),
-    actualHours: 0,
+    actualHours: 3.5,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     createdBy: null,
     updatedBy: null,
     deletedAt: null,
     deletedBy: null,
+    approvalStatus: null,
   },
   {
     id: 'task-4',
@@ -104,8 +105,89 @@ const INITIAL_SEED_TASKS: Task[] = [
     updatedBy: null,
     deletedAt: null,
     deletedBy: null,
+    approvalStatus: null,
   },
 ];
+
+const today = new Date().toISOString().slice(0, 10);
+const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+
+const INITIAL_SEED_TIMESHEETS: TimesheetRecord[] = [
+  {
+    id: 'ts-1',
+    projectId: 'proj-flow-desk',
+    taskId: 'task-1',
+    employeeId: 'emp-ajay',
+    workDate: twoDaysAgo,
+    hoursLogged: 3.5,
+    billable: true,
+    notes: 'Cross-checked attendance module features, fixed timer logic',
+    status: 'approved',
+    approvedBy: 'emp-ajay',
+    approvedAt: yesterday,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'emp-ajay',
+    updatedBy: 'emp-ajay',
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: 'ts-2',
+    projectId: 'proj-flow-desk',
+    taskId: 'task-2',
+    employeeId: 'emp-ajay',
+    workDate: yesterday,
+    hoursLogged: 4.0,
+    billable: true,
+    notes: 'Implemented clock-in/out functionality and break tracking',
+    status: 'submitted',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'emp-ajay',
+    updatedBy: 'emp-ajay',
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: 'ts-3',
+    projectId: 'proj-flow-desk',
+    taskId: 'task-3',
+    employeeId: 'emp-ajay',
+    workDate: today,
+    hoursLogged: 2.0,
+    billable: true,
+    notes: 'Working on expense claim forms and report export',
+    status: 'submitted',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'emp-ajay',
+    updatedBy: 'emp-ajay',
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: 'ts-4',
+    projectId: 'proj-flow-desk',
+    taskId: 'task-1',
+    employeeId: 'emp-ajay',
+    workDate: yesterday,
+    hoursLogged: 1.5,
+    billable: false,
+    notes: 'Code review and documentation',
+    status: 'approved',
+    approvedBy: 'emp-ajay',
+    approvedAt: today,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'emp-ajay',
+    updatedBy: 'emp-ajay',
+    deletedAt: null,
+    deletedBy: null,
+  },
+];
+
 
 export class MockTaskRepository extends MemoryRepository<Task> implements ITaskRepository {
   constructor() { super({ defaultStatus: 'todo', pageSize: 50 }, INITIAL_SEED_TASKS, 'MockTaskRepository'); }
@@ -118,7 +200,7 @@ export class MockTaskRepository extends MemoryRepository<Task> implements ITaskR
 }
 
 export class MockTimesheetRepository extends MemoryRepository<TimesheetRecord> implements ITimesheetRepository {
-  constructor() { super({ defaultStatus: 'draft', pageSize: 50 }, [], 'MockTimesheetRepository'); }
+  constructor() { super({ defaultStatus: 'draft', pageSize: 50 }, INITIAL_SEED_TIMESHEETS, 'MockTimesheetRepository'); }
 
   async findByEmployee(employeeId: UUID): Promise<TimesheetRecord[]> {
     return [...this.store.values()].filter(

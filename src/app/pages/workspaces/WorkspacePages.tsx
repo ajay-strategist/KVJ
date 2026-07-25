@@ -104,6 +104,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 }: AttendancePanelProps) {
   const { confirm } = useDialog();
   const { toast } = useNotifications();
+  const { user } = useAuth();
   const { batches, courses } = useTraining();
   const [clockInOpen, setClockInOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
@@ -640,7 +641,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 'attendance_claim',
                 `${values.date} (${values.startTime} - ${values.endTime})`,
                 `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
-                { id: record?.employeeId || 'emp-user', role: 'Employee' }
+                { id: record?.employeeId || user?.id || 'emp-user', role: 'Employee' }
               );
             } catch (e) {
               console.warn('Attendance correction request notice:', e);

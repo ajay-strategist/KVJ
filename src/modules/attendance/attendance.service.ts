@@ -364,19 +364,75 @@ export class AttendanceService implements IAttendanceService {
 
       this.corrections.delete(correctionId);
 
-      const record = await this.repo.findById(corr.attendanceRecordId);
-      if (record) {
+      let record = null;
+      if (corr.attendanceRecordId && !corr.attendanceRecordId.includes('-') && corr.attendanceRecordId.length === 36) {
+        try {
+          record = await this.repo.findById(corr.attendanceRecordId);
+        } catch {}
+      }
+
+      if (!record) {
+        let targetDate = corr.requestedDate;
+        if (corr.fieldToCorrect === 'attendance_claim') {
+          const match = corr.proposedValue.match(/^([\d-]+)/);
+          if (match) targetDate = match[1];
+        }
+        if (targetDate) {
+          record = await this.repo.findActiveRecord(corr.requestedBy, targetDate);
+        }
+      }
+
+      if (!record) {
+        let workDate = corr.requestedDate;
+        let firstClockIn = undefined;
+        let lastClockOut = undefined;
+
+        if (corr.fieldToCorrect === 'attendance_claim') {
+          const match = corr.proposedValue.match(/^([\d-]+)\s*\(([\d:]+)\s*-\s*([\d:]+)\)/);
+          if (match) {
+            workDate = match[1];
+            firstClockIn = match[2];
+            lastClockOut = match[3];
+          }
+        }
+
+        const newRecord: AttendanceRecord = {
+          id: this.uuid(),
+          employeeId: corr.requestedBy,
+          workDate: workDate || todayStr(),
+          status: 'clocked_out',
+          firstClockIn,
+          lastClockOut,
+          totalWorkingMinutes: 480,
+          totalBreakMinutes: 0,
+          sessions: [],
+          breaks: [],
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+          createdBy: actor.id,
+          updatedBy: actor.id,
+          deletedAt: null,
+          deletedBy: null,
+        };
+        await this.repo.create(newRecord, actor);
+      } else {
         const patch: Partial<AttendanceRecord> = {};
         if (corr.fieldToCorrect === 'firstClockIn') {
           patch.firstClockIn = corr.proposedValue;
         } else if (corr.fieldToCorrect === 'lastClockOut') {
           patch.lastClockOut = corr.proposedValue;
+        } else if (corr.fieldToCorrect === 'attendance_claim') {
+          const match = corr.proposedValue.match(/^([\d-]+)\s*\(([\d:]+)\s*-\s*([\d:]+)\)/);
+          if (match) {
+            patch.firstClockIn = match[2];
+            patch.lastClockOut = match[3];
+          }
         }
         await this.repo.update(record.id, patch, actor);
       }
 
       return Ok(undefined);
-    } catch {
+    } catch (e) {
       return Err(AppError.internal());
     }
   }

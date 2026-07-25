@@ -4,6 +4,8 @@ import { PageHeader, SectionHeader, Button } from '../../../shared/ui/components
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { Tabs } from '../../../shared/ui/Tabs';
 import { useLeave } from '../../leave/hooks/useLeave';
+import { useProject } from '../../project/hooks/useProject';
+import { useMemo } from 'react';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
@@ -17,6 +19,9 @@ import { useAuth } from '../../auth/AuthProvider';
 export function ApprovalsQueue() {
   const { user } = useAuth();
   const { pendingApprovals, approveLeave, rejectLeave, refreshPending } = useLeave();
+  const { tasks, approveTaskSubmission, requestRework, approveTaskAssignment, refresh: refreshProjects } = useProject();
+  const [reworkTask, setReworkTask] = useState<any | null>(null);
+  const [reworkNotes, setReworkNotes] = useState('');
   const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
   const empService = container.resolve(EMPLOYEE_SERVICE_TOKEN);
   const { confirm } = useDialog();
@@ -28,6 +33,13 @@ export function ApprovalsQueue() {
   const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
   const [selectedCorrection, setSelectedCorrection] = useState<any | null>(null);
   const [notes, setNotes] = useState('');
+  
+  const pendingTaskApprovals = useMemo(() => {
+    return tasks.filter((t) => 
+      !t.deletedAt && 
+      (t.approvalStatus === 'pending_task_approval' || t.approvalStatus === 'pending_assignment_approval')
+    );
+  }, [tasks]);
 
   const fetchCorrectionsAndEmployees = useCallback(async () => {
     const cRes = await attService.listPendingCorrections();
@@ -145,6 +157,114 @@ export function ApprovalsQueue() {
     }
   };
 
+  
+  const handleApproveAssignmentInline = async (task: any) => {
+    const ok = await confirm({
+      title: 'Approve Assignment?',
+      message: `Confirm assigning task "${task.title}"?`,
+    });
+    if (!ok) return;
+
+    const res = await approveTaskAssignment(task.id);
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Assignment Approved' });
+      refreshProjects();
+    } else {
+      toast({ variant: 'error', title: 'Approval Failed', message: res.error });
+    }
+  };
+
+  const handleApproveTaskInline = async (task: any) => {
+    const ok = await confirm({
+      title: 'Approve Task Completion?',
+      message: `Approve completed work for task "${task.title}"?`,
+    });
+    if (!ok) return;
+
+    const res = await approveTaskSubmission(task.id);
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Task Approved' });
+      refreshProjects();
+    } else {
+      toast({ variant: 'error', title: 'Approval Failed', message: res.error });
+    }
+  };
+
+  const handleReworkTaskInline = (task: any) => {
+    setReworkTask(task);
+    setReworkNotes('');
+  };
+
+  const submitRework = async () => {
+    if (!reworkTask || !reworkNotes.trim()) return;
+    const res = await requestRework(reworkTask.id, reworkNotes);
+    if (res.ok) {
+      toast({ variant: 'warning', title: 'Rework Requested', message: 'Task sent back for rework.' });
+      setReworkTask(null);
+      setReworkNotes('');
+      refreshProjects();
+    } else {
+      toast({ variant: 'error', title: 'Rework Failed', message: res.error });
+    }
+  };
+
+  const taskApprovalColumns: Column<any>[] = [
+    {
+      key: 'task',
+      header: 'Task Name',
+      accessor: (r) => r.title,
+    },
+    {
+      key: 'assignee',
+      header: 'Assignee',
+      render: (r) => {
+        const emp = Object.values(employees).find(e => e.id === r.assigneeId);
+        return emp ? `${emp.firstName} ${emp.lastName}` : 'Unassigned';
+      }
+    },
+    {
+      key: 'type',
+      header: 'Approval Type',
+      render: (r) => {
+        if (r.approvalStatus === 'pending_assignment_approval') {
+          return <span style={{ color: 'var(--status-warning)', fontWeight: 600 }}>Assignment Approval</span>;
+        }
+        return <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>Task Completion</span>;
+      }
+    },
+    {
+      key: 'requestedBy',
+      header: 'Requested By',
+      render: (r) => {
+        if (r.approvalStatus === 'pending_assignment_approval') {
+          const emp = Object.values(employees).find(e => e.id === r.assignedByEmployeeId);
+          return emp ? `${emp.firstName} ${emp.lastName}` : 'System / Employee';
+        }
+        const emp = Object.values(employees).find(e => e.id === r.submittedBy || e.id === r.assigneeId);
+        return emp ? `${emp.firstName} ${emp.lastName}` : 'Assignee';
+      }
+    },
+    {
+      key: 'actions',
+      header: 'Action',
+      render: (r) => {
+        if (r.approvalStatus === 'pending_assignment_approval') {
+          return (
+            <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+              <Button size="sm" onClick={() => handleApproveAssignmentInline(r)}>Approve Assignment</Button>
+            </div>
+          );
+        }
+        return (
+          <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" onClick={() => handleApproveTaskInline(r)}>Approve Task</Button>
+            <Button size="sm" variant="danger" onClick={() => handleReworkTaskInline(r)}>Rework</Button>
+          </div>
+        );
+      }
+    }
+  ];
+
   const leaveColumns: Column<LeaveRecord>[] = [
     {
       key: 'employee',
@@ -217,6 +337,17 @@ export function ApprovalsQueue() {
   ];
 
   const tabs = [
+    {
+      id: 'tasks',
+      label: `Task Approvals (${pendingTaskApprovals.length})`,
+      content: (
+        <DataTable
+          columns={taskApprovalColumns}
+          rows={pendingTaskApprovals}
+          rowKey={(r) => r.id}
+        />
+      ),
+    },
     {
       id: 'leaves',
       label: `Leave Applications (${pendingApprovals.length})`,
@@ -295,6 +426,32 @@ export function ApprovalsQueue() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button variant="danger" onClick={handleRejectLeave}>Reject Request</Button>
               <Button onClick={handleApproveLeave}>Approve Request</Button>
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+
+      {/* Task Rework Notes Drawer */}
+      <Drawer open={!!reworkTask} onClose={() => setReworkTask(null)} title="Request Task Rework">
+        {reworkTask && (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{reworkTask.title}</div>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Enter notes and instructions for rework:</span>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <textarea
+                value={reworkNotes}
+                onChange={(e) => setReworkNotes(e.target.value)}
+                placeholder="Type instructions here (e.g., please verify column values)..."
+                className="kvj-textarea"
+                style={{ width: '100%', minHeight: 100 }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button variant="secondary" onClick={() => setReworkTask(null)}>Cancel</Button>
+              <Button variant="danger" onClick={submitRework} disabled={!reworkNotes.trim()}>Send back for Rework</Button>
             </div>
           </div>
         )}

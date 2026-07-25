@@ -25,6 +25,11 @@ export interface IProjectService {
   createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>>;
   updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>>;
   deleteTask(taskId: UUID, actor: Actor): Promise<Result<void>>;
+  submitTask(taskId: UUID, notes: string, actor: Actor): Promise<Result<Task>>;
+  requestRework(taskId: UUID, notes: string, actor: Actor): Promise<Result<Task>>;
+  approveTaskSubmission(taskId: UUID, actor: Actor): Promise<Result<Task>>;
+  requestTaskAssignment(taskId: UUID, assigneeId: UUID, assignedByEmployeeId: UUID, actor: Actor): Promise<Result<Task>>;
+  approveTaskAssignment(taskId: UUID, actor: Actor): Promise<Result<Task>>;
   logTimesheet(data: Partial<TimesheetRecord>, actor: Actor): Promise<Result<TimesheetRecord>>;
   approveTimesheet(timesheetId: UUID, actor: Actor): Promise<Result<TimesheetRecord>>;
 }
@@ -135,6 +140,106 @@ export class ProjectService implements IProjectService {
     try {
       await this.taskRepo.softDelete(taskId, actor);
       return Ok(undefined as any);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async submitTask(taskId: UUID, notes: string, actor: Actor): Promise<Result<Task>> {
+    try {
+      const updated = await this.taskRepo.update(taskId, {
+        status: 'review',
+        approvalStatus: 'pending_task_approval',
+        submittedAt: new Date().toISOString(),
+        submittedBy: actor.id,
+      } as any, actor);
+      await this.activity.log('project', updated.projectId, actor, 'update', `Task submitted for approval: ${updated.title}`);
+      return Ok(updated);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async requestRework(taskId: UUID, notes: string, actor: Actor): Promise<Result<Task>> {
+    try {
+      const existing = await this.taskRepo.findById(taskId);
+      if (!existing) return Err(AppError.notFound('Task not found.'));
+      const updated = await this.taskRepo.update(taskId, {
+        status: 'in_progress',
+        approvalStatus: 'rework',
+        reworkNotes: notes,
+        reworkRequestedAt: new Date().toISOString(),
+      } as any, actor);
+      if (existing.assigneeId) {
+        await this.notification.send({
+          recipientId: existing.assigneeId,
+          title: 'Task Sent Back for Rework',
+          body: `"${existing.title}" was returned for rework. Notes: ${notes}`,
+          channels: ['in_app'],
+        });
+      }
+      await this.activity.log('project', updated.projectId, actor, 'update', `Rework requested for task: ${updated.title}`);
+      return Ok(updated);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async approveTaskSubmission(taskId: UUID, actor: Actor): Promise<Result<Task>> {
+    try {
+      const existing = await this.taskRepo.findById(taskId);
+      if (!existing) return Err(AppError.notFound('Task not found.'));
+      const updated = await this.taskRepo.update(taskId, {
+        status: 'done',
+        approvalStatus: 'approved',
+      } as any, actor);
+      if (existing.assigneeId) {
+        await this.notification.send({
+          recipientId: existing.assigneeId,
+          title: 'Task Approved ✅',
+          body: `Your submission for "${existing.title}" has been approved.`,
+          channels: ['in_app'],
+        });
+      }
+      await this.activity.log('project', updated.projectId, actor, 'approve', `Task approved: ${updated.title}`);
+      return Ok(updated);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async requestTaskAssignment(taskId: UUID, assigneeId: UUID, assignedByEmployeeId: UUID, actor: Actor): Promise<Result<Task>> {
+    try {
+      const updated = await this.taskRepo.update(taskId, {
+        assigneeId,
+        approvalStatus: 'pending_assignment_approval',
+        assignedByEmployeeId,
+      } as any, actor);
+      await this.activity.log('project', updated.projectId, actor, 'assign', `Assignment pending approval: ${updated.title}`);
+      return Ok(updated);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async approveTaskAssignment(taskId: UUID, actor: Actor): Promise<Result<Task>> {
+    try {
+      const existing = await this.taskRepo.findById(taskId);
+      if (!existing) return Err(AppError.notFound('Task not found.'));
+      const updated = await this.taskRepo.update(taskId, {
+        status: 'todo',
+        approvalStatus: null,
+      } as any, actor);
+      if (existing.assigneeId) {
+        await this.notification.send({
+          recipientId: existing.assigneeId,
+          title: 'New Task Assigned to You',
+          body: `You have been assigned task: "${existing.title}". You can start working on it now.`,
+          channels: ['in_app'],
+        });
+      }
+      await this.activity.log('project', updated.projectId, actor, 'approve', `Assignment approved: ${updated.title}`);
+      return Ok(updated);
     } catch (e: any) {
       return Err(AppError.internal(e.message));
     }

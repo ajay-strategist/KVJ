@@ -123,6 +123,56 @@ export function useProject() {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const submitTask = useCallback(async (taskId: UUID, notes: string): Promise<CallbackResult<Task>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.submitTask(taskId, notes, { id: user.id, role: user.role });
+    if (res.ok) {
+      setTasks((prev) => prev.map((t) => t.id === taskId ? res.value : t));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
+  const requestRework = useCallback(async (taskId: UUID, notes: string): Promise<CallbackResult<Task>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.requestRework(taskId, notes, { id: user.id, role: user.role });
+    if (res.ok) {
+      setTasks((prev) => prev.map((t) => t.id === taskId ? res.value : t));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
+  const approveTaskSubmission = useCallback(async (taskId: UUID): Promise<CallbackResult<Task>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.approveTaskSubmission(taskId, { id: user.id, role: user.role });
+    if (res.ok) {
+      setTasks((prev) => prev.map((t) => t.id === taskId ? res.value : t));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
+  const requestTaskAssignment = useCallback(async (taskId: UUID, assigneeId: UUID, assignedByEmployeeId: UUID): Promise<CallbackResult<Task>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.requestTaskAssignment(taskId, assigneeId, assignedByEmployeeId, { id: user.id, role: user.role });
+    if (res.ok) {
+      setTasks((prev) => prev.map((t) => t.id === taskId ? res.value : t));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
+  const approveTaskAssignment = useCallback(async (taskId: UUID): Promise<CallbackResult<Task>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.approveTaskAssignment(taskId, { id: user.id, role: user.role });
+    if (res.ok) {
+      setTasks((prev) => prev.map((t) => t.id === taskId ? res.value : t));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
   const logTimesheet = useCallback(async (data: Partial<TimesheetRecord>): Promise<CallbackResult<TimesheetRecord>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.logTimesheet(data, { id: user.id, role: user.role });
@@ -162,6 +212,11 @@ export function useProject() {
     createTask,
     updateTask,
     deleteTask,
+    submitTask,
+    requestRework,
+    approveTaskSubmission,
+    requestTaskAssignment,
+    approveTaskAssignment,
     logTimesheet,
     approveTimesheet,
     refresh: fetchAll,
