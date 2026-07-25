@@ -96,7 +96,7 @@ const INITIAL_SEED_TASKS: Task[] = [
     title: 'Project Management & Task Management',
     status: 'todo',
     priority: 'medium',
-    dueDate: new Date().toISOString().slice(0, 10),
+    dueDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
     actualHours: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

@@ -705,16 +705,42 @@ export interface TaskItem {
   secondsToday: number;
 }
 
+function getTimeLeftInfo(dueStr: string): { label: string; tone: 'danger' | 'warning' | 'neutral' } {
+  if (!dueStr) return { label: 'No due date', tone: 'neutral' };
+  const todayStr = toLocalISODate(new Date());
+  const due = dueStr.slice(0, 10);
+
+  if (due < todayStr) {
+    const diffMs = new Date(todayStr).getTime() - new Date(due).getTime();
+    const diffDays = Math.max(1, Math.round(diffMs / 86400000));
+    return {
+      label: diffDays === 1 ? '1 day overdue' : `${diffDays} days overdue`,
+      tone: 'danger',
+    };
+  } else if (due === todayStr) {
+    return { label: 'Due Today', tone: 'warning' };
+  } else {
+    const diffMs = new Date(due).getTime() - new Date(todayStr).getTime();
+    const diffDays = Math.max(1, Math.round(diffMs / 86400000));
+    return {
+      label: diffDays === 1 ? '1 day left' : `${diffDays} days left`,
+      tone: 'neutral',
+    };
+  }
+}
+
 export const TaskWidget = memo(function TaskWidget({
   tasks,
   setTasks,
   onToggleTask,
   onSubmitReview,
+  onSyncTask,
 }: {
   tasks: TaskItem[];
   setTasks: React.Dispatch<React.SetStateAction<TaskItem[]>>;
   onToggleTask: (id: string, taskTitle: string, currentActive: boolean) => void;
   onSubmitReview: (id: string, taskTitle: string) => void;
+  onSyncTask?: (id: string, secondsToday: number, active: boolean, underReview?: boolean) => void;
 }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -725,7 +751,11 @@ export const TaskWidget = memo(function TaskWidget({
         const next = prev.map((t) => {
           if (t.active) {
             changed = true;
-            return { ...t, secondsToday: t.secondsToday + 1 };
+            const nextSec = t.secondsToday + 1;
+            if (onSyncTask && nextSec % 5 === 0) {
+              onSyncTask(t.id, nextSec, true, t.underReview);
+            }
+            return { ...t, secondsToday: nextSec };
           }
           return t;
         });
@@ -747,7 +777,7 @@ export const TaskWidget = memo(function TaskWidget({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [setTasks]);
+  }, [setTasks, onSyncTask]);
 
   const formatSec = (sec: number) => {
     const h = Math.floor(sec / 3600);
@@ -834,7 +864,17 @@ export const TaskWidget = memo(function TaskWidget({
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong></span>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• 📅 Due: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong></span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• ⏳ Time Left: <strong style={{ color: 'var(--status-warning)' }}>{t.id === '1' ? '2 hrs left' : t.id === '2' ? '1 day left' : '3 days left'}</strong></span>
+                    {(() => {
+                      const info = getTimeLeftInfo(t.due);
+                      return (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          • ⏳ Time Left:{' '}
+                          <strong style={{ color: info.tone === 'danger' ? 'var(--status-danger)' : info.tone === 'warning' ? 'var(--status-warning)' : 'var(--brand)' }}>
+                            {info.label}
+                          </strong>
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1152,11 +1192,10 @@ function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; l
   );
 }
 
-/** My Day — default employee workspace. */
 export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
-  const { tasks: projectTasks, projects, createTask } = useProject();
+  const { tasks: projectTasks, projects, createTask, updateTask } = useProject();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -1169,6 +1208,13 @@ export function MyDayPage() {
       return [];
     }
   });
+
+  const handleSyncTask = useCallback((id: string, secondsToday: number, active: boolean, underReview?: boolean) => {
+    updateTask(id, {
+      actualHours: secondsToday / 3600,
+      status: underReview ? 'review' : active ? 'in_progress' : 'todo',
+    });
+  }, [updateTask]);
 
   useEffect(() => {
     const todayStr = toLocalISODate(new Date());
@@ -1234,6 +1280,7 @@ export function MyDayPage() {
     const nextActive = !currentActive;
     const now = Date.now();
     setTasks((prev) => {
+      const targetTask = prev.find((t) => t.id === id);
       const updated = prev.map((t) =>
         t.id === id ? { ...t, active: nextActive } : { ...t, active: false }
       );
@@ -1247,6 +1294,14 @@ export function MyDayPage() {
         };
       });
       saveStoredTaskStates(states);
+
+      if (targetTask) {
+        updateTask(id, {
+          status: nextActive ? 'in_progress' : 'todo',
+          actualHours: targetTask.secondsToday / 3600,
+        });
+      }
+
       return updated;
     });
     handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
@@ -1254,6 +1309,7 @@ export function MyDayPage() {
 
   const handleSubmitReview = (id: string, taskTitle: string) => {
     setTasks((prev) => {
+      const targetTask = prev.find((t) => t.id === id);
       const updated = prev.map((t) =>
         t.id === id ? { ...t, active: false, underReview: true } : t
       );
@@ -1264,6 +1320,14 @@ export function MyDayPage() {
         delete states[id].lastStartTime;
       }
       saveStoredTaskStates(states);
+
+      if (targetTask) {
+        updateTask(id, {
+          status: 'review',
+          actualHours: (targetTask?.secondsToday || 0) / 3600,
+        });
+      }
+
       return updated;
     });
     toast({
@@ -1318,31 +1382,50 @@ export function MyDayPage() {
   };
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && isInitialLoad) {
+      handleActivityLog('System initialized: My Day workspace loaded', 'info');
       setIsInitialLoad(false);
     }
-  }, [loading]);
-
-  if (isInitialLoad && loading) {
-    return (
-      <AppShell>
-        <PageHeader title="Loading Workspace..." />
-      </AppShell>
-    );
-  }
+  }, [loading, isInitialLoad]);
 
   return (
     <AppShell>
-      <Greeting />
+      <PageHeader
+        title="My Day"
+        subtitle="Manage your daily attendance, tasks, breaks, and workspace activity."
+        actions={
+          <Button onClick={() => setCreateTaskOpen(true)} style={{ gap: 6 }}>
+            ＋ Add Task
+          </Button>
+        }
+      />
 
-      {/* Quick Actions + Resized Metrics. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-        <ResizedQuickAction icon="✓" label="Add Task" onClick={() => setCreateTaskOpen(true)} />
-        <ResizedQuickAction icon="₹" label="Submit Expense" />
-        <ResizedQuickAction icon="🗓" label="Request Leave" />
-        <ResizedStatPill label="Tasks Due" value={`${tasks.filter(t => !t.underReview).length}`} tone="warning" icon="◧" />
-        <ResizedStatPill label="Hours this Month" value={`${hoursThisMonth} hrs`} tone="info" icon="⌛" />
-        <ResizedStatPill label="Attendance %" value={`${monthAttendancePct}%`} tone="success" icon="📈" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+        <ResizedStatPill
+          label="TODAY ATTENDANCE"
+          value={record?.firstClockIn ? `Logged: ${record.firstClockIn}` : 'Not Clocked In'}
+          tone={record?.firstClockIn ? 'success' : 'warning'}
+          icon="🕒"
+        />
+        <ResizedStatPill
+          label="MONTH ATTENDANCE RATE"
+          value={`${monthAttendancePct}%`}
+          tone={monthAttendancePct >= 90 ? 'success' : 'warning'}
+          icon="📅"
+        />
+        <ResizedStatPill
+          label="TOTAL HOURS THIS MONTH"
+          value={`${hoursThisMonth} hrs`}
+          tone="info"
+          icon="⏱"
+        />
+        <ResizedQuickAction
+          icon="📝"
+          label="Apply Leave / Regularize"
+          onClick={() => {
+            toast({ variant: 'info', title: 'Leave Application', message: 'Opening Leave Request Module.' });
+          }}
+        />
       </div>
 
       <AttendancePanel
@@ -1355,23 +1438,19 @@ export function MyDayPage() {
         onActivityLog={handleActivityLog}
       />
 
-      {/* Main Layout:
-          LEFT column: Today's Tasks + Upcoming Events (width auto matching left column)
-          RIGHT column: Announcements Dashboard + Daily Activity Timeline (flowing down on right) */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginTop: 16 }}>
-        {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <TaskWidget
             tasks={tasks}
             setTasks={setTasks}
             onToggleTask={handleToggleTask}
             onSubmitReview={handleSubmitReview}
+            onSyncTask={handleSyncTask}
           />
 
           <UpcomingEventsWidget />
         </div>
 
-        {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AnnouncementWidget />
           <TimelineWidget entries={timelineEntries} />
