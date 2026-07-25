@@ -729,6 +729,23 @@ function getTimeLeftInfo(dueStr: string): { label: string; tone: 'danger' | 'war
   }
 }
 
+const TASK_ORDER_STORAGE_KEY = 'kvj_task_order_v1';
+
+const getStoredTaskOrder = (): string[] => {
+  try {
+    const saved = localStorage.getItem(TASK_ORDER_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredTaskOrder = (order: string[]) => {
+  try {
+    localStorage.setItem(TASK_ORDER_STORAGE_KEY, JSON.stringify(order));
+  } catch {}
+};
+
 export const TaskWidget = memo(function TaskWidget({
   tasks,
   setTasks,
@@ -738,11 +755,12 @@ export const TaskWidget = memo(function TaskWidget({
 }: {
   tasks: TaskItem[];
   setTasks: React.Dispatch<React.SetStateAction<TaskItem[]>>;
-  onToggleTask: (id: string, taskTitle: string, currentActive: boolean) => void;
-  onSubmitReview: (id: string, taskTitle: string) => void;
+  onToggleTask: (id: string, title: string, currentActive: boolean) => void;
+  onSubmitReview: (id: string, title: string) => void;
   onSyncTask?: (id: string, secondsToday: number, active: boolean, underReview?: boolean) => void;
 }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -792,9 +810,12 @@ export const TaskWidget = memo(function TaskWidget({
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== idx) {
+      setDragOverIndex(idx);
+    }
   };
 
   const handleDrop = (e: React.DragEvent, targetIdx: number) => {
@@ -803,12 +824,16 @@ export const TaskWidget = memo(function TaskWidget({
     const sourceIdx = sourceIdxStr !== '' ? parseInt(sourceIdxStr, 10) : draggedIndex;
 
     if (sourceIdx !== null && !isNaN(sourceIdx) && sourceIdx !== targetIdx) {
-      const updated = [...tasks];
-      const [moved] = updated.splice(sourceIdx, 1);
-      updated.splice(targetIdx, 0, moved);
-      setTasks(updated);
+      setTasks((prev) => {
+        const updated = [...prev];
+        const [moved] = updated.splice(sourceIdx, 1);
+        updated.splice(targetIdx, 0, moved);
+        saveStoredTaskOrder(updated.map((t) => t.id));
+        return updated;
+      });
     }
     setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   return (
@@ -827,6 +852,9 @@ export const TaskWidget = memo(function TaskWidget({
           border: 2px dashed var(--brand) !important;
           background: var(--bg-sunken) !important;
         }
+        .task-card-drop-target {
+          border-top: 3px solid var(--brand) !important;
+        }
       `}</style>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {tasks.length === 0 ? (
@@ -839,10 +867,13 @@ export const TaskWidget = memo(function TaskWidget({
             key={t.id}
             draggable
             onDragStart={(e) => handleDragStart(e, idx)}
-            onDragOver={handleDragOver}
+            onDragOver={(e) => handleDragOver(e, idx)}
             onDrop={(e) => handleDrop(e, idx)}
-            onDragEnd={() => setDraggedIndex(null)}
-            className={`task-card-hover ${draggedIndex === idx ? 'task-card-dragging' : ''}`}
+            onDragEnd={() => {
+              setDraggedIndex(null);
+              setDragOverIndex(null);
+            }}
+            className={`task-card-hover ${draggedIndex === idx ? 'task-card-dragging' : ''} ${dragOverIndex === idx && draggedIndex !== idx ? 'task-card-drop-target' : ''}`}
             style={{
               padding: 16,
               border: '1px solid var(--border)',
@@ -1068,10 +1099,11 @@ export const TimelineWidget = memo(function TimelineWidget({
 }: {
   entries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>;
 }) {
+  const cleanEntries = entries.filter((e) => !e.title?.includes('System initialized'));
   return (
     <Card>
       <SectionHeader title="Daily Activity Timeline (Clock In → Clock Out)" />
-      <Timeline entries={entries} />
+      <Timeline entries={cleanEntries} />
     </Card>
   );
 });
@@ -1196,14 +1228,16 @@ export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
   const { tasks: projectTasks, projects, createTask, updateTask } = useProject();
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>(() => {
     try {
       const saved = localStorage.getItem(TIMELINE_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+      const parsed = saved ? JSON.parse(saved) : [];
+      const filtered = parsed.filter((e: any) => !e.title?.includes('System initialized'));
+      localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(filtered));
+      return filtered;
     } catch {
       return [];
     }
@@ -1258,6 +1292,18 @@ export function MyDayPage() {
           secondsToday,
         };
       });
+
+    const savedOrder = getStoredTaskOrder();
+    if (savedOrder.length > 0) {
+      mapped.sort((a, b) => {
+        const idxA = savedOrder.indexOf(a.id);
+        const idxB = savedOrder.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0;
+      });
+    }
 
     if (mapped.length > 0) {
       setTasks(mapped);
@@ -1381,12 +1427,7 @@ export function MyDayPage() {
     setCreateTaskOpen(false);
   };
 
-  useEffect(() => {
-    if (!loading && isInitialLoad) {
-      handleActivityLog('System initialized: My Day workspace loaded', 'info');
-      setIsInitialLoad(false);
-    }
-  }, [loading, isInitialLoad]);
+
 
   return (
     <AppShell>
