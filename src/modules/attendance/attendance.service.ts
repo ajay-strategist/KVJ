@@ -175,29 +175,49 @@ export class AttendanceService implements IAttendanceService {
     try {
       const date = todayStr();
       const ts = nowIso();
-      const record = await this.repo.findActiveRecord(employeeId, date);
+      let record = await this.repo.findActiveRecord(employeeId, date);
       const actor: Actor = { id: employeeId, role: 'Employee' };
 
-      if (!record || (record.status !== 'present' && record.status !== 'on_break')) {
-        return Err(AppError.businessRule('You must be clocked in and not already on break to start a break.'));
+      if (!record) {
+        record = await this.repo.create(
+          {
+            employeeId,
+            workDate: date,
+            status: 'present',
+            firstClockIn: ts,
+            totalWorkingMinutes: 0,
+            totalBreakMinutes: 0,
+            sessions: [{ id: this.uuid(), clockIn: ts, workType: 'Office' }],
+            breaks: [],
+          },
+          actor
+        );
       }
 
-      const activeSession = record.sessions?.find((s) => !s.clockOut);
+      let activeSession = record.sessions?.find((s) => !s.clockOut);
+      let updatedSessions = record.sessions ?? [];
+
       if (!activeSession) {
-        return Err(AppError.businessRule('No active work session found.'));
+        activeSession = {
+          id: this.uuid(),
+          clockIn: record.firstClockIn || ts,
+          workType: 'Office',
+        };
+        updatedSessions = [...updatedSessions, activeSession];
       }
 
       const breakRec: BreakRecord = {
         id: this.uuid(),
         workSessionId: activeSession.id,
         startTime: ts,
-        reason,
+        reason: reason || 'Official Break',
       };
 
       const updated = await this.repo.update(
         record.id,
         {
           status: 'on_break',
+          sessions: updatedSessions,
           breaks: [...(record.breaks ?? []), breakRec],
         },
         actor
