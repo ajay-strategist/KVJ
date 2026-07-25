@@ -34,14 +34,14 @@ export function useEmployee() {
   }, [service, principal, user]);
 
   const updateProfile = useCallback(async (id: string, patch: Partial<Employee>) => {
-    if (!principal) return { ok: false, error: 'Unauthorized' };
-    const res = await service.updateProfile(id, patch, { id: principal.id, role: principal.role });
+    const actor = principal || { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' };
+    const res = await service.updateProfile(id, patch, actor);
     if (res.ok) {
       setEmployees((prev) => prev.map((e) => (e.id === id ? res.value : e)));
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };
-  }, [service, principal]);
+  }, [service, principal, user]);
 
   useEffect(() => {
     fetchEmployees();

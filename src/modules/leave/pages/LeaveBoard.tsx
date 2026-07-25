@@ -11,22 +11,14 @@ import Drawer from '../../../shared/ui/Drawer';
 import type { LeaveRecord } from '../leave.repository';
 
 export function LeaveBoard() {
-  const { leaves, applyLeave, loading } = useLeave();
+  const { leaves, applyLeave, uploadMedicalCertificate, loading } = useLeave();
   const { confirm } = useDialog();
   const { toast } = useNotifications();
   const [applyOpen, setApplyOpen] = useState(false);
+  const [uploadCertOpen, setUploadCertOpen] = useState(false);
+  const [uploadTargetLeave, setUploadTargetLeave] = useState<LeaveRecord | null>(null);
 
   const handleApplySubmit = async (values: Record<string, unknown>) => {
-    // Medical Leave cannot be submitted without a certificate.
-    if (values.leaveType === businessRules.leave.medicalCertRequiredFor && !values.medCert) {
-      toast({
-        variant: 'error',
-        title: 'Medical Certificate Required',
-        message: 'Attach a medical certificate to submit a Medical Leave request.',
-      });
-      return;
-    }
-
     const ok = await confirm({
       title: 'Submit Leave Application?',
       message: 'Are you sure you want to submit this leave request?',
@@ -43,7 +35,7 @@ export function LeaveBoard() {
     );
 
     if (res.ok) {
-      toast({ variant: 'success', title: 'Leave Applied', message: 'Your application has been submitted.' });
+      toast({ variant: 'success', title: 'Leave Applied', message: 'Your application has been submitted successfully.' });
       setApplyOpen(false);
     } else {
       toast({ variant: 'error', title: 'Application Failed', message: res.error });
@@ -78,6 +70,33 @@ export function LeaveBoard() {
         >
           {r.status}
         </span>
+      ),
+    },
+    {
+      key: 'medicalCert',
+      header: 'Medical Cert',
+      render: (r) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {r.medicalCertUrl ? (
+            <span style={{ fontSize: 12, color: 'var(--status-success)', fontWeight: 600 }}>
+              📎 {r.medicalCertUrl}
+            </span>
+          ) : r.leaveType === 'Medical Leave' ? (
+            <Button
+              size="xs"
+              variant="secondary"
+              onClick={(e) => {
+                e.stopPropagation();
+                setUploadTargetLeave(r);
+                setUploadCertOpen(true);
+              }}
+            >
+              📤 Upload Cert
+            </Button>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>N/A</span>
+          )}
+        </div>
       ),
     },
     {
@@ -118,7 +137,7 @@ export function LeaveBoard() {
           <DatePickerField name="startDate" label="Start Date" />
           <DatePickerField name="endDate" label="End Date" />
           <CheckboxField name="halfDay" label="Apply for Half Day" />
-          <FileUploadField name="medCert" label="Medical Certificate (required for Medical Leave)" accept=".pdf,.png,.jpg" />
+          <FileUploadField name="medCert" label="Medical Certificate (Optional upfront; can be uploaded after leave)" accept=".pdf,.png,.jpg" />
           <TextAreaField name="reason" label="Reason for Leave" />
           
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -127,6 +146,43 @@ export function LeaveBoard() {
           </div>
         </Form>
       </Drawer>
+
+      {/* Upload Post-Leave Medical Certificate Drawer */}
+      {uploadCertOpen && uploadTargetLeave && (
+        <Drawer
+          open={true}
+          onClose={() => { setUploadCertOpen(false); setUploadTargetLeave(null); }}
+          title="Upload Medical Certificate"
+        >
+          <Form
+            initial={{}}
+            onSubmit={async (values) => {
+              if (!values.medCert) {
+                toast({ variant: 'error', title: 'File Required', message: 'Please select a medical certificate file to upload.' });
+                return;
+              }
+              const fileName = (values.medCert as any).name || 'medical_certificate.pdf';
+              const res = await uploadMedicalCertificate(uploadTargetLeave.id, fileName);
+              if (res.ok) {
+                toast({ variant: 'success', title: 'Certificate Uploaded', message: 'Medical certificate attached successfully to your leave record.' });
+                setUploadCertOpen(false);
+                setUploadTargetLeave(null);
+              } else {
+                toast({ variant: 'error', title: 'Upload Failed', message: res.error });
+              }
+            }}
+          >
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Attaching medical certificate for Medical Leave: <strong>{uploadTargetLeave.startDate} to {uploadTargetLeave.endDate}</strong>
+            </div>
+            <FileUploadField name="medCert" label="Select Medical Certificate (.pdf, .jpg, .png)" accept=".pdf,.png,.jpg" />
+            <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button variant="secondary" type="button" onClick={() => { setUploadCertOpen(false); setUploadTargetLeave(null); }}>Cancel</Button>
+              <Button type="submit">Upload Certificate</Button>
+            </div>
+          </Form>
+        </Drawer>
+      )}
     </AppShell>
   );
 }

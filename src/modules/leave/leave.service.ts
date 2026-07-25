@@ -17,6 +17,7 @@ export interface ILeaveService {
     halfDay?: boolean,
     medicalCertUrl?: string
   ): Promise<Result<LeaveRecord>>;
+  updateMedicalCertificate(leaveId: UUID, medicalCertUrl: string): Promise<Result<LeaveRecord>>;
   listPendingApprovals(): Promise<Result<LeaveRecord[]>>;
   approveLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
   rejectLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
@@ -45,13 +46,6 @@ export class LeaveService implements ILeaveService {
         return Err(AppError.validation(`Invalid leave type. Allowed: ${businessRules.leave.types.join(', ')}.`));
       }
 
-      // Medical Leave ALWAYS requires a medical certificate.
-      if (leaveType === businessRules.leave.medicalCertRequiredFor && !medicalCertUrl) {
-        return Err(
-          AppError.validation('A medical certificate must be attached for Medical Leave.')
-        );
-      }
-
       const actor: Actor = { id: employeeId, role: 'Employee' };
       const record = await this.repo.create(
         {
@@ -71,6 +65,18 @@ export class LeaveService implements ILeaveService {
       eventBus.emit('leave.applied' as any, { leaveId: record.id, employeeId } as any);
 
       return Ok(record);
+    } catch {
+      return Err(AppError.internal());
+    }
+  }
+
+  async updateMedicalCertificate(leaveId: UUID, medicalCertUrl: string): Promise<Result<LeaveRecord>> {
+    try {
+      const existing = await this.repo.findById(leaveId);
+      if (!existing) return Err(AppError.notFound('Leave record not found.'));
+      const actor: Actor = { id: existing.employeeId, role: 'Employee' };
+      const updated = await this.repo.update(leaveId, { medicalCertUrl }, actor);
+      return Ok(updated);
     } catch {
       return Err(AppError.internal());
     }

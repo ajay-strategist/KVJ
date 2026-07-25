@@ -59,6 +59,8 @@ export function EmployeeProfile() {
       firstName: values.firstName as string,
       lastName: values.lastName as string,
       phone: values.phone as string,
+      designation: values.designation as string,
+      dateOfJoining: values.dateOfJoining as string,
     });
 
     if (res.ok) {
@@ -179,9 +181,20 @@ export function EmployeeProfile() {
 
       {/* Edit Profile Drawer */}
       <Drawer open={editOpen} onClose={() => setEditOpen(false)} title="Edit Employee Profile">
-        <Form initial={{ firstName: profile.firstName, lastName: profile.lastName, phone: profile.phone ?? '' }} onSubmit={handleUpdate}>
+        <Form
+          initial={{
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            designation: profile.designation,
+            dateOfJoining: profile.dateOfJoining,
+            phone: profile.phone ?? '',
+          }}
+          onSubmit={handleUpdate}
+        >
           <TextField name="firstName" label="First Name" />
           <TextField name="lastName" label="Last Name" />
+          <TextField name="designation" label="Designation" />
+          <TextField name="dateOfJoining" label="Joining Date (YYYY-MM-DD)" placeholder="YYYY-MM-DD" />
           <TextField name="phone" label="Phone Number" />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setEditOpen(false)}>Cancel</Button>

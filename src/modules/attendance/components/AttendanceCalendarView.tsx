@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Card, SectionHeader, Badge } from '../../../shared/ui/components';
+import { useEmployee } from '../../employee/hooks/useEmployee';
 
 export interface SessionEntry {
   location: string;
@@ -110,10 +111,14 @@ export function AttendanceCalendarView({
     };
   }, [days]);
 
+  const { employees } = useEmployee();
+
   // Financial Year Accumulated Stats matching specs
   const fyStats = useMemo(() => {
+    const selectedEmp = employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployeeName) || employees[0];
+    const joinedDate = selectedEmp?.dateOfJoining || '—';
     return {
-      joinedDate: '—',
+      joinedDate,
       workingDaysInFY: monthlyStats.workingDaysInMonth,
       daysToBeWorkedFY: monthlyStats.daysToBeWorked,
       noOfLeavesFY: monthlyStats.noOfLeaves,
@@ -124,7 +129,7 @@ export function AttendanceCalendarView({
       totalBreakHrsFY: monthlyStats.totalBreakHrs,
       totalExpensesFY: monthlyStats.totalExpenses,
     };
-  }, [monthlyStats]);
+  }, [monthlyStats, employees, selectedEmployeeName]);
 
   const orgBreakdown = useMemo(() => {
     const orgMap: Record<string, { totalHrs: number; count: number }> = {};

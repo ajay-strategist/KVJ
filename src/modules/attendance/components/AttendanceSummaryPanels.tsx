@@ -129,24 +129,27 @@ export function AttendanceSummaryPanels({
 
     const totalExpenses = expenseClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
 
-    return {
-      workingDaysInMonth,
-      daysToBeWorked,
-      noOfLeaves,
-      holidayWorked,
-      workingDays,
-      lateReporting,
-      earlyLeaving,
-      breakHrs: Math.round(totalBreakHrs * 100) / 100,
-      avgBreakTime: workingDays > 0 ? Math.round((totalBreakHrs / workingDays) * 100) / 100 : 0,
-      overBreakTime: '0 hr',
-      joinedDate: '—',
-      accumulatedLeave: noOfLeaves,
-      accumulatedHolidayWorked: holidayWorked,
-      overallAvgDuration: workingDays > 0 ? Math.round((attendanceRecords.reduce((sum, r) => sum + (r.totalWorkingMinutes || 0), 0) / 60 / workingDays) * 100) / 100 : 0,
-      totalExpenses,
-    };
-  }, [dateList, attendanceRecords, expenseClaims]);
+      const selectedEmp = employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployee) || employees[0];
+      const joinedDate = selectedEmp?.dateOfJoining || '—';
+
+      return {
+        workingDaysInMonth,
+        daysToBeWorked,
+        noOfLeaves,
+        holidayWorked,
+        workingDays,
+        lateReporting,
+        earlyLeaving,
+        breakHrs: Math.round(totalBreakHrs * 100) / 100,
+        avgBreakTime: workingDays > 0 ? Math.round((totalBreakHrs / workingDays) * 100) / 100 : 0,
+        overBreakTime: '0 hr',
+        joinedDate,
+        accumulatedLeave: noOfLeaves,
+        accumulatedHolidayWorked: holidayWorked,
+        overallAvgDuration: workingDays > 0 ? Math.round((attendanceRecords.reduce((sum, r) => sum + (r.totalWorkingMinutes || 0), 0) / 60 / workingDays) * 100) / 100 : 0,
+        totalExpenses,
+      };
+    }, [dateList, attendanceRecords, expenseClaims, selectedEmployee, employees]);
 
   const orgBreakdown = useMemo(() => {
     const orgMap: Record<string, { totalHrs: number; count: number }> = {};

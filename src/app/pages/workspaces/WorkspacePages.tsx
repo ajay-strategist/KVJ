@@ -334,52 +334,28 @@ export const AttendancePanel = memo(function AttendancePanel({
         {/* Action Controls Bar matching Sample Image */}
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
           {(currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && (
-            <>
-              <button
-                type="button"
-                className="kvj-btn"
-                disabled={loading}
-                onClick={() => setClockInOpen(true)}
-                style={{
-                  background: '#00c875',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '12px 28px',
-                  fontWeight: 700,
-                  fontSize: 13.5,
-                  borderRadius: 999,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,200,117,0.25)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
-                Clock In (Office / Training)
-              </button>
-
-              <button
-                type="button"
-                className="kvj-btn"
-                onClick={() => setClaimOpen(true)}
-                style={{
-                  background: '#ffffff',
-                  color: '#6366f1',
-                  border: '2px solid #a5b4fc',
-                  padding: '10px 24px',
-                  fontWeight: 700,
-                  fontSize: 13.5,
-                  borderRadius: 999,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 2px 6px rgba(99,102,241,0.08)',
-                }}
-              >
-                📋 Submit Attendance
-              </button>
-            </>
+            <button
+              type="button"
+              className="kvj-btn"
+              disabled={loading}
+              onClick={() => setClockInOpen(true)}
+              style={{
+                background: '#00c875',
+                color: '#ffffff',
+                border: 'none',
+                padding: '12px 28px',
+                fontWeight: 700,
+                fontSize: 13.5,
+                borderRadius: 999,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,200,117,0.25)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              Clock In (Office / Training)
+            </button>
           )}
 
           {currentStatus === 'present' && (
@@ -432,31 +408,53 @@ export const AttendancePanel = memo(function AttendancePanel({
           )}
 
           {currentStatus === 'on_break' && (
-            <>
-              <button
-                type="button"
-                className="kvj-btn"
-                disabled={loading}
-                onClick={handleEndBreak}
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '11px 22px',
-                  fontWeight: 700,
-                  fontSize: 13.5,
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
-                ▶️ Resume Work Session
-              </button>
-            </>
+            <button
+              type="button"
+              className="kvj-btn"
+              disabled={loading}
+              onClick={handleEndBreak}
+              style={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '11px 22px',
+                fontWeight: 700,
+                fontSize: 13.5,
+                borderRadius: 10,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              ▶️ Resume Work Session
+            </button>
           )}
+
+          {/* Always visible action to submit previous / missed attendance */}
+          <button
+            type="button"
+            className="kvj-btn"
+            onClick={() => setClaimOpen(true)}
+            style={{
+              background: '#ffffff',
+              color: '#6366f1',
+              border: '2px solid #a5b4fc',
+              padding: '10px 22px',
+              fontWeight: 700,
+              fontSize: 13.5,
+              borderRadius: 999,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 6px rgba(99,102,241,0.08)',
+              marginLeft: 'auto',
+            }}
+          >
+            📅 Submit Previous Days Attendance
+          </button>
         </div>
       </div>
 
@@ -608,10 +606,10 @@ export const AttendancePanel = memo(function AttendancePanel({
       </Drawer>
 
       {/* Submit / Claim Attendance Drawer */}
-      <Drawer open={claimOpen} onClose={() => setClaimOpen(false)} title="Submit / Claim Attendance Request">
+      <Drawer open={claimOpen} onClose={() => setClaimOpen(false)} title="Submit Previous / Missed Attendance Claim">
         <Form
           initial={{
-            date: new Date().toISOString().slice(0, 10),
+            date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
             classification: 'Office',
             location: 'Christ 3BBA Data Analytics B1',
             organisationsVisited: '',
@@ -671,6 +669,31 @@ export const AttendancePanel = memo(function AttendancePanel({
   );
 });
 
+const TASK_TIMER_STORAGE_KEY = 'kvj_task_timer_state_v1';
+const TIMELINE_STORAGE_KEY = 'kvj_daily_activity_timeline_v1';
+
+export interface StoredTaskState {
+  secondsToday: number;
+  active: boolean;
+  lastStartTime?: number;
+  underReview?: boolean;
+}
+
+const getStoredTaskStates = (): Record<string, StoredTaskState> => {
+  try {
+    const raw = localStorage.getItem(TASK_TIMER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStoredTaskStates = (states: Record<string, StoredTaskState>) => {
+  try {
+    localStorage.setItem(TASK_TIMER_STORAGE_KEY, JSON.stringify(states));
+  } catch {}
+};
+
 export interface TaskItem {
   id: string;
   title: string;
@@ -697,9 +720,31 @@ export const TaskWidget = memo(function TaskWidget({
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTasks((prev) =>
-        prev.map((t) => (t.active ? { ...t, secondsToday: t.secondsToday + 1 } : t))
-      );
+      setTasks((prev) => {
+        let changed = false;
+        const next = prev.map((t) => {
+          if (t.active) {
+            changed = true;
+            return { ...t, secondsToday: t.secondsToday + 1 };
+          }
+          return t;
+        });
+        if (changed) {
+          const states = getStoredTaskStates();
+          next.forEach((t) => {
+            if (t.active) {
+              states[t.id] = {
+                secondsToday: t.secondsToday,
+                active: true,
+                lastStartTime: states[t.id]?.lastStartTime || Date.now(),
+                underReview: t.underReview,
+              };
+            }
+          });
+          saveStoredTaskStates(states);
+        }
+        return next;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, [setTasks]);
@@ -884,9 +929,17 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
       else if (i === 1) dayLabel = 'Day 2 (Tomorrow)';
 
       // 1. Gather tasks due on this date
-      const dayTasks = tasks.filter((t) => t.dueDate === isoDate).map((t) => ({
+      const dayTasks = tasks.filter((t) => {
+        const taskDate = (t.dueDate || '').slice(0, 10);
+        if (!taskDate) return i === 0;
+        if (i === 0) {
+          // Day 1 (Today): show tasks due today or active overdue tasks
+          return taskDate <= isoDate && t.status !== 'done';
+        }
+        return taskDate === isoDate;
+      }).map((t) => ({
         id: `task-${t.id}`,
-        time: t.status === 'done' ? 'Completed' : 'Due Today',
+        time: t.status === 'done' ? 'Completed' : (t.dueDate || '').slice(0, 10) < isoDate ? 'Overdue' : 'Due Today',
         title: `Task: ${t.title}`,
         type: 'Projects' as const,
       }));
@@ -1108,23 +1161,55 @@ export function MyDayPage() {
 
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
-  const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
+  const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>(() => {
+    try {
+      const saved = localStorage.getItem(TIMELINE_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const todayStr = toLocalISODate(new Date());
+    const storedStates = getStoredTaskStates();
+    const now = Date.now();
+
     const mapped: TaskItem[] = projectTasks
-      .filter((t) => t.dueDate === todayStr || t.status === 'in_progress' || t.status === 'todo')
+      .filter((t) => {
+        const d = (t.dueDate || '').slice(0, 10);
+        return d === todayStr || d < todayStr || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || storedStates[t.id];
+      })
       .map((t) => {
         const proj = projects.find((p) => p.id === t.projectId);
+        const stored = storedStates[t.id];
+        let secondsToday = (t.actualHours || 0) * 3600;
+        let active = t.status === 'in_progress';
+        let underReview = t.status === 'review';
+
+        if (stored) {
+          secondsToday = stored.secondsToday || 0;
+          if (stored.active && stored.lastStartTime) {
+            const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
+            secondsToday += Math.max(0, elapsed);
+            active = true;
+          } else {
+            active = stored.active;
+          }
+          if (stored.underReview !== undefined) {
+            underReview = stored.underReview;
+          }
+        }
+
         return {
           id: t.id,
           title: t.title,
-          project: proj ? proj.title : 'General Project',
-          due: t.dueDate || todayStr,
+          project: proj ? proj.title : 'Flow Desk',
+          due: (t.dueDate || '').slice(0, 10) || todayStr,
           priority: t.priority === 'high' ? 'High' : 'Normal',
-          active: t.status === 'in_progress',
-          underReview: t.status === 'review',
-          secondsToday: (t.actualHours || 0) * 3600,
+          active,
+          underReview,
+          secondsToday,
         };
       });
 
@@ -1135,24 +1220,52 @@ export function MyDayPage() {
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setTimelineEntries((prev) => [
-      ...prev,
-      { id: String(Date.now()), title, time: timeStr, tone },
-    ]);
+    const newEntry = { id: String(Date.now()), title, time: timeStr, tone };
+    setTimelineEntries((prev) => {
+      const next = [...prev, newEntry];
+      try {
+        localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleToggleTask = (id: string, taskTitle: string, currentActive: boolean) => {
     const nextActive = !currentActive;
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: nextActive } : { ...t, active: false }))
-    );
+    const now = Date.now();
+    setTasks((prev) => {
+      const updated = prev.map((t) =>
+        t.id === id ? { ...t, active: nextActive } : { ...t, active: false }
+      );
+      const states = getStoredTaskStates();
+      updated.forEach((t) => {
+        states[t.id] = {
+          secondsToday: t.secondsToday,
+          active: t.active,
+          lastStartTime: t.active ? now : undefined,
+          underReview: t.underReview,
+        };
+      });
+      saveStoredTaskStates(states);
+      return updated;
+    });
     handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
   };
 
   const handleSubmitReview = (id: string, taskTitle: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, active: false, underReview: true } : t))
-    );
+    setTasks((prev) => {
+      const updated = prev.map((t) =>
+        t.id === id ? { ...t, active: false, underReview: true } : t
+      );
+      const states = getStoredTaskStates();
+      if (states[id]) {
+        states[id].active = false;
+        states[id].underReview = true;
+        delete states[id].lastStartTime;
+      }
+      saveStoredTaskStates(states);
+      return updated;
+    });
     toast({
       variant: 'success',
       title: 'Routed to Manager Review',
@@ -1181,8 +1294,9 @@ export function MyDayPage() {
       priority: 'medium',
     });
 
+    const taskId = res.ok ? res.value.id : String(Date.now());
     const newTaskItem: TaskItem = {
-      id: res.ok ? res.value.id : String(Date.now()),
+      id: taskId,
       title,
       project: projName,
       due: todayStr,
@@ -1191,7 +1305,14 @@ export function MyDayPage() {
       secondsToday: 0,
     };
 
-    setTasks((prev) => [newTaskItem, ...prev]);
+    setTasks((prev) => {
+      const next = [newTaskItem, ...prev];
+      const states = getStoredTaskStates();
+      states[taskId] = { secondsToday: 0, active: false };
+      saveStoredTaskStates(states);
+      return next;
+    });
+
     toast({ variant: 'success', title: 'Task Created', message: `Task "${title}" added to Today's Tasks.` });
     setCreateTaskOpen(false);
   };

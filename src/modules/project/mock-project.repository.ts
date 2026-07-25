@@ -44,8 +44,71 @@ export class MockResourceAllocationRepository extends MemoryRepository<ResourceA
   }
 }
 
+const INITIAL_SEED_TASKS: Task[] = [
+  {
+    id: 'task-1',
+    projectId: 'proj-flow-desk',
+    title: 'Cross check each features',
+    status: 'todo',
+    priority: 'medium',
+    dueDate: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+    actualHours: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: null,
+    updatedBy: null,
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: 'task-2',
+    projectId: 'proj-flow-desk',
+    title: 'Complete the Attendance Feature',
+    status: 'todo',
+    priority: 'medium',
+    dueDate: new Date().toISOString().slice(0, 10),
+    actualHours: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: null,
+    updatedBy: null,
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: 'task-3',
+    projectId: 'proj-flow-desk',
+    title: 'Complete the Expense details',
+    status: 'todo',
+    priority: 'medium',
+    dueDate: new Date().toISOString().slice(0, 10),
+    actualHours: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: null,
+    updatedBy: null,
+    deletedAt: null,
+    deletedBy: null,
+  },
+  {
+    id: 'task-4',
+    projectId: 'proj-flow-desk',
+    title: 'Project Management & Task Management',
+    status: 'todo',
+    priority: 'medium',
+    dueDate: new Date().toISOString().slice(0, 10),
+    actualHours: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: null,
+    updatedBy: null,
+    deletedAt: null,
+    deletedBy: null,
+  },
+];
+
 export class MockTaskRepository extends MemoryRepository<Task> implements ITaskRepository {
-  constructor() { super({ defaultStatus: 'todo', pageSize: 50 }, [], 'MockTaskRepository'); }
+  constructor() { super({ defaultStatus: 'todo', pageSize: 50 }, INITIAL_SEED_TASKS, 'MockTaskRepository'); }
 
   async findByProject(projectId: UUID): Promise<Task[]> {
     return [...this.store.values()].filter(

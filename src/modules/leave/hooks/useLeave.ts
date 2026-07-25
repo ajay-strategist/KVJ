@@ -82,6 +82,17 @@ export function useLeave() {
     return { ok: false, error: res.error.message };
   }, [service, principal]);
 
+  const uploadMedicalCertificate = useCallback(async (leaveId: string, medicalCertUrl: string) => {
+    setLoading(true);
+    const res = await service.updateMedicalCertificate(leaveId, medicalCertUrl);
+    setLoading(false);
+    if (res.ok) {
+      setLeaves((prev) => prev.map((l) => (l.id === leaveId ? res.value : l)));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service]);
+
   useEffect(() => {
     fetchMyLeaves();
     fetchPendingApprovals();
@@ -93,6 +104,7 @@ export function useLeave() {
     loading,
     error,
     applyLeave,
+    uploadMedicalCertificate,
     approveLeave,
     rejectLeave,
     refreshMyLeaves: fetchMyLeaves,
