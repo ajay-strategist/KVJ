@@ -432,7 +432,7 @@ export const AttendancePanel = memo(function AttendancePanel({
             </button>
           )}
 
-          {/* Always visible action to submit previous / missed attendance */}
+          {/* Always visible action to submit attendance */}
           <button
             type="button"
             className="kvj-btn"
@@ -453,7 +453,7 @@ export const AttendancePanel = memo(function AttendancePanel({
               marginLeft: 'auto',
             }}
           >
-            📅 Submit Previous Days Attendance
+            📋 Submit Attendance
           </button>
         </div>
       </div>
@@ -606,7 +606,7 @@ export const AttendancePanel = memo(function AttendancePanel({
       </Drawer>
 
       {/* Submit / Claim Attendance Drawer */}
-      <Drawer open={claimOpen} onClose={() => setClaimOpen(false)} title="Submit Previous / Missed Attendance Claim">
+      <Drawer open={claimOpen} onClose={() => setClaimOpen(false)} title="Submit Attendance Request">
         <Form
           initial={{
             date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
@@ -779,12 +779,13 @@ export const TaskWidget = memo(function TaskWidget({
         });
         if (changed) {
           const states = getStoredTaskStates();
+          const now = Date.now();
           next.forEach((t) => {
             if (t.active) {
               states[t.id] = {
                 secondsToday: t.secondsToday,
                 active: true,
-                lastStartTime: states[t.id]?.lastStartTime || Date.now(),
+                lastStartTime: now,
                 underReview: t.underReview,
               };
             }
@@ -1254,6 +1255,7 @@ export function MyDayPage() {
     const todayStr = toLocalISODate(new Date());
     const storedStates = getStoredTaskStates();
     const now = Date.now();
+    const updatedStates = { ...storedStates };
 
     const mapped: TaskItem[] = projectTasks
       .filter((t) => {
@@ -1263,7 +1265,7 @@ export function MyDayPage() {
       .map((t) => {
         const proj = projects.find((p) => p.id === t.projectId);
         const stored = storedStates[t.id];
-        let secondsToday = (t.actualHours || 0) * 3600;
+        let secondsToday = Math.round((t.actualHours || 0) * 3600);
         let active = t.status === 'in_progress';
         let underReview = t.status === 'review';
 
@@ -1271,7 +1273,9 @@ export function MyDayPage() {
           secondsToday = stored.secondsToday || 0;
           if (stored.active && stored.lastStartTime) {
             const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
-            secondsToday += Math.max(0, elapsed);
+            if (elapsed > 0 && elapsed < 86400) {
+              secondsToday += elapsed;
+            }
             active = true;
           } else {
             active = stored.active;
@@ -1280,6 +1284,18 @@ export function MyDayPage() {
             underReview = stored.underReview;
           }
         }
+
+        // Sanity guard against corrupted inflated values (> 24 hours)
+        if (secondsToday > 86400) {
+          secondsToday = 0;
+        }
+
+        updatedStates[t.id] = {
+          secondsToday,
+          active,
+          lastStartTime: active ? now : undefined,
+          underReview,
+        };
 
         return {
           id: t.id,
@@ -1292,6 +1308,8 @@ export function MyDayPage() {
           secondsToday,
         };
       });
+
+    saveStoredTaskStates(updatedStates);
 
     const savedOrder = getStoredTaskOrder();
     if (savedOrder.length > 0) {
