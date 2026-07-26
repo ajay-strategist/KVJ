@@ -9,7 +9,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
-import { ATTENDANCE_REPOSITORY_TOKEN, type AttendanceRecord } from '../attendance.repository';
+import { ATTENDANCE_REPOSITORY_TOKEN, type AttendanceRecord, type WorkSessionType } from '../attendance.repository';
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN, type ExpenseClaim } from '../../finance/finance.repository';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
@@ -279,34 +279,57 @@ export function AttendanceLogPage() {
         : user ? user.fullName || 'Employee' : 'Employee';
 
       if (record) {
-        const startT = record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-        const endT = record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const emp = employees.find(e => e.id === record.employeeId);
+        const resolvedEmpName = emp ? `${emp.firstName} ${emp.lastName}` : empName;
         const duration = `${Math.floor(record.totalWorkingMinutes / 60)}h ${record.totalWorkingMinutes % 60}m`;
         const breakTime = `${Math.floor(record.totalBreakMinutes / 60)}h ${record.totalBreakMinutes % 60}m`;
 
-        const emp = employees.find(e => e.id === record.employeeId);
-        const resolvedEmpName = emp ? `${emp.firstName} ${emp.lastName}` : empName;
+        const sessionsList = record.sessions && record.sessions.length > 0
+          ? record.sessions
+          : [{
+              id: record.id,
+              workType: 'Office' as WorkSessionType,
+              clockIn: record.firstClockIn || '',
+              clockOut: record.lastClockOut || '',
+              notes: (record as any).notes || '',
+            }];
 
-        const firstSession = record.sessions?.[0];
-        const workType = firstSession?.workType || 'Office';
-        const batchId = (firstSession as any)?.batchId || (firstSession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
-        const orgVal = resolveOrgValue(workType, firstSession?.notes, (record as any).notes, batchId) || 'Office';
+        const hasMultipleSessions = sessionsList.length > 1;
 
-        rows.push({
-          date: dateStr.split('-').reverse().join('/'),
-          name: resolvedEmpName,
-          holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : '',
-          org: orgVal,
-          location: orgVal,
-          type: workType as string,
-          mode: 'Offline',
-          start: startT,
-          end: endT,
-          duration,
-          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-          note: firstSession?.notes || (record as any).notes || '',
-          break: breakTime,
-          tasks: record.sessions?.map(s => s.notes).filter(Boolean) as string[] || [],
+        sessionsList.forEach((s, sIdx) => {
+          const startT = s.clockIn
+            ? new Date(s.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+          const endT = s.clockOut
+            ? new Date(s.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+          const workType = s.workType || 'Office';
+          const batchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+          const orgVal = resolveOrgValue(workType, s.notes, (record as any).notes, batchId) || 'Office';
+
+          const isReapproved = (s as any).isReapproved ||
+            (s as any).status === 'Approved' ||
+            (s as any).status === 'reapproved' ||
+            (s.notes && (s.notes.toLowerCase().includes('approved') || s.notes.toLowerCase().includes('claim') || s.notes.toLowerCase().includes('reapproved'))) ||
+            sIdx > 0;
+
+          rows.push({
+            date: dateStr.split('-').reverse().join('/'),
+            name: resolvedEmpName,
+            holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : '',
+            org: orgVal,
+            location: orgVal,
+            type: workType as string,
+            mode: isReapproved ? 'Re-Approved' : (hasMultipleSessions ? `Session ${sIdx + 1}` : 'Offline'),
+            start: startT,
+            end: endT,
+            duration: sIdx === 0 ? duration : '—',
+            expenses: sIdx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+            note: s.notes || (record as any).notes || (isReapproved ? 'Re-approved session' : ''),
+            break: sIdx === 0 ? breakTime : '0h 0m',
+            tasks: s.notes ? [s.notes] : [],
+          });
         });
       } else {
         const isSunday = d.getDay() === 0;
@@ -437,7 +460,13 @@ export function AttendanceLogPage() {
                             </Badge>
                           )}
                         </td>
-                        <td style={{ padding: '8px 10px' }}>{r.mode}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          {r.mode === 'Re-Approved' || r.mode.includes('Re-Approved') ? (
+                            <Badge tone="success">Re-Approved</Badge>
+                          ) : (
+                            r.mode
+                          )}
+                        </td>
                         <td style={{ padding: '8px 10px' }}>{r.start}</td>
                         <td style={{ padding: '8px 10px' }}>{r.end}</td>
                         <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
