@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, Badge, Button } from '../../../shared/ui/components';
 import { Tabs } from '../../../shared/ui/Tabs';
@@ -165,6 +165,37 @@ export function AttendanceLogPage() {
     setSelectedExpenses({});
   };
 
+  const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+    const wt = workType || 'Office';
+    const isTraining = wt === 'Training' || wt.toLowerCase().includes('training');
+
+    if (isTraining) {
+      if (recordBatchId) {
+        const found = batches.find((b) => b.id === recordBatchId);
+        if (found) return found.trainingName || found.batchNo || found.code || found.college || 'Training Batch';
+      }
+
+      const combinedNotes = `${sessionNotes || ''} ${recordNotes || ''}`.toLowerCase();
+      if (combinedNotes.trim()) {
+        const found = batches.find((b) =>
+          (b.trainingName && combinedNotes.includes(b.trainingName.toLowerCase())) ||
+          (b.batchNo && combinedNotes.includes(b.batchNo.toLowerCase())) ||
+          (b.code && combinedNotes.includes(b.code.toLowerCase())) ||
+          (b.college && combinedNotes.includes(b.college.toLowerCase()))
+        );
+        if (found) return found.trainingName || found.batchNo || found.code || 'Training Batch';
+      }
+
+      if (batches.length > 0) {
+        return batches[0].trainingName || batches[0].batchNo || batches[0].code || 'Training Batch';
+      }
+
+      return 'Training Batch';
+    }
+
+    return wt;
+  }, [batches]);
+
   const calendarDays: CalendarDayDetail[] = useMemo(() => {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -182,8 +213,13 @@ export function AttendanceLogPage() {
       const decHoliday = declaredHolidays.find((h: any) => h.date === dateStr);
 
       if (record) {
+        const firstSession = record.sessions?.[0];
+        const workType = firstSession?.workType || 'Office';
+        const batchId = (firstSession as any)?.batchId || (firstSession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+        const orgVal = resolveOrgValue(workType, firstSession?.notes, (record as any).notes, batchId) || 'Office';
+
         const sessions = record.sessions?.map(s => ({
-          location: s.workType,
+          location: resolveOrgValue(s.workType, s.notes, (record as any).notes, (s as any).batchId || (s as any).batch_id) || 'Office',
           type: s.workType,
           startTime: s.clockIn ? new Date(s.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
           endTime: s.clockOut ? new Date(s.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
@@ -198,7 +234,7 @@ export function AttendanceLogPage() {
           dayName,
           fullDate: dateStr.split('-').reverse().join('/'),
           status: decHoliday ? 'holiday' : 'present',
-          location: record.sessions?.[0]?.workType || 'Office',
+          location: orgVal,
           startTime: record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
           endTime: record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
           sessions,
@@ -224,7 +260,7 @@ export function AttendanceLogPage() {
       }
     }
     return days;
-  }, [startDate, endDate, attendanceRecords, expenseClaims, declaredHolidays]);
+  }, [startDate, endDate, attendanceRecords, expenseClaims, declaredHolidays, resolveOrgValue]);
 
   const tableRows = useMemo(() => {
     const start = new Date(startDate);
@@ -251,19 +287,24 @@ export function AttendanceLogPage() {
         const emp = employees.find(e => e.id === record.employeeId);
         const resolvedEmpName = emp ? `${emp.firstName} ${emp.lastName}` : empName;
 
+        const firstSession = record.sessions?.[0];
+        const workType = firstSession?.workType || 'Office';
+        const batchId = (firstSession as any)?.batchId || (firstSession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+        const orgVal = resolveOrgValue(workType, firstSession?.notes, (record as any).notes, batchId) || 'Office';
+
         rows.push({
           date: dateStr.split('-').reverse().join('/'),
           name: resolvedEmpName,
           holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : '',
-          org: record.sessions?.[0]?.workType || 'Office',
-          location: record.sessions?.[0]?.workType || 'Office',
-          type: (record.sessions?.[0]?.workType || 'Office') as string,
+          org: orgVal,
+          location: orgVal,
+          type: workType as string,
           mode: 'Offline',
           start: startT,
           end: endT,
           duration,
           expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-          note: record.sessions?.[0]?.notes || '',
+          note: firstSession?.notes || (record as any).notes || '',
           break: breakTime,
           tasks: record.sessions?.map(s => s.notes).filter(Boolean) as string[] || [],
         });
