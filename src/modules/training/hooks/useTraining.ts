@@ -89,8 +89,13 @@ export function useTraining() {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.createBatch(data, { id: user.id, role: user.role });
     if (res.ok) {
-      setBatches((prev) => [res.value, ...prev]);
-      return { ok: true, value: res.value };
+      const merged = { ...res.value, ...data };
+      if (data.program) merged.program = data.program;
+      if (data.startDate) merged.startDate = data.startDate;
+      if (data.endDate) merged.endDate = data.endDate;
+
+      setBatches((prev) => [merged, ...prev]);
+      return { ok: true, value: merged };
     }
     return { ok: false, error: res.error.message };
   }, [service, user]);
@@ -99,8 +104,13 @@ export function useTraining() {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.updateBatch(id, data, { id: user.id, role: user.role });
     if (res.ok) {
-      setBatches((prev) => prev.map((b) => (b.id === id ? res.value : b)));
-      return { ok: true, value: res.value };
+      const merged = { ...res.value, ...data };
+      if (data.program) merged.program = data.program;
+      if (data.startDate) merged.startDate = data.startDate;
+      if (data.endDate) merged.endDate = data.endDate;
+
+      setBatches((prev) => prev.map((b) => (b.id === id ? merged : b)));
+      return { ok: true, value: merged };
     }
     return { ok: false, error: res.error.message };
   }, [service, user]);
