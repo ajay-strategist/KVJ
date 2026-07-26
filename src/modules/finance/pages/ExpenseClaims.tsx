@@ -359,13 +359,18 @@ export function ExpenseClaims() {
 
     if (values.receiptFile && values.receiptFile instanceof File) {
       try {
-        const driveRes = await googleIntegration.uploadReceiptWithMetadata(values.receiptFile, {
-          person: user?.fullName || 'Employee',
-          category: (values.categoryType as string) || 'Office Expense',
+        const driveRes = await googleIntegration.uploadReceiptWithMetadata({
+          date: new Date().toISOString().split('T')[0],
+          personName: user?.fullName || 'Employee',
+          isOfficeExpense: values.categoryType === 'Office Expense',
+          batchName: (values.batch as string) || undefined,
+          expenseType: (values.expenseType as string) || 'Expense',
           amount,
+          originalFileName: values.receiptFile.name,
+          uploadedBy: user?.fullName || 'Employee',
         });
-        if (driveRes.ok && driveRes.fileUrl) {
-          receiptLink = driveRes.fileUrl;
+        if (driveRes && driveRes.googleDriveViewUrl) {
+          receiptLink = driveRes.googleDriveViewUrl;
         }
       } catch (e) {
         console.warn('Google Drive receipt upload warning:', e);

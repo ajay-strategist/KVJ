@@ -433,7 +433,7 @@ export class AttendanceService implements IAttendanceService {
             {
               id: this.uuid(),
               workType: corr.reason?.toLowerCase().includes('training') ? 'Training' : 'Office',
-              clockIn: firstClockIn,
+              clockIn: firstClockIn || workDate || nowIso(),
               clockOut: lastClockOut,
               notes: corr.reason || 'Approved Claim',
             },

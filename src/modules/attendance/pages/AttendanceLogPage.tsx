@@ -15,6 +15,24 @@ import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { toLocalISODate, todayISO } from '../../../shared/utils/date';
 import { useTraining } from '../../training/hooks/useTraining';
+import { supabase } from '../../../shared/integration/supabase';
+
+export interface AttendanceLogRow {
+  date: string;
+  name: string;
+  holiday: string;
+  org: string;
+  location: string;
+  type: string;
+  mode: string;
+  start: string;
+  end: string;
+  duration: string;
+  expenses: string;
+  note: string;
+  break: string;
+  tasks: string[];
+}
 
 export function AttendanceLogPage() {
   const { user } = useAuth();
@@ -42,6 +60,7 @@ export function AttendanceLogPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
+  const [declaredHolidays, setDeclaredHolidays] = useState<{ date: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -88,7 +107,7 @@ export function AttendanceLogPage() {
 
         const { data: hData } = await supabase.from('declared_holidays').select('*');
         if (hData) {
-          setDeclaredHolidays(hData.map((h) => ({ date: h.date || h.holiday_date, name: h.title || h.name || 'Company Holiday' })));
+          setDeclaredHolidays(hData.map((h: any) => ({ date: h.date || h.holiday_date, name: h.title || h.name || 'Company Holiday' })));
         }
       } catch (e) {
         console.error('Error fetching attendance history:', e);
@@ -160,7 +179,7 @@ export function AttendanceLogPage() {
       const record = attendanceRecords.find(r => r.workDate === dateStr);
       const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === dateStr);
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const decHoliday = declaredHolidays.find(h => h.date === dateStr);
+      const decHoliday = declaredHolidays.find((h: any) => h.date === dateStr);
 
       if (record) {
         const sessions = record.sessions?.map(s => ({
@@ -217,11 +236,11 @@ export function AttendanceLogPage() {
       const record = attendanceRecords.find(r => r.workDate === dateStr);
       const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === dateStr);
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const decHoliday = declaredHolidays.find(h => h.date === dateStr);
+      const decHoliday = declaredHolidays.find((h: any) => h.date === dateStr);
 
       const empName = currentEmployee
         ? `${currentEmployee.firstName} ${currentEmployee.lastName}`
-        : user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Employee' : 'Employee';
+        : user ? user.fullName || 'Employee' : 'Employee';
 
       if (record) {
         const startT = record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';

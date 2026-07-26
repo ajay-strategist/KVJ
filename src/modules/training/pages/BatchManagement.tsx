@@ -9,7 +9,7 @@ import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
 import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN } from '../training.repository';
 import { normalizeStudentKey } from '../supabase-training.repository';
-import type { Page } from '../../../core/types';
+import type { Page, UUID } from '../../../core/types';
 import { supabase } from '../../../shared/integration/supabase';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { usePermissions } from '../../../shared/permissions/react';
