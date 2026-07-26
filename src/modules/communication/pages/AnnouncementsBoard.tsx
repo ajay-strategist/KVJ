@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, Button, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
@@ -7,6 +7,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Announcement } from '../communication.repository';
+import { supabase } from '../../../shared/integration/supabase';
 
 export interface DeclaredHoliday {
   id: string;
@@ -24,6 +25,24 @@ export function AnnouncementsBoard() {
 
   const [holidays, setHolidays] = useState<DeclaredHoliday[]>([]);
 
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      const { data } = await supabase.from('declared_holidays').select('*');
+      if (data && data.length > 0) {
+        setHolidays(
+          data.map((h) => ({
+            id: h.id,
+            date: h.date || h.holiday_date,
+            name: h.title || h.name || 'Company Holiday',
+            type: h.type || 'Company Holiday',
+            status: (h.status === 'cancelled' ? 'cancelled' : 'active') as 'active' | 'cancelled',
+          }))
+        );
+      }
+    };
+    fetchHolidays();
+  }, []);
+
   const handlePostSubmit = async (values: Record<string, unknown>) => {
     const res = await postAnnouncement({
       title: values.title as string,
@@ -40,13 +59,13 @@ export function AnnouncementsBoard() {
     }
   };
 
-  const handleDeclareHoliday = (values: Record<string, unknown>) => {
+  const handleDeclareHoliday = async (values: Record<string, unknown>) => {
     const date = values.date as string;
     const name = values.name as string;
     const type = (values.type as string) || 'Company Holiday';
 
     const newH: DeclaredHoliday = {
-      id: String(Date.now()),
+      id: crypto.randomUUID(),
       date,
       name,
       type,
@@ -55,6 +74,19 @@ export function AnnouncementsBoard() {
 
     setHolidays((prev) => [newH, ...prev]);
     toast({ variant: 'success', title: 'Holiday Declared', message: `Holiday '${name}' on ${date} has been declared.` });
+
+    try {
+      await supabase.from('declared_holidays').upsert({
+        id: newH.id,
+        date: newH.date,
+        title: newH.name,
+        name: newH.name,
+        type: newH.type,
+        status: newH.status,
+      });
+    } catch (e) {
+      console.warn('Declared holiday insert error:', e);
+    }
 
     // Broadcast announcement & notification
     postAnnouncement({
@@ -74,11 +106,16 @@ export function AnnouncementsBoard() {
     setHolidayOpen(false);
   };
 
-  const handleToggleHolidayStatus = (id: string, currentStatus: 'active' | 'cancelled', name: string) => {
+  const handleToggleHolidayStatus = async (id: string, currentStatus: 'active' | 'cancelled', name: string) => {
     const nextStatus = currentStatus === 'active' ? 'cancelled' : 'active';
     setHolidays((prev) =>
       prev.map((h) => (h.id === id ? { ...h, status: nextStatus } : h))
     );
+    try {
+      await supabase.from('declared_holidays').update({ status: nextStatus }).eq('id', id);
+    } catch (e) {
+      console.warn('Holiday status update error:', e);
+    }
     toast({
       variant: nextStatus === 'cancelled' ? 'warning' : 'success',
       title: `Holiday ${nextStatus === 'cancelled' ? 'Cancelled' : 'Reactivated'}`,

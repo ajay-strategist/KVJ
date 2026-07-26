@@ -20,6 +20,8 @@ export interface College {
   principalName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  logoUrl?: string;
+  imageUrl?: string;
 }
 
 const INITIAL_COLLEGES: College[] = [
@@ -31,6 +33,8 @@ const INITIAL_COLLEGES: College[] = [
     principalName: 'Dr. Fr. Jolly Andrews',
     contactEmail: 'info@christcollegeijk.edu.in',
     contactPhone: '+91 480 2825258',
+    logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?w=100&auto=format&fit=crop&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?w=600&auto=format&fit=crop&q=80',
   },
   {
     id: 'col-2',
@@ -93,6 +97,8 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     principalName: '',
     contactEmail: '',
     contactPhone: '',
+    logoUrl: '',
+    imageUrl: '',
   });
 
   const DEFAULT_COURSE_CHECKLIST = [
@@ -109,6 +115,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   // Dynamic checklist builder state for create/edit drawers
   const [checklistItems, setChecklistItems] = useState<string[]>(DEFAULT_COURSE_CHECKLIST);
   const [newCheckitemText, setNewCheckitemText] = useState('');
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
   const handleOpenEditCourse = (c: Course) => {
     setEditingCourse(c);
@@ -132,6 +139,44 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
 
   const handleRemoveChecklistItem = (idx: number) => {
     setChecklistItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleMoveUpChecklistItem = (idx: number) => {
+    if (idx <= 0) return;
+    setChecklistItems((prev) => {
+      const next = [...prev];
+      const temp = next[idx - 1];
+      next[idx - 1] = next[idx];
+      next[idx] = temp;
+      return next;
+    });
+  };
+
+  const handleMoveDownChecklistItem = (idx: number) => {
+    setChecklistItems((prev) => {
+      if (idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      const temp = next[idx + 1];
+      next[idx + 1] = next[idx];
+      next[idx] = temp;
+      return next;
+    });
+  };
+
+  const handleDragStart = (idx: number) => {
+    setDraggedIdx(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (draggedIdx === null || draggedIdx === targetIdx) return;
+    setChecklistItems((prev) => {
+      const next = [...prev];
+      const item = next.splice(draggedIdx, 1)[0];
+      next.splice(targetIdx, 0, item);
+      return next;
+    });
+    setDraggedIdx(targetIdx);
   };
 
   const handleCreateCourseSubmit = async (values: Record<string, unknown>) => {
@@ -183,6 +228,8 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       principalName: '',
       contactEmail: '',
       contactPhone: '',
+      logoUrl: '',
+      imageUrl: '',
     });
     setOpenCollegeModal(true);
   };
@@ -196,6 +243,8 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       principalName: c.principalName || '',
       contactEmail: c.contactEmail || '',
       contactPhone: c.contactPhone || '',
+      logoUrl: c.logoUrl || '',
+      imageUrl: c.imageUrl || '',
     });
     setOpenCollegeModal(true);
   };
@@ -215,7 +264,10 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
           location: collegeForm.location.trim(),
           contactEmail: collegeForm.contactEmail.trim(),
           contactPhone: collegeForm.contactPhone.trim(),
-        }, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+          principalName: collegeForm.principalName.trim() || undefined,
+          logoUrl: collegeForm.logoUrl.trim() || undefined,
+          imageUrl: collegeForm.imageUrl.trim() || undefined,
+        } as any, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
 
         setColleges((prev) => prev.map((c) => (c.id === editingCollege.id ? (val as any) : c)));
         toast({ variant: 'success', title: 'College Updated', message: `${collegeForm.name} updated successfully.` });
@@ -226,8 +278,11 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
           location: collegeForm.location.trim(),
           contactEmail: collegeForm.contactEmail.trim(),
           contactPhone: collegeForm.contactPhone.trim(),
+          principalName: collegeForm.principalName.trim() || undefined,
+          logoUrl: collegeForm.logoUrl.trim() || undefined,
+          imageUrl: collegeForm.imageUrl.trim() || undefined,
           isActive: true,
-        }, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+        } as any, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
 
         setColleges((prev) => [val as any, ...prev]);
         toast({ variant: 'success', title: 'College Added', message: `${collegeForm.name} added to catalog successfully.` });
@@ -299,12 +354,24 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     { key: 'code', header: 'College Code', sortable: true, accessor: (c) => c.code },
     {
       key: 'name',
-      header: 'College Name',
+      header: 'College Name & Logo',
       sortable: true,
       accessor: (c) => c.name,
       render: (c) => (
-        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>
-          🏛️ {c.name}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {c.logoUrl ? (
+            <img src={c.logoUrl} alt={c.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+          ) : (
+            <span style={{ fontSize: 18 }}>🏛️</span>
+          )}
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{c.name}</div>
+            {c.imageUrl && (
+              <a href={c.imageUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none' }}>
+                🖼️ View Campus Image
+              </a>
+            )}
+          </div>
         </div>
       ),
     },
@@ -360,7 +427,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
         title="Courses & Colleges"
         subtitle={
           activeTab === 'colleges'
-            ? 'Manage affiliated colleges, locations, head details, and contact information'
+            ? 'Manage affiliated colleges, locations, logos, images, head details, and contact information'
             : 'Manage courses master list, maximum marks, pass criteria, and execution task checklists'
         }
         actions={
@@ -391,7 +458,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
           {/* Checklist Builder */}
           <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
-              📋 Course Execution Checklist Tasks
+              📋 Course Execution Checklist Tasks (Drag or use ⬆️⬇️ to reorder)
             </label>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               <input
@@ -405,11 +472,28 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
               <Button type="button" size="sm" onClick={handleAddChecklistItem}>➕ Add Task</Button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {checklistItems.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)', border: '1px solid var(--border)', fontSize: 11.5 }}>
-                  <span>✓ {item}</span>
-                  <button type="button" onClick={() => handleRemoveChecklistItem(idx)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-danger)', fontSize: 12 }}>🗑️</button>
+                <div
+                  key={idx}
+                  draggable
+                  onDragStart={() => handleDragStart(idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)',
+                    border: '1px solid var(--border)', fontSize: 11.5, cursor: 'grab',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
+                    <span>✓ {item}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button type="button" onClick={() => handleMoveUpChecklistItem(idx)} disabled={idx === 0} style={{ border: 'none', background: 'none', cursor: 'pointer', opacity: idx === 0 ? 0.3 : 1 }}>⬆️</button>
+                    <button type="button" onClick={() => handleMoveDownChecklistItem(idx)} disabled={idx === checklistItems.length - 1} style={{ border: 'none', background: 'none', cursor: 'pointer', opacity: idx === checklistItems.length - 1 ? 0.3 : 1 }}>⬇️</button>
+                    <button type="button" onClick={() => handleRemoveChecklistItem(idx)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-danger)', fontSize: 12 }}>🗑️</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -436,7 +520,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
             {/* Checklist Builder */}
             <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
-                📋 Course Execution Checklist Tasks
+                📋 Course Execution Checklist Tasks (Drag or use ⬆️⬇️ to reorder)
               </label>
               <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                 <input
@@ -450,11 +534,28 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
                 <Button type="button" size="sm" onClick={handleAddChecklistItem}>➕ Add Task</Button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {checklistItems.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)', border: '1px solid var(--border)', fontSize: 11.5 }}>
-                    <span>✓ {item}</span>
-                    <button type="button" onClick={() => handleRemoveChecklistItem(idx)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-danger)', fontSize: 12 }}>🗑️</button>
+                  <div
+                    key={idx}
+                    draggable
+                    onDragStart={() => handleDragStart(idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)',
+                      border: '1px solid var(--border)', fontSize: 11.5, cursor: 'grab',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
+                      <span>✓ {item}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button type="button" onClick={() => handleMoveUpChecklistItem(idx)} disabled={idx === 0} style={{ border: 'none', background: 'none', cursor: 'pointer', opacity: idx === 0 ? 0.3 : 1 }}>⬆️</button>
+                      <button type="button" onClick={() => handleMoveDownChecklistItem(idx)} disabled={idx === checklistItems.length - 1} style={{ border: 'none', background: 'none', cursor: 'pointer', opacity: idx === checklistItems.length - 1 ? 0.3 : 1 }}>⬇️</button>
+                      <button type="button" onClick={() => handleRemoveChecklistItem(idx)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-danger)', fontSize: 12 }}>🗑️</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -528,6 +629,33 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
               value={collegeForm.principalName}
               onChange={(e) => setCollegeForm({ ...collegeForm, principalName: e.target.value })}
             />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                College Logo Link (URL / Image)
+              </label>
+              <input
+                type="url"
+                className="kvj-input"
+                placeholder="https://... logo link"
+                value={collegeForm.logoUrl}
+                onChange={(e) => setCollegeForm({ ...collegeForm, logoUrl: e.target.value })}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                College Building / Campus Image Link
+              </label>
+              <input
+                type="url"
+                className="kvj-input"
+                placeholder="https://... campus image link"
+                value={collegeForm.imageUrl}
+                onChange={(e) => setCollegeForm({ ...collegeForm, imageUrl: e.target.value })}
+              />
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

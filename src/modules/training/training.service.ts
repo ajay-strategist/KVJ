@@ -28,6 +28,7 @@ export interface ITrainingService {
   createCourse(data: Partial<Course>, actor: Actor): Promise<Result<Course>>;
   updateCourse(id: UUID, data: Partial<Course>, actor: Actor): Promise<Result<Course>>;
   createBatch(data: Partial<Batch>, actor: Actor): Promise<Result<Batch>>;
+  updateBatch(id: UUID, data: Partial<Batch>, actor: Actor): Promise<Result<Batch>>;
   enrollStudent(studentId: UUID, batchId: UUID, actor: Actor): Promise<Result<Enrollment>>;
   logSessionAttendance(batchId: UUID, dateStr: string, records: Partial<SessionAttendanceRecord>[], actor: Actor): Promise<Result<SessionAttendanceRecord[]>>;
   evaluateAssessment(enrollmentId: UUID, data: Partial<AssessmentRecord>, actor: Actor): Promise<Result<AssessmentRecord>>;
@@ -99,6 +100,17 @@ export class TrainingService implements ITrainingService {
       const batch = await this.batchRepo.create(data, actor);
       await this.activity.log('training', batch.id, actor, 'create', `Scheduled training batch ${batch.code}`);
       await this.audit.log(actor, 'create', 'batches', batch.id, { newValues: batch });
+      return Ok(batch);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  async updateBatch(id: UUID, data: Partial<Batch>, actor: Actor): Promise<Result<Batch>> {
+    try {
+      const batch = await this.batchRepo.update(id, data, actor);
+      await this.activity.log('training', batch.id, actor, 'update', `Updated training batch ${batch.code}`);
+      await this.audit.log(actor, 'update', 'batches', batch.id, { newValues: batch });
       return Ok(batch);
     } catch (e: any) {
       return Err(AppError.internal(e.message));

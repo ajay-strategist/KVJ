@@ -476,12 +476,17 @@ export function TrainingCalendar() {
 
     // Persist to Supabase schedule_sessions DB table
     try {
+      const assocBatch = batches.find((b) => b.code === sessionObj.batchCode || b.batchNo === sessionObj.batchCode || b.id === sessionObj.batchCode);
+      const sessId = targetSessionId.startsWith('custom-sess-') ? crypto.randomUUID() : targetSessionId;
+      sessionObj.id = sessId;
+
       await supabase.from('schedule_sessions').upsert({
-        id: targetSessionId.startsWith('custom-sess-') ? undefined : targetSessionId,
+        id: sessId,
         date: sessionObj.date,
         session_title: sessionObj.name,
         topic: sessionObj.batchCode,
-        trainer_id: sessionObj.trainerId,
+        trainer_id: sessionObj.trainerId || null,
+        batch_id: assocBatch ? assocBatch.id : null,
         start_time: sessionObj.startTime,
         end_time: sessionObj.endTime,
         venue: sessionObj.venue,

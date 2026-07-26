@@ -87,19 +87,22 @@ export function ChatChannels() {
 
       // Find direct message recipient details
       let dmParticipant = null;
+      let otherName = '';
       if (c.type === 'direct' && c.name?.startsWith('DM:')) {
-        const parts = c.name.split(' <-> ');
-        const otherUserId = parts.find((p) => p !== user?.id && p !== 'DM:')?.replace('DM:', '').trim();
-        dmParticipant = employees.find((e) => e.id === otherUserId) || null;
+        const cleaned = c.name.replace(/^DM:\s*/i, '');
+        const parts = cleaned.split(/\s*<->\s*/);
+        const otherUserId = parts.find((p) => p.trim() !== user?.id)?.trim();
+        dmParticipant = employees.find((e) => e.id === otherUserId || `${e.firstName} ${e.lastName}` === otherUserId) || null;
+        otherName = otherUserId || '';
       }
 
       return {
         id: c.id,
-        name: dmParticipant ? `${dmParticipant.firstName} ${dmParticipant.lastName}` : (c.name || 'Direct Message'),
+        name: dmParticipant ? `${dmParticipant.firstName} ${dmParticipant.lastName}` : (otherName || c.name || 'Direct Message'),
         category,
         description: c.department || c.type || '',
         unreadCount: 0,
-        membersCount: c.members?.length || 5,
+        membersCount: c.members?.length || 2,
         isMuted: c.isMuted,
         isStarred: c.isStarred,
         isArchived: c.isArchived,

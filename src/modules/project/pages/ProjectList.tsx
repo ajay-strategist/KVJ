@@ -443,7 +443,7 @@ export function ProjectList() {
   const tableColumns: Column<ProjectCardData>[] = [
     { key: 'code', header: 'Project Code', sortable: true, render: (p) => <strong>{p.code}</strong> },
     { key: 'title', header: 'Project Name & Client', sortable: true, render: (p) => <div><div style={{ fontWeight: 600 }}>{p.title}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Client: {p.client}</div></div> },
-    { key: 'supervisor', header: 'Supervisor', render: (p) => <span>👤 {p.supervisor}</span> },
+    { key: 'supervisor', header: 'Manager (Operations)', render: (p) => p.supervisor ? <span>👤 {p.supervisor}</span> : <span>—</span> },
     { key: 'members', header: 'Assigned Members & Hours', render: (p) => (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {p.members.map((m, idx) => (
@@ -712,7 +712,7 @@ export function ProjectList() {
                 <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ background: 'rgba(255,255,255,0.15)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>{selectedProject.code}</span>
                   <span>Client: <strong>{selectedProject.client}</strong></span>
-                  <span>Supervisor: <strong>{selectedProject.supervisor}</strong></span>
+                  {selectedProject.supervisor && <span>Manager (Operations): <strong>{selectedProject.supervisor}</strong></span>}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

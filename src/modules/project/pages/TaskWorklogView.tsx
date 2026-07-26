@@ -38,7 +38,7 @@ export function TaskWorklogView() {
   const { employees } = useEmployee();
 
   const mappedLogs = useMemo(() => {
-    return timesheets.map((ts) => {
+    const list = timesheets.map((ts) => {
       const project = projects.find((p) => p.id === ts.projectId);
       const task = tasks.find((t) => t.id === ts.taskId);
       const emp = employees.find((e) => e.id === ts.employeeId);
@@ -46,7 +46,7 @@ export function TaskWorklogView() {
       
       const supervisorAlloc = project ? allocations.find((a) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
       const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
-      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : 'Manager (Operations)';
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
 
       const isSuper = emp ? (emp.designation.toLowerCase().includes('manager') || emp.designation.toLowerCase().includes('ceo') || emp.designation.toLowerCase().includes('lead')) : false;
 
@@ -64,6 +64,7 @@ export function TaskWorklogView() {
         supervisorName,
       };
     });
+    return list.sort((a, b) => b.date.localeCompare(a.date));
   }, [timesheets, projects, tasks, employees, allocations]);
 
   useEffect(() => {
@@ -201,7 +202,7 @@ export function TaskWorklogView() {
                   <td style={{ padding: '10px 14px', fontWeight: 600 }}>👤 {log.employeeName}</td>
                   <td style={{ padding: '10px 14px' }}>
                     <Badge tone={log.role === 'Supervisor' ? 'info' : 'neutral'}>
-                      {log.role}
+                      {log.role === 'Supervisor' ? 'Manager (Operations)' : 'Assignee'}
                     </Badge>
                   </td>
                   <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', maxWidth: 280 }}>{log.description}</td>

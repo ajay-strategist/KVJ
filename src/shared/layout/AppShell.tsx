@@ -266,7 +266,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   {/* Notifications Popover */}
                   {notifOpen && (
                     <div style={{
-                      position: 'absolute', bottom: 'calc(100% + 8px)', left: 0,
+                      position: 'fixed', bottom: 64, left: collapsed && !isMobile ? 74 : 16,
                       width: 320, maxHeight: 460,
                       background: 'var(--bg-panel)',
                       border: '1px solid var(--border)',

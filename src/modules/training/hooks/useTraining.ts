@@ -95,6 +95,16 @@ export function useTraining() {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const updateBatch = useCallback(async (id: UUID, data: Partial<Batch>): Promise<CallbackResult<Batch>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const res = await service.updateBatch(id, data, { id: user.id, role: user.role });
+    if (res.ok) {
+      setBatches((prev) => prev.map((b) => (b.id === id ? res.value : b)));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
+
   const enrollStudent = useCallback(async (studentId: UUID, batchId: UUID): Promise<CallbackResult<Enrollment>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.enrollStudent(studentId, batchId, { id: user.id, role: user.role });
@@ -150,6 +160,7 @@ export function useTraining() {
     createCourse,
     updateCourse,
     createBatch,
+    updateBatch,
     enrollStudent,
     evaluateAssessment,
     claimVoucher,

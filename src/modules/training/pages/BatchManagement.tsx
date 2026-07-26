@@ -114,7 +114,7 @@ export function BatchManagement() {
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const canCreateBatch = ['ADMIN', 'MANAGER', 'CEO'].includes(userRole);
   const canViewDailyReport = can('training', 'view');
-  const { batches, courses, createBatch, students: dbStudents, enrollments } = useTraining();
+  const { batches, courses, createBatch, updateBatch, students: dbStudents, enrollments, loading: batchesLoading, error: batchesError, refresh: refreshBatches } = useTraining();
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
@@ -299,41 +299,77 @@ export function BatchManagement() {
   // Edit Batch modal state
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
+    selectedCourseId: '',
     trainingName: '',
+    college: '',
+    collegeCourse: '',
     program: '',
     batchNo: '',
     academicYear: '',
-    trainer: '',
+    trainerId: '',
     coordinator: '',
     coordinatorEmail: '',
     coordinator2: '',
     coordinatorEmail2: '',
+    startDate: '',
+    endDate: '',
   });
 
   const handleOpenEditBatch = (id: string) => {
     const target = batches.find((b) => b.id === id);
     setEditingBatchId(id);
     setEditForm({
-      trainingName: target?.trainingName || '2 CS Power BI',
+      selectedCourseId: target?.courseId || '',
+      trainingName: target?.trainingName || target?.code || '',
+      college: target?.college || '',
+      collegeCourse: (target as any)?.collegeCourse || '',
       program: (target as any)?.program || 'Computer Science & Analytics',
-      batchNo: target?.batchNo || target?.code || 'Batch 2',
+      batchNo: target?.batchNo || target?.code || '',
       academicYear: target?.academicYear || '2026-2027',
-      trainer: 'Priya Nair',
-      coordinator: target?.coordinator || 'Prof. Anil Kumar',
-      coordinatorEmail: target?.coordinatorEmail || 'anil@christcollege.edu',
+      trainerId: target?.trainerId || '',
+      coordinator: target?.coordinator || '',
+      coordinatorEmail: target?.coordinatorEmail || '',
       coordinator2: target?.coordinator2 || '',
       coordinatorEmail2: target?.coordinatorEmail2 || '',
+      startDate: target?.startDate || (target as any)?.start_date || '',
+      endDate: target?.endDate || (target as any)?.end_date || '',
     });
   };
 
-  const handleSaveEditBatch = (e: React.FormEvent) => {
+  const handleSaveEditBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      variant: 'success',
-      title: 'Training Batch Updated',
-      message: `Batch "${editForm.trainingName}" details successfully updated.`,
-    });
-    setEditingBatchId(null);
+    if (!editingBatchId) return;
+
+    const selectedCourse = courses.find((c) => c.id === editForm.selectedCourseId);
+    const res = await updateBatch(editingBatchId as UUID, {
+      courseId: editForm.selectedCourseId as UUID || undefined,
+      trainingName: editForm.trainingName || selectedCourse?.title,
+      college: editForm.college,
+      batchNo: editForm.batchNo,
+      academicYear: editForm.academicYear,
+      trainerId: editForm.trainerId as UUID || undefined,
+      coordinator: editForm.coordinator,
+      coordinatorEmail: editForm.coordinatorEmail,
+      coordinator2: editForm.coordinator2 || undefined,
+      coordinatorEmail2: editForm.coordinatorEmail2 || undefined,
+      startDate: editForm.startDate || undefined,
+      endDate: editForm.endDate || undefined,
+    } as any);
+
+    if (res.ok) {
+      toast({
+        variant: 'success',
+        title: 'Training Batch Updated',
+        message: `Batch "${editForm.trainingName}" details successfully updated.`,
+      });
+      setEditingBatchId(null);
+    } else {
+      toast({
+        variant: 'error',
+        title: 'Update Failed',
+        message: res.error,
+      });
+    }
   };
   
   // Tab control
@@ -3146,7 +3182,30 @@ export function BatchManagement() {
           <form onSubmit={handleSaveEditBatch} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Training Course Name
+                Select Master Course
+              </label>
+              <select
+                className="kvj-select"
+                value={editForm.selectedCourseId}
+                onChange={(e) => {
+                  const selected = courses.find(c => c.id === e.target.value);
+                  setEditForm({
+                    ...editForm,
+                    selectedCourseId: e.target.value,
+                    trainingName: selected ? selected.title : editForm.trainingName,
+                  });
+                }}
+              >
+                <option value="">-- Choose Course --</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title} ({c.code})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Training Course Name *
               </label>
               <input
                 type="text"
@@ -3160,19 +3219,19 @@ export function BatchManagement() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Program
+                  College Name
                 </label>
                 <input
                   type="text"
                   className="kvj-input"
-                  value={editForm.program}
-                  onChange={(e) => setEditForm({ ...editForm, program: e.target.value })}
+                  value={editForm.college}
+                  onChange={(e) => setEditForm({ ...editForm, college: e.target.value })}
                 />
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Batch No.
+                  Batch Name / No. *
                 </label>
                 <input
                   type="text"
@@ -3187,7 +3246,7 @@ export function BatchManagement() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Academic Year
+                  Academic Year *
                 </label>
                 <input
                   type="text"
@@ -3202,12 +3261,41 @@ export function BatchManagement() {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
                   Lead Trainer
                 </label>
+                <select
+                  className="kvj-select"
+                  value={editForm.trainerId}
+                  onChange={(e) => setEditForm({ ...editForm, trainerId: e.target.value })}
+                >
+                  <option value="">-- Choose Trainer --</option>
+                  {trainers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.designation})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Start Date
+                </label>
                 <input
-                  type="text"
+                  type="date"
                   className="kvj-input"
-                  required
-                  value={editForm.trainer}
-                  onChange={(e) => setEditForm({ ...editForm, trainer: e.target.value })}
+                  value={editForm.startDate}
+                  onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  className="kvj-input"
+                  value={editForm.endDate}
+                  onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
                 />
               </div>
             </div>
@@ -3220,7 +3308,6 @@ export function BatchManagement() {
                 <input
                   type="text"
                   className="kvj-input"
-                  required
                   value={editForm.coordinator}
                   onChange={(e) => setEditForm({ ...editForm, coordinator: e.target.value })}
                 />
@@ -3233,7 +3320,6 @@ export function BatchManagement() {
                 <input
                   type="email"
                   className="kvj-input"
-                  required
                   value={editForm.coordinatorEmail}
                   onChange={(e) => setEditForm({ ...editForm, coordinatorEmail: e.target.value })}
                 />

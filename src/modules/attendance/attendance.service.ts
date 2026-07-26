@@ -296,7 +296,10 @@ export class AttendanceService implements IAttendanceService {
 
   async requestCorrection(recordId: UUID, field: string, proposed: string, reason: string, actor: Actor): Promise<Result<void>> {
     try {
-      const record = await this.repo.findById(recordId);
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUuid = UUID_RE.test(recordId);
+
+      const record = isUuid ? await this.repo.findById(recordId) : null;
       const originalVal = record
         ? field === 'firstClockIn'
           ? record.firstClockIn || 'None'
@@ -304,7 +307,7 @@ export class AttendanceService implements IAttendanceService {
         : 'None';
 
       const payload = {
-        attendance_record_id: recordId,
+        attendance_record_id: isUuid ? recordId : null,
         requested_by: actor.id,
         requested_date: todayStr(),
         field_to_correct: field,
@@ -426,7 +429,15 @@ export class AttendanceService implements IAttendanceService {
           lastClockOut,
           totalWorkingMinutes: 480,
           totalBreakMinutes: 0,
-          sessions: [],
+          sessions: [
+            {
+              id: this.uuid(),
+              workType: corr.reason?.toLowerCase().includes('training') ? 'Training' : 'Office',
+              clockIn: firstClockIn,
+              clockOut: lastClockOut,
+              notes: corr.reason || 'Approved Claim',
+            },
+          ],
           breaks: [],
           createdAt: nowIso(),
           updatedAt: nowIso(),

@@ -20,6 +20,8 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useTraining } from '../../training/hooks/useTraining';
 import { supabase } from '../../../shared/integration/supabase';
 
+import { googleIntegration } from '../../../shared/integration/google';
+
 export interface ExpenseRecord {
   id: string;
   date: string;
@@ -348,12 +350,27 @@ export function ExpenseClaims() {
     const rate = vehicle === 'Car' ? carRate : bikeRate;
     const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
 
-    const receiptLink: string =
+    let receiptLink: string =
       (typeof values.receiptPreview === 'string' && values.receiptPreview)
         ? values.receiptPreview
         : (typeof values.receipt === 'string' && values.receipt)
         ? values.receipt
-        : (values.receiptFile ? `[Uploaded File: ${(values.receiptFile as File).name}]` : 'Uploaded Proof');
+        : 'Uploaded Proof';
+
+    if (values.receiptFile && values.receiptFile instanceof File) {
+      try {
+        const driveRes = await googleIntegration.uploadReceiptWithMetadata(values.receiptFile, {
+          person: user?.fullName || 'Employee',
+          category: (values.categoryType as string) || 'Office Expense',
+          amount,
+        });
+        if (driveRes.ok && driveRes.fileUrl) {
+          receiptLink = driveRes.fileUrl;
+        }
+      } catch (e) {
+        console.warn('Google Drive receipt upload warning:', e);
+      }
+    }
 
     try {
       const { error } = await supabase.from('expense_claims').insert({

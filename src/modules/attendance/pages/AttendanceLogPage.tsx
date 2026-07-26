@@ -85,13 +85,18 @@ export function AttendanceLogPage() {
         }
         setAttendanceRecords(records);
         setExpenseClaims(claims);
+
+        const { data: hData } = await supabase.from('declared_holidays').select('*');
+        if (hData) {
+          setDeclaredHolidays(hData.map((h) => ({ date: h.date || h.holiday_date, name: h.title || h.name || 'Company Holiday' })));
+        }
       } catch (e) {
         console.error('Error fetching attendance history:', e);
       }
       setLoading(false);
     };
     fetchHistory();
-  }, [startDate, endDate, currentEmployee, selectedEmployee, user]);
+  }, [startDate, endDate, currentEmployee, selectedEmployee, user, isManagement]);
 
   const handleFilterPreset = (preset: 'current_month' | 'last_month' | 'last_1_year' | 'custom') => {
     setActiveFilterPreset(preset);
@@ -155,6 +160,7 @@ export function AttendanceLogPage() {
       const record = attendanceRecords.find(r => r.workDate === dateStr);
       const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === dateStr);
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
+      const decHoliday = declaredHolidays.find(h => h.date === dateStr);
 
       if (record) {
         const sessions = record.sessions?.map(s => ({
@@ -172,7 +178,7 @@ export function AttendanceLogPage() {
           dateNum: dayNum,
           dayName,
           fullDate: dateStr.split('-').reverse().join('/'),
-          status: 'present',
+          status: decHoliday ? 'holiday' : 'present',
           location: record.sessions?.[0]?.workType || 'Office',
           startTime: record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
           endTime: record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
@@ -187,8 +193,8 @@ export function AttendanceLogPage() {
           dateNum: dayNum,
           dayName,
           fullDate: dateStr.split('-').reverse().join('/'),
-          status: isSunday ? 'holiday' : 'absent',
-          location: '',
+          status: decHoliday || isSunday ? 'holiday' : 'absent',
+          location: decHoliday ? decHoliday.name : '',
           startTime: undefined,
           endTime: undefined,
           sessions: [],
@@ -199,39 +205,71 @@ export function AttendanceLogPage() {
       }
     }
     return days;
-  }, [startDate, endDate, attendanceRecords, expenseClaims]);
+  }, [startDate, endDate, attendanceRecords, expenseClaims, declaredHolidays]);
 
   const tableRows = useMemo(() => {
-    return attendanceRecords.map((record) => {
-      const start = record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-      const end = record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-      const duration = `${Math.floor(record.totalWorkingMinutes / 60)}h ${record.totalWorkingMinutes % 60}m`;
-      const breakTime = `${Math.floor(record.totalBreakMinutes / 60)}h ${record.totalBreakMinutes % 60}m`;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const rows: AttendanceLogRow[] = [];
 
-      const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === record.workDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = toLocalISODate(d);
+      const record = attendanceRecords.find(r => r.workDate === dateStr);
+      const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === dateStr);
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
+      const decHoliday = declaredHolidays.find(h => h.date === dateStr);
 
-      const emp = employees.find(e => e.id === record.employeeId);
-      const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'System Admin';
+      const empName = currentEmployee
+        ? `${currentEmployee.firstName} ${currentEmployee.lastName}`
+        : user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Employee' : 'Employee';
 
-      return {
-        date: record.workDate.split('-').reverse().join('/'),
-        name: empName,
-        holiday: new Date(record.workDate).getDay() === 0 ? 'Sunday' : '',
-        org: record.sessions?.[0]?.workType || 'Office',
-        location: record.sessions?.[0]?.workType || 'Office',
-        type: (record.sessions?.[0]?.workType || 'Office') as string,
-        mode: 'Offline',
-        start,
-        end,
-        duration,
-        expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-        note: record.sessions?.[0]?.notes || '',
-        break: breakTime,
-        tasks: record.sessions?.map(s => s.notes).filter(Boolean) as string[] || [],
-      };
-    });
-  }, [attendanceRecords, expenseClaims, employees]);
+      if (record) {
+        const startT = record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const endT = record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const duration = `${Math.floor(record.totalWorkingMinutes / 60)}h ${record.totalWorkingMinutes % 60}m`;
+        const breakTime = `${Math.floor(record.totalBreakMinutes / 60)}h ${record.totalBreakMinutes % 60}m`;
+
+        const emp = employees.find(e => e.id === record.employeeId);
+        const resolvedEmpName = emp ? `${emp.firstName} ${emp.lastName}` : empName;
+
+        rows.push({
+          date: dateStr.split('-').reverse().join('/'),
+          name: resolvedEmpName,
+          holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : '',
+          org: record.sessions?.[0]?.workType || 'Office',
+          location: record.sessions?.[0]?.workType || 'Office',
+          type: (record.sessions?.[0]?.workType || 'Office') as string,
+          mode: 'Offline',
+          start: startT,
+          end: endT,
+          duration,
+          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+          note: record.sessions?.[0]?.notes || '',
+          break: breakTime,
+          tasks: record.sessions?.map(s => s.notes).filter(Boolean) as string[] || [],
+        });
+      } else {
+        const isSunday = d.getDay() === 0;
+        rows.push({
+          date: dateStr.split('-').reverse().join('/'),
+          name: empName,
+          holiday: decHoliday ? decHoliday.name : isSunday ? 'Sunday' : '',
+          org: '—',
+          location: '—',
+          type: '—',
+          mode: '—',
+          start: '—',
+          end: '—',
+          duration: '0h 0m',
+          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+          note: decHoliday ? `Declared Holiday: ${decHoliday.name}` : isSunday ? 'Weekend Off' : 'Not Clocked',
+          break: '0h 0m',
+          tasks: [],
+        });
+      }
+    }
+    return rows;
+  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays]);
 
   const mappedExpenseRows = useMemo(() => {
     return expenseClaims.map((claim) => {
