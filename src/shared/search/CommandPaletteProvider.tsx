@@ -38,7 +38,15 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [providers, setProviders] = useState<SearchProvider[]>([]);
   const [term, setTerm] = useState('');
   const [results, setResults] = useState<CommandItem[]>([]);
-  const [recent, setRecent] = useState<string[]>(() => JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]'));
+  const [recent, setRecent] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(RECENT_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
 
   const registerProvider = useCallback((p: SearchProvider) => {
     setProviders((prev) => [...prev.filter((x) => x.id !== p.id), p]);

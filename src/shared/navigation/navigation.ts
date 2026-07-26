@@ -77,7 +77,20 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean): NavItem[
 // ── User nav preferences (favorites / pinned / recent) ───────────────────────
 const PREFS_KEY = 'kvj.nav.prefs';
 interface NavPrefs { favorites: string[]; pinned: string[]; recent: string[] }
-const load = (): NavPrefs => JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{"favorites":[],"pinned":[],"recent":[]}');
+const load = (): NavPrefs => {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return { favorites: [], pinned: [], recent: [] };
+    const p = JSON.parse(raw);
+    return {
+      favorites: Array.isArray(p?.favorites) ? p.favorites : [],
+      pinned: Array.isArray(p?.pinned) ? p.pinned : [],
+      recent: Array.isArray(p?.recent) ? p.recent : [],
+    };
+  } catch {
+    return { favorites: [], pinned: [], recent: [] };
+  }
+};
 
 export function useNavPrefs() {
   const [prefs, setPrefs] = useState<NavPrefs>(load);

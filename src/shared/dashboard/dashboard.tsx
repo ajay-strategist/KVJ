@@ -33,8 +33,13 @@ const LAYOUT_KEY = (role: string) => `kvj.dashboard.layout.${role}`;
  *  registry + layout persistence are ready now (Prompt: "infrastructure only"). */
 export function DashboardGrid({ role }: { role: string }) {
   const [layout, setLayout] = useState<WidgetLayout[]>(() => {
-    const saved = localStorage.getItem(LAYOUT_KEY(role));
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem(LAYOUT_KEY(role));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
     return widgetRegistry.forRole(role).map((w) => ({ id: w.id, w: w.defaultSize?.w ?? 4, h: w.defaultSize?.h ?? 1 }));
   });
 
