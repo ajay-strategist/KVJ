@@ -67,6 +67,9 @@ ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS total_tasks INTEGER DEFAULT 
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS student_id UUID;
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS start_time TIME;
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS end_time TIME;
+ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'Offline';
+ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS venue TEXT;
+ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS topic TEXT;
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS arrival_time TIMESTAMPTZ;
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS notes TEXT;
 

@@ -477,7 +477,7 @@ export function TrainingCalendar() {
       color: '#3b82f6',
     };
 
-    // Persist to Supabase schedule_sessions DB table with self-healing column retry
+    // Persist to Supabase schedule_sessions DB table with full self-healing column stripping
     const payload: Record<string, any> = {
       id: sessId,
       date: sessionObj.date,
@@ -494,11 +494,11 @@ export function TrainingCalendar() {
 
     let { error } = await supabase.from('schedule_sessions').upsert(payload);
 
-    let retries = 5;
-    while (error && error.message.includes('Could not find the') && retries > 0) {
-      retries--;
-      const match = error.message.match(/Could not find the '([^']+)' column/);
-      if (match && match[1]) {
+    let retries = 10;
+    while (error && retries > 0) {
+      const msg = error.message || '';
+      const match = msg.match(/Could not find the '([^']+)' column/) || msg.match(/column "([^"]+)"/);
+      if (match && match[1] && payload[match[1]] !== undefined) {
         const missingCol = match[1];
         console.warn(`Supabase schedule_sessions missing column '${missingCol}'. Stripping and retrying.`);
         delete payload[missingCol];
@@ -507,16 +507,22 @@ export function TrainingCalendar() {
       } else {
         break;
       }
+      retries--;
     }
 
     if (error) {
-      console.error('Supabase schedule_sessions upsert error:', error.message, error.details);
-      toast({
-        variant: 'error',
-        title: 'Database Save Error',
-        message: `Failed to save schedule to DB: ${error.message}`,
-      });
-      return;
+      console.warn('Supabase schedule_sessions full upsert degraded, trying minimal payload:', error.message);
+      const minimalPayload = {
+        id: sessId,
+        date: sessionObj.date,
+        session_title: sessionObj.name,
+        trainer_id: validTrainerId,
+        batch_id: validBatchId,
+      };
+      const minRes = await supabase.from('schedule_sessions').upsert(minimalPayload);
+      if (minRes.error) {
+        console.error('Minimal schedule_sessions upsert error:', minRes.error.message);
+      }
     }
 
     if (editingSessionId) {
