@@ -7,7 +7,7 @@ import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
-import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN } from '../training.repository';
+import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN, type Batch } from '../training.repository';
 import { normalizeStudentKey } from '../supabase-training.repository';
 import type { Page, UUID } from '../../../core/types';
 import { supabase } from '../../../shared/integration/supabase';
@@ -369,6 +369,52 @@ export function BatchManagement() {
       toast({
         variant: 'error',
         title: 'Update Failed',
+        message: res.error,
+      });
+    }
+  };
+
+  const handleCopyBatch = async (batchId: string) => {
+    const target = batches.find((b) => b.id === batchId);
+    if (!target) return;
+
+    const copyCode = `${target.code || target.batchNo || 'Batch'} - Copy`;
+    const copyBatchNo = `${target.batchNo || target.code || 'Batch 1'} (Copy)`;
+    const copyTrainingName = target.trainingName ? `${target.trainingName} (Copy)` : copyCode;
+
+    const newBatchPayload: Partial<Batch> = {
+      code: copyCode,
+      courseId: target.courseId,
+      college: target.college,
+      program: target.program || (target as any).collegeCourse || '',
+      batchNo: copyBatchNo,
+      trainingName: copyTrainingName,
+      academicYear: target.academicYear || '2026-2027',
+      trainerId: target.trainerId,
+      coordinator: target.coordinator,
+      coordinatorEmail: target.coordinatorEmail,
+      coordinator2: target.coordinator2,
+      coordinatorEmail2: target.coordinatorEmail2,
+      startDate: target.startDate,
+      endDate: target.endDate,
+      phase: target.phase || 'Scheduled',
+      capacity: target.capacity || 40,
+      venue: target.venue || '',
+      onlineLink: target.onlineLink || '',
+    };
+
+    const res = await createBatch(newBatchPayload);
+    if (res.ok) {
+      toast({
+        variant: 'success',
+        title: 'Training Details Card Copied',
+        message: `Created duplicate batch: "${copyTrainingName}"`,
+      });
+      setSelectedBatchId(res.value.id);
+    } else {
+      toast({
+        variant: 'error',
+        title: 'Copy Failed',
         message: res.error,
       });
     }
@@ -3117,6 +3163,7 @@ export function BatchManagement() {
         onSelect={setSelectedBatchId}
         onAction={handleCarouselAction}
         onEdit={handleOpenEditBatch}
+        onCopy={handleCopyBatch}
       />
 
       {/* EMAIL COMPOSER MODAL */}

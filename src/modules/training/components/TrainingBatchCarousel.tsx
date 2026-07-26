@@ -133,7 +133,7 @@ function saveChecklistDoneState(batchId: string, state: Record<string, boolean>)
 // ── Individual Batch Card Component (Side-by-Side with Right Checklist Panel) ──
 const BatchCard = memo(function BatchCard({
   vm, active, pinned, favourite,
-  onSelect, onTogglePin, onToggleFav, onAction, onEdit,
+  onSelect, onTogglePin, onToggleFav, onAction, onEdit, onCopy,
 }: {
   vm: BatchCardVM;
   active: boolean;
@@ -144,6 +144,7 @@ const BatchCard = memo(function BatchCard({
   onToggleFav: (id: string) => void;
   onAction: (id: string, action: BatchAction) => void;
   onEdit?: (id: string) => void;
+  onCopy?: (id: string) => void;
 }) {
   const [showAllChecklist, setShowAllChecklist] = useState(true);
   const [checklist, setChecklist] = useState(() => {
@@ -254,7 +255,7 @@ const BatchCard = memo(function BatchCard({
               </div>
             </div>
 
-            {/* Edit + Fav + Pin controls */}
+            {/* Edit + Copy + Fav + Pin controls */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
@@ -268,6 +269,19 @@ const BatchCard = memo(function BatchCard({
                 }}
               >
                 ✏️ Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => onCopy?.(vm.id)}
+                title="Make a Copy of Training Details Card"
+                style={{
+                  background: 'var(--bg-sunken)', border: '1px solid var(--border)',
+                  cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                  padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                📋 Copy
               </button>
               <button
                 type="button"
@@ -449,7 +463,7 @@ function InfoField({ label, value, mono }: { label: string; value: string; mono?
 const PREFS_KEY_STORE = 'kvj.batchCards.prefs.v3';
 
 export function TrainingBatchCarousel({
-  batches, courses, trainers, activeId, onSelect, onAction, onEdit,
+  batches, courses, trainers, activeId, onSelect, onAction, onEdit, onCopy,
 }: {
   batches: Batch[];
   courses: Course[];
@@ -458,6 +472,7 @@ export function TrainingBatchCarousel({
   onSelect: (id: string) => void;
   onAction: (batchId: string, action: BatchAction) => void;
   onEdit?: (batchId: string) => void;
+  onCopy?: (batchId: string) => void;
 }) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [query, setQuery] = useState('');
@@ -584,6 +599,7 @@ export function TrainingBatchCarousel({
               onToggleFav={toggleFav}
               onAction={onAction}
               onEdit={onEdit}
+              onCopy={onCopy}
             />
           ))}
         </div>
