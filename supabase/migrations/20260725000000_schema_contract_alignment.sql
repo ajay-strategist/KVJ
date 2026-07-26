@@ -65,6 +65,8 @@ ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS total_tasks INTEGER DEFAULT 
 --     status values must match: present/absent/late/leave
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS student_id UUID;
+ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS start_time TIME;
+ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS end_time TIME;
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS arrival_time TIMESTAMPTZ;
 ALTER TABLE public.schedule_sessions ADD COLUMN IF NOT EXISTS notes TEXT;
 

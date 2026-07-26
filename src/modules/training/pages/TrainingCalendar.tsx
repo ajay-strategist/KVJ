@@ -477,8 +477,8 @@ export function TrainingCalendar() {
       color: '#3b82f6',
     };
 
-    // Persist to Supabase schedule_sessions DB table
-    const payload = {
+    // Persist to Supabase schedule_sessions DB table with self-healing column retry
+    const payload: Record<string, any> = {
       id: sessId,
       date: sessionObj.date,
       session_title: sessionObj.name,
@@ -492,7 +492,22 @@ export function TrainingCalendar() {
       status: sessionObj.status,
     };
 
-    const { error } = await supabase.from('schedule_sessions').upsert(payload);
+    let { error } = await supabase.from('schedule_sessions').upsert(payload);
+
+    let retries = 5;
+    while (error && error.message.includes('Could not find the') && retries > 0) {
+      retries--;
+      const match = error.message.match(/Could not find the '([^']+)' column/);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Supabase schedule_sessions missing column '${missingCol}'. Stripping and retrying.`);
+        delete payload[missingCol];
+        const retryRes = await supabase.from('schedule_sessions').upsert(payload);
+        error = retryRes.error;
+      } else {
+        break;
+      }
+    }
 
     if (error) {
       console.error('Supabase schedule_sessions upsert error:', error.message, error.details);
