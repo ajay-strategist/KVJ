@@ -91,31 +91,35 @@ ALTER TABLE public.student_records ADD COLUMN IF NOT EXISTS first_name TEXT;
 ALTER TABLE public.student_records ADD COLUMN IF NOT EXISTS last_name TEXT;
 
 -- Populate first_name / last_name from 'name' where not yet set
-UPDATE public.student_records
-SET
-  first_name = COALESCE(
-    first_name,
-    CASE WHEN name IS NOT NULL AND position(' ' IN trim(name)) > 0
-         THEN trim(split_part(trim(name), ' ', 1))
-         ELSE trim(name)
-    END
-  ),
-  last_name = COALESCE(
-    last_name,
-    CASE WHEN name IS NOT NULL AND position(' ' IN trim(name)) > 0
-         THEN trim(substring(trim(name) FROM position(' ' IN trim(name)) + 1))
-         ELSE ''
-    END
-  )
-WHERE first_name IS NULL OR last_name IS NULL;
+DO $$ BEGIN
+  UPDATE public.student_records
+  SET
+    first_name = COALESCE(
+      first_name,
+      CASE WHEN name IS NOT NULL AND position(' ' IN trim(name)) > 0
+           THEN trim(split_part(trim(name), ' ', 1))
+           ELSE trim(name)
+      END
+    ),
+    last_name = COALESCE(
+      last_name,
+      CASE WHEN name IS NOT NULL AND position(' ' IN trim(name)) > 0
+           THEN trim(substring(trim(name) FROM position(' ' IN trim(name)) + 1))
+           ELSE ''
+      END
+    )
+  WHERE first_name IS NULL OR last_name IS NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.student_records ADD COLUMN IF NOT EXISTS guardian_name TEXT;
 ALTER TABLE public.student_records ADD COLUMN IF NOT EXISTS guardian_phone TEXT;
 -- academic_qualification: migration has 'qualification' — add canonical name, copy
 ALTER TABLE public.student_records ADD COLUMN IF NOT EXISTS academic_qualification TEXT;
-UPDATE public.student_records
-SET academic_qualification = COALESCE(academic_qualification, qualification)
-WHERE academic_qualification IS NULL AND qualification IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.student_records
+  SET academic_qualification = COALESCE(academic_qualification, qualification)
+  WHERE academic_qualification IS NULL AND qualification IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.student_records ADD COLUMN IF NOT EXISTS employment_status TEXT;
 ALTER TABLE public.student_records ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT;
@@ -142,21 +146,21 @@ ALTER TABLE public.enrollments ADD COLUMN IF NOT EXISTS seat_number TEXT;
 -- ---------------------------------------------------------------------------
 -- title (was assessment_title)
 ALTER TABLE public.assessments ADD COLUMN IF NOT EXISTS title TEXT;
-UPDATE public.assessments
-SET title = COALESCE(title, assessment_title)
-WHERE title IS NULL AND assessment_title IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.assessments SET title = COALESCE(title, assessment_title) WHERE title IS NULL AND assessment_title IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- max_marks (was max_score)
 ALTER TABLE public.assessments ADD COLUMN IF NOT EXISTS max_marks INTEGER DEFAULT 100;
-UPDATE public.assessments
-SET max_marks = COALESCE(max_marks, max_score)
-WHERE max_marks IS NULL AND max_score IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.assessments SET max_marks = COALESCE(max_marks, max_score) WHERE max_marks IS NULL AND max_score IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- marks_obtained (was score)
 ALTER TABLE public.assessments ADD COLUMN IF NOT EXISTS marks_obtained INTEGER;
-UPDATE public.assessments
-SET marks_obtained = COALESCE(marks_obtained, score)
-WHERE marks_obtained IS NULL AND score IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.assessments SET marks_obtained = COALESCE(marks_obtained, score) WHERE marks_obtained IS NULL AND score IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- New columns
 ALTER TABLE public.assessments ADD COLUMN IF NOT EXISTS type TEXT;
@@ -166,9 +170,9 @@ ALTER TABLE public.assessments ADD COLUMN IF NOT EXISTS evaluated_by UUID;
 ALTER TABLE public.assessments ADD COLUMN IF NOT EXISTS evaluated_at TIMESTAMPTZ;
 
 -- Copy assessed_date into evaluated_at
-UPDATE public.assessments
-SET evaluated_at = COALESCE(evaluated_at, assessed_date::TIMESTAMPTZ)
-WHERE evaluated_at IS NULL AND assessed_date IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.assessments SET evaluated_at = COALESCE(evaluated_at, assessed_date::TIMESTAMPTZ) WHERE evaluated_at IS NULL AND assessed_date IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 
 -- ---------------------------------------------------------------------------
@@ -208,15 +212,15 @@ EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- certificate_number (was certificate_code)
 ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS certificate_number TEXT;
-UPDATE public.certificates
-SET certificate_number = COALESCE(certificate_number, certificate_code)
-WHERE certificate_number IS NULL AND certificate_code IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.certificates SET certificate_number = COALESCE(certificate_number, certificate_code) WHERE certificate_number IS NULL AND certificate_code IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- issued_at as TIMESTAMPTZ (was issue_date DATE)
 ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS issued_at TIMESTAMPTZ;
-UPDATE public.certificates
-SET issued_at = COALESCE(issued_at, issue_date::TIMESTAMPTZ)
-WHERE issued_at IS NULL AND issue_date IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.certificates SET issued_at = COALESCE(issued_at, issue_date::TIMESTAMPTZ) WHERE issued_at IS NULL AND issue_date IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- New columns
 ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS verification_qr_url TEXT;
@@ -231,14 +235,14 @@ ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS reissue_reason TEXT;
 --     candidate_email). Add: referral_code, reward_amount, payout_eligible.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.referrals ADD COLUMN IF NOT EXISTS referrer_student_id UUID;
-UPDATE public.referrals
-SET referrer_student_id = COALESCE(referrer_student_id, referrer_id)
-WHERE referrer_student_id IS NULL AND referrer_id IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.referrals SET referrer_student_id = COALESCE(referrer_student_id, referrer_id) WHERE referrer_student_id IS NULL AND referrer_id IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.referrals ADD COLUMN IF NOT EXISTS referee_email TEXT;
-UPDATE public.referrals
-SET referee_email = COALESCE(referee_email, candidate_email)
-WHERE referee_email IS NULL AND candidate_email IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.referrals SET referee_email = COALESCE(referee_email, candidate_email) WHERE referee_email IS NULL AND candidate_email IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.referrals ADD COLUMN IF NOT EXISTS referral_code TEXT;
 ALTER TABLE public.referrals ADD COLUMN IF NOT EXISTS reward_amount NUMERIC(10,2);
@@ -251,14 +255,14 @@ ALTER TABLE public.referrals ADD COLUMN IF NOT EXISTS payout_eligible BOOLEAN DE
 --     (was designation). Add: graduation_date, package_amount, testimonial.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.alumni_profiles ADD COLUMN IF NOT EXISTS current_employer TEXT;
-UPDATE public.alumni_profiles
-SET current_employer = COALESCE(current_employer, company_name)
-WHERE current_employer IS NULL AND company_name IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.alumni_profiles SET current_employer = COALESCE(current_employer, company_name) WHERE current_employer IS NULL AND company_name IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.alumni_profiles ADD COLUMN IF NOT EXISTS current_designation TEXT;
-UPDATE public.alumni_profiles
-SET current_designation = COALESCE(current_designation, designation)
-WHERE current_designation IS NULL AND designation IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.alumni_profiles SET current_designation = COALESCE(current_designation, designation) WHERE current_designation IS NULL AND designation IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.alumni_profiles ADD COLUMN IF NOT EXISTS graduation_date DATE;
 ALTER TABLE public.alumni_profiles ADD COLUMN IF NOT EXISTS package_amount NUMERIC(10,2);
@@ -282,9 +286,9 @@ ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS notes TEXT;
 --     Add: category, type, priority, estimated_hours, notes, custom_fields.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS title TEXT;
-UPDATE public.projects
-SET title = COALESCE(title, name)
-WHERE title IS NULL AND name IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.projects SET title = COALESCE(title, name) WHERE title IS NULL AND name IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS type TEXT;
@@ -300,9 +304,9 @@ ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS custom_fields JSONB DEFAULT
 --     Missing: role, status.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.resource_allocations ADD COLUMN IF NOT EXISTS capacity_percentage INTEGER;
-UPDATE public.resource_allocations
-SET capacity_percentage = COALESCE(capacity_percentage, allocation_pct)
-WHERE capacity_percentage IS NULL AND allocation_pct IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.resource_allocations SET capacity_percentage = COALESCE(capacity_percentage, allocation_pct) WHERE capacity_percentage IS NULL AND allocation_pct IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.resource_allocations ADD COLUMN IF NOT EXISTS role TEXT;
 ALTER TABLE public.resource_allocations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
@@ -351,9 +355,9 @@ EXCEPTION WHEN OTHERS THEN NULL; END $$;
 ALTER TABLE public.client_meetings ADD COLUMN IF NOT EXISTS project_id UUID;
 ALTER TABLE public.client_meetings ADD COLUMN IF NOT EXISTS online_link TEXT;
 ALTER TABLE public.client_meetings ADD COLUMN IF NOT EXISTS summary TEXT;
-UPDATE public.client_meetings
-SET summary = COALESCE(summary, notes)
-WHERE summary IS NULL AND notes IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.client_meetings SET summary = COALESCE(summary, notes) WHERE summary IS NULL AND notes IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- Add FK for project_id
 DO $$ BEGIN
@@ -373,19 +377,19 @@ EXCEPTION WHEN OTHERS THEN NULL; END $$;
 --                 receipt_url (was receipt_file_name).
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.expense_claims ADD COLUMN IF NOT EXISTS category TEXT;
-UPDATE public.expense_claims
-SET category = COALESCE(category, expense_type)
-WHERE category IS NULL AND expense_type IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.expense_claims SET category = COALESCE(category, expense_type) WHERE category IS NULL AND expense_type IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.expense_claims ADD COLUMN IF NOT EXISTS notes TEXT;
-UPDATE public.expense_claims
-SET notes = COALESCE(notes, description)
-WHERE notes IS NULL AND description IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.expense_claims SET notes = COALESCE(notes, description) WHERE notes IS NULL AND description IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.expense_claims ADD COLUMN IF NOT EXISTS receipt_url TEXT;
-UPDATE public.expense_claims
-SET receipt_url = COALESCE(receipt_url, google_drive_view_url, receipt_file_name)
-WHERE receipt_url IS NULL;
+DO $$ BEGIN
+  UPDATE public.expense_claims SET receipt_url = COALESCE(receipt_url, google_drive_view_url, receipt_file_name) WHERE receipt_url IS NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 
 -- ---------------------------------------------------------------------------
@@ -394,9 +398,9 @@ WHERE receipt_url IS NULL;
 --     Keep both columns — app uses text, but FK is still valid for reporting.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.budgets ADD COLUMN IF NOT EXISTS fiscal_year TEXT;
-UPDATE public.budgets
-SET fiscal_year = COALESCE(fiscal_year, year::TEXT)
-WHERE fiscal_year IS NULL AND year IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.budgets SET fiscal_year = COALESCE(fiscal_year, year::TEXT) WHERE fiscal_year IS NULL AND year IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- department as text (TypeScript interface uses text, not FK)
 ALTER TABLE public.budgets ADD COLUMN IF NOT EXISTS department TEXT;
@@ -415,9 +419,9 @@ EXCEPTION WHEN OTHERS THEN NULL; END $$;
 --     Missing: contact_person, performance_score, contract_url.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS email TEXT;
-UPDATE public.vendors
-SET email = COALESCE(email, contact_email)
-WHERE email IS NULL AND contact_email IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.vendors SET email = COALESCE(email, contact_email) WHERE email IS NULL AND contact_email IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS contact_person TEXT;
 ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS performance_score NUMERIC(3,1);
@@ -430,9 +434,9 @@ ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS contract_url TEXT;
 --     Missing: goods_received, invoice_url.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS amount NUMERIC(12,2);
-UPDATE public.purchase_orders
-SET amount = COALESCE(amount, total_amount)
-WHERE amount IS NULL AND total_amount IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.purchase_orders SET amount = COALESCE(amount, total_amount) WHERE amount IS NULL AND total_amount IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS goods_received BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS invoice_url TEXT;
@@ -445,19 +449,19 @@ ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS invoice_url TEXT;
 --     Missing: warranty_expiry, status, depreciation_rate_annual.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS barcode_qr TEXT;
-UPDATE public.assets
-SET barcode_qr = COALESCE(barcode_qr, asset_tag)
-WHERE barcode_qr IS NULL AND asset_tag IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.assets SET barcode_qr = COALESCE(barcode_qr, asset_tag) WHERE barcode_qr IS NULL AND asset_tag IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS assigned_employee_id UUID;
-UPDATE public.assets
-SET assigned_employee_id = COALESCE(assigned_employee_id, assigned_to)
-WHERE assigned_employee_id IS NULL AND assigned_to IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.assets SET assigned_employee_id = COALESCE(assigned_employee_id, assigned_to) WHERE assigned_employee_id IS NULL AND assigned_to IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS original_value NUMERIC(10,2);
-UPDATE public.assets
-SET original_value = COALESCE(original_value, value)
-WHERE original_value IS NULL AND value IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.assets SET original_value = COALESCE(original_value, value) WHERE original_value IS NULL AND value IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS warranty_expiry DATE;
 ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'available';
@@ -469,9 +473,9 @@ ALTER TABLE public.assets ADD COLUMN IF NOT EXISTS depreciation_rate_annual NUME
 --     Mismatch: basic_salary (was base_salary).
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.salary_structures ADD COLUMN IF NOT EXISTS basic_salary NUMERIC(10,2);
-UPDATE public.salary_structures
-SET basic_salary = COALESCE(basic_salary, base_salary)
-WHERE basic_salary IS NULL AND base_salary IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.salary_structures SET basic_salary = COALESCE(basic_salary, base_salary) WHERE basic_salary IS NULL AND base_salary IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 
 -- ---------------------------------------------------------------------------
@@ -480,9 +484,9 @@ WHERE basic_salary IS NULL AND base_salary IS NOT NULL;
 --     Missing: hotel_booking_details.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.travel_requests ADD COLUMN IF NOT EXISTS advance_requested NUMERIC(10,2);
-UPDATE public.travel_requests
-SET advance_requested = COALESCE(advance_requested, estimated_cost)
-WHERE advance_requested IS NULL AND estimated_cost IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.travel_requests SET advance_requested = COALESCE(advance_requested, estimated_cost) WHERE advance_requested IS NULL AND estimated_cost IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.travel_requests ADD COLUMN IF NOT EXISTS hotel_booking_details TEXT;
 
@@ -514,17 +518,16 @@ ALTER TABLE public.chat_channels ADD COLUMN IF NOT EXISTS members JSONB DEFAULT 
 -- ---------------------------------------------------------------------------
 -- Add 'text' column as the canonical message body
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS text TEXT;
-UPDATE public.chat_messages
-SET text = COALESCE(text, content)
-WHERE text IS NULL AND content IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.chat_messages SET text = COALESCE(text, content) WHERE text IS NULL AND content IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- attachments as JSONB array
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
 -- Migrate single attachment_url into the array
-UPDATE public.chat_messages
-SET attachments = jsonb_build_array(attachment_url)
-WHERE attachment_url IS NOT NULL
-  AND (attachments IS NULL OR attachments = '[]'::jsonb);
+DO $$ BEGIN
+  UPDATE public.chat_messages SET attachments = jsonb_build_array(attachment_url) WHERE attachment_url IS NOT NULL AND (attachments IS NULL OR attachments = '[]'::jsonb);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS reply_to UUID;
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '[]'::jsonb;
@@ -550,9 +553,9 @@ ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ
 --     Missing: muted_channels, digest_mode.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.notification_preferences ADD COLUMN IF NOT EXISTS employee_id UUID;
-UPDATE public.notification_preferences
-SET employee_id = COALESCE(employee_id, user_id)
-WHERE employee_id IS NULL AND user_id IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.notification_preferences SET employee_id = COALESCE(employee_id, user_id) WHERE employee_id IS NULL AND user_id IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.notification_preferences ADD COLUMN IF NOT EXISTS muted_channels JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.notification_preferences ADD COLUMN IF NOT EXISTS digest_mode BOOLEAN DEFAULT FALSE;
@@ -569,9 +572,9 @@ ALTER TABLE public.notification_preferences ADD COLUMN IF NOT EXISTS digest_mode
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.kpi_definitions ADD COLUMN IF NOT EXISTS code TEXT;
 ALTER TABLE public.kpi_definitions ADD COLUMN IF NOT EXISTS name TEXT;
-UPDATE public.kpi_definitions
-SET name = COALESCE(name, title)
-WHERE name IS NULL AND title IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.kpi_definitions SET name = COALESCE(name, title) WHERE name IS NULL AND title IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.kpi_definitions ADD COLUMN IF NOT EXISTS formula TEXT;
 
@@ -586,9 +589,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_kpi_definitions_code
 --     Mismatch: filters (was config). Missing: creator_id, grouping_by, sorting_by.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.saved_reports ADD COLUMN IF NOT EXISTS filters JSONB;
-UPDATE public.saved_reports
-SET filters = COALESCE(filters, config)
-WHERE filters IS NULL AND config IS NOT NULL;
+DO $$ BEGIN
+  UPDATE public.saved_reports SET filters = COALESCE(filters, config) WHERE filters IS NULL AND config IS NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 ALTER TABLE public.saved_reports ADD COLUMN IF NOT EXISTS creator_id UUID;
 ALTER TABLE public.saved_reports ADD COLUMN IF NOT EXISTS grouping_by TEXT;
