@@ -26,6 +26,9 @@ import { supabase } from '../../../shared/integration/supabase';
 
 const EMPTY: ScheduleRangeResult = { sessions: [], leaves: [], holidays: [], daysLoaded: 0 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const toValidUuid = (val?: string | null): string | null => (val && UUID_RE.test(val) ? val : null);
+
 const FROZEN = { date: 116, day: 56, holiday: 132 };
 const FROZEN_W = FROZEN.date + FROZEN.day + FROZEN.holiday;
 const COL_W = 250;
@@ -74,43 +77,57 @@ export function TrainingCalendar() {
   // Additional user-created sessions in state loaded from Supabase
   const [customSessions, setCustomSessions] = useState<ScheduleSession[]>([]);
 
-  // Load schedule sessions from Supabase schedule_sessions table on mount
-  useEffect(() => {
-    async function loadDbSessions() {
-      try {
-        const { data: rows, error } = await supabase
-          .from('schedule_sessions')
-          .select('*')
-          .is('deleted_at', null);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
 
-        if (!error && rows && rows.length > 0) {
-          const dbSess: ScheduleSession[] = rows.map((r: any) => ({
+  // Load schedule sessions from Supabase schedule_sessions table
+  const loadDbSessions = useCallback(async () => {
+    try {
+      const { data: rows, error } = await supabase
+        .from('schedule_sessions')
+        .select('*')
+        .is('deleted_at', null);
+
+      if (error) {
+        console.warn('Could not load DB schedule_sessions:', error.message);
+        return;
+      }
+
+      if (rows && rows.length > 0) {
+        const dbSess: ScheduleSession[] = rows.map((r: any) => {
+          const matchedBatch = batches.find((b) => b.id === r.batch_id || b.code === r.topic);
+          const matchedCourse = matchedBatch ? courses.find((c) => c.id === matchedBatch.courseId) : undefined;
+
+          return {
             id: r.id,
             trainerId: r.trainer_id || '',
             date: r.date,
-            name: r.session_title || 'Training Session',
-            batchCode: r.topic || 'KVJ Batch',
-            college: 'College',
-            course: r.topic || 'Training',
-            academicYear: '2026-27',
-            coordinator: 'Coordinator',
+            name: r.session_title || matchedBatch?.trainingName || matchedCourse?.title || 'Training Session',
+            batchCode: matchedBatch?.code || r.topic || 'KVJ Batch',
+            college: matchedBatch?.college || 'College',
+            course: matchedCourse?.title || r.topic || 'Training',
+            academicYear: matchedBatch?.academicYear || '2026-27',
+            coordinator: matchedBatch?.coordinator || 'Coordinator',
             startTime: r.start_time || '09:00',
             endTime: r.end_time || '16:00',
-            venue: r.venue || 'Campus',
+            venue: r.venue || matchedBatch?.venue || 'Campus',
             mode: (r.mode === 'Online' ? 'Online' : 'Offline') as any,
-            studentCount: 30,
+            studentCount: r.student_count || matchedBatch?.capacity || 30,
             status: (r.status || 'Scheduled') as any,
-            color: '#3b82f6',
-          }));
+            color: r.color || '#3b82f6',
+          };
+        });
 
-          setCustomSessions(dbSess);
-        }
-      } catch (e) {
-        console.warn('Could not load DB schedule_sessions:', e);
+        setCustomSessions(dbSess);
       }
+    } catch (e) {
+      console.warn('Could not load DB schedule_sessions:', e);
     }
+  }, [batches, courses]);
+
+  useEffect(() => {
     loadDbSessions();
-  }, []);
+  }, [loadDbSessions]);
 
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [savedFilters, setSavedFilters] = useState<Record<string, FilterState>>(() => {
@@ -160,9 +177,6 @@ export function TrainingCalendar() {
     mode: 'Offline',
     studentCount: 0,
   });
-
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
@@ -436,17 +450,24 @@ export function TrainingCalendar() {
     const finalBatchCode = assignForm.batchCode.trim() || firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI';
     const finalName = assignForm.name.trim() || firstPreset?.name || 'Power BI';
 
-    const targetSessionId = editingSessionId || `custom-sess-${Date.now()}`;
+    const assocBatch = batches.find((b) => b.code === finalBatchCode || b.batchNo === finalBatchCode || b.id === finalBatchCode);
+
+    const isEdit = Boolean(editingSessionId && UUID_RE.test(editingSessionId));
+    const sessId = isEdit && editingSessionId ? editingSessionId : crypto.randomUUID();
+
+    const validTrainerId = toValidUuid(assignForm.trainerId);
+    const validBatchId = assocBatch ? toValidUuid(assocBatch.id) : null;
+
     const sessionObj: ScheduleSession = {
-      id: targetSessionId,
+      id: sessId,
       trainerId: assignForm.trainerId,
       date: assignForm.date,
       name: finalName,
       batchCode: finalBatchCode,
-      college: assignForm.college,
-      course: assignForm.course,
-      academicYear: assignForm.academicYear,
-      coordinator: assignForm.coordinator,
+      college: assignForm.college || assocBatch?.college || '—',
+      course: assignForm.course || '—',
+      academicYear: assignForm.academicYear || assocBatch?.academicYear || '—',
+      coordinator: assignForm.coordinator || assocBatch?.coordinator || '—',
       startTime: assignForm.startTime,
       endTime: assignForm.endTime,
       venue: assignForm.venue,
@@ -456,9 +477,36 @@ export function TrainingCalendar() {
       color: '#3b82f6',
     };
 
+    // Persist to Supabase schedule_sessions DB table
+    const payload = {
+      id: sessId,
+      date: sessionObj.date,
+      session_title: sessionObj.name,
+      topic: sessionObj.batchCode,
+      trainer_id: validTrainerId,
+      batch_id: validBatchId,
+      start_time: sessionObj.startTime,
+      end_time: sessionObj.endTime,
+      venue: sessionObj.venue,
+      mode: sessionObj.mode,
+      status: sessionObj.status,
+    };
+
+    const { error } = await supabase.from('schedule_sessions').upsert(payload);
+
+    if (error) {
+      console.error('Supabase schedule_sessions upsert error:', error.message, error.details);
+      toast({
+        variant: 'error',
+        title: 'Database Save Error',
+        message: `Failed to save schedule to DB: ${error.message}`,
+      });
+      return;
+    }
+
     if (editingSessionId) {
       setCustomSessions((prev) =>
-        prev.map((sess) => (sess.id === editingSessionId ? sessionObj : sess))
+        prev.map((sess) => (sess.id === editingSessionId || sess.id === sessId ? sessionObj : sess))
       );
       toast({
         variant: 'success',
@@ -474,29 +522,6 @@ export function TrainingCalendar() {
       });
     }
 
-    // Persist to Supabase schedule_sessions DB table
-    try {
-      const assocBatch = batches.find((b) => b.code === sessionObj.batchCode || b.batchNo === sessionObj.batchCode || b.id === sessionObj.batchCode);
-      const sessId = targetSessionId.startsWith('custom-sess-') ? crypto.randomUUID() : targetSessionId;
-      sessionObj.id = sessId;
-
-      await supabase.from('schedule_sessions').upsert({
-        id: sessId,
-        date: sessionObj.date,
-        session_title: sessionObj.name,
-        topic: sessionObj.batchCode,
-        trainer_id: sessionObj.trainerId || null,
-        batch_id: assocBatch ? assocBatch.id : null,
-        start_time: sessionObj.startTime,
-        end_time: sessionObj.endTime,
-        venue: sessionObj.venue,
-        mode: sessionObj.mode,
-        status: sessionObj.status,
-      });
-    } catch (e) {
-      console.warn('Supabase schedule_sessions save warning:', e);
-    }
-
     setIsAssignDrawerOpen(false);
     setEditingSessionId(null);
   };
@@ -504,14 +529,21 @@ export function TrainingCalendar() {
   const handleDeleteSession = async () => {
     if (!editingSessionId) return;
     const deletedId = editingSessionId;
-    setCustomSessions((prev) => prev.filter((s) => s.id !== deletedId));
 
-    try {
-      await supabase.from('schedule_sessions').delete().eq('id', deletedId);
-    } catch (e) {
-      console.warn('Supabase schedule_sessions delete warning:', e);
+    if (UUID_RE.test(deletedId)) {
+      const { error } = await supabase.from('schedule_sessions').delete().eq('id', deletedId);
+      if (error) {
+        console.error('Supabase schedule_sessions delete error:', error.message);
+        toast({
+          variant: 'error',
+          title: 'Delete Failed',
+          message: error.message,
+        });
+        return;
+      }
     }
 
+    setCustomSessions((prev) => prev.filter((s) => s.id !== deletedId));
     setIsAssignDrawerOpen(false);
     setEditingSessionId(null);
     toast({ variant: 'info', title: 'Schedule Removed', message: 'Assigned schedule deleted.' });

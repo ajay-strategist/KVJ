@@ -980,23 +980,18 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
   useEffect(() => {
     async function loadSchedules() {
       try {
-        const saved = localStorage.getItem('kvj_schedule_sessions');
-        let local: any[] = saved ? JSON.parse(saved) : [];
         const { data } = await supabase.from('schedule_sessions').select('*').is('deleted_at', null);
-        const mergedMap = new Map();
-        local.forEach((s) => mergedMap.set(s.id, s));
         if (data) {
-          data.forEach((r: any) => {
-            mergedMap.set(r.id, {
+          setDbSchedules(
+            data.map((r: any) => ({
               id: r.id,
               date: r.date,
               startTime: r.start_time || '09:00 AM',
               title: r.session_title || r.topic || 'Training Session',
               type: 'Training',
-            });
-          });
+            }))
+          );
         }
-        setDbSchedules(Array.from(mergedMap.values()));
       } catch (e) {}
     }
     loadSchedules();
