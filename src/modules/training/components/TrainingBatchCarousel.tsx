@@ -68,7 +68,7 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
     phase:         b.phase ?? 'Scheduled',
     college:       b.college || '—',
     course:        course?.title || '—',
-    program:       (b as any).program || (course as any)?.program || '—',
+    program:       b.program || (b as any).collegeCourse || (course as any)?.program || '—',
     academicYear:  b.academicYear || '—',
     batchNo:       b.batchNo || b.code,
     trainer:       trainer ? `${trainer.firstName} ${trainer.lastName}` : (b as any).trainer || '—',

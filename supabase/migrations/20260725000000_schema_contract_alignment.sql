@@ -47,6 +47,7 @@ ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 40;
 ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS venue TEXT;
 ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS online_link TEXT;
 ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS training_name TEXT;
+ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS program TEXT;
 ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS academic_year TEXT;
 -- batch_code already exists — add batch_no as the app-facing alias
 ALTER TABLE public.batches ADD COLUMN IF NOT EXISTS batch_no TEXT;

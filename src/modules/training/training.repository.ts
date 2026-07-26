@@ -77,6 +77,7 @@ export interface Batch extends Entity {
   // Optional so existing records and create flows keep compiling.
   trainingName?: string;
   college?: string;
+  program?: string;
   academicYear?: string;   // e.g. "2026-2027"
   batchNo?: string;        // e.g. "Batch 2"
   coordinator?: string;

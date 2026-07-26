@@ -167,6 +167,7 @@ export function BatchManagement() {
       code: newBatchForm.code,
       trainingName: newBatchForm.trainingName || selectedCourse?.title || newBatchForm.code,
       college: newBatchForm.college,
+      program: newBatchForm.collegeCourse || newBatchForm.trainingName || 'Computer Science & Analytics',
       courseId,
       trainerId,
       startDate: newBatchForm.startDate || undefined,
@@ -218,9 +219,9 @@ export function BatchManagement() {
   const [dailyReportPreviewOpen, setDailyReportPreviewOpen] = useState(false);
 
   const dailyReportFixture = useMemo<DailyReportData>(() => {
-    const selectedBatch = batches.find((b) => b.id === selectedBatchId);
-    const batchStudents = dbStudents.filter((s) => {
-      return enrollments.some((e) => e.batchId === selectedBatchId && e.studentId === s.id);
+    const selectedBatch = (batches || []).find((b) => b.id === selectedBatchId);
+    const batchStudents = (dbStudents || []).filter((s) => {
+      return (enrollments || []).some((e) => e.batchId === selectedBatchId && e.studentId === s.id);
     });
 
     return {
@@ -345,6 +346,7 @@ export function BatchManagement() {
       courseId: editForm.selectedCourseId as UUID || undefined,
       trainingName: editForm.trainingName || selectedCourse?.title,
       college: editForm.college,
+      program: editForm.program,
       batchNo: editForm.batchNo,
       academicYear: editForm.academicYear,
       trainerId: editForm.trainerId as UUID || undefined,
@@ -3229,6 +3231,22 @@ export function BatchManagement() {
                 />
               </div>
 
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Program / Stream *
+                </label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  placeholder="e.g. Computer Science & Analytics"
+                  value={editForm.program}
+                  onChange={(e) => setEditForm({ ...editForm, program: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
                   Batch Name / No. *
