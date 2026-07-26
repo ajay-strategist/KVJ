@@ -1011,7 +1011,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
       else if (i === 1) dayLabel = 'Day 2 (Tomorrow)';
 
       // 1. Gather tasks due on this date
-      const dayTasks = tasks.filter((t) => {
+      const dayTasks = (tasks || []).filter((t) => {
         const taskDate = (t.dueDate || '').slice(0, 10);
         if (!taskDate) return i === 0;
         if (i === 0) {
@@ -1027,7 +1027,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
       }));
 
       // 2. Gather training schedules on this date
-      const daySchedules = dbSchedules.filter((s) => s.date === isoDate).map((s) => ({
+      const daySchedules = (dbSchedules || []).filter((s) => s.date === isoDate).map((s) => ({
         id: `sched-${s.id}`,
         time: s.startTime || s.time || '09:00 AM',
         title: s.name || s.title || 'Training Session',
@@ -1267,13 +1267,13 @@ export function MyDayPage() {
     const now = Date.now();
     const updatedStates = { ...storedStates };
 
-    const mapped: TaskItem[] = projectTasks
+    const mapped: TaskItem[] = (projectTasks || [])
       .filter((t) => {
         const d = (t.dueDate || '').slice(0, 10);
         return d === todayStr || d < todayStr || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || storedStates[t.id];
       })
       .map((t) => {
-        const proj = projects.find((p) => p.id === t.projectId);
+        const proj = (projects || []).find((p) => p.id === t.projectId);
         const stored = storedStates[t.id];
         let secondsToday = Math.round((t.actualHours || 0) * 3600);
         let active = t.status === 'in_progress';
@@ -1604,11 +1604,11 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
         
         // Find attendance for today
         const attRes = await attRepo.findMany();
-        const todayPresent = attRes.data.filter((r) => r.workDate === today && r.firstClockIn).length;
+        const todayPresent = (attRes?.data || []).filter((r) => r.workDate === today && r.firstClockIn).length;
 
         // Find pending expenses (submitted status)
         const expRes = await expRepo.findMany();
-        const pendingExp = expRes.data.filter((c) => c.status === 'submitted').length;
+        const pendingExp = (expRes?.data || []).filter((c) => c.status === 'submitted').length;
 
         if (active) {
           setPresentCount(todayPresent);
@@ -1623,14 +1623,14 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
     return () => { active = false; };
   }, []);
 
-  const totalEmployees = employees.length;
+  const totalEmployees = (employees || []).length;
   const teamPresent = totalEmployees > 0 ? `${presentCount}/${totalEmployees}` : '0/0';
 
-  const pendingTimesheets = timesheets.filter((t) => t.status === 'submitted').length;
+  const pendingTimesheets = (timesheets || []).filter((t) => t.status === 'submitted').length;
   const pendingApprovals = pendingExpenses + pendingTimesheets;
 
   // At-risk projects: count of planning/execution projects with high or critical priority
-  const atRiskProjects = projects.filter(
+  const atRiskProjects = (projects || []).filter(
     (p) =>
       p.status !== 'closure' &&
       p.status !== 'suspended' &&
@@ -1638,8 +1638,8 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
   ).length;
 
   const mappedProjects = useMemo(() => {
-    return projects.map((p) => {
-      const client = clients.find((c) => c.id === p.clientId);
+    return (projects || []).map((p) => {
+      const client = (clients || []).find((c) => c.id === p.clientId);
       return {
         id: p.id,
         name: p.title,
