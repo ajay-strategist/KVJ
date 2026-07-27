@@ -717,6 +717,7 @@ export interface TaskItem {
   priority: string;
   active: boolean;
   underReview?: boolean;
+  isApproved?: boolean;
   secondsToday: number;
 }
 
@@ -927,7 +928,11 @@ export const TaskWidget = memo(function TaskWidget({
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
-                {t.underReview && <Badge tone="info">Under Review</Badge>}
+                {t.isApproved ? (
+                  <Badge tone="success">Approved &amp; Completed</Badge>
+                ) : t.underReview ? (
+                  <Badge tone="info">Under Review</Badge>
+                ) : null}
               </div>
             </div>
 
@@ -939,7 +944,15 @@ export const TaskWidget = memo(function TaskWidget({
 
               {/* Action Buttons: Single Toggle Button (Start / Pause) & Submit */}
               <div style={{ display: 'flex', gap: 8 }}>
-                {!t.underReview && (
+                {t.isApproved ? (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    ✓ Approved &amp; Completed
+                  </span>
+                ) : t.underReview ? (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
+                    ✓ Submitted for Manager Approval
+                  </span>
+                ) : (
                   <>
                     <Button
                       variant={t.active ? 'secondary' : 'primary'}
@@ -956,12 +969,6 @@ export const TaskWidget = memo(function TaskWidget({
                       📩 Submit
                     </Button>
                   </>
-                )}
-
-                {t.underReview && (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
-                    ✓ Submitted for Manager Approval
-                  </span>
                 )}
               </div>
             </div>
@@ -1278,6 +1285,11 @@ export function MyDayPage() {
         let secondsToday = Math.round((t.actualHours || 0) * 3600);
         let active = t.status === 'in_progress';
         let underReview = t.status === 'review';
+        const statusStr = (t.status || '') as string;
+        const isApproved = statusStr === 'done' || statusStr === 'completed' || (t as any).approvalStatus === 'approved' || (t as any).isApproved === true;
+        if (isApproved) {
+          underReview = false;
+        }
 
         if (stored) {
           secondsToday = stored.secondsToday || 0;
@@ -1291,7 +1303,7 @@ export function MyDayPage() {
             active = stored.active;
           }
           if (stored.underReview !== undefined) {
-            underReview = stored.underReview;
+            underReview = isApproved ? false : stored.underReview;
           }
         }
 
@@ -1315,6 +1327,7 @@ export function MyDayPage() {
           priority: t.priority === 'high' ? 'High' : 'Normal',
           active,
           underReview,
+          isApproved,
           secondsToday,
         };
       });

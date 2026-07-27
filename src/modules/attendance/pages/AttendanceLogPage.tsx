@@ -32,7 +32,9 @@ function batchDisplayName(b: {
 }): string {
   const parts = [b.college, b.program, b.academicYear, b.batchNo].filter(Boolean);
   if (parts.length) return parts.join(' - ');
-  return b.trainingName || b.code || 'Training Batch';
+  if (b.code && b.code !== '—') return b.code;
+  if (b.batchNo && b.batchNo !== '—') return b.batchNo;
+  return b.trainingName || 'Training Batch';
 }
 
 export interface AttendanceLogRow {

@@ -65,16 +65,17 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
   const total = b.totalTasks ?? 0;
   const done  = b.completedTasks ?? 0;
 
-  const college = b.college || '—';
+  const college = b.college || (b.code?.includes('-') ? b.code.split('-')[0] : undefined) || '—';
   const courseTitle = course?.title || b.trainingName || '—';
-  const program = b.program || (b as any).collegeCourse || (course as any)?.program || (b.code?.includes(' - ') ? b.code.split(' - ')[1] : undefined) || '—';
-  const academicYear = b.academicYear || '—';
-  const batchNo = b.batchNo || b.code;
+  const program = b.program || (b as any).collegeCourse || (course as any)?.program || (b.code?.includes('-') ? b.code.split('-')[1] : undefined) || '—';
+  const academicYear = b.academicYear || (b.code?.match(/20\d\d-20\d\d/)?.[0]) || '—';
+  const rawBatchNo = b.batchNo && b.batchNo !== b.code ? b.batchNo : undefined;
+  const batchNo = rawBatchNo || (b.code?.match(/Batch\s*\d+/i)?.[0]) || (b.code && !b.code.includes('-') ? b.code : '—');
 
-  // Batch Code = College-Program-AcademicYear-Batch-Course (only real parts).
-  const batchCode = [college, program, academicYear, batchNo, courseTitle]
-    .filter((p) => p && p !== '—')
-    .join('-') || b.code || 'Batch';
+  // Format: College-Program-Academic Year-Batch-Course
+  // Example: MIM Kuttikkanam-2 MBA-2026-2027-Batch 1-Excel Expert 365
+  const parts = [college, program, academicYear, batchNo, courseTitle].filter((p) => p && p !== '—');
+  const batchCode = parts.length > 0 ? parts.join('-') : (b.code || b.trainingName || 'Batch');
 
   return {
     id:            b.id,
