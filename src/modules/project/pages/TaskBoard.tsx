@@ -228,7 +228,7 @@ export function TaskBoard() {
 
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       if (dateWindowFilter === 'today') {
-        if (t.dueDate !== todayStr) return false;
+        if (t.dueDate !== todayStr && t.approvalStatus !== 'rework' && t.status !== 'In Progress') return false;
       } else if (dateWindowFilter === 'next_3_days') {
         if (t.dueDate < todayStr || t.dueDate > windowEnd) return false;
       }
