@@ -6,6 +6,8 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { eventBus } from '../../core/event-bus';
+import { useAuth } from '../../modules/auth/AuthProvider';
 
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type NotificationCategory = 'system' | 'approval' | 'task' | 'training' | 'chat' | 'finance' | 'info';
@@ -58,10 +60,33 @@ const uid = () => Math.random().toString(36).slice(2);
 const defaultNotificationService = new MockNotificationService();
 
 export function NotificationProvider({ children, service = defaultNotificationService }: { children: ReactNode; service?: INotificationService }) {
+  const { user } = useAuth();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(() => { service.list().then(setItems); }, [service]);
+
+  // Bridge: notifications sent through the NotificationEngine (e.g. task
+  // approved / returned for rework) arrive here via the event bus. Show them in
+  // the bell/panel only for the recipient who is currently signed in.
+  useEffect(() => {
+    const off = eventBus.on('notification.created', (n) => {
+      if (!user || n.recipientId !== user.id) return;
+      setItems((prev) => [
+        {
+          id: Math.random().toString(36).slice(2),
+          title: n.title,
+          message: n.body,
+          category: n.category ?? 'info',
+          priority: n.priority ?? 'normal',
+          read: false,
+          createdAt: Date.now(),
+        },
+        ...prev,
+      ]);
+    });
+    return off;
+  }, [user]);
 
   const markRead = useCallback((id: string) => setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n))), []);
   const markAllRead = useCallback(() => setItems((prev) => prev.map((n) => ({ ...n, read: true }))), []);

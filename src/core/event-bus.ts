@@ -24,6 +24,17 @@ export interface AppEventMap {
   'auth.login': { userId: string; role: string };
   'auth.logout': { userId: string };
   'theme.changed': { theme: 'light' | 'dark' };
+  // Bridges the NotificationEngine (server/queue side) to the in-app
+  // NotificationProvider (bell + panel). The provider shows it only when
+  // recipientId matches the signed-in user.
+  'notification.created': {
+    recipientId: string;
+    title: string;
+    body?: string;
+    category?: 'system' | 'approval' | 'task' | 'training' | 'chat' | 'finance' | 'info';
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
+    actionUrl?: string;
+  };
 }
 
 export type EventName = keyof AppEventMap;

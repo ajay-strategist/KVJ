@@ -60,7 +60,7 @@ export const featureFlags = {
   },
   // Integrations
   integrations: {
-    supabase: true, // master switch — set to true for live Supabase integration
+    supabase: false, // TEMP mobile verify (revert true) master switch — set to true for live Supabase integration
     googleDrive: false,
     powerBi: false,
   },

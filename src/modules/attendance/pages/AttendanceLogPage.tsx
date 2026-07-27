@@ -17,6 +17,24 @@ import { toLocalISODate, todayISO } from '../../../shared/utils/date';
 import { useTraining } from '../../training/hooks/useTraining';
 import { supabase } from '../../../shared/integration/supabase';
 
+/**
+ * Human-readable name of a training batch, e.g.
+ * "Christ Irinjalakkuda - 3 BBA - 2026-2027 - Batch 1".
+ *
+ * The attendance log used to show a batch's `trainingName` (the course, e.g.
+ * "Power BI") in the Organization/Location columns. Those columns should carry
+ * the BATCH identity, so we compose it from college · program · academic year ·
+ * batch number, falling back to the course/code only when those are absent.
+ */
+function batchDisplayName(b: {
+  college?: string; program?: string; academicYear?: string;
+  batchNo?: string; trainingName?: string; code?: string;
+}): string {
+  const parts = [b.college, b.program, b.academicYear, b.batchNo].filter(Boolean);
+  if (parts.length) return parts.join(' - ');
+  return b.trainingName || b.code || 'Training Batch';
+}
+
 export interface AttendanceLogRow {
   date: string;
   name: string;
@@ -171,7 +189,7 @@ export function AttendanceLogPage() {
     // 1. Direct recordBatchId lookup
     if (recordBatchId) {
       const found = batches.find((b) => b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId);
-      if (found) return found.trainingName || found.batchNo || found.code || found.college || 'Training Batch';
+      if (found) return batchDisplayName(found);
     }
 
     const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
@@ -186,7 +204,7 @@ export function AttendanceLogPage() {
           b.trainingName?.toLowerCase() === locStr.toLowerCase() ||
           b.batchNo?.toLowerCase() === locStr.toLowerCase()
         );
-        return found ? (found.trainingName || found.batchNo || found.code || locStr) : locStr;
+        return found ? batchDisplayName(found) : locStr;
       }
     }
 
@@ -199,14 +217,14 @@ export function AttendanceLogPage() {
         (b.code && lower.includes(b.code.toLowerCase())) ||
         (b.college && lower.includes(b.college.toLowerCase()))
       );
-      if (found) return found.trainingName || found.batchNo || found.code || 'Training Batch';
+      if (found) return batchDisplayName(found);
     }
 
     // 4. If workType is Training or notes mention training/batch
     const isTraining = wt === 'Training' || wt.toLowerCase().includes('training') || lower.includes('training') || lower.includes('batch');
     if (isTraining) {
       if (batches.length > 0) {
-        return batches[0].trainingName || batches[0].batchNo || batches[0].code || 'Training Batch';
+        return batchDisplayName(batches[0]);
       }
       return 'Training Batch';
     }

@@ -1,6 +1,7 @@
 import { container, createToken } from '../registry';
 import { type Result, Ok, Err, AppError } from '../result';
 import type { UUID } from '../types';
+import { eventBus } from '../event-bus';
 
 export type NotificationChannel = 'email' | 'in_app' | 'push' | 'sms' | 'whatsapp';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -50,7 +51,19 @@ export class NotificationEngine implements INotificationEngine {
       attempts: 0,
     };
     this.queue.push(item);
-    
+
+    // Surface it in the recipient's in-app bell/panel. The provider filters by
+    // recipientId, so only the intended user sees it.
+    if (payload.channels.includes('in_app')) {
+      eventBus.emit('notification.created', {
+        recipientId: payload.recipientId,
+        title: payload.title,
+        body: payload.body,
+        priority: payload.priority,
+        actionUrl: payload.actionUrl,
+      });
+    }
+
     // Process immediately in background
     this.processItem(item);
 

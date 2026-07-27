@@ -3231,10 +3231,11 @@ export function BatchManagement() {
           <form onSubmit={handleSaveEditBatch} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Select Master Course
+                Training Course Name *
               </label>
               <select
                 className="kvj-select"
+                required
                 value={editForm.selectedCourseId}
                 onChange={(e) => {
                   const selected = courses.find(c => c.id === e.target.value);
@@ -3245,24 +3246,16 @@ export function BatchManagement() {
                   });
                 }}
               >
-                <option value="">-- Choose Course --</option>
+                <option value="" disabled>— Select a Course from Course Catalog —</option>
                 {courses.map((c) => (
                   <option key={c.id} value={c.id}>{c.title} ({c.code})</option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Training Course Name *
-              </label>
-              <input
-                type="text"
-                className="kvj-input"
-                required
-                value={editForm.trainingName}
-                onChange={(e) => setEditForm({ ...editForm, trainingName: e.target.value })}
-              />
+              {courses.length === 0 && (
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                  No courses in catalog yet. Add courses in the Course Catalog first.
+                </p>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -3679,7 +3672,7 @@ export function BatchManagement() {
 
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Training Course Title (Program)
+                Training Course Name *
               </label>
               <select
                 className="kvj-input"

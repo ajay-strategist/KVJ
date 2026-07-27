@@ -41,6 +41,8 @@ const PHASE_TONE: Record<TrainingPhase, { bg: string; fg: string; border: string
 export interface BatchCardVM {
   id: string;
   trainingName: string;
+  /** Composed batch code shown as the card title: College-Program-AcademicYear-Batch-Course. */
+  batchCode: string;
   phase: TrainingPhase;
   college: string;
   course: string;
@@ -62,15 +64,28 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
   const trainer = trainers.find((t) => t.id === b.trainerId);
   const total = b.totalTasks ?? 0;
   const done  = b.completedTasks ?? 0;
+
+  const college = b.college || '—';
+  const courseTitle = course?.title || b.trainingName || '—';
+  const program = b.program || (b as any).collegeCourse || (course as any)?.program || (b.code?.includes(' - ') ? b.code.split(' - ')[1] : undefined) || '—';
+  const academicYear = b.academicYear || '—';
+  const batchNo = b.batchNo || b.code;
+
+  // Batch Code = College-Program-AcademicYear-Batch-Course (only real parts).
+  const batchCode = [college, program, academicYear, batchNo, courseTitle]
+    .filter((p) => p && p !== '—')
+    .join('-') || b.code || 'Batch';
+
   return {
     id:            b.id,
     trainingName:  b.trainingName || course?.title || b.code,
+    batchCode,
     phase:         b.phase ?? 'Scheduled',
-    college:       b.college || '—',
-    course:        course?.title || '—',
-    program:       b.program || (b as any).collegeCourse || (course as any)?.program || (b.code?.includes(' - ') ? b.code.split(' - ')[1] : undefined) || '—',
-    academicYear:  b.academicYear || '—',
-    batchNo:       b.batchNo || b.code,
+    college,
+    course:        courseTitle,
+    program,
+    academicYear,
+    batchNo,
     trainer:       trainer ? `${trainer.firstName} ${trainer.lastName}` : (b as any).trainer || '—',
     coordinator:   b.coordinator || '—',
     startDate:     b.startDate || (b as any).start_date || '—',
@@ -238,7 +253,7 @@ const BatchCard = memo(function BatchCard({
                   margin: 0, fontSize: 16, fontWeight: 700,
                   color: 'var(--text-primary)', letterSpacing: '-0.01em',
                 }}>
-                  {vm.trainingName}
+                  {vm.batchCode}
                 </h3>
                 <span style={{
                   background: tone.bg, color: tone.fg,

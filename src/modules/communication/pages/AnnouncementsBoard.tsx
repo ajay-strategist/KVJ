@@ -76,16 +76,19 @@ export function AnnouncementsBoard() {
     toast({ variant: 'success', title: 'Holiday Declared', message: `Holiday '${name}' on ${date} has been declared.` });
 
     try {
-      await supabase.from('declared_holidays').upsert({
-        id: newH.id,
-        date: newH.date,
-        title: newH.name,
-        name: newH.name,
-        type: newH.type,
-        status: newH.status,
-      });
+      // Only columns guaranteed by the base declared_holidays schema
+      // (id, date, name). The table has NO `title` column — sending it made the
+      // whole upsert fail, so holidays never persisted and never reached the
+      // attendance calendar. Conflict on the UNIQUE date so re-declaring updates.
+      const { error } = await supabase
+        .from('declared_holidays')
+        .upsert({ id: newH.id, date: newH.date, name: newH.name }, { onConflict: 'date' });
+      if (error) {
+        console.error('Declared holiday save failed:', error);
+        toast({ variant: 'error', title: 'Not Saved', message: `Holiday could not be saved: ${error.message}` });
+      }
     } catch (e) {
-      console.warn('Declared holiday insert error:', e);
+      console.error('Declared holiday insert error:', e);
     }
 
     // Broadcast announcement & notification
