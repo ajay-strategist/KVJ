@@ -1,6 +1,6 @@
 import { container } from '../core/registry';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../modules/employee/employee.repository';
-import { AUTH_SERVICE_TOKEN, MockAuthService } from '../modules/auth/auth.service'; // TEMP mock import
+import { AUTH_SERVICE_TOKEN } from '../modules/auth/auth.service';
 import { SupabaseAuthService } from '../modules/auth/supabase-auth.service';
 import { EMPLOYEE_SERVICE_TOKEN, EmployeeService } from '../modules/employee/employee.service';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../modules/attendance/attendance.repository';
@@ -191,7 +191,7 @@ export function bootstrap() {
   container.register(PROJECT_SERVICE_TOKEN, () => new ProjectService());
   container.register(FINANCE_SERVICE_TOKEN, () => new FinanceService());
   container.register(COMMUNICATION_SERVICE_TOKEN, () => new CommunicationService());
-  container.register(AUTH_SERVICE_TOKEN, () => new MockAuthService()); // TEMP mobile-verify (revert to SupabaseAuthService)
+  container.register(AUTH_SERVICE_TOKEN, () => new SupabaseAuthService());
 
   // Register platform engines
   container.register(WORKFLOW_ENGINE_TOKEN, () => new WorkflowEngine());
