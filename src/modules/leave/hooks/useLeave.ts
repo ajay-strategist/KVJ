@@ -18,9 +18,10 @@ export function useLeave() {
     setLoading(true);
     const res = await service.getEmployeeLeaves(user.id);
     if (res.ok) {
-      setLeaves(res.value);
+      setLeaves(Array.isArray(res.value) ? res.value : []);
       setError(null);
     } else {
+      setLeaves([]);
       setError(res.error.message);
     }
     setLoading(false);
@@ -31,9 +32,10 @@ export function useLeave() {
     setLoading(true);
     const res = await service.listPendingApprovals();
     if (res.ok) {
-      setPendingApprovals(res.value);
+      setPendingApprovals(Array.isArray(res.value) ? res.value : []);
       setError(null);
     } else {
+      setPendingApprovals([]);
       setError(res.error.message);
     }
     setLoading(false);

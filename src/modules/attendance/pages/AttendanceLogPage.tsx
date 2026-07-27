@@ -132,22 +132,23 @@ export function AttendanceLogPage() {
 
         if (isManagement && selectedEmployee === 'All Employees') {
           const allRes = await attendanceRepo.findMany();
-          const rawRecords = allRes?.data || [];
-          records = rawRecords.filter((r: any) => r.workDate >= range.from && r.workDate <= range.to);
+          const rawRecords = Array.isArray(allRes?.data) ? allRes.data : Array.isArray(allRes) ? allRes : [];
+          records = rawRecords.filter((r: any) => r && r.workDate && r.workDate >= range.from && r.workDate <= range.to);
           const allClaims = await expenseRepo.findMany();
-          const rawClaims = allClaims?.data || [];
-          claims = rawClaims.filter((c: any) => (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
+          const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
+          claims = rawClaims.filter((c: any) => c && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
         } else {
           const empId = currentEmployee?.id || user?.id;
           if (empId) {
-            records = await attendanceRepo.findHistory(empId, range);
+            const rawHist = await attendanceRepo.findHistory(empId, range);
+            records = Array.isArray(rawHist) ? rawHist : [];
             const allClaims = await expenseRepo.findMany();
-            const rawClaims = allClaims?.data || [];
-            claims = rawClaims.filter((c: any) => c.employeeId === empId && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
+            const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
+            claims = rawClaims.filter((c: any) => c && c.employeeId === empId && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
           }
         }
-        setAttendanceRecords(records || []);
-        setExpenseClaims(claims || []);
+        setAttendanceRecords(Array.isArray(records) ? records : []);
+        setExpenseClaims(Array.isArray(claims) ? claims : []);
 
         const { data: hData } = await supabase.from('declared_holidays').select('*');
         if (hData) {

@@ -15,9 +15,10 @@ export function useEmployee() {
     setLoading(true);
     const res = await service.listEmployees();
     if (res.ok) {
-      setEmployees(res.value);
+      setEmployees(Array.isArray(res.value) ? res.value : []);
       setError(null);
     } else {
+      setEmployees([]);
       setError(res.error.message);
     }
     setLoading(false);
