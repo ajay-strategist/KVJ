@@ -31,7 +31,9 @@ export function can(principal: PrincipalLike | null | undefined, resource: Resou
   // explicit grant
   if (principal.grants?.includes(perm)) return true;
 
-  const rolePerms = ROLE_PERMISSIONS[principal.role];
+  const rawRole = principal.role ? String(principal.role).toUpperCase() : 'EMPLOYEE';
+  const roleKey = (rawRole in ROLE_PERMISSIONS ? rawRole : 'EMPLOYEE') as RoleKey;
+  const rolePerms = ROLE_PERMISSIONS[roleKey];
   if (rolePerms === '*') return true; // SUPER_ADMIN
   return rolePerms?.includes(perm) ?? false;
 }

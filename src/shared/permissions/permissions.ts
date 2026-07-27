@@ -53,9 +53,11 @@ export const ROLE_PERMISSIONS: Record<RoleKey, Permission[] | '*'> = {
 
   COORDINATOR: [
     ...some('dashboard', ['view']),
+    ...some('employee', ['view']),
     ...some('training', ['view', 'update']),
     ...some('student', ['view', 'create', 'update', 'import']),
     ...some('attendance', ['view', 'create', 'update']),
+    ...some('leave', ['view', 'create', 'approve']),
     ...some('assessment', ['view', 'create', 'update']),
     ...some('voucher', ['view']),
     ...some('certificate', ['view', 'update']),
@@ -70,6 +72,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, Permission[] | '*'> = {
 
   TRAINER: [
     ...some('dashboard', ['view']),
+    ...some('employee', ['view']),
     ...some('training', ['view']),
     ...some('student', ['view']),
     ...some('attendance', ['view', 'create', 'update']),
@@ -77,7 +80,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, Permission[] | '*'> = {
     ...some('report', ['view']),
     ...some('finalExam', ['view', 'update']),
     ...some('calendar', ['view']),
-    ...some('leave', ['view', 'create']),
+    ...some('leave', ['view', 'create', 'approve']),
     ...some('task', ['view', 'update']),
     ...some('chat', ['view', 'create']),
     ...some('notification', ['view']),
@@ -86,9 +89,10 @@ export const ROLE_PERMISSIONS: Record<RoleKey, Permission[] | '*'> = {
 
   EMPLOYEE: [
     ...some('dashboard', ['view']),
+    ...some('employee', ['view']),
     ...some('attendance', ['view', 'create', 'update']),
     ...some('workSession', ['view', 'create', 'update']),
-    ...some('leave', ['view', 'create']),
+    ...some('leave', ['view', 'create', 'approve']),
     ...some('task', ['view', 'create', 'update']),
     ...some('taskApproval', ['view']),                 // can see their pending tasks
     ...some('expense', ['view', 'create', 'upload']),

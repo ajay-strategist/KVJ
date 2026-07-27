@@ -150,15 +150,16 @@ export function StatusChip({ tone = 'neutral', label }: { tone?: StatusTone; lab
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
 export function Avatar({
-  name,
+  name = 'User',
   src,
   size = 32,
 }: {
-  name: string;
+  name?: string;
   src?: string | null;
   size?: number;
 }) {
-  const initials = name
+  const safeName = typeof name === 'string' && name ? name : 'User';
+  const initials = safeName
     .split(' ')
     .filter(Boolean)
     .map((n) => n[0])
@@ -171,7 +172,7 @@ export function Avatar({
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
     >
       {src ? (
-        <img src={src} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={src} alt={safeName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
         initials
       )}

@@ -33,7 +33,7 @@ export function useCommunication(activeChannelId?: UUID) {
     try {
       const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
       const res = await channelRepo.findMany();
-      setChannels(res.data);
+      setChannels(Array.isArray(res?.data) ? res.data : []);
     } catch (e: any) {
       setError(e.message);
     }
@@ -44,7 +44,7 @@ export function useCommunication(activeChannelId?: UUID) {
     try {
       const msgRepo = container.resolve(CHAT_MESSAGE_REPOSITORY_TOKEN);
       const res = await msgRepo.findByChannel(activeChannelId);
-      setMessages(res);
+      setMessages(Array.isArray(res) ? res : []);
     } catch (e: any) {
       setError(e.message);
     }
@@ -54,7 +54,7 @@ export function useCommunication(activeChannelId?: UUID) {
     try {
       const annRepo = container.resolve(ANNOUNCEMENT_REPOSITORY_TOKEN);
       const res = await annRepo.findMany();
-      setAnnouncements(res.data);
+      setAnnouncements(Array.isArray(res?.data) ? res.data : []);
     } catch (e: any) {
       setError(e.message);
     }
@@ -64,8 +64,7 @@ export function useCommunication(activeChannelId?: UUID) {
     try {
       const emailRepo = container.resolve(EMAIL_LOG_REPOSITORY_TOKEN);
       const res = await emailRepo.findMany();
-      setAnnouncements([]); // Clear warning for compilation
-      setEmailLogs(res.data);
+      setEmailLogs(Array.isArray(res?.data) ? res.data : []);
     } catch (e: any) {
       setError(e.message);
     }

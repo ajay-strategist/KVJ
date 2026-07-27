@@ -41,16 +41,18 @@ export function DataTable<T>({
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  const safeRows = useMemo(() => (Array.isArray(rows) ? rows : []), [rows]);
+
   const sorted = useMemo(() => {
-    if (!sort) return rows;
-    const col = columns.find((c) => c.key === sort.key);
-    if (!col?.accessor) return rows;
-    return [...rows].sort((a, b) => {
-      const av = col.accessor!(a); const bv = col.accessor!(b);
+    if (!sort) return safeRows;
+    const col = columns?.find((c) => c.key === sort.key);
+    if (!col?.accessor) return safeRows;
+    return [...safeRows].sort((a, b) => {
+      const av = col.accessor!(a) ?? ''; const bv = col.accessor!(b) ?? '';
       const cmp = av < bv ? -1 : av > bv ? 1 : 0;
       return sort.dir === 'desc' ? -cmp : cmp;
     });
-  }, [rows, sort, columns]);
+  }, [safeRows, sort, columns]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageRows = sorted.slice((page - 1) * pageSize, page * pageSize);

@@ -38,21 +38,26 @@ export function ApprovalsQueue() {
   const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
 
   const pendingTaskApprovals = useMemo(() => {
-    return tasks.filter((t) => 
-      !t.deletedAt && 
+    const safeTasks = Array.isArray(tasks) ? tasks : [];
+    return safeTasks.filter((t) => 
+      t && !t.deletedAt && 
       (t.approvalStatus === 'pending_task_approval' || t.approvalStatus === 'pending_assignment_approval' || t.status === 'review')
     );
   }, [tasks]);
 
   const fetchCorrectionsAndEmployees = useCallback(async () => {
-    const cRes = await attService.listPendingCorrections();
-    if (cRes.ok) setCorrections(cRes.value);
+    try {
+      const cRes = await attService.listPendingCorrections();
+      if (cRes.ok && Array.isArray(cRes.value)) setCorrections(cRes.value);
 
-    const eRes = await empService.listEmployees();
-    if (eRes.ok) {
-      const map: Record<string, Employee> = {};
-      eRes.value.forEach((e) => (map[e.id] = e));
-      setEmployees(map);
+      const eRes = await empService.listEmployees();
+      if (eRes.ok && Array.isArray(eRes.value)) {
+        const map: Record<string, Employee> = {};
+        eRes.value.forEach((e) => { if (e && e.id) map[e.id] = e; });
+        setEmployees(map);
+      }
+    } catch (e) {
+      console.warn('ApprovalsQueue fetch error:', e);
     }
   }, [attService, empService]);
 

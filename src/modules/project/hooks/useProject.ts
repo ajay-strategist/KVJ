@@ -45,11 +45,11 @@ export function useProject() {
         timesheetRepo.findMany(),
       ]);
 
-      setClients(clPage.data);
-      setProjects(prPage.data);
-      setAllocations(alPage.data);
-      setTasks(tkPage.data);
-      setTimesheets(tsPage.data);
+      setClients(Array.isArray(clPage?.data) ? clPage.data : []);
+      setProjects(Array.isArray(prPage?.data) ? prPage.data : []);
+      setAllocations(Array.isArray(alPage?.data) ? alPage.data : []);
+      setTasks(Array.isArray(tkPage?.data) ? tkPage.data : []);
+      setTimesheets(Array.isArray(tsPage?.data) ? tsPage.data : []);
       setError(null);
     } catch (e: any) {
       setError(e.message);

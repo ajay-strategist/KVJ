@@ -404,19 +404,22 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     },
   ];
 
+  const safeCourses = Array.isArray(courses) ? courses : [];
+  const safeColleges = Array.isArray(colleges) ? colleges : [];
+
   const tabItems = [
     {
       id: 'courses',
-      label: `📚 Courses Catalog (${courses.length})`,
+      label: `📚 Courses Catalog (${safeCourses.length})`,
       content: (
-        <DataTable columns={courseColumns} rows={courses} rowKey={(c) => c.id} loading={loading} />
+        <DataTable columns={courseColumns} rows={safeCourses} rowKey={(c) => c.id} loading={loading} />
       ),
     },
     {
       id: 'colleges',
-      label: `🏛️ Colleges Catalog (${colleges.length})`,
+      label: `🏛️ Colleges Catalog (${safeColleges.length})`,
       content: (
-        <DataTable columns={collegeColumns} rows={colleges} rowKey={(c) => c.id} />
+        <DataTable columns={collegeColumns} rows={safeColleges} rowKey={(c) => c.id} />
       ),
     },
   ];

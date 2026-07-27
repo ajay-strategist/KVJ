@@ -1346,15 +1346,19 @@ export function BatchManagement() {
     });
   }, []);
 
-  useEffect(() => {
-    if (batches.length > 0 && !selectedBatchId) {
-      setSelectedBatchId(batches[0].id);
-    }
-  }, [batches, selectedBatchId]);
+  const safeBatches = Array.isArray(batches) ? batches : [];
+  const safeCourses = Array.isArray(courses) ? courses : [];
+  const safeTrainers = Array.isArray(trainers) ? trainers : [];
 
-  const activeBatch = batches.find((b) => b.id === selectedBatchId);
-  const activeCourse = activeBatch ? courses.find((c) => c.id === activeBatch.courseId) : null;
-  const activeTrainer = activeBatch ? trainers.find((t) => t.id === activeBatch.trainerId) : null;
+  useEffect(() => {
+    if (safeBatches.length > 0 && !selectedBatchId) {
+      setSelectedBatchId(safeBatches[0].id);
+    }
+  }, [safeBatches, selectedBatchId]);
+
+  const activeBatch = safeBatches.find((b) => b && b.id === selectedBatchId);
+  const activeCourse = activeBatch ? safeCourses.find((c) => c && c.id === activeBatch.courseId) : null;
+  const activeTrainer = activeBatch ? safeTrainers.find((t) => t && t.id === activeBatch.trainerId) : null;
 
   const handleToggleCheck = (stage: string, itemId: string) => {
     const list = checklist[stage].map((item) =>

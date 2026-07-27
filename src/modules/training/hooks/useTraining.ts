@@ -44,10 +44,10 @@ export function useTraining() {
         enrollmentRepo.findMany(),
       ]);
 
-      setStudents(sPage.data);
-      setCourses(cPage.data);
-      setBatches(bPage.data);
-      setEnrollments(ePage.data);
+      setStudents(Array.isArray(sPage?.data) ? sPage.data : []);
+      setCourses(Array.isArray(cPage?.data) ? cPage.data : []);
+      setBatches(Array.isArray(bPage?.data) ? bPage.data : []);
+      setEnrollments(Array.isArray(ePage?.data) ? ePage.data : []);
       setError(null);
     } catch (e: any) {
       setError(e.message);

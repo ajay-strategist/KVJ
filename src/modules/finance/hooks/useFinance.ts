@@ -52,13 +52,13 @@ export function useFinance() {
         salaryRepo.findMany(),
       ]);
 
-      setBudgets(buPage.data);
-      setExpenseClaims(exPage.data);
-      setTravelRequests(trPage.data);
-      setVendors(vePage.data);
-      setPurchaseOrders(poPage.data);
-      setAssets(asPage.data);
-      setSalaryStructures(saPage.data);
+      setBudgets(Array.isArray(buPage?.data) ? buPage.data : []);
+      setExpenseClaims(Array.isArray(exPage?.data) ? exPage.data : []);
+      setTravelRequests(Array.isArray(trPage?.data) ? trPage.data : []);
+      setVendors(Array.isArray(vePage?.data) ? vePage.data : []);
+      setPurchaseOrders(Array.isArray(poPage?.data) ? poPage.data : []);
+      setAssets(Array.isArray(asPage?.data) ? asPage.data : []);
+      setSalaryStructures(Array.isArray(saPage?.data) ? saPage.data : []);
       setError(null);
     } catch (e: any) {
       setError(e.message);
