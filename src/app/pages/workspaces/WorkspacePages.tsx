@@ -718,6 +718,8 @@ export interface TaskItem {
   active: boolean;
   underReview?: boolean;
   isApproved?: boolean;
+  isRework?: boolean;
+  reworkNotes?: string;
   secondsToday: number;
 }
 
@@ -932,9 +934,29 @@ export const TaskWidget = memo(function TaskWidget({
                   <Badge tone="success">Approved &amp; Completed</Badge>
                 ) : t.underReview ? (
                   <Badge tone="info">Under Review</Badge>
+                ) : t.isRework ? (
+                  <Badge tone="warning">🔄 Rework</Badge>
                 ) : null}
               </div>
             </div>
+
+            {/* Rework reason alert box */}
+            {t.isRework && t.reworkNotes && (
+              <div style={{
+                fontSize: 12,
+                color: '#b45309',
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: 8,
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <span>🔄</span>
+                <span><strong>Rework Reason:</strong> {t.reworkNotes}</span>
+              </div>
+            )}
 
             {/* Display "Hours " instead of Total Hours Worked & progress bar */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1276,18 +1298,23 @@ export function MyDayPage() {
 
     const mapped: TaskItem[] = (projectTasks || [])
       .filter((t) => {
+        if (!t) return false;
+        // Don't show unapproved assignment requests to assignee until approved by manager
+        if ((t as any).approvalStatus === 'pending_assignment_approval') return false;
         const d = (t.dueDate || '').slice(0, 10);
-        return d === todayStr || d < todayStr || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || storedStates[t.id];
+        return d === todayStr || d < todayStr || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || (t as any).approvalStatus === 'rework' || storedStates[t.id];
       })
       .map((t) => {
         const proj = (projects || []).find((p) => p.id === t.projectId);
         const stored = storedStates[t.id];
         let secondsToday = Math.round((t.actualHours || 0) * 3600);
         let active = t.status === 'in_progress';
-        let underReview = t.status === 'review';
+        const isRework = (t as any).approvalStatus === 'rework';
+        const reworkNotes = (t as any).reworkNotes;
+        let underReview = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval';
         const statusStr = (t.status || '') as string;
         const isApproved = statusStr === 'done' || statusStr === 'completed' || (t as any).approvalStatus === 'approved' || (t as any).isApproved === true;
-        if (isApproved) {
+        if (isApproved || isRework) {
           underReview = false;
         }
 
@@ -1302,8 +1329,8 @@ export function MyDayPage() {
           } else {
             active = stored.active;
           }
-          if (stored.underReview !== undefined) {
-            underReview = isApproved ? false : stored.underReview;
+          if (stored.underReview !== undefined && !isRework && !isApproved) {
+            underReview = stored.underReview;
           }
         }
 
@@ -1328,6 +1355,8 @@ export function MyDayPage() {
           active,
           underReview,
           isApproved,
+          isRework,
+          reworkNotes,
           secondsToday,
         };
       });
@@ -1398,7 +1427,7 @@ export function MyDayPage() {
     setTasks((prev) => {
       const targetTask = prev.find((t) => t.id === id);
       const updated = prev.map((t) =>
-        t.id === id ? { ...t, active: false, underReview: true } : t
+        t.id === id ? { ...t, active: false, underReview: true, isRework: false, reworkNotes: undefined } : t
       );
       const states = getStoredTaskStates();
       if (states[id]) {

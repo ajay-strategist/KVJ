@@ -120,8 +120,18 @@ export class ProjectService implements IProjectService {
 
   async createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
-      const task = await this.taskRepo.create(data, actor);
-      if (task.assigneeId) {
+      const isSelfAssigned = !data.assigneeId || data.assigneeId === actor.id;
+      const isAdminOrManager = actor.role === 'ADMIN' || actor.role === 'CEO' || actor.role === 'MANAGER';
+      const needsAssignmentApproval = !isSelfAssigned && !isAdminOrManager;
+
+      const payload: Partial<Task> = {
+        ...data,
+        approvalStatus: needsAssignmentApproval ? 'pending_assignment_approval' : (data.approvalStatus ?? null),
+        assignedByEmployeeId: !isSelfAssigned ? actor.id : undefined,
+      };
+
+      const task = await this.taskRepo.create(payload, actor);
+      if (task.assigneeId && !needsAssignmentApproval) {
         await this.activity.log('project', task.projectId, actor, 'assign', `Assigned task: ${task.title}`);
         await this.notification.send({
           recipientId: task.assigneeId,
@@ -138,6 +148,15 @@ export class ProjectService implements IProjectService {
 
   async updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
+      const existing = await this.taskRepo.findById(taskId);
+      if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
+        const isSelfAssigned = patch.assigneeId === actor.id;
+        const isAdminOrManager = actor.role === 'ADMIN' || actor.role === 'CEO' || actor.role === 'MANAGER';
+        if (!isSelfAssigned && !isAdminOrManager) {
+          patch.approvalStatus = 'pending_assignment_approval';
+          (patch as any).assignedByEmployeeId = actor.id;
+        }
+      }
       const updated = await this.taskRepo.update(taskId, patch, actor);
       if (updated) {
         await this.activity.log('project', updated.projectId, actor, 'update', `Updated task: ${updated.title}`);
