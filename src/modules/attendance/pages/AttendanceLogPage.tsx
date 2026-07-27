@@ -26,15 +26,27 @@ import { supabase } from '../../../shared/integration/supabase';
  * the BATCH identity, so we compose it from college · program · academic year ·
  * batch number, falling back to the course/code only when those are absent.
  */
-function batchDisplayName(b: {
+function batchDisplayName(b?: {
   college?: string; program?: string; academicYear?: string;
   batchNo?: string; trainingName?: string; code?: string;
-}): string {
+} | null): string {
+  if (!b) return 'Training Batch';
   const parts = [b.college, b.program, b.academicYear, b.batchNo].filter(Boolean);
   if (parts.length) return parts.join(' - ');
   if (b.code && b.code !== '—') return b.code;
   if (b.batchNo && b.batchNo !== '—') return b.batchNo;
   return b.trainingName || 'Training Batch';
+}
+
+function safeFormatTime(raw?: string): string {
+  if (!raw) return '—';
+  try {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '—';
+  }
 }
 
 export interface AttendanceLogRow {
@@ -74,28 +86,37 @@ export function AttendanceLogPage() {
   const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
-  const [expenseRows, setExpenseRows] = useState<any[]>([]);
+  const [expenseRows, setExpenseRows] = useState<Array<{ id: string; date: string; employee: string; category: string; batch: string; amount: number; status: string }>>([]);
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
-  const [declaredHolidays, setDeclaredHolidays] = useState<{ date: string; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [declaredHolidays, setDeclaredHolidays] = useState<Array<{ date: string; name: string }>>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
-      if (r.ok) setEmployees(r.value);
-    });
+    const fetchEmployees = async () => {
+      try {
+        const empService = container.resolve(EMPLOYEE_SERVICE_TOKEN);
+        const res = await empService.listEmployees();
+        if (res.ok) {
+          setEmployees(res.value);
+        }
+      } catch (e) {
+        console.error('Error fetching employees:', e);
+      }
+    };
+    fetchEmployees();
   }, []);
 
   const employeeNames = useMemo(() => {
-    return employees.map((e) => `${e.firstName} ${e.lastName}`);
+    return (employees || []).map((e) => `${e.firstName || ''} ${e.lastName || ''}`.trim());
   }, [employees]);
 
   const currentEmployee = useMemo(() => {
     if (selectedEmployee === 'All Employees') return null;
-    return employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployee) || null;
+    return (employees || []).find(e => `${e.firstName || ''} ${e.lastName || ''}`.trim() === selectedEmployee) || null;
   }, [employees, selectedEmployee]);
 
   useEffect(() => {
@@ -111,19 +132,22 @@ export function AttendanceLogPage() {
 
         if (isManagement && selectedEmployee === 'All Employees') {
           const allRes = await attendanceRepo.findMany();
-          records = allRes.data.filter(r => r.workDate >= range.from && r.workDate <= range.to);
+          const rawRecords = allRes?.data || [];
+          records = rawRecords.filter((r: any) => r.workDate >= range.from && r.workDate <= range.to);
           const allClaims = await expenseRepo.findMany();
-          claims = allClaims.data.filter(c => c.createdAt >= range.from && c.createdAt <= range.to);
+          const rawClaims = allClaims?.data || [];
+          claims = rawClaims.filter((c: any) => (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
         } else {
           const empId = currentEmployee?.id || user?.id;
           if (empId) {
             records = await attendanceRepo.findHistory(empId, range);
             const allClaims = await expenseRepo.findMany();
-            claims = allClaims.data.filter(c => c.employeeId === empId && c.createdAt >= range.from && c.createdAt <= range.to);
+            const rawClaims = allClaims?.data || [];
+            claims = rawClaims.filter((c: any) => c.employeeId === empId && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
           }
         }
-        setAttendanceRecords(records);
-        setExpenseClaims(claims);
+        setAttendanceRecords(records || []);
+        setExpenseClaims(claims || []);
 
         const { data: hData } = await supabase.from('declared_holidays').select('*');
         if (hData) {
@@ -187,24 +211,27 @@ export function AttendanceLogPage() {
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
     const wt = workType || 'Office';
+    const safeBatches = Array.isArray(batches) ? batches : [];
 
     // 1. Direct recordBatchId lookup
     if (recordBatchId) {
-      const found = batches.find((b) => b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId);
+      const found = safeBatches.find((b) => b && (b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId));
       if (found) return batchDisplayName(found);
     }
 
     const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
 
     // 2. Parse Location: ... in notes
-    const locMatch = rawNotes.match(/Location:\s*([^.\n,]+)/i);
+    const locMatch = rawNotes.match(/Location:\s*([^\n,]+)/i);
     if (locMatch && locMatch[1].trim()) {
-      const locStr = locMatch[1].trim();
+      let locStr = locMatch[1].trim().replace(/\.$/, '').trim();
       if (locStr.toLowerCase() !== 'office work' && locStr.toLowerCase() !== 'office') {
-        const found = batches.find((b) =>
-          b.code?.toLowerCase() === locStr.toLowerCase() ||
-          b.trainingName?.toLowerCase() === locStr.toLowerCase() ||
-          b.batchNo?.toLowerCase() === locStr.toLowerCase()
+        const found = safeBatches.find((b) =>
+          b && (
+            (b.code && b.code.toLowerCase() === locStr.toLowerCase()) ||
+            (b.batchNo && b.batchNo.toLowerCase() === locStr.toLowerCase()) ||
+            (b.college && locStr.toLowerCase().includes(b.college.toLowerCase()))
+          )
         );
         return found ? batchDisplayName(found) : locStr;
       }
@@ -213,11 +240,13 @@ export function AttendanceLogPage() {
     // 3. Search notes for any batch code/name/college matching batches array
     const lower = rawNotes.toLowerCase();
     if (lower.trim()) {
-      const found = batches.find((b) =>
-        (b.trainingName && lower.includes(b.trainingName.toLowerCase())) ||
-        (b.batchNo && lower.includes(b.batchNo.toLowerCase())) ||
-        (b.code && lower.includes(b.code.toLowerCase())) ||
-        (b.college && lower.includes(b.college.toLowerCase()))
+      const found = safeBatches.find((b) =>
+        b && (
+          (b.batchNo && lower.includes(b.batchNo.toLowerCase())) ||
+          (b.code && lower.includes(b.code.toLowerCase())) ||
+          (b.college && lower.includes(b.college.toLowerCase())) ||
+          (b.trainingName && lower.includes(b.trainingName.toLowerCase()))
+        )
       );
       if (found) return batchDisplayName(found);
     }
@@ -225,8 +254,8 @@ export function AttendanceLogPage() {
     // 4. If workType is Training or notes mention training/batch
     const isTraining = wt === 'Training' || wt.toLowerCase().includes('training') || lower.includes('training') || lower.includes('batch');
     if (isTraining) {
-      if (batches.length > 0) {
-        return batchDisplayName(batches[0]);
+      if (safeBatches.length > 0) {
+        return batchDisplayName(safeBatches[0]);
       }
       return 'Training Batch';
     }
@@ -239,16 +268,20 @@ export function AttendanceLogPage() {
     const end = new Date(endDate);
     const days: CalendarDayDetail[] = [];
 
+    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
+    const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
+    const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
+
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = toLocalISODate(d);
       const dayNum = d.getDate();
       const dayOfWeekIdx = d.getDay();
       const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
 
-      const record = attendanceRecords.find(r => r.workDate === dateStr);
-      const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === dateStr);
-      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const decHoliday = declaredHolidays.find((h: any) => h.date === dateStr);
+      const record = recList.find(r => r && r.workDate === dateStr);
+      const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
+      const decHoliday = holList.find((h: any) => h && h.date === dateStr);
 
       if (record) {
         const firstSession = record.sessions?.[0];
@@ -258,14 +291,15 @@ export function AttendanceLogPage() {
 
         const sessions = record.sessions?.map(s => ({
           location: resolveOrgValue(s.workType, s.notes, (record as any).notes, (s as any).batchId || (s as any).batch_id) || 'Office',
-          type: s.workType,
-          startTime: s.clockIn ? new Date(s.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-          endTime: s.clockOut ? new Date(s.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+          type: s.workType || 'Office',
+          startTime: safeFormatTime(s.clockIn),
+          endTime: safeFormatTime(s.clockOut),
           tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
         })) || [];
 
-        const totalHrs = Math.floor(record.totalWorkingMinutes / 60);
-        const totalMins = record.totalWorkingMinutes % 60;
+        const totalMins = record.totalWorkingMinutes || 0;
+        const totalHrs = Math.floor(totalMins / 60);
+        const remMins = totalMins % 60;
 
         days.push({
           dateNum: dayNum,
@@ -273,11 +307,11 @@ export function AttendanceLogPage() {
           fullDate: dateStr.split('-').reverse().join('/'),
           status: decHoliday ? 'holiday' : 'present',
           location: orgVal,
-          startTime: record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
-          endTime: record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+          startTime: safeFormatTime(record.firstClockIn),
+          endTime: safeFormatTime(record.lastClockOut),
           sessions,
           tasks: record.sessions?.map(s => ({ title: s.notes || 'Task', duration: '' })) || [],
-          hoursWorked: `${totalHrs}h ${totalMins}m`,
+          hoursWorked: `${totalHrs}h ${remMins}m`,
           expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '',
         });
       } else {
@@ -305,22 +339,29 @@ export function AttendanceLogPage() {
     const end = new Date(endDate);
     const rows: AttendanceLogRow[] = [];
 
+    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
+    const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
+    const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
+    const empList = Array.isArray(employees) ? employees : [];
+
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = toLocalISODate(d);
-      const record = attendanceRecords.find(r => r.workDate === dateStr);
-      const dayClaims = expenseClaims.filter(c => c.createdAt.slice(0, 10) === dateStr);
-      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const decHoliday = declaredHolidays.find((h: any) => h.date === dateStr);
+      const record = recList.find(r => r && r.workDate === dateStr);
+      const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
+      const decHoliday = holList.find((h: any) => h && h.date === dateStr);
 
       const empName = currentEmployee
-        ? `${currentEmployee.firstName} ${currentEmployee.lastName}`
+        ? `${currentEmployee.firstName || ''} ${currentEmployee.lastName || ''}`.trim()
         : user ? user.fullName || 'Employee' : 'Employee';
 
       if (record) {
-        const emp = employees.find(e => e.id === record.employeeId);
-        const resolvedEmpName = emp ? `${emp.firstName} ${emp.lastName}` : empName;
-        const duration = `${Math.floor(record.totalWorkingMinutes / 60)}h ${record.totalWorkingMinutes % 60}m`;
-        const breakTime = `${Math.floor(record.totalBreakMinutes / 60)}h ${record.totalBreakMinutes % 60}m`;
+        const emp = empList.find(e => e && e.id === record.employeeId);
+        const resolvedEmpName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : empName;
+        const totalMins = record.totalWorkingMinutes || 0;
+        const breakMins = record.totalBreakMinutes || 0;
+        const duration = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+        const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
 
         const sessionsList = record.sessions && record.sessions.length > 0
           ? record.sessions
@@ -335,12 +376,8 @@ export function AttendanceLogPage() {
         const hasMultipleSessions = sessionsList.length > 1;
 
         sessionsList.forEach((s, sIdx) => {
-          const startT = s.clockIn
-            ? new Date(s.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : record.firstClockIn ? new Date(record.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-          const endT = s.clockOut
-            ? new Date(s.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : record.lastClockOut ? new Date(record.lastClockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+          const startT = safeFormatTime(s.clockIn || record.firstClockIn);
+          const endT = safeFormatTime(s.clockOut || record.lastClockOut);
 
           const workType = s.workType || 'Office';
           const batchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
@@ -390,7 +427,7 @@ export function AttendanceLogPage() {
       }
     }
     return rows;
-  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays]);
+  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, resolveOrgValue]);
 
   const mappedExpenseRows = useMemo(() => {
     return expenseClaims.map((claim) => {
