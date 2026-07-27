@@ -1,4 +1,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { eventBus } from '../../core/event-bus';
+
+/**
+ * The default wallpaper. While the user is on this default we DON'T override
+ * --app-canvas, so the theme's own light/dark canvas (tokens.css) applies and
+ * dark mode actually looks dark. A wallpaper is only forced once the user picks
+ * a custom one.
+ */
+const DEFAULT_WALLPAPER =
+  'radial-gradient(circle at 10% 10%, #e0f2fe 0%, #f3e8ff 50%, #faf5ff 100%)';
 
 export interface WorkspacePreset {
   name: string;
@@ -120,6 +130,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [shadowSoftness, setShadowSoftness] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].shadowSoftness);
   const [animationSpeed, setAnimationSpeed] = useState(WORKSPACE_PRESETS['Glass White (VisionOS)'].animationSpeed);
   const [viewMode, setViewMode] = useState<WorkspaceViewMode>('Standard');
+  // Bumped whenever the theme changes so the surface/opacity overrides below are
+  // recomputed for the new theme (light ↔ dark) at runtime, not just on reload.
+  const [themeTick, setThemeTick] = useState(0);
+  useEffect(() => {
+    const off = eventBus.on('theme.changed', () => setThemeTick((t) => t + 1));
+    return off;
+  }, []);
 
   const loadPreset = (name: string) => {
     const preset = WORKSPACE_PRESETS[name];
@@ -137,7 +154,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Sync state values with global CSS custom properties in real-time
   useEffect(() => {
     const root = document.documentElement;
-    const isLight = root.getAttribute('data-theme') === 'light' || root.getAttribute('data-theme') === 'hud-light';
+    const isLight = root.getAttribute('data-theme') === 'light';
 
     // 1. Enforce strict minimum glass opacity safeguards for readability priority
     let baseOpacity = glassOpacity;
@@ -173,8 +190,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       root.style.setProperty('--focus-glow-dim', '1');
     }
 
-    // Apply values to CSS custom properties
-    root.style.setProperty('--app-canvas', wallpaper);
+    // Apply values to CSS custom properties.
+    // Only force the canvas when the user has chosen a CUSTOM wallpaper. On the
+    // default, remove the override so tokens.css drives it and dark mode renders
+    // its dark canvas instead of a forced light gradient.
+    if (wallpaper && wallpaper !== DEFAULT_WALLPAPER) {
+      root.style.setProperty('--app-canvas', wallpaper);
+    } else {
+      root.style.removeProperty('--app-canvas');
+    }
     root.style.setProperty('--glass-blur', `${finalBlur}px`);
     root.style.setProperty('--brand', accentColor);
     root.style.setProperty('--radius-xl', `${finalRadius}px`);
@@ -221,7 +245,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--e3', `0 24px 65px ${shadowColor}`);
     root.style.setProperty('--e4', `0 40px 95px ${shadowColor}`);
 
-  }, [wallpaper, glassOpacity, glassBlur, accentColor, cornerRadius, shadowSoftness, animationSpeed, viewMode]);
+  }, [wallpaper, glassOpacity, glassBlur, accentColor, cornerRadius, shadowSoftness, animationSpeed, viewMode, themeTick]);
 
   return (
     <WorkspaceContext.Provider

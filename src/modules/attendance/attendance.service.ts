@@ -23,6 +23,7 @@ export interface IAttendanceService {
   listPendingCorrections(): Promise<Result<any[]>>;
   requestCorrection(recordId: UUID, field: string, proposed: string, reason: string, actor: Actor): Promise<Result<void>>;
   approveCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>>;
+  rejectCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>>;
 }
 
 export const ATTENDANCE_SERVICE_TOKEN = createToken<IAttendanceService>('AttendanceService');
@@ -39,50 +40,68 @@ export class AttendanceService implements IAttendanceService {
     return (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)) as UUID;
   }
 
+  private corrections = new Map<string, any>();
+
   async getRecordForToday(employeeId: UUID): Promise<Result<AttendanceRecord | null>> {
     try {
-      const rec = await this.repo.findActiveRecord(employeeId, todayStr());
-      return Ok(rec);
-    } catch {
+      const record = await this.repo.findActiveRecord(employeeId, todayStr());
+      return Ok(record);
+    } catch (e) {
+      console.error('Failed to get today attendance record:', e);
       return Err(AppError.internal());
     }
   }
 
   async getHistory(employeeId: UUID, range: DateRange): Promise<Result<AttendanceRecord[]>> {
     try {
-      const history = await this.repo.findHistory(employeeId, range);
-      return Ok(history);
-    } catch {
+      const records = await this.repo.findHistory(employeeId, range);
+      return Ok(records);
+    } catch (e) {
+      console.error('Failed to get attendance history:', e);
       return Err(AppError.internal());
     }
   }
 
   async clockIn(employeeId: UUID, workType: WorkSessionType, geo?: GeoPoint): Promise<Result<AttendanceRecord>> {
     try {
-      const date = todayStr();
       const ts = nowIso();
-      let record = await this.repo.findActiveRecord(employeeId, date);
-      const actor: Actor = { id: employeeId, role: 'Employee' };
+      const date = todayStr();
+      const existing = await this.repo.findActiveRecord(employeeId, date);
 
-      if (!record) {
-        record = await this.repo.create(
-          {
-            employeeId,
-            workDate: date,
-            status: 'present',
-            firstClockIn: ts,
-            totalWorkingMinutes: 0,
-            totalBreakMinutes: 0,
-            sessions: [],
-            breaks: [],
-          },
-          actor
-        );
+      if (!existing) {
+        const newRecord: AttendanceRecord = {
+          id: this.uuid(),
+          employeeId,
+          workDate: date,
+          status: 'present',
+          firstClockIn: ts,
+          totalWorkingMinutes: 0,
+          totalBreakMinutes: 0,
+          sessions: [
+            {
+              id: this.uuid(),
+              clockIn: ts,
+              workType,
+              clockInGeo: geo,
+            },
+          ],
+          breaks: [],
+          createdAt: ts,
+          updatedAt: ts,
+          createdBy: employeeId,
+          updatedBy: employeeId,
+          deletedAt: null,
+          deletedBy: null,
+        };
+
+        const saved = await this.repo.create(newRecord, { id: employeeId, role: 'Employee' });
+        eventBus.emit('attendance.clockIn' as any, { employeeId, time: ts } as any);
+        return Ok(saved);
       }
 
-      const hasOpenSession = record.sessions?.some((s) => !s.clockOut);
+      const hasOpenSession = existing.sessions?.some((s) => !s.clockOut);
       if (hasOpenSession) {
-        return Err(AppError.businessRule('You are already clocked in.'));
+        return Err(AppError.businessRule('Already clocked in. Please clock out of current session first.'));
       }
 
       const session: WorkSession = {
@@ -92,111 +111,89 @@ export class AttendanceService implements IAttendanceService {
         clockInGeo: geo,
       };
 
-      const updatedSessions = [...(record.sessions ?? []), session];
-      const updated = await this.repo.update(
-        record.id,
-        {
-          status: 'present',
-          sessions: updatedSessions,
-        },
-        actor
-      );
+      const updatedSessions = [...(existing.sessions ?? []), session];
+      const patch: Partial<AttendanceRecord> = {
+        status: 'present',
+        firstClockIn: existing.firstClockIn || ts,
+        sessions: updatedSessions,
+        updatedAt: ts,
+        updatedBy: employeeId,
+      };
 
+      const saved = await this.repo.update(existing.id, patch, { id: employeeId, role: 'Employee' });
       eventBus.emit('attendance.clockIn' as any, { employeeId, time: ts } as any);
-
-      return Ok(updated);
-    } catch (err: any) {
-      return Err(err instanceof AppError ? err : AppError.internal());
+      return Ok(saved);
+    } catch (e) {
+      console.error('Failed to clock in:', e);
+      return Err(AppError.internal());
     }
   }
 
   async clockOut(employeeId: UUID, geo?: GeoPoint): Promise<Result<AttendanceRecord>> {
     try {
-      const date = todayStr();
       const ts = nowIso();
-      const record = await this.repo.findActiveRecord(employeeId, date);
-      const actor: Actor = { id: employeeId, role: 'Employee' };
+      const record = await this.repo.findActiveRecord(employeeId, todayStr());
 
       if (!record || record.status === 'clocked_out') {
-        return Err(AppError.businessRule('No active work session found to clock out.'));
+        return Err(AppError.businessRule('No active session to clock out from.'));
       }
-
-      let updatedBreaks = [...(record.breaks ?? [])];
-      if (record.status === 'on_break') {
-        updatedBreaks = updatedBreaks.map((b) => (b.endTime ? b : { ...b, endTime: ts }));
-      }
-
-      const updatedSessions = (record.sessions ?? []).map((s) => {
-        if (!s.clockOut) {
-          return { ...s, clockOut: ts, clockOutGeo: geo };
-        }
-        return s;
-      });
 
       let totalWorkingMs = 0;
-      updatedSessions.forEach((s) => {
-        if (s.clockOut) {
+      const updatedSessions = (record.sessions ?? []).map((s) => {
+        if (!s.clockOut) {
+          const finished: WorkSession = { ...s, clockOut: ts, clockOutGeo: geo };
+          totalWorkingMs += new Date(ts).getTime() - new Date(s.clockIn).getTime();
+          return finished;
+        } else {
           totalWorkingMs += new Date(s.clockOut).getTime() - new Date(s.clockIn).getTime();
+          return s;
         }
       });
 
-      let totalBreakMs = 0;
-      updatedBreaks.forEach((b) => {
-        if (b.endTime) {
-          totalBreakMs += new Date(b.endTime).getTime() - new Date(b.startTime).getTime();
-        }
-      });
+      const openBreak = record.breaks?.find((b) => !b.endTime);
+      let updatedBreaks = record.breaks ?? [];
+      let extraBreakMs = 0;
+      if (openBreak) {
+        updatedBreaks = updatedBreaks.map((b) =>
+          b.id === openBreak.id ? { ...b, endTime: ts } : b
+        );
+        extraBreakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
+      }
 
-      const workingMin = Math.round(totalWorkingMs / 60000);
-      const breakMin = Math.round(totalBreakMs / 60000);
+      const totalWorkingMins = Math.max(0, Math.floor(totalWorkingMs / 60000));
+      const totalBreakMins = record.totalBreakMinutes + Math.floor(extraBreakMs / 60000);
 
-      const updated = await this.repo.update(
-        record.id,
-        {
-          status: 'clocked_out',
-          lastClockOut: ts,
-          sessions: updatedSessions,
-          breaks: updatedBreaks,
-          totalWorkingMinutes: workingMin,
-          totalBreakMinutes: breakMin,
-        },
-        actor
-      );
+      const patch: Partial<AttendanceRecord> = {
+        status: 'clocked_out',
+        lastClockOut: ts,
+        totalWorkingMinutes: totalWorkingMins,
+        totalBreakMinutes: totalBreakMins,
+        sessions: updatedSessions,
+        breaks: updatedBreaks,
+        updatedAt: ts,
+        updatedBy: employeeId,
+      };
 
+      const saved = await this.repo.update(record.id, patch, { id: employeeId, role: 'Employee' });
       eventBus.emit('attendance.clockOut' as any, { employeeId, time: ts } as any);
-
-      return Ok(updated);
-    } catch (err: any) {
-      return Err(err instanceof AppError ? err : AppError.internal());
+      return Ok(saved);
+    } catch (e) {
+      console.error('Failed to clock out:', e);
+      return Err(AppError.internal());
     }
   }
 
   async startBreak(employeeId: UUID, reason?: string): Promise<Result<AttendanceRecord>> {
     try {
-      const date = todayStr();
       const ts = nowIso();
-      let record = await this.repo.findActiveRecord(employeeId, date);
-      const actor: Actor = { id: employeeId, role: 'Employee' };
+      const record = await this.repo.findActiveRecord(employeeId, todayStr());
 
-      if (!record) {
-        record = await this.repo.create(
-          {
-            employeeId,
-            workDate: date,
-            status: 'present',
-            firstClockIn: ts,
-            totalWorkingMinutes: 0,
-            totalBreakMinutes: 0,
-            sessions: [{ id: this.uuid(), clockIn: ts, workType: 'Office' }],
-            breaks: [],
-          },
-          actor
-        );
+      if (!record || record.status !== 'present') {
+        return Err(AppError.businessRule('Must be actively clocked in to start a break.'));
       }
 
       let activeSession = record.sessions?.find((s) => !s.clockOut);
       let updatedSessions = record.sessions ?? [];
-
       if (!activeSession) {
         activeSession = {
           id: this.uuid(),
@@ -210,68 +207,61 @@ export class AttendanceService implements IAttendanceService {
         id: this.uuid(),
         workSessionId: activeSession.id,
         startTime: ts,
-        reason: reason || 'Official Break',
+        reason,
       };
 
-      const updated = await this.repo.update(
-        record.id,
-        {
-          status: 'on_break',
-          sessions: updatedSessions,
-          breaks: [...(record.breaks ?? []), breakRec],
-        },
-        actor
-      );
+      const patch: Partial<AttendanceRecord> = {
+        status: 'on_break',
+        sessions: updatedSessions,
+        breaks: [...(record.breaks ?? []), breakRec],
+        updatedAt: ts,
+        updatedBy: employeeId,
+      };
 
-      return Ok(updated);
-    } catch (err: any) {
-      return Err(err instanceof AppError ? err : AppError.internal());
+      const saved = await this.repo.update(record.id, patch, { id: employeeId, role: 'Employee' });
+      return Ok(saved);
+    } catch (e) {
+      console.error('Failed to start break:', e);
+      return Err(AppError.internal());
     }
   }
 
   async endBreak(employeeId: UUID): Promise<Result<AttendanceRecord>> {
     try {
-      const date = todayStr();
       const ts = nowIso();
-      const record = await this.repo.findActiveRecord(employeeId, date);
-      const actor: Actor = { id: employeeId, role: 'Employee' };
+      const record = await this.repo.findActiveRecord(employeeId, todayStr());
 
       if (!record || record.status !== 'on_break') {
-        return Err(AppError.businessRule('You are not currently on a break.'));
+        return Err(AppError.businessRule('Not currently on break.'));
       }
 
-      const updatedBreaks = (record.breaks ?? []).map((b) => {
-        if (!b.endTime) {
-          return { ...b, endTime: ts };
-        }
-        return b;
-      });
+      const openBreak = record.breaks?.find((b) => !b.endTime);
+      if (!openBreak) {
+        return Err(AppError.businessRule('No active break found.'));
+      }
 
-      let totalBreakMs = 0;
-      updatedBreaks.forEach((b) => {
-        if (b.endTime) {
-          totalBreakMs += new Date(b.endTime).getTime() - new Date(b.startTime).getTime();
-        }
-      });
-      const breakMin = Math.round(totalBreakMs / 60000);
+      const breakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
+      const breakMins = Math.max(0, Math.floor(breakMs / 60000));
 
-      const updated = await this.repo.update(
-        record.id,
-        {
-          status: 'present',
-          breaks: updatedBreaks,
-          totalBreakMinutes: breakMin,
-        },
-        actor
+      const updatedBreaks = (record.breaks ?? []).map((b) =>
+        b.id === openBreak.id ? { ...b, endTime: ts } : b
       );
 
-      return Ok(updated);
-    } catch (err: any) {
-      return Err(err instanceof AppError ? err : AppError.internal());
+      const patch: Partial<AttendanceRecord> = {
+        status: 'present',
+        totalBreakMinutes: record.totalBreakMinutes + breakMins,
+        breaks: updatedBreaks,
+        updatedAt: ts,
+        updatedBy: employeeId,
+      };
+
+      const saved = await this.repo.update(record.id, patch, { id: employeeId, role: 'Employee' });
+      return Ok(saved);
+    } catch (e) {
+      console.error('Failed to end break:', e);
+      return Err(AppError.internal());
     }
   }
-
-  private corrections = new Map<UUID, any>();
 
   async listPendingCorrections(): Promise<Result<any[]>> {
     try {
@@ -355,6 +345,7 @@ export class AttendanceService implements IAttendanceService {
       if (!corr) return Err(AppError.notFound('Correction request not found.'));
 
       const parseTimeStr = (date: string, tStr: string): string | undefined => {
+        if (!tStr) return undefined;
         if (tStr.includes('T') && tStr.includes('Z')) return tStr;
         const t = tStr.trim();
         const match = t.match(/^(\d+)(?::(\d+))?(?::(\d+))?\s*(AM|PM)?$/i);
@@ -384,6 +375,40 @@ export class AttendanceService implements IAttendanceService {
         }
       };
 
+      // Determine workDate, firstClockIn, lastClockOut
+      let workDate = corr.requestedDate || todayStr();
+      let firstClockIn: string | undefined = undefined;
+      let lastClockOut: string | undefined = undefined;
+
+      if (corr.fieldToCorrect === 'attendance_claim') {
+        const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\(([^)]+)\)/);
+        if (claimMatch) {
+          workDate = claimMatch[1];
+          const timeRange = claimMatch[2];
+          const times = timeRange.split(/\s*-\s*/);
+          if (times.length === 2) {
+            firstClockIn = parseTimeStr(workDate, times[0]);
+            lastClockOut = parseTimeStr(workDate, times[1]);
+          }
+        }
+      }
+
+      // Parse classification & location from corr.reason
+      let workType: WorkSessionType = 'Office';
+      const reasonStr = corr.reason || '';
+      const classMatch = reasonStr.match(/Classification:\s*([^,\n.]+)/i);
+      if (classMatch) {
+        const raw = classMatch[1].trim().toLowerCase();
+        if (raw.includes('training')) workType = 'Training';
+        else if (raw.includes('marketing')) workType = 'Marketing';
+        else if (raw.includes('supervision')) workType = 'Supervision' as any;
+        else if (raw.includes('travel')) workType = 'Travel' as any;
+        else if (raw.includes('remote')) workType = 'Work From Home';
+        else workType = 'Office';
+      } else if (reasonStr.toLowerCase().includes('training')) {
+        workType = 'Training';
+      }
+
       let record = null;
       if (corr.attendanceRecordId && corr.attendanceRecordId.length === 36) {
         try {
@@ -391,35 +416,22 @@ export class AttendanceService implements IAttendanceService {
         } catch {}
       }
 
-      if (!record) {
-        let targetDate = corr.requestedDate;
-        if (corr.fieldToCorrect === 'attendance_claim') {
-          const match = corr.proposedValue.match(/^([\d-]+)/);
-          if (match) targetDate = match[1];
-        }
-        if (targetDate) {
-          record = await this.repo.findActiveRecord(corr.requestedBy, targetDate);
+      if (!record && workDate) {
+        record = await this.repo.findActiveRecord(corr.requestedBy, workDate);
+      }
+
+      // Calculate elapsed working minutes
+      let calculatedMins = 480;
+      if (firstClockIn && lastClockOut) {
+        const sMs = new Date(firstClockIn).getTime();
+        const eMs = new Date(lastClockOut).getTime();
+        if (!isNaN(sMs) && !isNaN(eMs) && eMs > sMs) {
+          calculatedMins = Math.round((eMs - sMs) / (1000 * 60));
         }
       }
 
       if (!record) {
-        let workDate = corr.requestedDate;
-        let firstClockIn = undefined;
-        let lastClockOut = undefined;
-
-        if (corr.fieldToCorrect === 'attendance_claim') {
-          const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\(([^)]+)\)/);
-          if (claimMatch) {
-            workDate = claimMatch[1];
-            const timeRange = claimMatch[2];
-            const times = timeRange.split(/\s*-\s*/);
-            if (times.length === 2) {
-              firstClockIn = parseTimeStr(workDate, times[0]);
-              lastClockOut = parseTimeStr(workDate, times[1]);
-            }
-          }
-        }
-
+        // CREATE NEW ATTENDANCE RECORD
         const newRecord: AttendanceRecord = {
           id: this.uuid(),
           employeeId: corr.requestedBy,
@@ -427,12 +439,12 @@ export class AttendanceService implements IAttendanceService {
           status: 'clocked_out',
           firstClockIn,
           lastClockOut,
-          totalWorkingMinutes: 480,
+          totalWorkingMinutes: calculatedMins,
           totalBreakMinutes: 0,
           sessions: [
             {
               id: this.uuid(),
-              workType: corr.reason?.toLowerCase().includes('training') ? 'Training' : 'Office',
+              workType,
               clockIn: firstClockIn || workDate || nowIso(),
               clockOut: lastClockOut,
               notes: corr.reason || 'Approved Claim',
@@ -448,23 +460,48 @@ export class AttendanceService implements IAttendanceService {
         };
         await this.repo.create(newRecord, actor);
       } else {
-        const patch: Partial<AttendanceRecord> = {};
-        if (corr.fieldToCorrect === 'firstClockIn') {
+        // RESUBMISSION / UPDATE EXISTING ATTENDANCE RECORD
+        const patch: Partial<AttendanceRecord> = {
+          status: 'clocked_out',
+          updatedAt: nowIso(),
+          updatedBy: actor.id,
+        };
+
+        if (firstClockIn) patch.firstClockIn = firstClockIn;
+        else if (corr.fieldToCorrect === 'firstClockIn') {
           patch.firstClockIn = parseTimeStr(record.workDate, corr.proposedValue) || corr.proposedValue;
-        } else if (corr.fieldToCorrect === 'lastClockOut') {
+        }
+
+        if (lastClockOut) patch.lastClockOut = lastClockOut;
+        else if (corr.fieldToCorrect === 'lastClockOut') {
           patch.lastClockOut = parseTimeStr(record.workDate, corr.proposedValue) || corr.proposedValue;
-        } else if (corr.fieldToCorrect === 'attendance_claim') {
-          const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\(([^)]+)\)/);
-          if (claimMatch) {
-            const workDate = claimMatch[1];
-            const timeRange = claimMatch[2];
-            const times = timeRange.split(/\s*-\s*/);
-            if (times.length === 2) {
-              patch.firstClockIn = parseTimeStr(workDate, times[0]);
-              patch.lastClockOut = parseTimeStr(workDate, times[1]);
-            }
+        }
+
+        const effectiveFirstIn = patch.firstClockIn || record.firstClockIn;
+        const effectiveLastOut = patch.lastClockOut || record.lastClockOut;
+
+        if (effectiveFirstIn && effectiveLastOut) {
+          const sMs = new Date(effectiveFirstIn).getTime();
+          const eMs = new Date(effectiveLastOut).getTime();
+          if (!isNaN(sMs) && !isNaN(eMs) && eMs > sMs) {
+            patch.totalWorkingMinutes = Math.round((eMs - sMs) / (1000 * 60));
           }
         }
+        if (!patch.totalWorkingMinutes) {
+          patch.totalWorkingMinutes = record.totalWorkingMinutes || 480;
+        }
+
+        const sessionNotes = corr.reason || (record as any).notes || 'Re-approved session';
+        const updatedSession: WorkSession = {
+          id: record.sessions?.[0]?.id || this.uuid(),
+          workType,
+          clockIn: effectiveFirstIn || record.firstClockIn || record.workDate || nowIso(),
+          clockOut: effectiveLastOut || record.lastClockOut,
+          notes: sessionNotes,
+        };
+        (updatedSession as any).isReapproved = true;
+
+        patch.sessions = [updatedSession, ...(record.sessions?.slice(1) || [])];
         await this.repo.update(record.id, patch, actor);
       }
 
@@ -484,6 +521,26 @@ export class AttendanceService implements IAttendanceService {
       return Ok(undefined);
     } catch (e) {
       console.error('Failed to approve attendance correction:', e);
+      return Err(AppError.internal());
+    }
+  }
+
+  async rejectCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>> {
+    try {
+      await supabase
+        .from('attendance_corrections')
+        .update({
+          status: 'rejected',
+          approver_id: actor.id,
+          approver_notes: notes || null,
+          updated_at: nowIso(),
+        })
+        .eq('id', correctionId);
+
+      this.corrections.delete(correctionId);
+      return Ok(undefined);
+    } catch (e) {
+      console.error('Failed to reject attendance correction:', e);
       return Err(AppError.internal());
     }
   }

@@ -145,7 +145,7 @@ export function TaskBoard() {
       
       const supervisorAlloc = project ? allocations.find((a) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
       const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
-      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : 'Manager (Operations)';
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
 
       const tTimesheets = timesheets.filter((ts) => ts.taskId === t.id);
       const totalHoursWorked = tTimesheets.reduce((sum, ts) => sum + ts.hoursLogged, 0);
@@ -271,7 +271,7 @@ export function TaskBoard() {
         name: res.value.title,
         category: (values.category as any) || 'Project Task',
         projectName: proj ? proj.title : (values.projectName as string) || 'General Project',
-        supervisor: (values.supervisor as string) || 'Manager (Operations)',
+        supervisor: (values.supervisor as string) || '',
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (values.assignee as string) || user?.fullName || 'Unassigned',
         dueDate: res.value.dueDate || todayStr,
         status: statusLabel as any,
@@ -376,15 +376,32 @@ export function TaskBoard() {
   };
 
   const handleMarkComplete = async (task: TaskItem) => {
-    setTasksList((prev) =>
-      prev.map((x) => (x.id === task.id ? { ...x, status: 'Completed' } : x))
-    );
-    try {
-      await updateTask(task.id, { status: 'done' });
-    } catch (e) {
-      console.warn('Update task error:', e);
+    const isApprover = ['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '');
+    if (isApprover) {
+      setTasksList((prev) =>
+        prev.map((x) => (x.id === task.id ? { ...x, status: 'Completed' } : x))
+      );
+      try {
+        await updateTask(task.id, { status: 'done', approvalStatus: 'approved' });
+      } catch (e) {
+        console.warn('Update task error:', e);
+      }
+      toast({ variant: 'success', title: 'Task Completed', message: `Task "${task.name}" marked complete.` });
+    } else {
+      setTasksList((prev) =>
+        prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))
+      );
+      try {
+        await submitTask(task.id as UUID, 'Submitted for completion approval');
+      } catch (e) {
+        console.warn('Submit task error:', e);
+      }
+      toast({
+        variant: 'success',
+        title: 'Submitted for Review',
+        message: `Task "${task.name}" submitted to Manager/Admin Approval Queue.`,
+      });
     }
-    toast({ variant: 'success', title: 'Task Completed', message: `Task "${task.name}" marked complete.` });
   };
 
   const handleReopenTask = async (task: TaskItem) => {
@@ -715,7 +732,7 @@ export function TaskBoard() {
                       {t.approvalStatus === 'pending_assignment_approval' && <Badge tone="warning">⏳ Pending Assignment Approval</Badge>}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                      Project: <strong>{t.projectName}</strong> · Assignee: <strong>{t.assignee}</strong> · Supervisor: <strong>{t.supervisor}</strong>
+                      Project: <strong>{t.projectName}</strong> · Assignee: <strong>{t.assignee}</strong>{t.supervisor ? <> · Supervisor: <strong>{t.supervisor}</strong></> : null}
                     </div>
                     {t.approvedBy && (
                       <div style={{ fontSize: 11, color: 'var(--status-success)', marginTop: 3 }}>

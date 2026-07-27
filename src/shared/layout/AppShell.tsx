@@ -237,7 +237,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   title={`Theme: ${THEME_LABELS[theme]}`}
                   style={sidebarIconBtnStyle}
                 >
-                  <Icon name={theme === 'dark' || theme === 'hud' ? 'Moon' : 'Sun'} size={15} />
+                  <Icon name={theme === 'dark' ? 'Moon' : 'Sun'} size={15} />
                 </button>
 
                 {/* Notifications Bell */}
@@ -267,7 +267,12 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   {notifOpen && (
                     <div style={{
                       position: 'fixed', bottom: 64, left: collapsed && !isMobile ? 74 : 16,
-                      width: 320, maxHeight: 460,
+                      // On mobile fill the width; on desktop keep the 320px card.
+                      width: isMobile ? 'calc(100vw - 32px)' : 320,
+                      maxWidth: 'calc(100vw - 32px)',
+                      // Never exceed the space above the bell, or the panel's top
+                      // runs off-screen and only its lower half is visible.
+                      maxHeight: 'min(460px, calc(100dvh - 88px))',
                       background: 'var(--bg-panel)',
                       border: '1px solid var(--border)',
                       borderRadius: 'var(--radius-xl)',

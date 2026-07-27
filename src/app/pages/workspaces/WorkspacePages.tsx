@@ -1238,7 +1238,7 @@ function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; l
 export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
-  const { tasks: projectTasks, projects, createTask, updateTask } = useProject();
+  const { tasks: projectTasks, projects, createTask, updateTask, submitTask } = useProject();
 
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -1396,9 +1396,8 @@ export function MyDayPage() {
       saveStoredTaskStates(states);
 
       if (targetTask) {
-        updateTask(id, {
-          status: 'review',
-          actualHours: (targetTask?.secondsToday || 0) / 3600,
+        submitTask(id as any, 'Submitted from Workspace').catch((e) => {
+          console.warn('submitTask error:', e);
         });
       }
 
@@ -1406,8 +1405,8 @@ export function MyDayPage() {
     });
     toast({
       variant: 'success',
-      title: 'Routed to Manager Review',
-      message: `Task '${taskTitle}' submitted for Manager completion approval.`,
+      title: 'Routed to Approvals Queue',
+      message: `Task '${taskTitle}' submitted to Approvals Queue for Manager/Admin review.`,
     });
     addNotification({
       title: 'Task Submitted for Review',

@@ -296,7 +296,7 @@ export function AttendanceCalendarView({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
                         {d.sessions.map((s, sIdx) => (
                           <div key={sIdx} style={{ fontSize: 9.5, lineHeight: 1.25, background: 'var(--bg-surface)', padding: '2px 4px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--brand)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--brand)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={s.location}>
                               📍 {s.location}
                             </div>
                             <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
@@ -308,7 +308,7 @@ export function AttendanceCalendarView({
                     ) : (
                       <>
                         {d.location && (
-                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={d.location}>
                             📍 {d.location}
                           </div>
                         )}

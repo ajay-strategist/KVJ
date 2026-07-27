@@ -300,8 +300,6 @@ export function SettingsPage() {
               <select className="kvj-select" style={{ width: 160 }} value={mode} onChange={(e) => setMode(e.target.value as ThemeMode)}>
                 <option value="light">☀️ Light Theme</option>
                 <option value="dark">🌙 Dark Theme</option>
-                <option value="hud">🎛️ Cockpit Dark</option>
-                <option value="hud-light">⚡ Cockpit Light</option>
                 <option value="system">🖥️ System Mode</option>
               </select>
             </Row>

@@ -8,20 +8,29 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { eventBus } from '../../core/event-bus';
 
-export type ThemeMode = 'light' | 'dark' | 'hud' | 'hud-light' | 'system';
-export type ResolvedTheme = 'light' | 'dark' | 'hud' | 'hud-light';
+// The "Cockpit" (hud) themes were removed — the product now ships a single,
+// refined Light and Dark theme. Legacy stored values 'hud'/'hud-light' are
+// migrated to 'dark'/'light' on read so no one is stranded on a missing theme.
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type ResolvedTheme = 'light' | 'dark';
 
 /** Cycle order used by the top-bar quick toggle. */
-export const THEME_CYCLE: ResolvedTheme[] = ['light', 'dark', 'hud', 'hud-light'];
+export const THEME_CYCLE: ResolvedTheme[] = ['light', 'dark'];
 
 /** Human labels for the theme picker. */
 export const THEME_LABELS: Record<ThemeMode, string> = {
   light: 'Light',
   dark: 'Dark',
-  hud: 'Cockpit Dark',
-  'hud-light': 'Cockpit Light',
   system: 'System',
 };
+
+/** Migrate any legacy/removed theme value to a supported one. */
+function normalizeStoredMode(raw: string | null): ThemeMode {
+  if (raw === 'dark' || raw === 'hud') return 'dark';
+  if (raw === 'light' || raw === 'hud-light') return 'light';
+  if (raw === 'system') return 'system';
+  return 'light';
+}
 
 interface ThemeContextValue {
   mode: ThemeMode;          // user preference
@@ -38,17 +47,17 @@ function systemPrefersDark(): boolean {
 }
 function resolve(mode: ThemeMode): ResolvedTheme {
   if (mode === 'system') return systemPrefersDark() ? 'dark' : 'light';
-  return mode; // 'light' | 'dark' | 'hud' apply directly
+  return mode; // 'light' | 'dark' apply directly
 }
 
 /** Boot-time application of the stored theme (call before React renders to avoid flash). */
 export function initTheme(): void {
-  const stored = (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? 'light';
+  const stored = normalizeStoredMode(localStorage.getItem(STORAGE_KEY));
   document.documentElement.setAttribute('data-theme', resolve(stored));
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(() => (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? 'light');
+  const [mode, setModeState] = useState<ThemeMode>(() => normalizeStoredMode(localStorage.getItem(STORAGE_KEY)));
   const [theme, setTheme] = useState<ResolvedTheme>(() => resolve(mode));
 
   const apply = useCallback((next: ThemeMode) => {

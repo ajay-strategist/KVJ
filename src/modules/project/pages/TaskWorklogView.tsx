@@ -64,7 +64,9 @@ export function TaskWorklogView() {
         supervisorName,
       };
     });
-    return list.sort((a, b) => b.date.localeCompare(a.date));
+    // Latest → oldest. Parse to a timestamp so non-ISO date formats still order
+    // chronologically rather than lexically.
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [timesheets, projects, tasks, employees, allocations]);
 
   useEffect(() => {

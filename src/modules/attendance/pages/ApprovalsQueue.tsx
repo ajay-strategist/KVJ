@@ -34,10 +34,13 @@ export function ApprovalsQueue() {
   const [selectedCorrection, setSelectedCorrection] = useState<any | null>(null);
   const [notes, setNotes] = useState('');
   
+  const userRole = user?.role || 'EMPLOYEE';
+  const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+
   const pendingTaskApprovals = useMemo(() => {
     return tasks.filter((t) => 
       !t.deletedAt && 
-      (t.approvalStatus === 'pending_task_approval' || t.approvalStatus === 'pending_assignment_approval')
+      (t.approvalStatus === 'pending_task_approval' || t.approvalStatus === 'pending_assignment_approval' || t.status === 'review')
     );
   }, [tasks]);
 
@@ -142,18 +145,19 @@ export function ApprovalsQueue() {
     });
     if (!ok) return;
 
-    if (!accept) {
-      setCorrections((prev) => prev.filter((c) => c.id !== rec.id));
-      toast({ variant: 'warning', title: 'Correction Rejected' });
-      return;
-    }
+    const actor = { id: user?.id || 'emp-admin', role: user?.role || 'ADMIN' };
+    const res = accept
+      ? await attService.approveCorrection(rec.id, actor)
+      : await attService.rejectCorrection(rec.id, actor);
 
-    const res = await attService.approveCorrection(rec.id, { id: user!.id, role: user!.role });
     if (res.ok) {
-      toast({ variant: 'success', title: 'Correction Accepted' });
-      setCorrections((prev) => prev.filter((c) => c.id !== rec.id));
+      toast({
+        variant: accept ? 'success' : 'warning',
+        title: accept ? 'Correction Accepted' : 'Correction Rejected',
+      });
+      fetchCorrectionsAndEmployees();
     } else {
-      toast({ variant: 'error', title: 'Approval Failed', message: res.error.message });
+      toast({ variant: 'error', title: 'Action Failed', message: res.error.message });
     }
   };
 
@@ -248,6 +252,9 @@ export function ApprovalsQueue() {
       key: 'actions',
       header: 'Action',
       render: (r) => {
+        if (!canApprove) {
+          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required (Admin/CEO/Manager)</span>;
+        }
         if (r.approvalStatus === 'pending_assignment_approval') {
           return (
             <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
@@ -381,7 +388,13 @@ export function ApprovalsQueue() {
 
   return (
     <AppShell>
-      <PageHeader title="Pending Approvals Queue" subtitle="Approve or reject leaves and attendance logs" />
+      <PageHeader title="Pending Approvals Queue" subtitle="Approve or reject leaves, attendance logs, and project tasks" />
+      {!canApprove && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>🔒</span>
+          <span><strong>Approving Rights Notice:</strong> Only <strong>Admin</strong>, <strong>CEO</strong>, and <strong>Manager</strong> roles have approval rights. You are viewing queue items in read-only mode.</span>
+        </div>
+      )}
       <Tabs items={tabs} />
 
       {/* Leave Details Drawer */}

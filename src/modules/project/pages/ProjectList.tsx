@@ -51,7 +51,7 @@ export function ProjectList() {
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
-  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, deleteTask } = useProject();
+  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, submitTask, deleteTask } = useProject();
   const { employees } = useEmployee();
 
   const assigneeOptions = useMemo(() => {
@@ -67,13 +67,14 @@ export function ProjectList() {
   const mappedProjects = useMemo(() => {
     return projects.map((p) => {
       const client = clients.find((c) => c.id === p.clientId);
-      const supervisorAlloc = allocations.find((a) => a.projectId === p.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager')));
+      // Only an EXPLICITLY assigned supervisor is shown. Previously, when a
+      // project had none, the first manager/lead allocated to it was displayed
+      // as the supervisor — which is why projects with no supervisor still
+      // showed one. If there is no supervisor, show nothing.
       const supervisorEmp = (p as any).supervisorId
         ? employees.find((e) => e.id === (p as any).supervisorId)
-        : supervisorAlloc
-        ? employees.find((e) => e.id === supervisorAlloc.employeeId)
         : null;
-      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : 'Manager (Operations)';
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
 
       let status: 'Not Started' | 'In Progress' | 'Completed' = 'Not Started';
       if (p.status === 'execution') status = 'In Progress';
@@ -605,9 +606,11 @@ export function ProjectList() {
                   </div>
 
                   {/* Supervisor */}
-                  <div style={{ fontSize: 12, marginBottom: 12, padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Supervisor:</span> <strong>👤 {p.supervisor}</strong>
-                  </div>
+                  {p.supervisor ? (
+                    <div style={{ fontSize: 12, marginBottom: 12, padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Supervisor:</span> <strong>👤 {p.supervisor}</strong>
+                    </div>
+                  ) : null}
 
                   {/* Member-specific Hours Breakdown */}
                   <div style={{ marginBottom: 12 }}>
@@ -843,7 +846,12 @@ export function ProjectList() {
                               <select
                                 value={t.rawStatus || 'todo'}
                                 onChange={async (e) => {
-                                  await updateTask(t.id, { status: e.target.value as any });
+                                  const val = e.target.value;
+                                  if (val === 'review') {
+                                    await submitTask(t.id, 'Status changed to Under Review');
+                                  } else {
+                                    await updateTask(t.id, { status: val as any });
+                                  }
                                   toast({ variant: 'success', title: 'Status Updated' });
                                 }}
                                 style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }}

@@ -167,29 +167,47 @@ export function AttendanceLogPage() {
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
     const wt = workType || 'Office';
-    const isTraining = wt === 'Training' || wt.toLowerCase().includes('training');
 
-    if (isTraining) {
-      if (recordBatchId) {
-        const found = batches.find((b) => b.id === recordBatchId);
-        if (found) return found.trainingName || found.batchNo || found.code || found.college || 'Training Batch';
-      }
+    // 1. Direct recordBatchId lookup
+    if (recordBatchId) {
+      const found = batches.find((b) => b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId);
+      if (found) return found.trainingName || found.batchNo || found.code || found.college || 'Training Batch';
+    }
 
-      const combinedNotes = `${sessionNotes || ''} ${recordNotes || ''}`.toLowerCase();
-      if (combinedNotes.trim()) {
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+
+    // 2. Parse Location: ... in notes
+    const locMatch = rawNotes.match(/Location:\s*([^.\n,]+)/i);
+    if (locMatch && locMatch[1].trim()) {
+      const locStr = locMatch[1].trim();
+      if (locStr.toLowerCase() !== 'office work' && locStr.toLowerCase() !== 'office') {
         const found = batches.find((b) =>
-          (b.trainingName && combinedNotes.includes(b.trainingName.toLowerCase())) ||
-          (b.batchNo && combinedNotes.includes(b.batchNo.toLowerCase())) ||
-          (b.code && combinedNotes.includes(b.code.toLowerCase())) ||
-          (b.college && combinedNotes.includes(b.college.toLowerCase()))
+          b.code?.toLowerCase() === locStr.toLowerCase() ||
+          b.trainingName?.toLowerCase() === locStr.toLowerCase() ||
+          b.batchNo?.toLowerCase() === locStr.toLowerCase()
         );
-        if (found) return found.trainingName || found.batchNo || found.code || 'Training Batch';
+        return found ? (found.trainingName || found.batchNo || found.code || locStr) : locStr;
       }
+    }
 
+    // 3. Search notes for any batch code/name/college matching batches array
+    const lower = rawNotes.toLowerCase();
+    if (lower.trim()) {
+      const found = batches.find((b) =>
+        (b.trainingName && lower.includes(b.trainingName.toLowerCase())) ||
+        (b.batchNo && lower.includes(b.batchNo.toLowerCase())) ||
+        (b.code && lower.includes(b.code.toLowerCase())) ||
+        (b.college && lower.includes(b.college.toLowerCase()))
+      );
+      if (found) return found.trainingName || found.batchNo || found.code || 'Training Batch';
+    }
+
+    // 4. If workType is Training or notes mention training/batch
+    const isTraining = wt === 'Training' || wt.toLowerCase().includes('training') || lower.includes('training') || lower.includes('batch');
+    if (isTraining) {
       if (batches.length > 0) {
         return batches[0].trainingName || batches[0].batchNo || batches[0].code || 'Training Batch';
       }
-
       return 'Training Batch';
     }
 

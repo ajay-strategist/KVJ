@@ -108,6 +108,7 @@
   --glass-blur: 30px;
   --glass-border: 1px solid rgba(255, 255, 255, 0.11);
   --glow-ambient: rgba(90, 150, 255, 0.16);
+  --grain-opacity: 0.05;
 
   --text-primary: #F1F5F9;
   --text-secondary: #CBD5E1;
