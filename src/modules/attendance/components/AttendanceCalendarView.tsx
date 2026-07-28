@@ -256,14 +256,14 @@ export function AttendanceCalendarView({
           <SectionHeader title={`Monthly Attendance Calendar Grid — ${selectedEmployeeName}`} />
 
           {/* Days of week header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, marginBottom: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--text-muted)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, marginBottom: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--text-muted)' }}>
             {daysOfWeek.map((d) => (
               <div key={d} style={{ padding: '4px 0' }}>{d}</div>
             ))}
           </div>
 
           {/* Calendar Days Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8 }}>
             {days.map((d, i) => {
               const styles = getStatusColor(d.status);
               const startColIdx = daysOfWeek.indexOf(d.dayName);
@@ -296,10 +296,10 @@ export function AttendanceCalendarView({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
                         {d.sessions.map((s, sIdx) => (
                           <div key={sIdx} style={{ fontSize: 9.5, lineHeight: 1.25, background: 'var(--bg-surface)', padding: '2px 4px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--brand)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={s.location}>
+                            <div style={{ fontWeight: 700, color: 'var(--brand)', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }} title={s.location}>
                               📍 {s.location}
                             </div>
-                            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+                            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
                               🕒 {s.startTime} - {s.endTime}
                             </div>
                           </div>
@@ -308,7 +308,7 @@ export function AttendanceCalendarView({
                     ) : (
                       <>
                         {d.location && (
-                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={d.location}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }} title={d.location}>
                             📍 {d.location}
                           </div>
                         )}
@@ -324,7 +324,7 @@ export function AttendanceCalendarView({
                     {d.tasks && d.tasks.length > 0 && !d.sessions && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
                         {d.tasks.slice(0, 1).map((t, idx) => (
-                          <div key={idx} style={{ fontSize: 9, color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          <div key={idx} style={{ fontSize: 9, color: 'var(--text-muted)', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                             ✓ {t.title}
                           </div>
                         ))}

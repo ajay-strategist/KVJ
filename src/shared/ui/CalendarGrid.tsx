@@ -68,7 +68,7 @@ export function CalendarGrid({ year, month, events = [], onDayClick }: CalendarG
   return (
     <div className="kvj-calendar-grid" style={{ width: '100%' }}>
       {/* Week Headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, textAlign: 'center', marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, textAlign: 'center', marginBottom: 8 }}>
         {weekDays.map((wd) => (
           <div key={wd} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', padding: '4px 0' }}>
             {wd}
@@ -77,7 +77,7 @@ export function CalendarGrid({ year, month, events = [], onDayClick }: CalendarG
       </div>
 
       {/* Days Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8 }}>
         {days.map((day, idx) => {
           if (day.dayNum === null) {
             return <div key={`empty-${idx}`} style={{ aspectRatio: '1', background: 'transparent' }} />;
