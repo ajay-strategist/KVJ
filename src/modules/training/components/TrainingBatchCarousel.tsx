@@ -273,32 +273,36 @@ const BatchCard = memo(function BatchCard({
 
             {/* Edit + Copy + Fav + Pin controls */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                onClick={() => onEdit?.(vm.id)}
-                title="Edit Training Details"
-                style={{
-                  background: 'var(--bg-sunken)', border: '1px solid var(--border)',
-                  cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
-                  padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                ✏️ Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => onCopy?.(vm.id)}
-                title="Make a Copy of Training Details Card"
-                style={{
-                  background: 'var(--bg-sunken)', border: '1px solid var(--border)',
-                  cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
-                  padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                📋 Copy
-              </button>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(vm.id)}
+                  title="Edit Training Details"
+                  style={{
+                    background: 'var(--bg-sunken)', border: '1px solid var(--border)',
+                    cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                    padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  ✏️ Edit
+                </button>
+              )}
+              {onCopy && (
+                <button
+                  type="button"
+                  onClick={() => onCopy(vm.id)}
+                  title="Make a Copy of Training Details Card"
+                  style={{
+                    background: 'var(--bg-sunken)', border: '1px solid var(--border)',
+                    cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                    padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  📋 Copy
+                </button>
+              )}
               <button
                 type="button"
                 aria-label={favourite ? 'Remove from favourites' : 'Add to favourites'}

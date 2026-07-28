@@ -335,7 +335,7 @@ export function SettingsPage() {
           <UserPasswordResetCard />
 
           {/* Admin User Management Panel */}
-          {user?.role === 'ADMIN' && (
+          {['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '') && (
             <AdminUserManagementCard />
           )}
 
@@ -600,6 +600,7 @@ function AdminUserManagementCard() {
                   <option value="MANAGER">COORDINATOR / MANAGER</option>
                   <option value="EMPLOYEE">EMPLOYEE</option>
                   <option value="ADMIN">ADMIN</option>
+                  <option value="CEO">CEO</option>
                 </select>
               </div>
 

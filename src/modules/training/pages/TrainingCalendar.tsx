@@ -184,7 +184,14 @@ export function TrainingCalendar() {
 
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
-      if (r.ok) setTrainers(r.value);
+      if (r.ok) {
+        if (isExecutive) {
+          setTrainers(r.value);
+        } else if (user) {
+          const selfTrainer = r.value.filter((emp) => emp.id === user.id);
+          setTrainers(selfTrainer.length > 0 ? selfTrainer : r.value.filter((emp) => emp.email?.toLowerCase() === user.email?.toLowerCase()));
+        }
+      }
     });
 
     const batchRepo = container.resolve(BATCH_REPOSITORY_TOKEN);
@@ -193,7 +200,7 @@ export function TrainingCalendar() {
       setBatches(bRes.data);
       setCourses(cRes.data);
     });
-  }, []);
+  }, [isExecutive, user]);
 
   const dynamicBatchPresets = useMemo(() => {
     return batches.map((b) => {

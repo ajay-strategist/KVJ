@@ -119,7 +119,7 @@ export function BatchManagement() {
   const [trainers, setTrainers] = useState<Employee[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const isExecutive = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
-  const [selectedTrainerId, setSelectedTrainerId] = useState<string>(isExecutive ? 'all' : (user?.id || ''));
+  const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
 
   // Create Batch Modal State
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
@@ -1351,13 +1351,10 @@ export function BatchManagement() {
   const safeTrainers = Array.isArray(trainers) ? trainers : [];
   const safeBatches = useMemo(() => {
     const raw = Array.isArray(batches) ? batches : [];
-    if (isExecutive) {
-      if (selectedTrainerId && selectedTrainerId !== 'all') {
-        return raw.filter((b) => b && b.trainerId === selectedTrainerId);
-      }
-      return raw;
+    if (selectedTrainerId && selectedTrainerId !== 'all') {
+      return raw.filter((b) => b && b.trainerId === selectedTrainerId);
     }
-    return raw.filter((b) => b && b.trainerId === user?.id);
+    return raw;
   }, [batches, isExecutive, selectedTrainerId, user]);
   const safeCourses = Array.isArray(courses) ? courses : [];
 
