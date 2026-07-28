@@ -72,10 +72,48 @@ export function getMonthlyFolderName(dateInput?: string): string {
   return `${now.getFullYear()}-${monthNames[now.getMonth()]}`;
 }
 
+const GOOGLE_APPS_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxoSfHLFOBpB2gybkhhMPVHE63nqa27u5dBd1vDmdga19wyPbEqVMxTylZ1GL9y878V/exec';
+
+async function uploadToGoogleDriveAppsScript(payload: {
+  categoryFolder: 'Receipt' | 'Medical Certificates';
+  monthFolder: string;
+  fileName: string;
+  mimeType?: string;
+  base64Content?: string;
+}): Promise<{ fileId: string; viewUrl: string } | null> {
+  try {
+    const response = await fetch(GOOGLE_APPS_SCRIPT_WEBAPP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({
+        categoryFolder: payload.categoryFolder,
+        monthFolder: payload.monthFolder,
+        fileName: payload.fileName,
+        mimeType: payload.mimeType || 'application/pdf',
+        base64Content: payload.base64Content || '',
+      }),
+    });
+    if (response.ok) {
+      const res = await response.json();
+      if (res && res.status === 'success' && res.url) {
+        return {
+          fileId: res.fileId || `drive_${Date.now()}`,
+          viewUrl: res.url,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Google Drive WebApp Upload warning:', e);
+  }
+  return null;
+}
+
 export interface GoogleIntegrationService {
   uploadFile(fileName: string, mimeType: string, content: ArrayBuffer, folder: string): Promise<string>;
-  uploadReceiptWithMetadata(params: ReceiptUploadParams): Promise<ReceiptMetadata>;
-  uploadMedicalCertificateWithMetadata(params: MedicalCertUploadParams): Promise<MedicalCertMetadata>;
+  uploadReceiptWithMetadata(params: ReceiptUploadParams & { base64Content?: string; mimeType?: string }): Promise<ReceiptMetadata>;
+  uploadMedicalCertificateWithMetadata(params: MedicalCertUploadParams & { base64Content?: string; mimeType?: string }): Promise<MedicalCertMetadata>;
   formatExpenseReceiptName(params: Omit<ReceiptUploadParams, 'fileContent'>): string;
   bookLeaveEvent(employeeName: string, leaveType: string, start: string, end: string): Promise<string>;
 }
@@ -98,18 +136,31 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
     return `${dateStr}_${person}_${locationOrBatch}_${type}_${amountStr}.${ext}`;
   }
 
-  async uploadReceiptWithMetadata(params: ReceiptUploadParams): Promise<ReceiptMetadata> {
+  async uploadReceiptWithMetadata(params: ReceiptUploadParams & { base64Content?: string; mimeType?: string }): Promise<ReceiptMetadata> {
     const dateStr = params.date || new Date().toISOString().split('T')[0];
     const monthFolder = getMonthlyFolderName(dateStr);
     const folderPath = `Office/Flow Desk/Receipt/${monthFolder}`;
 
     const storedFileName = this.formatExpenseReceiptName(params);
-    const fileId = `drive_rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+    let fileId = `drive_rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    let viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
     const downloadUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
     const uploadTimestamp = new Date().toISOString();
 
     console.log(`[Google Drive Integration] Uploading receipt into "${folderPath}": ${storedFileName}`);
+
+    const driveRes = await uploadToGoogleDriveAppsScript({
+      categoryFolder: 'Receipt',
+      monthFolder,
+      fileName: storedFileName,
+      mimeType: params.mimeType || 'image/png',
+      base64Content: params.base64Content || '',
+    });
+
+    if (driveRes) {
+      fileId = driveRes.fileId;
+      viewUrl = driveRes.viewUrl;
+    }
 
     return {
       googleDriveFileId: fileId,
@@ -125,7 +176,7 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
     };
   }
 
-  async uploadMedicalCertificateWithMetadata(params: MedicalCertUploadParams): Promise<MedicalCertMetadata> {
+  async uploadMedicalCertificateWithMetadata(params: MedicalCertUploadParams & { base64Content?: string; mimeType?: string }): Promise<MedicalCertMetadata> {
     const dateStr = params.date || params.startDate || new Date().toISOString().split('T')[0];
     const monthFolder = getMonthlyFolderName(dateStr);
     const folderPath = `Office/Flow Desk/Medical Certificates/${monthFolder}`;
@@ -136,12 +187,25 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
     const ext = extMatch ? extMatch[1].toLowerCase() : 'pdf';
     const storedFileName = `${dateStr}_MedicalCert_${emp}.${ext}`;
 
-    const fileId = `drive_med_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+    let fileId = `drive_med_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    let viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
     const downloadUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
     const uploadTimestamp = new Date().toISOString();
 
     console.log(`[Google Drive Integration] Uploading Medical Certificate into "${folderPath}": ${storedFileName}`);
+
+    const driveRes = await uploadToGoogleDriveAppsScript({
+      categoryFolder: 'Medical Certificates',
+      monthFolder,
+      fileName: storedFileName,
+      mimeType: params.mimeType || 'application/pdf',
+      base64Content: params.base64Content || '',
+    });
+
+    if (driveRes) {
+      fileId = driveRes.fileId;
+      viewUrl = driveRes.viewUrl;
+    }
 
     return {
       googleDriveFileId: fileId,

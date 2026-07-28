@@ -36,6 +36,22 @@ export function LeaveBoard() {
 
     if (values.medCert) {
       try {
+        const fileObj = values.medCert instanceof File ? values.medCert : (values.medCert as any).file instanceof File ? (values.medCert as any).file : null;
+        let base64Content = '';
+        if (fileObj) {
+          try {
+            base64Content = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const res = reader.result as string;
+                resolve(res.includes(',') ? res.split(',')[1] : res);
+              };
+              reader.onerror = () => resolve('');
+              reader.readAsDataURL(fileObj);
+            });
+          } catch (e) {}
+        }
+
         const driveRes = await googleIntegration.uploadMedicalCertificateWithMetadata({
           date: start,
           employeeName: user?.fullName || 'Employee',
@@ -43,6 +59,8 @@ export function LeaveBoard() {
           startDate: start,
           endDate: end,
           originalFileName: (values.medCert as any).name || 'medical_cert.pdf',
+          mimeType: fileObj?.type || 'application/pdf',
+          base64Content,
           uploadedBy: user?.fullName || 'Employee',
         });
         if (driveRes && driveRes.storedFileName) {
@@ -211,6 +229,22 @@ export function LeaveBoard() {
               const targetFolder = `Office/Flow Desk/Medical Certificates/${getMonthlyFolderName(uploadTargetLeave.startDate)}`;
 
               try {
+                const fileObj = values.medCert instanceof File ? values.medCert : (values.medCert as any).file instanceof File ? (values.medCert as any).file : null;
+                let base64Content = '';
+                if (fileObj) {
+                  try {
+                    base64Content = await new Promise<string>((resolve) => {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const res = reader.result as string;
+                        resolve(res.includes(',') ? res.split(',')[1] : res);
+                      };
+                      reader.onerror = () => resolve('');
+                      reader.readAsDataURL(fileObj);
+                    });
+                  } catch (e) {}
+                }
+
                 const driveRes = await googleIntegration.uploadMedicalCertificateWithMetadata({
                   date: uploadTargetLeave.startDate,
                   employeeName: user?.fullName || 'Employee',
@@ -218,6 +252,8 @@ export function LeaveBoard() {
                   startDate: uploadTargetLeave.startDate,
                   endDate: uploadTargetLeave.endDate,
                   originalFileName,
+                  mimeType: fileObj?.type || 'application/pdf',
+                  base64Content,
                   uploadedBy: user?.fullName || 'Employee',
                 });
                 if (driveRes && driveRes.storedFileName) {

@@ -387,6 +387,20 @@ export function ExpenseClaims() {
 
     if (values.receiptFile && values.receiptFile instanceof File) {
       try {
+        const fileObj = values.receiptFile as File;
+        let base64Content = '';
+        try {
+          base64Content = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const res = reader.result as string;
+              resolve(res.includes(',') ? res.split(',')[1] : res);
+            };
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(fileObj);
+          });
+        } catch (e) {}
+
         const driveRes = await googleIntegration.uploadReceiptWithMetadata({
           date: new Date().toISOString().split('T')[0],
           personName: user?.fullName || 'Employee',
@@ -394,7 +408,9 @@ export function ExpenseClaims() {
           batchName: (values.batch as string) || undefined,
           expenseType: (values.expenseType as string) || 'Expense',
           amount,
-          originalFileName: values.receiptFile.name,
+          originalFileName: fileObj.name,
+          mimeType: fileObj.type || 'image/png',
+          base64Content,
           uploadedBy: user?.fullName || 'Employee',
         });
         if (driveRes && driveRes.googleDriveViewUrl) {
