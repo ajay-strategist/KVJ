@@ -32,6 +32,10 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   useEffect(() => {
     let active = true;
     try {
@@ -195,14 +199,38 @@ export function LoginPage() {
                 </label>
                 <label style={fieldWrap}>
                   <span style={lbl}>Password</span>
-                  <input
-                    className="kvj-input"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    onKeyDown={(e) => e.key === 'Enter' && doLogin()}
-                  />
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      className="kvj-input"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password"
+                      onKeyDown={(e) => e.key === 'Enter' && doLogin()}
+                      style={{ paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 16,
+                        color: 'var(--text-muted)',
+                        padding: '4px 6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {showPassword ? '👁️' : '🙈'}
+                    </button>
+                  </div>
                 </label>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 18px' }}>
@@ -222,23 +250,71 @@ export function LoginPage() {
               <>
                 <label style={fieldWrap}>
                   <span style={lbl}>New Password</span>
-                  <input
-                    className="kvj-input"
-                    type="password"
-                    placeholder="Enter new password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      className="kvj-input"
+                      type={showNewPassword ? 'text' : 'password'}
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      style={{ paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      title={showNewPassword ? 'Hide password' : 'Show password'}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 16,
+                        color: 'var(--text-muted)',
+                        padding: '4px 6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {showNewPassword ? '👁️' : '🙈'}
+                    </button>
+                  </div>
                 </label>
                 <label style={fieldWrap}>
                   <span style={lbl}>Confirm New Password</span>
-                  <input
-                    className="kvj-input"
-                    type="password"
-                    placeholder="Confirm new password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      className="kvj-input"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Confirm new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      style={{ paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 16,
+                        color: 'var(--text-muted)',
+                        padding: '4px 6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {showConfirmPassword ? '👁️' : '🙈'}
+                    </button>
+                  </div>
                 </label>
 
                 <Button onClick={handleFirstTimeReset} disabled={busy} style={{ width: '100%', justifyContent: 'center', height: 42, fontSize: 14, fontWeight: 700, marginTop: 10 }}>
