@@ -63,13 +63,8 @@ function toAuthUser(row: EmployeeProfileRow, fallbackEmail: string): AuthUser {
   }
   
   let role = (row.role ?? 'EMPLOYEE').toUpperCase() as RoleKey;
-  const desig = (row.designation || '').toUpperCase();
-  if (desig.includes('CEO') || desig.includes('CHIEF EXECUTIVE') || emailLower === 'info@thestrategist.co.in') {
+  if (emailLower === 'info@thestrategist.co.in') {
     role = 'CEO';
-  } else if (desig.includes('ADMIN')) {
-    role = 'ADMIN';
-  } else if (desig.includes('MANAGER')) {
-    role = 'MANAGER';
   }
 
   return {
