@@ -668,7 +668,7 @@ function SideNavLink({
   to: string; icon: string; label: string; collapsed: boolean; onNavigate: () => void;
 }) {
   const { pathname } = useLocation();
-  const active = pathname === to || (to !== '/app' && pathname.startsWith(to));
+  const active = pathname === to || (to !== '/app' && pathname.startsWith(to) && !(to === '/app/employees' && pathname.startsWith('/app/employees/status')));
   return (
     <Link
       to={to}
