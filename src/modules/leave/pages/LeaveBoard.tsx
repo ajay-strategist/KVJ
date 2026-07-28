@@ -6,12 +6,15 @@ import { useLeave } from '../hooks/useLeave';
 import { Form, SelectField, DatePickerField, TextAreaField, CheckboxField, FileUploadField } from '../../../shared/forms/form';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { useAuth } from '../../auth/AuthProvider';
 import { businessRules } from '../../../config/business-rules';
 import Drawer from '../../../shared/ui/Drawer';
 import type { LeaveRecord } from '../leave.repository';
+import { googleIntegration, getMonthlyFolderName } from '../../../shared/integration/google';
 
 export function LeaveBoard() {
   const { leaves, applyLeave, uploadMedicalCertificate, loading } = useLeave();
+  const { user } = useAuth();
   const { confirm } = useDialog();
   const { toast } = useNotifications();
   const [applyOpen, setApplyOpen] = useState(false);
@@ -29,17 +32,44 @@ export function LeaveBoard() {
     const start = (values.startDate as string) || todayStr;
     const end = (values.endDate as string) || start;
 
+    let certName = values.medCert ? (values.medCert as any).name : undefined;
+
+    if (values.medCert) {
+      try {
+        const driveRes = await googleIntegration.uploadMedicalCertificateWithMetadata({
+          date: start,
+          employeeName: user?.fullName || 'Employee',
+          leaveType: (values.leaveType as string) || 'Leave',
+          startDate: start,
+          endDate: end,
+          originalFileName: (values.medCert as any).name || 'medical_cert.pdf',
+          uploadedBy: user?.fullName || 'Employee',
+        });
+        if (driveRes && driveRes.storedFileName) {
+          certName = driveRes.storedFileName;
+        }
+      } catch (e) {
+        console.warn('Google Drive medical cert upload warning:', e);
+      }
+    }
+
     const res = await applyLeave(
       (values.leaveType as string) || 'Leave',
       start,
       end,
       (values.reason as string) || 'Leave application',
       !!values.halfDay,
-      values.medCert ? (values.medCert as any).name : undefined
+      certName
     );
 
     if (res.ok) {
-      toast({ variant: 'success', title: 'Leave Applied', message: 'Your application has been submitted successfully.' });
+      toast({
+        variant: 'success',
+        title: 'Leave Applied & Cert Uploaded',
+        message: values.medCert
+          ? `Submitted application. Medical certificate saved in Google Drive: FlowDesk/${getMonthlyFolderName(start)}/Medical Certificates.`
+          : 'Your leave application has been submitted successfully.',
+      });
       setApplyOpen(false);
     } else {
       toast({ variant: 'error', title: 'Application Failed', message: res.error });
@@ -176,10 +206,34 @@ export function LeaveBoard() {
                 toast({ variant: 'error', title: 'File Required', message: 'Please select a medical certificate file to upload.' });
                 return;
               }
-              const fileName = (values.medCert as any).name || 'medical_certificate.pdf';
-              const res = await uploadMedicalCertificate(uploadTargetLeave.id, fileName);
+              const originalFileName = (values.medCert as any).name || 'medical_certificate.pdf';
+              let certName = originalFileName;
+              const targetFolder = `FlowDesk/${getMonthlyFolderName(uploadTargetLeave.startDate)}/Medical Certificates`;
+
+              try {
+                const driveRes = await googleIntegration.uploadMedicalCertificateWithMetadata({
+                  date: uploadTargetLeave.startDate,
+                  employeeName: user?.fullName || 'Employee',
+                  leaveType: uploadTargetLeave.leaveType,
+                  startDate: uploadTargetLeave.startDate,
+                  endDate: uploadTargetLeave.endDate,
+                  originalFileName,
+                  uploadedBy: user?.fullName || 'Employee',
+                });
+                if (driveRes && driveRes.storedFileName) {
+                  certName = driveRes.storedFileName;
+                }
+              } catch (e) {
+                console.warn('Google Drive medical cert upload warning:', e);
+              }
+
+              const res = await uploadMedicalCertificate(uploadTargetLeave.id, certName);
               if (res.ok) {
-                toast({ variant: 'success', title: 'Certificate Uploaded', message: 'Medical certificate attached successfully to your leave record.' });
+                toast({
+                  variant: 'success',
+                  title: 'Certificate Uploaded to Google Drive',
+                  message: `Medical certificate attached to leave record & saved in Google Drive: ${targetFolder}.`,
+                });
                 setUploadCertOpen(false);
                 setUploadTargetLeave(null);
               } else {

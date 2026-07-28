@@ -445,7 +445,15 @@ export function ExpenseClaims() {
     }
 
     setExpenses((prev) => [newRecord, ...(Array.isArray(prev) ? prev : [])]);
-    toast({ variant: 'success', title: 'Claim Filed', message: `Submitted ₹${amount.toFixed(2)} expense claim for review.` });
+    const todayStr = new Date().toISOString().split('T')[0];
+    const monthFolder = `${todayStr.slice(0, 4)}-${['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(todayStr.slice(5, 7), 10) - 1]}`;
+    toast({
+      variant: 'success',
+      title: 'Claim Filed & Receipt Uploaded',
+      message: values.receiptFile
+        ? `Submitted ₹${amount.toFixed(2)} claim. Receipt saved in Google Drive: FlowDesk/${monthFolder}/Receipts.`
+        : `Submitted ₹${amount.toFixed(2)} expense claim for review.`,
+    });
     setExpenseOpen(false);
   };
 

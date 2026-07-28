@@ -858,6 +858,10 @@ export const TaskWidget = memo(function TaskWidget({
     setDragOverIndex(null);
   };
 
+  const activeTasks = useMemo(() => {
+    return tasks.filter((t) => !t.isApproved);
+  }, [tasks]);
+
   return (
     <Card>
       <SectionHeader title="Today's Tasks (Drag & Drop Reorder)" />
@@ -879,12 +883,12 @@ export const TaskWidget = memo(function TaskWidget({
         }
       `}</style>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {tasks.length === 0 ? (
+        {activeTasks.length === 0 ? (
           <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-            📋 No tasks logged today. Click <strong>Add Task</strong> to create your first task.
+            📋 No pending or active tasks for today. Click <strong>Add Task</strong> to create a new task.
           </div>
         ) : (
-          tasks.map((t, idx) => (
+          activeTasks.map((t, idx) => (
           <div
             key={t.id}
             draggable
@@ -1042,18 +1046,22 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
       if (i === 0) dayLabel = 'Day 1 (Today)';
       else if (i === 1) dayLabel = 'Day 2 (Tomorrow)';
 
-      // 1. Gather tasks due on this date
+      // 1. Gather tasks due on this date (excluding approved/completed tasks)
       const dayTasks = (tasks || []).filter((t) => {
+        const status = (t.status || '').toLowerCase();
+        if (status === 'done' || status.includes('completed') || status.includes('approved')) {
+          return false;
+        }
         const taskDate = (t.dueDate || '').slice(0, 10);
         if (!taskDate) return i === 0;
         if (i === 0) {
           // Day 1 (Today): show tasks due today or active overdue tasks
-          return taskDate <= isoDate && t.status !== 'done';
+          return taskDate <= isoDate;
         }
         return taskDate === isoDate;
       }).map((t) => ({
         id: `task-${t.id}`,
-        time: t.status === 'done' ? 'Completed' : (t.dueDate || '').slice(0, 10) < isoDate ? 'Overdue' : 'Due Today',
+        time: (t.dueDate || '').slice(0, 10) < isoDate ? 'Overdue' : 'Due Today',
         title: `Task: ${t.title}`,
         type: 'Projects' as const,
       }));
