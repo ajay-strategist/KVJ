@@ -53,7 +53,7 @@ export const appConfig = {
       'Expense Receipts', 'Reports', 'Marketing', 'Temporary Uploads',
     ],
     powerBiEnabled: false,                 // Phase 2
-    supabaseEnabled: false,                // TEMP: local mobile verification (revert to true)
+    supabaseEnabled: true,                 // Production mode
   },
 } as const;
 
