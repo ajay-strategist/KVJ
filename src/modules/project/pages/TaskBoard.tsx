@@ -147,18 +147,18 @@ export function TaskBoard({
   const { employees } = useEmployee();
 
   const mappedTasks = useMemo(() => {
-    return tasks.map((t) => {
-      const project = projects.find((p) => p.id === t.projectId);
+    return tasks.map((t: any) => {
+      const project = projects.find((p: any) => p.id === t.projectId);
       const assignee = employees.find((e) => e.id === t.assigneeId);
       
-      const supervisorAlloc = project ? allocations.find((a) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
+      const supervisorAlloc = project ? allocations.find((a: any) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
       const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
 
-      const tTimesheets = timesheets.filter((ts) => ts.taskId === t.id);
-      const totalHoursWorked = tTimesheets.reduce((sum, ts) => sum + ts.hoursLogged, 0);
+      const tTimesheets = timesheets.filter((ts: any) => ts.taskId === t.id);
+      const totalHoursWorked = tTimesheets.reduce((sum: number, ts: any) => sum + ts.hoursLogged, 0);
 
-      const dailyTimeEntries = tTimesheets.map((ts) => {
+      const dailyTimeEntries = tTimesheets.map((ts: any) => {
         const emp = employees.find((e) => e.id === ts.employeeId);
         const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
         const isSuper = emp ? (emp.designation.toLowerCase().includes('manager') || emp.designation.toLowerCase().includes('ceo') || emp.designation.toLowerCase().includes('lead')) : false;
@@ -259,7 +259,7 @@ export function TaskBoard({
   }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
-    const proj = projects.find((p) => p.title === values.projectName || p.id === values.projectId);
+    const proj = projects.find((p: any) => p.title === values.projectName || p.id === values.projectId);
     const assignee = employees.find((e) => `${e.firstName} ${e.lastName}` === values.assignee || e.id === values.assigneeId);
 
     const isOtherAssignee = assignee && assignee.id !== user?.id;
@@ -432,7 +432,7 @@ export function TaskBoard({
     if (!selectedTask) return;
     const duration = Number(values.durationHrs) || 1.0;
 
-    const repoTask = tasks.find((t) => t.id === selectedTask.id);
+    const repoTask = tasks.find((t: any) => t.id === selectedTask.id);
     if (!repoTask) return;
 
     const res = await logTimesheet({

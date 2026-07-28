@@ -73,8 +73,8 @@ export function ProjectList({
   }, [employees]);
 
   const mappedProjects = useMemo(() => {
-    return projects.map((p) => {
-      const client = clients.find((c) => c.id === p.clientId);
+    return projects.map((p: any) => {
+      const client = clients.find((c: any) => c.id === p.clientId);
       // Only an EXPLICITLY assigned supervisor is shown. Previously, when a
       // project had none, the first manager/lead allocated to it was displayed
       // as the supervisor — which is why projects with no supervisor still
@@ -88,28 +88,28 @@ export function ProjectList({
       if (p.status === 'execution') status = 'In Progress';
       else if (p.status === 'closure') status = 'Completed';
 
-      const pTasks = tasks.filter((t) => t.projectId === p.id);
-      const pTaskIds = new Set(pTasks.map((t) => t.id));
-      const pTimesheets = timesheets.filter((ts) => ts.taskId && pTaskIds.has(ts.taskId));
+      const pTasks = tasks.filter((t: any) => t.projectId === p.id);
+      const pTaskIds = new Set(pTasks.map((t: any) => t.id));
+      const pTimesheets = timesheets.filter((ts: any) => ts.taskId && pTaskIds.has(ts.taskId));
 
-      const totalProjectHours = pTimesheets.reduce((sum, ts) => sum + Number(ts.hoursLogged || 0), 0) ||
-        pTasks.reduce((sum, t) => sum + Number(t.actualHours || 0), 0);
+      const totalProjectHours = pTimesheets.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0) ||
+        pTasks.reduce((sum: number, t: any) => sum + Number(t.actualHours || 0), 0);
 
-      const pAllocations = allocations.filter((a) => a.projectId === p.id);
+      const pAllocations = allocations.filter((a: any) => a.projectId === p.id);
       const membersMap = new Map<string, { name: string; hours: number }>();
 
       // Add allocated employees
-      pAllocations.forEach((a) => {
+      pAllocations.forEach((a: any) => {
         const emp = employees.find((e) => e.id === a.employeeId);
         const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
         const empHours = pTimesheets
-          .filter((ts) => ts.employeeId === a.employeeId)
-          .reduce((sum, ts) => sum + Number(ts.hoursLogged || 0), 0);
+          .filter((ts: any) => ts.employeeId === a.employeeId)
+          .reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
         membersMap.set(name, { name, hours: empHours });
       });
 
       // Add task assignees and timesheet loggers
-      pTasks.forEach((t) => {
+      pTasks.forEach((t: any) => {
         const emp = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
         const name = emp ? `${emp.firstName} ${emp.lastName}` : (t.assigneeId || 'Team Member');
         const taskHours = Number(t.actualHours || 0);
@@ -119,7 +119,7 @@ export function ProjectList({
 
       const members = Array.from(membersMap.values());
       const tasksTotal = pTasks.length;
-      const tasksCompleted = pTasks.filter((t) => t.status === 'done' || (t.status as any) === 'Completed').length;
+      const tasksCompleted = pTasks.filter((t: any) => t.status === 'done' || (t.status as any) === 'Completed').length;
 
       return {
         id: p.id,
@@ -143,7 +143,7 @@ export function ProjectList({
 
   useEffect(() => {
     if (selectedProject) {
-      const found = mappedProjects.find((p) => p.id === selectedProject.id);
+      const found = mappedProjects.find((p: any) => p.id === selectedProject.id);
       if (found) {
         if (JSON.stringify(found) !== JSON.stringify(selectedProject)) {
           setSelectedProject(found);
@@ -156,17 +156,17 @@ export function ProjectList({
   const filteredProjects = useMemo(() => {
     let list = projectsList;
     if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-      list = list.filter((p) => {
-        const dbProj = projects.find((dp) => dp.id === p.id);
+      list = list.filter((p: any) => {
+        const dbProj = projects.find((dp: any) => dp.id === p.id);
         if (dbProj && (dbProj as any).supervisorId === selectedEmployeeId) {
           return true;
         }
         const isAllocated = allocations.some(
-          (a) => a.projectId === p.id && a.employeeId === selectedEmployeeId
+          (a: any) => a.projectId === p.id && a.employeeId === selectedEmployeeId
         );
         if (isAllocated) return true;
         const hasTask = tasks.some(
-          (t) => t.projectId === p.id && t.assigneeId === selectedEmployeeId
+          (t: any) => t.projectId === p.id && t.assigneeId === selectedEmployeeId
         );
         if (hasTask) return true;
         return false;
@@ -179,17 +179,17 @@ export function ProjectList({
   const activeProjectsCount = useMemo(() => {
     let list = projectsList;
     if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-      list = list.filter((p) => {
-        const dbProj = projects.find((dp) => dp.id === p.id);
+      list = list.filter((p: any) => {
+        const dbProj = projects.find((dp: any) => dp.id === p.id);
         if (dbProj && (dbProj as any).supervisorId === selectedEmployeeId) {
           return true;
         }
         const isAllocated = allocations.some(
-          (a) => a.projectId === p.id && a.employeeId === selectedEmployeeId
+          (a: any) => a.projectId === p.id && a.employeeId === selectedEmployeeId
         );
         if (isAllocated) return true;
         const hasTask = tasks.some(
-          (t) => t.projectId === p.id && t.assigneeId === selectedEmployeeId
+          (t: any) => t.projectId === p.id && t.assigneeId === selectedEmployeeId
         );
         if (hasTask) return true;
         return false;
@@ -202,11 +202,11 @@ export function ProjectList({
 
   const selectedProjectTasks = useMemo(() => {
     if (!selectedProject) return [];
-    const pTasks = tasks.filter((t) => t.projectId === selectedProject.id);
-    return pTasks.map((t) => {
+    const pTasks = tasks.filter((t: any) => t.projectId === selectedProject.id);
+    return pTasks.map((t: any) => {
       const assignee = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
-      const tTimesheets = timesheets.filter((ts) => ts.taskId === t.id);
-      const hoursLogged = tTimesheets.reduce((sum, ts) => sum + Number(ts.hoursLogged || 0), 0) || Number(t.actualHours || 0);
+      const tTimesheets = timesheets.filter((ts: any) => ts.taskId === t.id);
+      const hoursLogged = tTimesheets.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0) || Number(t.actualHours || 0);
 
       let status = 'To Do';
       if (t.status === 'done' || (t.status as any) === 'Completed') status = 'Completed';
@@ -233,7 +233,7 @@ export function ProjectList({
 
     // Resolve client: match typed name to existing client, or pass name for new client creation
     const typedName = (clientNameInput || '').trim();
-    const matchedClient = clients.find((c) => c.name.toLowerCase() === typedName.toLowerCase());
+    const matchedClient = clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
     const resolvedClientId = matchedClient ? matchedClient.id : undefined;
 
     const res = await createProject({
@@ -267,7 +267,7 @@ export function ProjectList({
     if (!selectedProject) return;
 
     const typedName = (clientNameInput || '').trim();
-    const matchedClient = clients.find((c) => c.name.toLowerCase() === typedName.toLowerCase());
+    const matchedClient = clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
     const resolvedClientId = matchedClient ? matchedClient.id : undefined;
 
     const res = await updateProject(selectedProject.id as UUID, {
@@ -318,7 +318,7 @@ export function ProjectList({
 
   // PDF Export Logic — full content: KPIs, member hours, all tasks with hours/status
   const exportReportToPDF = (p: ProjectCardData) => {
-    const pTasks = tasks.filter((t) => t.projectId === p.id && !t.deletedAt);
+    const pTasks = tasks.filter((t: any) => t.projectId === p.id && !t.deletedAt);
     const completionPct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
     const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' });
 
@@ -455,11 +455,11 @@ export function ProjectList({
               </tr>
             </thead>
             <tbody>
-              ${pTasks.length > 0 ? pTasks.map((t, i) => {
+              ${pTasks.length > 0 ? pTasks.map((t: any, i: number) => {
                 const assignee = employees.find((e) => e.id === t.assigneeId);
                 const assigneeName = assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned';
-                const pTs = timesheets.filter((ts) => ts.taskId === t.id);
-                const hrs = pTs.reduce((sum, ts) => sum + (ts.hoursLogged || 0), 0);
+                const pTs = timesheets.filter((ts: any) => ts.taskId === t.id);
+                const hrs = pTs.reduce((sum: number, ts: any) => sum + (ts.hoursLogged || 0), 0);
                 return `
                   <tr>
                     <td style="color:#94a3b8;">${i + 1}</td>
@@ -872,7 +872,7 @@ export function ProjectList({
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedProjectTasks.map((t, idx) => (
+                        {selectedProjectTasks.map((t: any, idx: number) => (
                           <tr key={idx} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-sunken)', transition: 'background 0.15s' }}>
                             <td style={{ padding: '9px 12px', fontWeight: 600, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.name}>{t.name}</td>
                             <td style={{ padding: '6px 8px' }}>
@@ -990,9 +990,9 @@ export function ProjectList({
               }}
             />
             <datalist id="client-datalist">
-              {clients.map((c) => <option key={c.id} value={c.name} />)}
+              {clients.map((c: any) => <option key={c.id} value={c.name} />)}
             </datalist>
-            {clientNameInput && !clients.find((c) => c.name.toLowerCase() === clientNameInput.toLowerCase()) && (
+            {clientNameInput && !clients.find((c: any) => c.name.toLowerCase() === clientNameInput.toLowerCase()) && (
               <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>⚡ New client will be registered: "{clientNameInput}"</div>
             )}
           </div>
@@ -1051,7 +1051,7 @@ export function ProjectList({
               code: selectedProject.code,
               title: selectedProject.title,
               status: selectedProject.status === 'Completed' ? 'closure' : selectedProject.status === 'In Progress' ? 'execution' : 'not_started',
-              supervisorId: projects.find((p) => p.id === selectedProject.id)?.supervisorId || '',
+              supervisorId: projects.find((p: any) => p.id === selectedProject.id)?.supervisorId || '',
             }}
             onSubmit={handleEditProject}
           >
@@ -1079,7 +1079,7 @@ export function ProjectList({
                 }}
               />
               <datalist id="client-datalist">
-                {clients.map((c) => <option key={c.id} value={c.name} />)}
+                {clients.map((c: any) => <option key={c.id} value={c.name} />)}
               </datalist>
             </div>
 

@@ -225,7 +225,9 @@ export function LeaveBoard() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-        <SectionHeader title={isMgmt ? "Employee Leave History" : "My Leave History"} style={{ margin: 0 }} />
+        <div style={{ margin: 0 }}>
+          <SectionHeader title={isMgmt ? "Employee Leave History" : "My Leave History"} />
+        </div>
         {isMgmt && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Filter Employee:</span>

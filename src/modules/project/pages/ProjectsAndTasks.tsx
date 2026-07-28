@@ -32,7 +32,6 @@ export function ProjectsAndTasks() {
         <PageHeader 
           title="Projects & Tasks" 
           subtitle="Manage projects, schedules, worklogs, and tasks"
-          style={{ margin: 0 }}
         />
         {isMgmt && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>

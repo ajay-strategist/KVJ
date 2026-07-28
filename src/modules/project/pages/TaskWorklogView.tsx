@@ -46,7 +46,7 @@ export function TaskWorklogView({
   const { employees } = useEmployee();
 
   const mappedLogs = useMemo(() => {
-    const filteredTimesheets = timesheets.filter((ts) => {
+    const filteredTimesheets = timesheets.filter((ts: any) => {
       if (selectedEmployeeId && selectedEmployeeId !== 'all') {
         return ts.employeeId === selectedEmployeeId;
       }
@@ -56,13 +56,13 @@ export function TaskWorklogView({
       return true;
     });
 
-    const list = filteredTimesheets.map((ts) => {
-      const project = projects.find((p) => p.id === ts.projectId);
-      const task = tasks.find((t) => t.id === ts.taskId);
+    const list = filteredTimesheets.map((ts: any) => {
+      const project = projects.find((p: any) => p.id === ts.projectId);
+      const task = tasks.find((t: any) => t.id === ts.taskId);
       const emp = employees.find((e) => e.id === ts.employeeId);
       const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
       
-      const supervisorAlloc = project ? allocations.find((a) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
+      const supervisorAlloc = project ? allocations.find((a: any) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
       const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
 
@@ -83,7 +83,7 @@ export function TaskWorklogView({
       };
     });
     
-    return list.sort((a, b) => {
+    return list.sort((a: any, b: any) => {
       const timeA = a.date ? new Date(a.date).getTime() : 0;
       const timeB = b.date ? new Date(b.date).getTime() : 0;
       return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);

@@ -1058,7 +1058,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
         }
 
         if (!isManagement) {
-          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || (t.assignee && user?.fullName && t.assignee.toLowerCase() === user.fullName.toLowerCase());
+          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || ((t as any).assignee && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
           if (!isMyTask) return false;
         }
         const taskDate = (t.dueDate || '').slice(0, 10);
@@ -1241,7 +1241,7 @@ export const TimelineWidget = memo(function TimelineWidget({
             <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)' }}>👤 Filter Timeline:</span>
             <select
               value={selectedEmpId || 'me'}
-              onChange={(e) => onEmpIdChange(e.target.value)}
+              onChange={(e) => onEmpIdChange?.(e.target.value)}
               className="kvj-input"
               style={{ padding: '3px 8px', fontSize: 12, borderRadius: 6, flex: 1, background: 'var(--bg-surface)', cursor: 'pointer' }}
             >
@@ -1587,7 +1587,7 @@ export function MyDayPage() {
         if ((t as any).approvalStatus === 'pending_assignment_approval') return false;
 
         if (!isManagement) {
-          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || (t.assignee && user?.fullName && t.assignee.toLowerCase() === user.fullName.toLowerCase());
+          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || ((t as any).assignee && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
           if (!isMyTask) return false;
         }
 

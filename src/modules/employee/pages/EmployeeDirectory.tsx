@@ -275,80 +275,66 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         }
       />
 
-      <Tabs
-        defaultTabId={defaultTabId}
-        items={[
-          {
-            id: 'directory',
-            label: '📋 Directory',
-            content: (
-              <div>
-                <div style={{ marginBottom: 20, maxWidth: 360 }}>
-                  <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search directory..." />
-                </div>
+      {defaultTabId === 'directory' ? (
+        <div>
+          <div style={{ marginBottom: 20, maxWidth: 360 }}>
+            <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search directory..." />
+          </div>
 
-                <DataTable
-                  columns={columns}
-                  rows={filtered}
-                  rowKey={(r) => r.id}
-                  loading={loading}
-                  onRowClick={(r) => navigate(`/app/employees/${r.id}`)}
-                />
-              </div>
-            ),
-          },
-          {
-            id: 'status',
-            label: '🟢 Employee Status',
-            content: (
-              <div>
-                <SectionHeader title="Today's Employee Status & Current Work" />
-                <DataTable
-                  columns={[
-                    {
-                      key: 'name',
-                      header: 'Employee',
-                      render: (r: Employee) => (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Avatar name={`${r.firstName} ${r.lastName}`} size="sm" />
-                          <div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{`${r.firstName} ${r.lastName}`}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.designation}</div>
-                          </div>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: 'status',
-                      header: 'Current Status',
-                      render: (r: Employee) => {
-                        const stat = getEmployeeStatus(r.id);
-                        return (
-                          <Badge tone={stat.tone}>
-                            {stat.label}
-                          </Badge>
-                        );
-                      },
-                    },
-                    {
-                      key: 'activeTask',
-                      header: 'Current Task In Progress',
-                      render: (r: Employee) => (
-                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                          {getEmployeeActiveTask(r.id)}
-                        </span>
-                      ),
-                    },
-                  ]}
-                  rows={filtered}
-                  rowKey={(r) => r.id}
-                  loading={loading}
-                />
-              </div>
-            ),
-          },
-        ]}
-      />
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            rowKey={(r) => r.id}
+            loading={loading}
+            onRowClick={(r) => navigate(`/app/employees/${r.id}`)}
+          />
+        </div>
+      ) : (
+        <div>
+          <SectionHeader title="Today's Employee Status & Current Work" />
+          <DataTable
+            columns={[
+              {
+                key: 'name',
+                header: 'Employee',
+                render: (r: Employee) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Avatar name={`${r.firstName} ${r.lastName}`} size={28} />
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{`${r.firstName} ${r.lastName}`}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.designation}</div>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Current Status',
+                render: (r: Employee) => {
+                  const stat = getEmployeeStatus(r.id);
+                  return (
+                    <Badge tone={stat.tone}>
+                      {stat.label}
+                    </Badge>
+                  );
+                },
+              },
+              {
+                key: 'activeTask',
+                header: 'Current Task In Progress',
+                render: (r: Employee) => (
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {getEmployeeActiveTask(r.id)}
+                  </span>
+                ),
+              },
+            ]}
+            rows={filtered}
+            rowKey={(r) => r.id}
+            loading={loading}
+          />
+        </div>
+      )}
 
       {/* CREATE EMPLOYEE MODAL */}
       {addModalOpen && (
