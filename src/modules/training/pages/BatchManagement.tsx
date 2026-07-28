@@ -118,6 +118,8 @@ export function BatchManagement() {
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+  const isExecutive = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const [selectedTrainerId, setSelectedTrainerId] = useState<string>(isExecutive ? 'all' : (user?.id || ''));
 
   // Create Batch Modal State
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
@@ -1346,9 +1348,18 @@ export function BatchManagement() {
     });
   }, []);
 
-  const safeBatches = Array.isArray(batches) ? batches : [];
-  const safeCourses = Array.isArray(courses) ? courses : [];
   const safeTrainers = Array.isArray(trainers) ? trainers : [];
+  const safeBatches = useMemo(() => {
+    const raw = Array.isArray(batches) ? batches : [];
+    if (isExecutive) {
+      if (selectedTrainerId && selectedTrainerId !== 'all') {
+        return raw.filter((b) => b && b.trainerId === selectedTrainerId);
+      }
+      return raw;
+    }
+    return raw.filter((b) => b && b.trainerId === user?.id);
+  }, [batches, isExecutive, selectedTrainerId, user]);
+  const safeCourses = Array.isArray(courses) ? courses : [];
 
   useEffect(() => {
     if (safeBatches.length > 0 && !selectedBatchId) {
@@ -3150,17 +3161,40 @@ export function BatchManagement() {
           </p>
         </div>
 
-        {canCreateBatch && (
-          <Button onClick={() => setCreateBatchModalOpen(true)}>
-            ➕ Add New Batch
-          </Button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {isExecutive && safeTrainers.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>👤 Trainer:</span>
+              <select
+                className="kvj-select"
+                value={selectedTrainerId}
+                onChange={(e) => {
+                  setSelectedTrainerId(e.target.value);
+                  setSelectedBatchId('');
+                }}
+                style={{ padding: '4px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
+              >
+                <option value="all">👥 All Trainers</option>
+                {safeTrainers.map((emp) => {
+                  const name = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.email;
+                  return <option key={emp.id} value={emp.id}>{name}</option>;
+                })}
+              </select>
+            </div>
+          )}
+
+          {canCreateBatch && (
+            <Button onClick={() => setCreateBatchModalOpen(true)}>
+              ➕ Add New Batch
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Training Batch Overview Carousel — one card per assigned batch.
           Selecting a card sets the active batch for every section below. */}
       <TrainingBatchCarousel
-        batches={batches}
+        batches={safeBatches}
         courses={courses}
         trainers={trainers}
         activeId={selectedBatchId}

@@ -785,14 +785,20 @@ export const TaskWidget = memo(function TaskWidget({
 
   useEffect(() => {
     const timer = setInterval(() => {
+      let syncTaskId: string | null = null;
+      let syncSec = 0;
+      let syncUnderReview = false;
+
       setTasks((prev) => {
         let changed = false;
         const next = prev.map((t) => {
           if (t.active) {
             changed = true;
             const nextSec = t.secondsToday + 1;
-            if (onSyncTask && nextSec % 5 === 0) {
-              onSyncTask(t.id, nextSec, true, t.underReview);
+            if (nextSec % 5 === 0) {
+              syncTaskId = t.id;
+              syncSec = nextSec;
+              syncUnderReview = !!t.underReview;
             }
             return { ...t, secondsToday: nextSec };
           }
@@ -815,6 +821,10 @@ export const TaskWidget = memo(function TaskWidget({
         }
         return next;
       });
+
+      if (syncTaskId && onSyncTask) {
+        onSyncTask(syncTaskId, syncSec, true, syncUnderReview);
+      }
     }, 1000);
     return () => clearInterval(timer);
   }, [setTasks, onSyncTask]);
@@ -1686,8 +1696,11 @@ export function MyDayPage() {
   const handleToggleTask = (id: string, taskTitle: string, currentActive: boolean) => {
     const nextActive = !currentActive;
     const now = Date.now();
+    let targetTask: any = null;
+
     setTasks((prev) => {
-      const targetTask = prev.find((t) => t.id === id);
+      const found = prev.find((t) => t.id === id);
+      if (found) targetTask = found;
       const updated = prev.map((t) =>
         t.id === id ? { ...t, active: nextActive } : { ...t, active: false }
       );
@@ -1701,22 +1714,24 @@ export function MyDayPage() {
         };
       });
       saveStoredTaskStates(states);
-
-      if (targetTask) {
-        updateTask(id, {
-          status: nextActive ? 'in_progress' : 'todo',
-          actualHours: targetTask.secondsToday / 3600,
-        });
-      }
-
       return updated;
     });
+
+    if (targetTask) {
+      updateTask(id, {
+        status: nextActive ? 'in_progress' : 'todo',
+        actualHours: targetTask.secondsToday / 3600,
+      }).catch((e) => console.warn('Failed to update task status in DB:', e));
+    }
+
     handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
   };
 
   const handleSubmitReview = (id: string, taskTitle: string) => {
+    let targetTask: any = null;
     setTasks((prev) => {
-      const targetTask = prev.find((t) => t.id === id);
+      const found = prev.find((t) => t.id === id);
+      if (found) targetTask = found;
       const updated = prev.map((t) =>
         t.id === id ? { ...t, active: false, underReview: true, isRework: false, reworkNotes: undefined } : t
       );
@@ -1727,15 +1742,15 @@ export function MyDayPage() {
         delete states[id].lastStartTime;
       }
       saveStoredTaskStates(states);
-
-      if (targetTask) {
-        submitTask(id as any, 'Submitted from Workspace').catch((e) => {
-          console.warn('submitTask error:', e);
-        });
-      }
-
       return updated;
     });
+
+    if (targetTask) {
+      submitTask(id as any, 'Submitted from Workspace').catch((e) => {
+        console.warn('submitTask error:', e);
+      });
+    }
+
     toast({
       variant: 'success',
       title: 'Routed to Approvals Queue',

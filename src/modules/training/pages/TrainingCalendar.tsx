@@ -15,6 +15,7 @@ import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { useAuth } from '../../auth/AuthProvider';
 import { todayISO } from '../../../shared/utils/date';
 import {
   fetchScheduleRange, detectConflicts, eachDate, presetRange, PRESETS, CONFLICT_META,
@@ -64,6 +65,9 @@ const EMPTY_FILTERS: FilterState = {
 const SAVED_KEY = 'kvj.planner.savedFilters';
 
 export function TrainingCalendar() {
+  const { user } = useAuth();
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isExecutive = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
 

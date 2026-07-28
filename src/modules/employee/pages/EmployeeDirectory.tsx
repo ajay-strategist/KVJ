@@ -14,13 +14,31 @@ import { supabase } from '../../../shared/integration/supabase';
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
   const { employees, createEmployee, updateProfile, loading } = useEmployee();
-  const { createUser, resetToDefaultPassword } = useAuth();
+  const { createUser, resetToDefaultPassword, updateUser, getUsers } = useAuth();
   const { toast } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<Employee>>({});
+  const [editForm, setEditForm] = useState<any>({});
+
+  const [usersList, setUsersList] = useState<any[]>([]);
+
+  useEffect(() => {
+    getUsers().then((res) => {
+      if (Array.isArray(res)) {
+        setUsersList(res);
+      }
+    });
+  }, [getUsers]);
+
+  const getEmployeeUser = (email: string) => {
+    return usersList.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  };
+
+  const getEmployeeRole = (email: string): string => {
+    return getEmployeeUser(email)?.role || 'EMPLOYEE';
+  };
 
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
@@ -41,7 +59,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         const { data: taskData } = await supabase
           .from('tasks')
           .select('*')
-          .eq('status', 'in_progress')
+          .in('status', ['in_progress', 'In Progress'])
           .is('deleted_at', null);
         if (taskData) {
           setActiveTasks(taskData);
@@ -51,6 +69,8 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       }
     }
     loadStatusInfo();
+    const interval = setInterval(loadStatusInfo, 10000);
+    return () => clearInterval(interval);
   }, [employees]);
 
   const getEmployeeStatus = (empId: string) => {
@@ -76,6 +96,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     employeeId: `EMP-${Math.floor(100 + Math.random() * 900)}`,
     designation: 'Senior Technical Trainer',
     dateOfJoining: new Date().toISOString().split('T')[0],
+    role: 'EMPLOYEE',
   });
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -102,11 +123,15 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           username: form.email.trim(),
           fullName: `${form.firstName.trim()} ${form.lastName.trim()}`,
           email: form.email.trim(),
-          role: 'EMPLOYEE',
+          role: form.role as any,
         });
       } catch (err) {
         console.warn('Auth user creation note:', err);
       }
+
+      getUsers().then((res) => {
+        if (Array.isArray(res)) setUsersList(res);
+      });
 
       toast({
         variant: 'success',
@@ -122,6 +147,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         employeeId: `EMP-${Math.floor(100 + Math.random() * 900)}`,
         designation: 'Senior Technical Trainer',
         dateOfJoining: new Date().toISOString().split('T')[0],
+        role: 'EMPLOYEE',
       });
     } else {
       toast({ variant: 'error', title: 'Employee Creation Failed', message: res.error || 'Could not save employee. Check email format and network connection.' });
@@ -144,6 +170,19 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     });
 
     if (res.ok) {
+      try {
+        const u = getEmployeeUser(editingEmployee.email);
+        if (u && editForm.role && u.role !== editForm.role) {
+          await updateUser(u.id, { role: editForm.role as any });
+        }
+      } catch (err) {
+        console.warn('Auth user role update note:', err);
+      }
+
+      getUsers().then((res) => {
+        if (Array.isArray(res)) setUsersList(res);
+      });
+
       toast({
         variant: 'success',
         title: 'Employee Updated',
@@ -192,6 +231,21 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       accessor: (r) => r.designation,
     },
     {
+      key: 'role',
+      header: 'Role',
+      sortable: true,
+      accessor: (r) => getEmployeeRole(r.email),
+      render: (r) => {
+        const role = getEmployeeRole(r.email);
+        const tone = role === 'ADMIN' ? 'danger' : role === 'CEO' ? 'success' : role === 'MANAGER' ? 'warning' : 'neutral';
+        return (
+          <span className={`kvj-badge kvj-badge--${tone}`}>
+            {role}
+          </span>
+        );
+      },
+    },
+    {
       key: 'dateOfJoining',
       header: 'Joining Date',
       sortable: true,
@@ -228,6 +282,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
                 dateOfJoining: r.dateOfJoining,
                 phone: r.phone || '',
                 status: r.status,
+                role: getEmployeeRole(r.email),
               });
               setEditModalOpen(true);
             }}
@@ -443,6 +498,24 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
               </div>
             </div>
 
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                System Role *
+              </label>
+              <select
+                className="kvj-select"
+                required
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg-input, var(--bg-surface))', color: 'var(--text-primary)', fontSize: 14 }}
+              >
+                <option value="EMPLOYEE">Employee</option>
+                <option value="MANAGER">Manager</option>
+                <option value="CEO">CEO</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
               <Button type="button" variant="secondary" onClick={() => setAddModalOpen(false)}>
                 Cancel
@@ -554,6 +627,24 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />
               </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                System Role *
+              </label>
+              <select
+                className="kvj-select"
+                required
+                value={editForm.role || 'EMPLOYEE'}
+                onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg-input, var(--bg-surface))', color: 'var(--text-primary)', fontSize: 14 }}
+              >
+                <option value="EMPLOYEE">Employee</option>
+                <option value="MANAGER">Manager</option>
+                <option value="CEO">CEO</option>
+                <option value="ADMIN">Admin</option>
+              </select>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
