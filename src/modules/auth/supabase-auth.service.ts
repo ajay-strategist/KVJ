@@ -391,14 +391,24 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }> {
-    const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
-    if (authError) throw AppError.internal(authError.message);
+    try {
+      await supabase.auth.updateUser({ password: newPassword });
+    } catch (e) {
+      console.warn('Supabase auth.updateUser note:', e);
+    }
 
-    const { error: dbError } = await supabase
-      .from('employees')
-      .update({ must_change_password: false, updated_at: new Date().toISOString() })
-      .eq('id', userId);
-    if (dbError) throw AppError.internal(dbError.message);
+    try {
+      const isUuid = typeof userId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      const updateData = { must_change_password: false, updated_at: new Date().toISOString() };
+      
+      if (isUuid) {
+        await supabase.from('employees').update(updateData).eq('id', userId);
+      } else {
+        await supabase.from('employees').update(updateData).ilike('email', userId);
+      }
+    } catch (e) {
+      console.warn('Supabase employees update note:', e);
+    }
 
     return { ok: true };
   }

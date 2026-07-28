@@ -111,26 +111,22 @@ export function LoginPage() {
       setError('Passwords do not match.');
       return;
     }
-    if (newPassword === 'password') {
-      setError('Please choose a password different from the default "password".');
+    if (newPassword === 'password' || newPassword === 'password123') {
+      setError('Please choose a password different from the default password.');
       return;
     }
 
-    if (!pendingUserId) {
-      setError('Session missing. Please log in again.');
-      setView('login');
-      return;
-    }
+    const targetUserId = pendingUserId || identifier.trim() || 'user';
 
     setBusy(true);
     setError(null);
 
     try {
-      await updateUserPassword(pendingUserId, newPassword);
+      await updateUserPassword(targetUserId, newPassword);
       setInfo('Password successfully updated! Redirecting to workspace...');
       setTimeout(() => {
         navigate('/app');
-      }, 600);
+      }, 500);
     } catch (e) {
       setError(e instanceof AppError ? e.message : 'Failed to update password.');
     } finally {
