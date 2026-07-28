@@ -182,8 +182,8 @@ function DynamicExpenseForm({
             name="vehicle"
             label="Vehicle Type *"
             options={[
-              { value: 'Bike', label: `Bike (₹${bikeRate} / KM)` },
-              { value: 'Car', label: `Car (₹${carRate} / KM)` },
+              { value: 'Bike', label: 'Bike' },
+              { value: 'Car', label: 'Car' },
             ]}
           />
           <TextField name="km" label="Kilometers (KM) Travelled *" placeholder="e.g. 16" />
