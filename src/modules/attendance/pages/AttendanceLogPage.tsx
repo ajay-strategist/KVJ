@@ -324,8 +324,9 @@ export function AttendanceLogPage() {
         const totalHrs = Math.floor(totalMins / 60);
         const remMins = totalMins % 60;
 
-        const isHolType = workType === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday');
-        const isLeaveType = workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave;
+        const wtStr = (workType as string) || '';
+        const isHolType = wtStr === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday');
+        const isLeaveType = wtStr === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave;
 
         days.push({
           dateNum: dayNum,
@@ -425,8 +426,9 @@ export function AttendanceLogPage() {
             (s.notes && (s.notes.toLowerCase().includes('approved') || s.notes.toLowerCase().includes('claim') || s.notes.toLowerCase().includes('reapproved'))) ||
             sIdx > 0;
 
-          const isHoliday = workType === 'Holiday' || (s.notes && s.notes.toLowerCase().includes('holiday')) || !!decHoliday;
-          const isLeave = workType === 'Leave' || (s.notes && s.notes.toLowerCase().includes('leave')) || !!activeLeave;
+          const wtStr = (workType as string) || '';
+          const isHoliday = wtStr === 'Holiday' || (s.notes && s.notes.toLowerCase().includes('holiday')) || !!decHoliday;
+          const isLeave = wtStr === 'Leave' || (s.notes && s.notes.toLowerCase().includes('leave')) || !!activeLeave;
 
           rows.push({
             date: dateStr.split('-').reverse().join('/'),
