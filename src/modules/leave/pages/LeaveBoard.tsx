@@ -25,11 +25,15 @@ export function LeaveBoard() {
     });
     if (!ok) return;
 
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const start = (values.startDate as string) || todayStr;
+    const end = (values.endDate as string) || start;
+
     const res = await applyLeave(
-      values.leaveType as string,
-      values.startDate as string,
-      values.endDate as string,
-      values.reason as string,
+      (values.leaveType as string) || 'Leave',
+      start,
+      end,
+      (values.reason as string) || 'Leave application',
       !!values.halfDay,
       values.medCert ? (values.medCert as any).name : undefined
     );

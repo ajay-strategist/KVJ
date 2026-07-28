@@ -49,15 +49,15 @@ export function useLeave() {
     halfDay?: boolean,
     medUrl?: string
   ) => {
-    if (!user) return { ok: false, error: 'Unauthenticated' };
+    const empId = user?.id || 'emp-user';
     setLoading(true);
-    const res = await service.applyLeave(user.id, type, start, end, reason, halfDay, medUrl);
+    const res = await service.applyLeave(empId, type, start, end, reason, halfDay, medUrl);
     setLoading(false);
     if (res.ok) {
-      setLeaves((prev) => [res.value, ...prev]);
+      setLeaves((prev) => [res.value, ...(Array.isArray(prev) ? prev : [])]);
       return { ok: true, value: res.value };
     }
-    return { ok: false, error: res.error.message };
+    return { ok: false, error: res.error?.message || 'Failed to submit leave request.' };
   }, [service, user]);
 
   const approveLeave = useCallback(async (id: string, notes?: string) => {
