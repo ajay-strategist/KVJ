@@ -128,7 +128,7 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
   async uploadMedicalCertificateWithMetadata(params: MedicalCertUploadParams): Promise<MedicalCertMetadata> {
     const dateStr = params.date || params.startDate || new Date().toISOString().split('T')[0];
     const monthFolder = getMonthlyFolderName(dateStr);
-    const folderPath = `FlowDesk/${monthFolder}/Medical Certificates`;
+    const folderPath = `FlowDesk/Medical Reports/${monthFolder}`;
 
     const sanitize = (str: string) => str.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '');
     const emp = sanitize(params.employeeName || 'Employee');

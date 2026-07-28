@@ -67,7 +67,7 @@ export function LeaveBoard() {
         variant: 'success',
         title: 'Leave Applied & Cert Uploaded',
         message: values.medCert
-          ? `Submitted application. Medical certificate saved in Google Drive: FlowDesk/${getMonthlyFolderName(start)}/Medical Certificates.`
+          ? `Submitted application. Medical certificate saved in Google Drive: FlowDesk/Medical Reports/${getMonthlyFolderName(start)}.`
           : 'Your leave application has been submitted successfully.',
       });
       setApplyOpen(false);
@@ -208,7 +208,7 @@ export function LeaveBoard() {
               }
               const originalFileName = (values.medCert as any).name || 'medical_certificate.pdf';
               let certName = originalFileName;
-              const targetFolder = `FlowDesk/${getMonthlyFolderName(uploadTargetLeave.startDate)}/Medical Certificates`;
+              const targetFolder = `FlowDesk/Medical Reports/${getMonthlyFolderName(uploadTargetLeave.startDate)}`;
 
               try {
                 const driveRes = await googleIntegration.uploadMedicalCertificateWithMetadata({
