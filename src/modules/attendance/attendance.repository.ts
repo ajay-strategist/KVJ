@@ -3,7 +3,7 @@ import type { Entity, UUID, DateRange, GeoPoint } from '../../core/types';
 import { createToken } from '../../core/registry';
 
 export type AttendanceStatus = 'present' | 'on_break' | 'clocked_out' | 'absent';
-export type WorkSessionType = 'Office' | 'Training' | 'Marketing' | 'Meeting' | 'Work From Home' | 'Client Visit' | 'Other';
+export type WorkSessionType = 'Office' | 'Training' | 'Marketing' | 'Meeting' | 'Work From Home' | 'Client Visit' | 'Holiday' | 'Leave' | 'Other';
 
 export interface WorkSession {
   id: UUID;
