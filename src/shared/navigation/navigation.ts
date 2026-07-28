@@ -64,11 +64,14 @@ export const NAV_TREE: NavItem[] = [
 ];
 
 /** Filter the tree by (a) feature flags and (b) a permission predicate. */
-export function visibleNav(canFn: (r: Resource, a: Action) => boolean): NavItem[] {
+export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?: string): NavItem[] {
+  const isExecutive = userRole && ['CEO', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(String(userRole).toUpperCase());
   const keep = (item: NavItem): boolean => {
-    if (item.module && !featureFlags.modules[item.module]) return false;
-    if (item.page && !featureFlags.pages[item.page]) return false;
-    if (item.permission && !canFn(item.permission[0], item.permission[1])) return false;
+    if (!isExecutive) {
+      if (item.module && !featureFlags.modules[item.module]) return false;
+      if (item.page && !featureFlags.pages[item.page]) return false;
+      if (item.permission && !canFn(item.permission[0], item.permission[1])) return false;
+    }
     return true;
   };
   return NAV_TREE.filter(keep).map((i) => ({ ...i, children: i.children?.filter(keep) }));

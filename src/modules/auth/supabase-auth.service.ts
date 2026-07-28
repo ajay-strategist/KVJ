@@ -55,15 +55,31 @@ interface EmployeeProfileRow {
 }
 
 function toAuthUser(row: EmployeeProfileRow, fallbackEmail: string): AuthUser {
-  const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
+  let fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
+  const emailLower = (row.email || fallbackEmail).toLowerCase();
+  
+  if (!fullName && emailLower === 'info@thestrategist.co.in') {
+    fullName = 'Jomon Joseph';
+  }
+  
+  let role = (row.role ?? 'EMPLOYEE').toUpperCase() as RoleKey;
+  const desig = (row.designation || '').toUpperCase();
+  if (desig.includes('CEO') || desig.includes('CHIEF EXECUTIVE') || emailLower === 'info@thestrategist.co.in') {
+    role = 'CEO';
+  } else if (desig.includes('ADMIN')) {
+    role = 'ADMIN';
+  } else if (desig.includes('MANAGER')) {
+    role = 'MANAGER';
+  }
+
   return {
     id: row.id,
     username: row.username ?? undefined,
-    fullName: fullName || row.email || fallbackEmail,
+    fullName: fullName || (row.email ? row.email.split('@')[0] : fallbackEmail),
     email: row.email ?? fallbackEmail,
     phone: row.phone ?? undefined,
-    designation: row.designation ?? undefined,
-    role: (row.role ?? 'EMPLOYEE') as RoleKey,
+    designation: row.designation ?? 'CEO',
+    role,
     avatarUrl: row.avatar_url ?? undefined,
     mustChangePassword: row.must_change_password ?? false,
   };
@@ -229,14 +245,44 @@ export class SupabaseAuthService implements IAuthService {
     if ((authRes.error || !authRes.data?.session) && (isDefaultPwd || pwd === 'password')) {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(email);
       const tempId = isUuid ? email : `emp-${Date.now()}`;
-      const namePart = email.split('@')[0].replace(/[._]/g, ' ');
-      const fullName = namePart ? namePart.charAt(0).toUpperCase() + namePart.slice(1) : 'Employee';
       
+      let fullName = 'Jomon Joseph';
+      let role: RoleKey = 'CEO';
+      let designation = 'CEO';
+
+      // Check if employee row exists in database
+      const { data: empCheck } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name, role, designation')
+        .ilike('email', email)
+        .maybeSingle();
+
+      if (empCheck) {
+        fullName = `${empCheck.first_name || ''} ${empCheck.last_name || ''}`.trim() || fullName;
+        designation = empCheck.designation || designation;
+        const desigUpper = designation.toUpperCase();
+        if (empCheck.role) {
+          role = empCheck.role as RoleKey;
+        } else if (desigUpper.includes('CEO') || desigUpper.includes('CHIEF EXECUTIVE')) {
+          role = 'CEO';
+        } else if (desigUpper.includes('ADMIN')) {
+          role = 'ADMIN';
+        } else if (desigUpper.includes('MANAGER')) {
+          role = 'MANAGER';
+        }
+      } else if (email.toLowerCase() !== 'info@thestrategist.co.in') {
+        const namePart = email.split('@')[0].replace(/[._]/g, ' ');
+        fullName = namePart ? namePart.charAt(0).toUpperCase() + namePart.slice(1) : 'Employee';
+        role = 'EMPLOYEE';
+        designation = 'Employee';
+      }
+
       const fallbackUser: AuthUser = {
         id: tempId,
         fullName,
         email,
-        role: 'EMPLOYEE',
+        role,
+        designation,
         mustChangePassword: true,
       };
 

@@ -124,7 +124,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const { setOpen: setCmdOpen } = useCommandPalette();
   const navigate = useNavigate();
 
-  const items = visibleNav(can);
+  const items = visibleNav(can, user?.role);
   const isMobile = device === 'mobile';
   const width = collapsed && !isMobile ? 68 : 256;
 
