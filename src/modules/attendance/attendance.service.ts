@@ -236,16 +236,31 @@ export class AttendanceService implements IAttendanceService {
       }
 
       const openBreak = record.breaks?.find((b) => !b.endTime);
-      if (!openBreak) {
-        return Err(AppError.businessRule('No active break found.'));
+      let breakMins = 0;
+      let updatedBreaks = record.breaks ?? [];
+
+      if (openBreak) {
+        const breakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
+        breakMins = Math.max(0, Math.floor(breakMs / 60000));
+        updatedBreaks = (record.breaks ?? []).map((b) =>
+          b.id === openBreak.id ? { ...b, endTime: ts } : b
+        );
+      } else {
+        // Self-healing fallback: If the record status is 'on_break' but no unsaved break log
+        // exists in break_records table (e.g. started before the sync fix), heal the state.
+        const fallbackStart = record.updatedAt || record.firstClockIn || ts;
+        const breakMs = new Date(ts).getTime() - new Date(fallbackStart).getTime();
+        breakMins = Math.max(0, Math.floor(breakMs / 60000));
+
+        const fallbackBreak: BreakRecord = {
+          id: this.uuid(),
+          workSessionId: record.sessions?.[record.sessions.length - 1]?.id || this.uuid(),
+          startTime: fallbackStart,
+          endTime: ts,
+          reason: 'Auto-recovery break',
+        };
+        updatedBreaks = [...updatedBreaks, fallbackBreak];
       }
-
-      const breakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
-      const breakMins = Math.max(0, Math.floor(breakMs / 60000));
-
-      const updatedBreaks = (record.breaks ?? []).map((b) =>
-        b.id === openBreak.id ? { ...b, endTime: ts } : b
-      );
 
       const patch: Partial<AttendanceRecord> = {
         status: 'present',
