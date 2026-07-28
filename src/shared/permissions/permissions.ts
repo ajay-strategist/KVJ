@@ -97,17 +97,16 @@ export const ROLE_PERMISSIONS: Record<RoleKey, Permission[] | '*'> = {
 
   EMPLOYEE: [
     ...some('dashboard', ['view']),
-    ...some('employee', ['view']),
     ...some('attendance', ['view', 'create', 'update']),
     ...some('workSession', ['view', 'create', 'update']),
-    ...some('leave', ['view', 'create', 'approve']),
+    ...some('leave', ['view', 'create']),
     ...some('task', ['view', 'create', 'update']),
     ...some('taskApproval', ['view']),                 // can see their pending tasks
     ...some('project', ['view', 'create', 'update']),
     ...some('expense', ['view', 'create', 'upload']),
     ...some('travel', ['view', 'create']),
     ...some('calendar', ['view']),
-    ...some('training', ['view']),
+    ...some('training', ['view', 'create', 'update', 'delete']),
     ...some('chat', ['view', 'create']),
     ...some('report', ['view']),
     ...some('analytics', ['view']),
