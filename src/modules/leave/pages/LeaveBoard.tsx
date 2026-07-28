@@ -82,10 +82,23 @@ export function LeaveBoard() {
       render: (r) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {r.medicalCertUrl ? (
-            <span style={{ fontSize: 12, color: 'var(--status-success)', fontWeight: 600 }}>
-              📎 {r.medicalCertUrl}
-            </span>
-          ) : r.leaveType === 'Medical Leave' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--status-success)', fontWeight: 600 }}>
+                📎 {r.medicalCertUrl}
+              </span>
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUploadTargetLeave(r);
+                  setUploadCertOpen(true);
+                }}
+              >
+                ✏️ Change
+              </Button>
+            </div>
+          ) : (
             <Button
               size="xs"
               variant="secondary"
@@ -97,8 +110,6 @@ export function LeaveBoard() {
             >
               📤 Upload Cert
             </Button>
-          ) : (
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>N/A</span>
           )}
         </div>
       ),
