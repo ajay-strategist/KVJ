@@ -101,7 +101,7 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
   async uploadReceiptWithMetadata(params: ReceiptUploadParams): Promise<ReceiptMetadata> {
     const dateStr = params.date || new Date().toISOString().split('T')[0];
     const monthFolder = getMonthlyFolderName(dateStr);
-    const folderPath = `FlowDesk/${monthFolder}/Receipts`;
+    const folderPath = `Office/Flow Desk/Receipt/${monthFolder}`;
 
     const storedFileName = this.formatExpenseReceiptName(params);
     const fileId = `drive_rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -128,7 +128,7 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
   async uploadMedicalCertificateWithMetadata(params: MedicalCertUploadParams): Promise<MedicalCertMetadata> {
     const dateStr = params.date || params.startDate || new Date().toISOString().split('T')[0];
     const monthFolder = getMonthlyFolderName(dateStr);
-    const folderPath = `FlowDesk/Medical Reports/${monthFolder}`;
+    const folderPath = `Office/Flow Desk/Medical Certificates/${monthFolder}`;
 
     const sanitize = (str: string) => str.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '');
     const emp = sanitize(params.employeeName || 'Employee');

@@ -451,7 +451,7 @@ export function ExpenseClaims() {
       variant: 'success',
       title: 'Claim Filed & Receipt Uploaded',
       message: values.receiptFile
-        ? `Submitted ₹${amount.toFixed(2)} claim. Receipt saved in Google Drive: FlowDesk/${monthFolder}/Receipts.`
+        ? `Submitted ₹${amount.toFixed(2)} claim. Receipt saved in Google Drive: Office/Flow Desk/Receipt/${monthFolder}.`
         : `Submitted ₹${amount.toFixed(2)} expense claim for review.`,
     });
     setExpenseOpen(false);
