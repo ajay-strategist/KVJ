@@ -46,13 +46,13 @@ export function AttendanceCalendarView({
     switch (status) {
       case 'present':
         return { bg: 'rgba(34, 197, 94, 0.12)', border: '#22C55E', text: 'var(--status-success)' };
-      case 'absent':
       case 'leave':
-        return { bg: 'rgba(245, 158, 11, 0.14)', border: '#F59E0B', text: 'var(--status-warning)' };
+        return { bg: 'rgba(245, 158, 11, 0.18)', border: '#F59E0B', text: '#D97706' };
       case 'holiday':
-        return { bg: 'rgba(239, 68, 68, 0.14)', border: '#EF4444', text: 'var(--status-danger)' };
+        return { bg: 'rgba(239, 68, 68, 0.16)', border: '#EF4444', text: 'var(--status-danger)' };
+      case 'absent':
       default:
-        return { bg: 'var(--bg-sunken)', border: 'var(--border)', text: 'inherit' };
+        return { bg: 'var(--bg-sunken)', border: 'var(--border)', text: 'var(--text-muted)' };
     }
   };
 

@@ -93,6 +93,7 @@ export function AttendanceLogPage() {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
   const [declaredHolidays, setDeclaredHolidays] = useState<Array<{ date: string; name: string }>>([]);
+  const [leaveRecords, setLeaveRecords] = useState<Array<{ employeeId: string; startDate: string; endDate: string; leaveType: string; status: string }>>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -153,6 +154,19 @@ export function AttendanceLogPage() {
         const { data: hData } = await supabase.from('declared_holidays').select('*');
         if (hData) {
           setDeclaredHolidays(hData.map((h: any) => ({ date: h.date || h.holiday_date, name: h.title || h.name || 'Company Holiday' })));
+        }
+
+        const { data: lData } = await supabase.from('leave_records').select('*');
+        if (lData) {
+          setLeaveRecords(
+            lData.map((l: any) => ({
+              employeeId: l.employee_id || l.employeeId || '',
+              startDate: (l.start_date || l.startDate || '').slice(0, 10),
+              endDate: (l.end_date || l.endDate || '').slice(0, 10),
+              leaveType: l.leave_type || l.leaveType || 'Leave',
+              status: l.status || 'approved',
+            }))
+          );
         }
       } catch (e) {
         console.error('Error fetching attendance history:', e);
@@ -272,6 +286,9 @@ export function AttendanceLogPage() {
     const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
     const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
     const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
+    const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
+
+    const empId = currentEmployee?.id || user?.id || '';
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = toLocalISODate(d);
@@ -283,6 +300,11 @@ export function AttendanceLogPage() {
       const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
       const decHoliday = holList.find((h: any) => h && h.date === dateStr);
+      const activeLeave = leaveList.find(l =>
+        (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
+        dateStr >= l.startDate && dateStr <= l.endDate &&
+        l.status !== 'rejected'
+      );
 
       if (record) {
         const firstSession = record.sessions?.[0];
@@ -302,11 +324,14 @@ export function AttendanceLogPage() {
         const totalHrs = Math.floor(totalMins / 60);
         const remMins = totalMins % 60;
 
+        const isHolType = workType === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday');
+        const isLeaveType = workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave;
+
         days.push({
           dateNum: dayNum,
           dayName,
           fullDate: dateStr.split('-').reverse().join('/'),
-          status: decHoliday ? 'holiday' : 'present',
+          status: decHoliday || isHolType ? 'holiday' : isLeaveType ? 'leave' : 'present',
           location: orgVal,
           startTime: safeFormatTime(record.firstClockIn),
           endTime: safeFormatTime(record.lastClockOut),
@@ -317,12 +342,14 @@ export function AttendanceLogPage() {
         });
       } else {
         const isSunday = dayOfWeekIdx === 0;
+        const isHoliday = !!decHoliday || isSunday;
+
         days.push({
           dateNum: dayNum,
           dayName,
           fullDate: dateStr.split('-').reverse().join('/'),
-          status: decHoliday || isSunday ? 'holiday' : 'absent',
-          location: decHoliday ? decHoliday.name : '',
+          status: isHoliday ? 'holiday' : activeLeave ? 'leave' : 'absent',
+          location: decHoliday ? decHoliday.name : isSunday ? 'Weekend Off' : activeLeave ? `On Leave (${activeLeave.leaveType})` : '',
           startTime: undefined,
           endTime: undefined,
           sessions: [],
@@ -333,7 +360,7 @@ export function AttendanceLogPage() {
       }
     }
     return days;
-  }, [startDate, endDate, attendanceRecords, expenseClaims, declaredHolidays, resolveOrgValue]);
+  }, [startDate, endDate, attendanceRecords, expenseClaims, declaredHolidays, leaveRecords, currentEmployee, selectedEmployee, user, resolveOrgValue]);
 
   const tableRows = useMemo(() => {
     const start = new Date(startDate);
@@ -344,6 +371,9 @@ export function AttendanceLogPage() {
     const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
     const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
     const empList = Array.isArray(employees) ? employees : [];
+    const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
+
+    const empId = currentEmployee?.id || user?.id || '';
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = toLocalISODate(d);
@@ -351,6 +381,11 @@ export function AttendanceLogPage() {
       const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
       const decHoliday = holList.find((h: any) => h && h.date === dateStr);
+      const activeLeave = leaveList.find(l =>
+        (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
+        dateStr >= l.startDate && dateStr <= l.endDate &&
+        l.status !== 'rejected'
+      );
 
       const empName = currentEmployee
         ? `${currentEmployee.firstName || ''} ${currentEmployee.lastName || ''}`.trim()
@@ -390,45 +425,51 @@ export function AttendanceLogPage() {
             (s.notes && (s.notes.toLowerCase().includes('approved') || s.notes.toLowerCase().includes('claim') || s.notes.toLowerCase().includes('reapproved'))) ||
             sIdx > 0;
 
+          const isHoliday = workType === 'Holiday' || (s.notes && s.notes.toLowerCase().includes('holiday')) || !!decHoliday;
+          const isLeave = workType === 'Leave' || (s.notes && s.notes.toLowerCase().includes('leave')) || !!activeLeave;
+
           rows.push({
             date: dateStr.split('-').reverse().join('/'),
             name: resolvedEmpName,
-            holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : '',
+            holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
             org: orgVal,
             location: orgVal,
-            type: workType as string,
-            mode: isReapproved ? 'Re-Approved' : (hasMultipleSessions ? `Session ${sIdx + 1}` : 'Offline'),
+            type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : (workType as string),
+            mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : isReapproved ? 'Re-Approved' : (hasMultipleSessions ? `Session ${sIdx + 1}` : 'Offline'),
             start: startT,
             end: endT,
             duration: sIdx === 0 ? duration : '—',
             expenses: sIdx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-            note: s.notes || (record as any).notes || (isReapproved ? 'Re-approved session' : ''),
+            note: s.notes || (record as any).notes || (isHoliday ? 'Holiday' : isLeave ? `On Leave (${activeLeave?.leaveType || 'Leave'})` : isReapproved ? 'Re-approved session' : ''),
             break: sIdx === 0 ? breakTime : '0h 0m',
             tasks: s.notes ? [s.notes] : [],
           });
         });
       } else {
         const isSunday = d.getDay() === 0;
+        const isHoliday = !!decHoliday || isSunday;
+        const isLeave = !!activeLeave;
+
         rows.push({
           date: dateStr.split('-').reverse().join('/'),
           name: empName,
           holiday: decHoliday ? decHoliday.name : isSunday ? 'Sunday' : '',
           org: '—',
           location: '—',
-          type: '—',
-          mode: '—',
+          type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : '—',
+          mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : '—',
           start: '—',
           end: '—',
           duration: '0h 0m',
           expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-          note: decHoliday ? `Declared Holiday: ${decHoliday.name}` : isSunday ? 'Weekend Off' : 'Not Clocked',
+          note: decHoliday ? `Declared Holiday: ${decHoliday.name}` : isSunday ? 'Weekend Off' : isLeave ? `On Leave (${activeLeave?.leaveType || 'Leave'})` : 'Not Clocked',
           break: '0h 0m',
           tasks: [],
         });
       }
     }
     return rows;
-  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, resolveOrgValue]);
+  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, leaveRecords, resolveOrgValue]);
 
   const mappedExpenseRows = useMemo(() => {
     return expenseClaims.map((claim) => {
@@ -504,13 +545,56 @@ export function AttendanceLogPage() {
                 </thead>
                 <tbody>
                   {tableRows.map((r, i) => {
-                    const isHoliday = r.type === 'Holiday';
-                    const isLeave = r.type === 'Leave';
-                    const bg = isHoliday ? 'rgba(239, 68, 68, 0.12)' : isLeave ? 'rgba(245, 158, 11, 0.12)' : i % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)';
+                    const typeLower = (r.type || '').toLowerCase();
+                    const holidayLower = (r.holiday || '').toLowerCase();
+                    const modeLower = (r.mode || '').toLowerCase();
+                    const noteLower = (r.note || '').toLowerCase();
+
+                    const isHoliday =
+                      typeLower.includes('holiday') ||
+                      holidayLower.includes('holiday') ||
+                      holidayLower.includes('sunday') ||
+                      modeLower.includes('holiday') ||
+                      noteLower.includes('holiday') ||
+                      noteLower.includes('weekend off') ||
+                      noteLower.includes('sunday') ||
+                      noteLower.includes('declared holiday');
+
+                    const isLeave =
+                      !isHoliday && (
+                        typeLower.includes('leave') ||
+                        modeLower.includes('leave') ||
+                        noteLower.includes('leave') ||
+                        noteLower.includes('on leave')
+                      );
+
+                    const bg = isHoliday
+                      ? 'rgba(239, 68, 68, 0.12)'
+                      : isLeave
+                      ? 'rgba(245, 158, 11, 0.16)'
+                      : i % 2 === 0
+                      ? 'var(--bg-surface)'
+                      : 'var(--bg-sunken)';
+
+                    const rowTextColor = isHoliday
+                      ? 'var(--status-danger)'
+                      : isLeave
+                      ? '#d97706'
+                      : 'inherit';
+
                     const isExpanded = !!expandedRows[i];
 
                     return (
-                      <tr key={i} style={{ background: bg, borderBottom: '1px solid var(--border)', color: isHoliday || isLeave ? 'var(--status-danger)' : 'inherit' }}>
+                      <tr
+                        key={i}
+                        style={{
+                          background: bg,
+                          borderBottom: '1px solid var(--border)',
+                          color: rowTextColor,
+                          fontWeight: isHoliday || isLeave ? 600 : 400,
+                          transition: 'background 140ms ease',
+                        }}
+                      >
                         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                           {r.tasks && r.tasks.length > 0 ? (
                             <button
@@ -526,18 +610,32 @@ export function AttendanceLogPage() {
                         </td>
                         <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.date}</td>
                         <td style={{ padding: '8px 10px' }}>{r.name}</td>
-                        <td style={{ padding: '8px 10px' }}>{r.holiday}</td>
+                        <td style={{ padding: '8px 10px', color: isHoliday ? 'var(--status-danger)' : 'inherit', fontWeight: isHoliday ? 700 : 400 }}>
+                          {r.holiday || '—'}
+                        </td>
                         <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.org}</td>
-                        <td style={{ padding: '8px 10px', fontWeight: 500, color: 'var(--brand)' }}>{r.location || '-'}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 500, color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--brand)' }}>
+                          {r.location || '-'}
+                        </td>
                         <td style={{ padding: '8px 10px' }}>
-                          {r.type && (
-                            <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : r.type === 'Leave' ? 'danger' : 'neutral'}>
+                          {isHoliday ? (
+                            <Badge tone="danger">Holiday</Badge>
+                          ) : isLeave ? (
+                            <Badge tone="warning">On Leave</Badge>
+                          ) : r.type && r.type !== '—' ? (
+                            <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : 'neutral'}>
                               {r.type}
                             </Badge>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
                           )}
                         </td>
                         <td style={{ padding: '8px 10px' }}>
-                          {r.mode === 'Re-Approved' || r.mode.includes('Re-Approved') ? (
+                          {isHoliday ? (
+                            <Badge tone="danger">Holiday</Badge>
+                          ) : isLeave ? (
+                            <Badge tone="warning">On Leave</Badge>
+                          ) : r.mode === 'Re-Approved' || r.mode.includes('Re-Approved') ? (
                             <Badge tone="success">Re-Approved</Badge>
                           ) : (
                             r.mode
@@ -547,7 +645,13 @@ export function AttendanceLogPage() {
                         <td style={{ padding: '8px 10px' }}>{r.end}</td>
                         <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
                         <td style={{ padding: '8px 10px' }}>{r.expenses}</td>
-                        <td style={{ padding: '8px 10px', color: 'var(--status-warning)', fontWeight: 600 }}>{r.note}</td>
+                        <td style={{
+                          padding: '8px 10px',
+                          color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--text-secondary)',
+                          fontWeight: isHoliday || isLeave ? 700 : 500
+                        }}>
+                          {r.note}
+                        </td>
                         <td style={{ padding: '8px 10px' }}>{r.break}</td>
                       </tr>
                     );
