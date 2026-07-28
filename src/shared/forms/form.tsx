@@ -175,12 +175,16 @@ export function FileUploadField({ name, label, rules, accept }: { name: string; 
   return (
     <Field name={name} label={label} rules={rules}>
       {({ value, onChange, invalid }) => {
-        const file = value as { name: string; size: number } | null;
+        const file = value as { name: string; size: number; file?: File } | File | null;
+        const fileName = file instanceof File ? file.name : file?.name;
+        const fileSize = file instanceof File ? file.size : file?.size;
         return (
           <div style={{ border: invalid ? '2px dashed var(--status-danger)' : '2px dashed var(--border)', borderRadius: 'var(--radius-md)', padding: 16, textAlign: 'center', background: 'var(--bg-sunken)' }}>
-            {file ? (
+            {fileName ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                  {fileName} {fileSize !== undefined ? `(${(fileSize / 1024 / 1024).toFixed(2)} MB)` : ''}
+                </span>
                 <button type="button" className="kvj-btn kvj-btn--danger kvj-btn--sm" onClick={() => onChange(null)}>Remove</button>
               </div>
             ) : (
@@ -189,7 +193,7 @@ export function FileUploadField({ name, label, rules, accept }: { name: string; 
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Click to upload or drag & drop</span>
                 <input type="file" accept={accept} style={{ display: 'none' }} onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) onChange({ name: f.name, size: f.size });
+                  if (f) onChange(f);
                 }} />
               </label>
             )}

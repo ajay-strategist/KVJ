@@ -84,6 +84,8 @@ async function uploadToGoogleDriveAppsScript(payload: {
   try {
     const response = await fetch(GOOGLE_APPS_SCRIPT_WEBAPP_URL, {
       method: 'POST',
+      mode: 'cors',
+      redirect: 'follow',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
       },
