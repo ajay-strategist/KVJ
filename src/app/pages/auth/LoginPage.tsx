@@ -34,11 +34,26 @@ export function LoginPage() {
 
   useEffect(() => {
     let active = true;
-    hasUsers().then((exists) => {
-      if (!active) return;
-      setBootstrapNeeded(!exists);
-      setCheckingBootstrap(false);
-    });
+    try {
+      hasUsers()
+        .then((exists) => {
+          if (!active) return;
+          setBootstrapNeeded(!exists);
+          setCheckingBootstrap(false);
+        })
+        .catch((err) => {
+          console.warn('hasUsers check warning:', err);
+          if (!active) return;
+          setBootstrapNeeded(false);
+          setCheckingBootstrap(false);
+        });
+    } catch (err) {
+      console.warn('hasUsers check catch warning:', err);
+      if (active) {
+        setBootstrapNeeded(false);
+        setCheckingBootstrap(false);
+      }
+    }
     return () => { active = false; };
   }, [hasUsers]);
 

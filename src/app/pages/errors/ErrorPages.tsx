@@ -26,10 +26,14 @@ export function Forbidden() {
   return <Shell code="403" title="Access denied" message="You don't have permission to view this page. Contact an administrator if you believe this is a mistake." />;
 }
 export function ServerError({ onRetry }: { onRetry?: () => void }) {
+  const handleRetry = () => {
+    if (onRetry) onRetry();
+    window.location.reload();
+  };
   return (
     <Shell code="500" title="Something went wrong" message="An unexpected error occurred. You can retry, or head back to your workspace.">
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-        {onRetry && <Button onClick={onRetry}>Retry</Button>}
+        <Button onClick={handleRetry}>Retry</Button>
         <Link to="/app"><Button variant="secondary">Go home</Button></Link>
       </div>
     </Shell>
