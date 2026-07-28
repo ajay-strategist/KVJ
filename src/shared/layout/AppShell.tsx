@@ -120,7 +120,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const { pushRecent } = useNavPrefs();
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const { items: notifItems, unreadCount, markRead, markAllRead } = useNotifications();
+  const { items: notifItems, unreadCount, markRead, markAllRead, dismissNotification } = useNotifications();
   const { setOpen: setCmdOpen } = useCommandPalette();
   const navigate = useNavigate();
 
@@ -266,23 +266,28 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   {/* Notifications Popover */}
                   {notifOpen && (
                     <div style={{
-                      position: 'fixed', bottom: 64, left: collapsed && !isMobile ? 74 : 16,
-                      // On mobile fill the width; on desktop keep the 320px card.
-                      width: isMobile ? 'calc(100vw - 32px)' : 320,
+                      position: 'fixed',
+                      bottom: isMobile ? 64 : 110,
+                      left: isMobile ? 16 : (collapsed ? 74 : 16),
+                      width: isMobile ? 'calc(100vw - 32px)' : 340,
                       maxWidth: 'calc(100vw - 32px)',
-                      // Never exceed the space above the bell, or the panel's top
-                      // runs off-screen and only its lower half is visible.
-                      maxHeight: 'min(460px, calc(100dvh - 88px))',
+                      maxHeight: 'min(460px, calc(100dvh - 130px))',
                       background: 'var(--bg-panel)',
-                      border: '1px solid var(--border)',
+                      border: '1px solid var(--border-strong, var(--border))',
                       borderRadius: 'var(--radius-xl)',
-                      boxShadow: 'var(--e3)',
-                      zIndex: 1250, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                      boxShadow: 'var(--e4)',
+                      backdropFilter: 'blur(30px)',
+                      WebkitBackdropFilter: 'blur(30px)',
+                      zIndex: 1250,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      isolation: 'isolate',
                       animation: 'kvjSlideInUp 180ms cubic-bezier(0.16,1,0.3,1)',
                     }}>
-                      <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+                      <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                          <span style={{ fontWeight: 700, fontSize: 13 }}>Notifications</span>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Notifications</span>
                           {unreadCount > 0 && (
                             <button
                               type="button"
@@ -293,28 +298,54 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                             </button>
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
+                        <div style={{
+                          display: 'flex',
+                          gap: 4,
+                          overflowX: 'auto',
+                          paddingBottom: 4,
+                          paddingRight: 8,
+                          scrollbarWidth: 'none',
+                          msOverflowStyle: 'none',
+                          WebkitOverflowScrolling: 'touch',
+                        }}>
                           {NOTIF_CATEGORIES.map((cat) => {
                             const cnt = cat.key === 'all'
                               ? notifItems.filter((n) => !n.read).length
                               : notifItems.filter((n) => !n.read && (n as any).category?.toLowerCase() === cat.key).length;
+                            const isSelected = notifCategory === cat.key;
                             return (
                               <button
                                 key={cat.key}
                                 type="button"
                                 onClick={() => setNotifCategory(cat.key)}
                                 style={{
-                                  flexShrink: 0, padding: '3px 8px', borderRadius: 999,
-                                  fontSize: 10.5, fontWeight: 600,
-                                  border: notifCategory === cat.key ? '1px solid rgba(59,130,246,0.40)' : '1px solid var(--border)',
-                                  background: notifCategory === cat.key ? 'var(--brand-muted)' : 'transparent',
-                                  color: notifCategory === cat.key ? 'var(--brand)' : 'var(--text-muted)',
-                                  cursor: 'pointer', display: 'flex', gap: 4, alignItems: 'center',
+                                  flexShrink: 0,
+                                  padding: '4px 10px',
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                  border: isSelected ? '1px solid var(--brand)' : '1px solid var(--border)',
+                                  background: isSelected ? 'var(--brand-muted)' : 'var(--bg-sunken)',
+                                  color: isSelected ? 'var(--brand)' : 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  gap: 5,
+                                  alignItems: 'center',
+                                  transition: 'all 140ms ease',
                                 }}
                               >
                                 {cat.label}
                                 {cnt > 0 && (
-                                  <span style={{ background: 'var(--status-danger)', color: '#fff', borderRadius: 999, fontSize: 8.5, padding: '0 4px', fontWeight: 800 }}>
+                                  <span style={{
+                                    background: 'var(--status-danger)',
+                                    color: '#fff',
+                                    borderRadius: 999,
+                                    fontSize: 9,
+                                    padding: '1px 5px',
+                                    fontWeight: 800,
+                                    lineHeight: 1,
+                                  }}>
                                     {cnt}
                                   </span>
                                 )}
@@ -323,10 +354,32 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                           })}
                         </div>
                       </div>
-                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: '6px' }}>
+                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, padding: '8px', background: 'var(--bg-panel)' }}>
                         {filteredNotifs.length === 0 ? (
-                          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
-                            No notifications
+                          <div style={{
+                            padding: '32px 16px',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            color: 'var(--text-muted)'
+                          }}>
+                            <div style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: 999,
+                              background: 'var(--bg-sunken)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--text-muted)'
+                            }}>
+                              <Icon name="Bell" size={18} />
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>No notifications</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>You're all caught up!</span>
                           </div>
                         ) : (
                           filteredNotifs.map((item) => (
@@ -334,22 +387,52 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                               key={item.id}
                               onClick={() => markRead(item.id)}
                               style={{
-                                padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+                                padding: '10px 12px',
+                                borderRadius: 'var(--radius-md)',
                                 background: item.read ? 'transparent' : 'var(--bg-hover)',
+                                border: item.read ? '1px solid var(--border)' : '1px solid rgba(59,130,246,0.22)',
                                 borderLeft: item.read ? '3px solid transparent' : '3px solid var(--brand)',
                                 cursor: 'pointer',
+                                transition: 'all 140ms ease',
+                                position: 'relative',
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                                 <span style={{ fontSize: 12, fontWeight: item.read ? 500 : 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
                                   {item.title}
                                 </span>
-                                <span style={{ fontSize: 9.5, color: 'var(--text-muted)', flexShrink: 0 }}>
-                                  {(item as any).createdAt ? timeAgo((item as any).createdAt) : ''}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                  <span style={{ fontSize: 9.5, color: 'var(--text-muted)' }}>
+                                    {(item as any).createdAt ? timeAgo((item as any).createdAt) : ''}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      dismissNotification(item.id);
+                                    }}
+                                    aria-label="Dismiss notification"
+                                    title="Dismiss notification"
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: 'var(--text-muted)',
+                                      cursor: 'pointer',
+                                      fontSize: 13,
+                                      lineHeight: 1,
+                                      padding: '2px 4px',
+                                      borderRadius: 4,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
                               </div>
                               {item.message && (
-                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, paddingRight: 16 }}>
                                   {item.message}
                                 </div>
                               )}
