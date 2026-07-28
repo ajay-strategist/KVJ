@@ -22,6 +22,7 @@ export interface ILeaveService {
   approveLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
   rejectLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
   getEmployeeLeaves(employeeId: UUID): Promise<Result<LeaveRecord[]>>;
+  listAllLeaves(): Promise<Result<LeaveRecord[]>>;
 }
 
 export const LEAVE_SERVICE_TOKEN = createToken<ILeaveService>('LeaveService');
@@ -209,6 +210,15 @@ export class LeaveService implements ILeaveService {
     try {
       const all = await this.repo.findByEmployeeId(employeeId);
       return Ok(all);
+    } catch {
+      return Err(AppError.internal());
+    }
+  }
+
+  async listAllLeaves(): Promise<Result<LeaveRecord[]>> {
+    try {
+      const all = await this.repo.findMany();
+      return Ok(all.data);
     } catch {
       return Err(AppError.internal());
     }

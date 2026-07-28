@@ -37,13 +37,24 @@ export function ApprovalsQueue() {
   const userRole = user?.role || 'EMPLOYEE';
   const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
 
-  const pendingTaskApprovals = useMemo(() => {
+  const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval'>('all');
+
+  const filteredTaskApprovals = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
-    return safeTasks.filter((t) => 
-      t && !t.deletedAt && 
-      (t.approvalStatus === 'pending_task_approval' || t.approvalStatus === 'pending_assignment_approval' || t.status === 'review')
-    );
-  }, [tasks]);
+    return safeTasks.filter((t) => {
+      if (!t || t.deletedAt) return false;
+      const isPendingTask = t.approvalStatus === 'pending_task_approval' || t.status === 'review';
+      const isPendingAssign = t.approvalStatus === 'pending_assignment_approval';
+      if (!isPendingTask && !isPendingAssign) return false;
+      if (taskStatusFilter === 'pending_task_approval') {
+        return isPendingTask;
+      }
+      if (taskStatusFilter === 'pending_assignment_approval') {
+        return isPendingAssign;
+      }
+      return true;
+    });
+  }, [tasks, taskStatusFilter]);
 
   const fetchCorrectionsAndEmployees = useCallback(async () => {
     try {
@@ -356,13 +367,28 @@ export function ApprovalsQueue() {
   const tabs = [
     {
       id: 'tasks',
-      label: `Task Approvals (${pendingTaskApprovals.length})`,
+      label: `Task Approvals (${filteredTaskApprovals.length})`,
       content: (
-        <DataTable
-          columns={taskApprovalColumns}
-          rows={pendingTaskApprovals}
-          rowKey={(r) => r.id}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, alignSelf: 'flex-end' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>🔍 Filter Status:</span>
+            <select
+              className="kvj-select"
+              value={taskStatusFilter}
+              onChange={(e) => setTaskStatusFilter(e.target.value as any)}
+              style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 200 }}
+            >
+              <option value="all">👥 All Approvals</option>
+              <option value="pending_task_approval">📝 Task Completion Approvals</option>
+              <option value="pending_assignment_approval">📌 Assignment Approvals</option>
+            </select>
+          </div>
+          <DataTable
+            columns={taskApprovalColumns}
+            rows={filteredTaskApprovals}
+            rowKey={(r) => r.id}
+          />
+        </div>
       ),
     },
     {

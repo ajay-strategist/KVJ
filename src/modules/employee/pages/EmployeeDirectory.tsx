@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Avatar, SearchInput, Button } from '../../../shared/ui/components';
+import { PageHeader, Avatar, SearchInput, Button, Badge, SectionHeader } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
+import { Tabs } from '../../../shared/ui/Tabs';
 import { useEmployee } from '../hooks/useEmployee';
 import { useAuth } from '../../auth/AuthProvider';
 import Drawer from '../../../shared/ui/Drawer';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Employee } from '../employee.repository';
+import { supabase } from '../../../shared/integration/supabase';
 
-export function EmployeeDirectory() {
+export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
   const { employees, createEmployee, updateProfile, loading } = useEmployee();
   const { createUser, resetToDefaultPassword } = useAuth();
@@ -19,6 +21,52 @@ export function EmployeeDirectory() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Employee>>({});
+
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [activeTasks, setActiveTasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadStatusInfo() {
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const { data: attData } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('work_date', todayStr)
+          .is('deleted_at', null);
+        if (attData) {
+          setAttendanceRecords(attData);
+        }
+
+        const { data: taskData } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('status', 'in_progress')
+          .is('deleted_at', null);
+        if (taskData) {
+          setActiveTasks(taskData);
+        }
+      } catch (e) {
+        console.warn('Could not load status info:', e);
+      }
+    }
+    loadStatusInfo();
+  }, [employees]);
+
+  const getEmployeeStatus = (empId: string) => {
+    const record = attendanceRecords.find((r) => r.employee_id === empId);
+    if (!record) return { label: 'Offline', tone: 'neutral' as const };
+    const status = record.status;
+    if (status === 'present') return { label: '🟢 Clocked In', tone: 'success' as const };
+    if (status === 'on_break') return { label: '☕ On Break', tone: 'warning' as const };
+    if (status === 'clocked_out') return { label: '🔴 Clocked Out', tone: 'danger' as const };
+    return { label: 'Offline', tone: 'neutral' as const };
+  };
+
+  const getEmployeeActiveTask = (empId: string) => {
+    const task = activeTasks.find((t) => t.assignee_id === empId || t.assignee === empId);
+    return task ? `📝 ${task.title}` : 'No active task in progress';
+  };
 
   const [form, setForm] = useState({
     firstName: '',
@@ -227,16 +275,79 @@ export function EmployeeDirectory() {
         }
       />
 
-      <div style={{ marginBottom: 20, maxWidth: 360 }}>
-        <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search directory..." />
-      </div>
+      <Tabs
+        defaultTabId={defaultTabId}
+        items={[
+          {
+            id: 'directory',
+            label: '📋 Directory',
+            content: (
+              <div>
+                <div style={{ marginBottom: 20, maxWidth: 360 }}>
+                  <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search directory..." />
+                </div>
 
-      <DataTable
-        columns={columns}
-        rows={filtered}
-        rowKey={(r) => r.id}
-        loading={loading}
-        onRowClick={(r) => navigate(`/app/employees/${r.id}`)}
+                <DataTable
+                  columns={columns}
+                  rows={filtered}
+                  rowKey={(r) => r.id}
+                  loading={loading}
+                  onRowClick={(r) => navigate(`/app/employees/${r.id}`)}
+                />
+              </div>
+            ),
+          },
+          {
+            id: 'status',
+            label: '🟢 Employee Status',
+            content: (
+              <div>
+                <SectionHeader title="Today's Employee Status & Current Work" />
+                <DataTable
+                  columns={[
+                    {
+                      key: 'name',
+                      header: 'Employee',
+                      render: (r: Employee) => (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar name={`${r.firstName} ${r.lastName}`} size="sm" />
+                          <div>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{`${r.firstName} ${r.lastName}`}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.designation}</div>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'status',
+                      header: 'Current Status',
+                      render: (r: Employee) => {
+                        const stat = getEmployeeStatus(r.id);
+                        return (
+                          <Badge tone={stat.tone}>
+                            {stat.label}
+                          </Badge>
+                        );
+                      },
+                    },
+                    {
+                      key: 'activeTask',
+                      header: 'Current Task In Progress',
+                      render: (r: Employee) => (
+                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                          {getEmployeeActiveTask(r.id)}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  rows={filtered}
+                  rowKey={(r) => r.id}
+                  loading={loading}
+                />
+              </div>
+            ),
+          },
+        ]}
       />
 
       {/* CREATE EMPLOYEE MODAL */}

@@ -32,7 +32,13 @@ interface TaskItem {
   dueDate: string;
 }
 
-export function ProjectList() {
+export function ProjectList({
+  projectData,
+  selectedEmployeeId,
+}: {
+  projectData?: any;
+  selectedEmployeeId?: string;
+}) {
   const { toast } = useNotifications();
   const { confirm } = useDialog();
   const { user } = useAuth();
@@ -51,7 +57,9 @@ export function ProjectList() {
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
 
-  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, submitTask, deleteTask } = useProject();
+  const localProjectData = useProject();
+  const actualProjectData = projectData || localProjectData;
+  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, submitTask, deleteTask } = actualProjectData;
   const { employees } = useEmployee();
 
   const assigneeOptions = useMemo(() => {
@@ -144,13 +152,53 @@ export function ProjectList() {
     }
   }, [mappedProjects, selectedProject]);
 
-  // Filter based on selected checkboxes
-  const filteredProjects = projectsList.filter((p) => selectedStatuses.includes(p.status));
+  // Filter based on selected checkboxes and selectedEmployeeId
+  const filteredProjects = useMemo(() => {
+    let list = projectsList;
+    if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+      list = list.filter((p) => {
+        const dbProj = projects.find((dp) => dp.id === p.id);
+        if (dbProj && (dbProj as any).supervisorId === selectedEmployeeId) {
+          return true;
+        }
+        const isAllocated = allocations.some(
+          (a) => a.projectId === p.id && a.employeeId === selectedEmployeeId
+        );
+        if (isAllocated) return true;
+        const hasTask = tasks.some(
+          (t) => t.projectId === p.id && t.assigneeId === selectedEmployeeId
+        );
+        if (hasTask) return true;
+        return false;
+      });
+    }
+    return list.filter((p) => selectedStatuses.includes(p.status));
+  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses]);
 
   // Count active projects (Not Started + In Progress)
-  const activeProjectsCount = projectsList.filter(
-    (p) => p.status === 'Not Started' || p.status === 'In Progress'
-  ).length;
+  const activeProjectsCount = useMemo(() => {
+    let list = projectsList;
+    if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+      list = list.filter((p) => {
+        const dbProj = projects.find((dp) => dp.id === p.id);
+        if (dbProj && (dbProj as any).supervisorId === selectedEmployeeId) {
+          return true;
+        }
+        const isAllocated = allocations.some(
+          (a) => a.projectId === p.id && a.employeeId === selectedEmployeeId
+        );
+        if (isAllocated) return true;
+        const hasTask = tasks.some(
+          (t) => t.projectId === p.id && t.assigneeId === selectedEmployeeId
+        );
+        if (hasTask) return true;
+        return false;
+      });
+    }
+    return list.filter(
+      (p) => p.status === 'Not Started' || p.status === 'In Progress'
+    ).length;
+  }, [projectsList, selectedEmployeeId, projects, allocations, tasks]);
 
   const selectedProjectTasks = useMemo(() => {
     if (!selectedProject) return [];

@@ -1,5 +1,5 @@
 import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
-import type { AttendanceRecord, IAttendanceRepository, WorkSession } from './attendance.repository';
+import type { AttendanceRecord, IAttendanceRepository, WorkSession, BreakRecord } from './attendance.repository';
 import type { UUID, DateRange, Actor } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 
@@ -61,12 +61,96 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
     return records;
   }
 
+  private async syncBreaks(attendanceRecordId: UUID, breaks?: BreakRecord[]): Promise<void> {
+    if (!breaks || breaks.length === 0) return;
+    try {
+      const { data: sessions } = await supabase
+        .from('work_sessions')
+        .select('id')
+        .eq('attendance_record_id', attendanceRecordId);
+        
+      const sessionIds = (sessions || []).map((s) => s.id);
+      if (sessionIds.length > 0) {
+        await supabase.from('break_records').delete().in('work_session_id', sessionIds);
+      }
+      
+      const rows = breaks.map((b) => ({
+        id: b.id,
+        work_session_id: b.workSessionId,
+        start_time: b.startTime,
+        end_time: b.endTime || null,
+        reason: b.reason || null,
+      }));
+      
+      await supabase.from('break_records').insert(rows);
+    } catch (e) {
+      console.warn('Could not sync break_records to Supabase:', e);
+    }
+  }
+
+  private async attachBreaksToRecords(records: AttendanceRecord[]): Promise<AttendanceRecord[]> {
+    if (records.length === 0) return records;
+    const ids = records.map((r) => r.id).filter((id) => id && id.length === 36);
+    if (ids.length === 0) return records;
+
+    try {
+      const { data: wsData } = await supabase
+        .from('work_sessions')
+        .select('id, attendance_record_id')
+        .in('attendance_record_id', ids);
+
+      if (wsData && wsData.length > 0) {
+        const sessionIds = wsData.map((row) => row.id);
+        const wsToAttMap: Record<string, string> = {};
+        wsData.forEach((row) => {
+          wsToAttMap[row.id] = row.attendance_record_id;
+        });
+
+        const { data: bData } = await supabase
+          .from('break_records')
+          .select('*')
+          .in('work_session_id', sessionIds);
+
+        if (bData && bData.length > 0) {
+          const attToBreaksMap: Record<string, BreakRecord[]> = {};
+          bData.forEach((row: any) => {
+            const b: BreakRecord = {
+              id: row.id,
+              workSessionId: row.work_session_id,
+              startTime: row.start_time,
+              endTime: row.end_time || undefined,
+              reason: row.reason || undefined,
+            };
+            const attId = wsToAttMap[row.work_session_id];
+            if (attId) {
+              if (!attToBreaksMap[attId]) attToBreaksMap[attId] = [];
+              attToBreaksMap[attId].push(b);
+            }
+          });
+
+          return records.map((r) => ({
+            ...r,
+            breaks: attToBreaksMap[r.id] && attToBreaksMap[r.id].length > 0 ? attToBreaksMap[r.id] : r.breaks || [],
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Could not attach break_records:', e);
+    }
+    return records;
+  }
+
   override async create(data: Partial<AttendanceRecord>, actor: Actor): Promise<AttendanceRecord> {
     const created = await super.create(data, actor);
     const sessions = data.sessions || created.sessions;
     if (sessions && sessions.length > 0) {
       await this.syncWorkSessions(created.id, sessions);
       created.sessions = sessions;
+    }
+    const breaks = data.breaks || created.breaks;
+    if (breaks && breaks.length > 0) {
+      await this.syncBreaks(created.id, breaks);
+      created.breaks = breaks;
     }
     return created;
   }
@@ -77,6 +161,10 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       await this.syncWorkSessions(id, patch.sessions);
       updated.sessions = patch.sessions;
     }
+    if (patch.breaks && patch.breaks.length > 0) {
+      await this.syncBreaks(id, patch.breaks);
+      updated.breaks = patch.breaks;
+    }
     return updated;
   }
 
@@ -84,13 +172,15 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
     const rec = await super.findById(id, opts);
     if (!rec) return null;
     const attached = await this.attachSessionsToRecords([rec]);
-    return attached[0];
+    const withBreaks = await this.attachBreaksToRecords(attached);
+    return withBreaks[0];
   }
 
   override async findMany(query?: any): Promise<any> {
     const res = await super.findMany(query);
     if (res.data.length > 0) {
-      res.data = await this.attachSessionsToRecords(res.data);
+      const attached = await this.attachSessionsToRecords(res.data);
+      res.data = await this.attachBreaksToRecords(attached);
     }
     return res;
   }
@@ -111,7 +201,8 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
     if (!data) return null;
     const rec = toCamelCaseObject(data) as AttendanceRecord;
     const attached = await this.attachSessionsToRecords([rec]);
-    return attached[0];
+    const withBreaks = await this.attachBreaksToRecords(attached);
+    return withBreaks[0];
   }
 
   async findHistory(employeeId: UUID, range: DateRange): Promise<AttendanceRecord[]> {
@@ -128,7 +219,8 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       return [];
     }
     const list = (data ?? []).map((row) => toCamelCaseObject(row) as AttendanceRecord);
-    return this.attachSessionsToRecords(list);
+    const attached = await this.attachSessionsToRecords(list);
+    return this.attachBreaksToRecords(attached);
   }
 }
 

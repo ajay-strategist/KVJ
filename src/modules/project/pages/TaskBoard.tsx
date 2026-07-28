@@ -53,7 +53,13 @@ export interface TaskItem {
   }>;
 }
 
-export function TaskBoard() {
+export function TaskBoard({
+  projectData,
+  selectedEmployeeId,
+}: {
+  projectData?: any;
+  selectedEmployeeId?: string;
+}) {
   const { user } = useAuth();
   const { toast } = useNotifications();
   const { can } = usePermissions();
@@ -74,6 +80,8 @@ export function TaskBoard() {
 
   const [tasksList, setTasksList] = useState<TaskItem[]>([]);
 
+  const localProjectData = useProject();
+  const actualProjectData = projectData || localProjectData;
   const {
     projects,
     tasks,
@@ -88,7 +96,7 @@ export function TaskBoard() {
     approveTaskAssignment,
     logTimesheet,
     approveTimesheet
-  } = useProject();
+  } = actualProjectData;
 
 
   // Active timers tracking in localStorage
@@ -211,9 +219,13 @@ export function TaskBoard() {
     const filtered = tasksList.filter((t) => {
       if (t.status === 'Pending Approval') return false;
 
-      // User-level filtering: regular employees see only their assigned/supervised tasks
-      if (!isManagement) {
+      // User-level filtering
+      if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+        const isTarget = t.assigneeId === selectedEmployeeId;
+        if (!isTarget) return false;
+      } else if (!isManagement) {
         const isMyTask =
+          t.assigneeId === user?.id ||
           t.assignee.toLowerCase() === myName ||
           t.supervisor.toLowerCase() === myName ||
           t.approvedBy?.toLowerCase() === myName;

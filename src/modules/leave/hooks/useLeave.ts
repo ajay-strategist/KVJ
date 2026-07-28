@@ -9,6 +9,7 @@ export function useLeave() {
   const service = useMemo(() => container.resolve(LEAVE_SERVICE_TOKEN), []);
   const { user, principal } = useAuth();
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
+  const [allLeaves, setAllLeaves] = useState<LeaveRecord[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<LeaveRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,20 @@ export function useLeave() {
       setError(null);
     } else {
       setPendingApprovals([]);
+      setError(res.error.message);
+    }
+    setLoading(false);
+  }, [service, principal]);
+
+  const fetchAllLeaves = useCallback(async () => {
+    if (!can(principal, 'leave', 'approve')) return;
+    setLoading(true);
+    const res = await service.listAllLeaves();
+    if (res.ok) {
+      setAllLeaves(Array.isArray(res.value) ? res.value : []);
+      setError(null);
+    } else {
+      setAllLeaves([]);
       setError(res.error.message);
     }
     setLoading(false);
@@ -98,10 +113,12 @@ export function useLeave() {
   useEffect(() => {
     fetchMyLeaves();
     fetchPendingApprovals();
-  }, [fetchMyLeaves, fetchPendingApprovals]);
+    fetchAllLeaves();
+  }, [fetchMyLeaves, fetchPendingApprovals, fetchAllLeaves]);
 
   return {
     leaves,
+    allLeaves,
     pendingApprovals,
     loading,
     error,
@@ -111,5 +128,6 @@ export function useLeave() {
     rejectLeave,
     refreshMyLeaves: fetchMyLeaves,
     refreshPending: fetchPendingApprovals,
+    refreshAll: fetchAllLeaves,
   };
 }

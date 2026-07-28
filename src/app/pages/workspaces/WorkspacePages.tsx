@@ -1009,6 +1009,7 @@ export const TaskWidget = memo(function TaskWidget({
 });
 
 export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
+  const { user } = useAuth();
   const [selectedDay, setSelectedDay] = useState<number>(0);
   const { tasks } = useProject();
   const [dbSchedules, setDbSchedules] = useState<any[]>([]);
@@ -1047,10 +1048,18 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
       else if (i === 1) dayLabel = 'Day 2 (Tomorrow)';
 
       // 1. Gather tasks due on this date (excluding approved/completed tasks)
+      const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+      const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+
       const dayTasks = (tasks || []).filter((t) => {
         const status = (t.status || '').toLowerCase();
         if (status === 'done' || status.includes('completed') || status.includes('approved')) {
           return false;
+        }
+
+        if (!isManagement) {
+          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || (t.assignee && user?.fullName && t.assignee.toLowerCase() === user.fullName.toLowerCase());
+          if (!isMyTask) return false;
         }
         const taskDate = (t.dueDate || '').slice(0, 10);
         if (!taskDate) return i === 0;
@@ -1227,7 +1236,7 @@ export const TimelineWidget = memo(function TimelineWidget({
         </div>
 
         {/* User Level Employee Filter Dropdown for Executive Roles */}
-        {isExecutive && employeeList.length > 0 && onEmpIdChange && (
+        {false && isExecutive && employeeList.length > 0 && onEmpIdChange && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-sunken)', padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
             <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)' }}>👤 Filter Timeline:</span>
             <select
@@ -1568,11 +1577,20 @@ export function MyDayPage() {
     const now = Date.now();
     const updatedStates = { ...storedStates };
 
+    const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+    const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+
     const mapped: TaskItem[] = (projectTasks || [])
       .filter((t) => {
         if (!t) return false;
         // Don't show unapproved assignment requests to assignee until approved by manager
         if ((t as any).approvalStatus === 'pending_assignment_approval') return false;
+
+        if (!isManagement) {
+          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || (t.assignee && user?.fullName && t.assignee.toLowerCase() === user.fullName.toLowerCase());
+          if (!isMyTask) return false;
+        }
+
         const d = (t.dueDate || '').slice(0, 10);
         return d === todayStr || d < todayStr || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || (t as any).approvalStatus === 'rework' || storedStates[t.id];
       })

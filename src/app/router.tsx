@@ -81,7 +81,8 @@ export function AppRouter() {
           <Route path="/app/workspace/supervisor" element={<ProtectedRoute><RoleWorkspacePage role="supervisor" /></ProtectedRoute>} />
           <Route path="/app/workspace/manager" element={<ProtectedRoute><RoleWorkspacePage role="manager" /></ProtectedRoute>} />
           <Route path="/app/workspace/ceo" element={<ProtectedRoute><RoleWorkspacePage role="ceo" /></ProtectedRoute>} />
-          <Route path="/app/employees" element={<ProtectedRoute resource="employee" action="view"><EmployeeDirectory /></ProtectedRoute>} />
+          <Route path="/app/employees" element={<ProtectedRoute resource="employee" action="view"><EmployeeDirectory defaultTabId="directory" /></ProtectedRoute>} />
+          <Route path="/app/employees/status" element={<ProtectedRoute resource="employee" action="view"><EmployeeDirectory defaultTabId="status" /></ProtectedRoute>} />
           <Route path="/app/employees/:id" element={<ProtectedRoute resource="employee" action="view"><EmployeeProfile /></ProtectedRoute>} />
           <Route path="/app/attendance" element={<ProtectedRoute resource="attendance" action="view"><AttendanceLogPage /></ProtectedRoute>} />
           <Route path="/app/leave" element={<ProtectedRoute resource="leave" action="view"><LeaveBoard /></ProtectedRoute>} />

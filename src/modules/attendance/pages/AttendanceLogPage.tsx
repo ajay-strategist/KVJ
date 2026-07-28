@@ -81,7 +81,9 @@ export function AttendanceLogPage() {
   const [activeFilterPreset, setActiveFilterPreset] = useState<'current_month' | 'last_month' | 'last_1_year' | 'custom'>('current_month');
   const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(defaultEnd);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>(user?.fullName || 'System Admin');
+  const [selectedEmployee, setSelectedEmployee] = useState<string>(
+    isManagement ? 'All Employees' : (user?.fullName || 'System Admin')
+  );
   const [submitDrawerOpen, setSubmitDrawerOpen] = useState(false);
   const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});

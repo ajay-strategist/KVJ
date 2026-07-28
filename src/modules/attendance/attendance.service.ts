@@ -161,7 +161,7 @@ export class AttendanceService implements IAttendanceService {
       }
 
       const totalWorkingMins = Math.max(0, Math.floor(totalWorkingMs / 60000));
-      const totalBreakMins = record.totalBreakMinutes + Math.floor(extraBreakMs / 60000);
+      const totalBreakMins = (record.totalBreakMinutes || 0) + Math.floor(extraBreakMs / 60000);
 
       const patch: Partial<AttendanceRecord> = {
         status: 'clocked_out',
@@ -249,7 +249,7 @@ export class AttendanceService implements IAttendanceService {
 
       const patch: Partial<AttendanceRecord> = {
         status: 'present',
-        totalBreakMinutes: record.totalBreakMinutes + breakMins,
+        totalBreakMinutes: (record.totalBreakMinutes || 0) + breakMins,
         breaks: updatedBreaks,
         updatedAt: ts,
         updatedBy: employeeId,

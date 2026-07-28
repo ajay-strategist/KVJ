@@ -22,7 +22,13 @@ export interface WorklogRecord {
   supervisorName: string;
 }
 
-export function TaskWorklogView() {
+export function TaskWorklogView({
+  projectData,
+  selectedEmployeeId,
+}: {
+  projectData?: any;
+  selectedEmployeeId?: string;
+}) {
   const { user } = useAuth();
   const { toast } = useNotifications();
   const { can } = usePermissions();
@@ -34,11 +40,23 @@ export function TaskWorklogView() {
 
   const [logs, setLogs] = useState<WorklogRecord[]>([]);
 
-  const { projects, tasks, allocations, timesheets, approveTimesheet } = useProject();
+  const localProjectData = useProject();
+  const actualProjectData = projectData || localProjectData;
+  const { projects, tasks, allocations, timesheets, approveTimesheet } = actualProjectData;
   const { employees } = useEmployee();
 
   const mappedLogs = useMemo(() => {
-    const list = timesheets.map((ts) => {
+    const filteredTimesheets = timesheets.filter((ts) => {
+      if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+        return ts.employeeId === selectedEmployeeId;
+      }
+      if (!isSupervisor && user) {
+        return ts.employeeId === user.id;
+      }
+      return true;
+    });
+
+    const list = filteredTimesheets.map((ts) => {
       const project = projects.find((p) => p.id === ts.projectId);
       const task = tasks.find((t) => t.id === ts.taskId);
       const emp = employees.find((e) => e.id === ts.employeeId);
@@ -58,16 +76,19 @@ export function TaskWorklogView() {
         category: 'Project Task' as const,
         employeeName: empName,
         role: isSuper ? ('Supervisor' as const) : ('Assignee' as const),
-        durationHrs: ts.hoursLogged,
+        durationHrs: Number(ts.hoursLogged || 0),
         description: ts.notes || 'Daily work progress entry',
         reviewStatus: ts.status === 'approved' ? ('Approved' as const) : ('Pending Review' as const),
         supervisorName,
       };
     });
-    // Latest → oldest. Parse to a timestamp so non-ISO date formats still order
-    // chronologically rather than lexically.
-    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [timesheets, projects, tasks, employees, allocations]);
+    
+    return list.sort((a, b) => {
+      const timeA = a.date ? new Date(a.date).getTime() : 0;
+      const timeB = b.date ? new Date(b.date).getTime() : 0;
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
+  }, [timesheets, projects, tasks, employees, allocations, selectedEmployeeId, isSupervisor, user]);
 
   useEffect(() => {
     setLogs(mappedLogs);
@@ -208,7 +229,7 @@ export function TaskWorklogView() {
                     </Badge>
                   </td>
                   <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', maxWidth: 280 }}>{log.description}</td>
-                  <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--accent)' }}>⏱ {log.durationHrs.toFixed(1)} hrs</td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--accent)' }}>⏱ {(log.durationHrs || 0).toFixed(1)} hrs</td>
                   <td style={{ padding: '10px 14px' }}>
                     <Badge tone={log.reviewStatus === 'Approved' ? 'success' : 'warning'}>
                       {log.reviewStatus}

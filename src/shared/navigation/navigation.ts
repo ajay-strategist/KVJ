@@ -25,6 +25,7 @@ export interface NavItem {
 export const NAV_TREE: NavItem[] = [
   { id: 'my-day', label: 'My Day', path: '/app', icon: 'Home' },
   { id: 'employees', label: 'Employees', path: '/app/employees', icon: 'Users', permission: ['employee', 'view'], module: 'employee' },
+  { id: 'employee-status', label: 'Employee Status', path: '/app/employees/status', icon: 'UserCheck', permission: ['employee', 'view'], module: 'employee' },
   { id: 'attendance', label: 'Attendance', path: '/app/attendance', icon: 'Clock', permission: ['attendance', 'view'], module: 'attendance' },
   { id: 'leave', label: 'Leave', path: '/app/leave', icon: 'CalendarDays', permission: ['leave', 'view'], module: 'leave' },
   { id: 'approvals', label: 'Approvals Queue', path: '/app/approvals', icon: 'CheckSquare', permission: ['leave', 'approve'] },
@@ -66,10 +67,35 @@ export const NAV_TREE: NavItem[] = [
 /** Filter the tree by (a) feature flags and (b) a permission predicate. */
 export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?: string): NavItem[] {
   const isExecutive = userRole && ['CEO', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(String(userRole).toUpperCase());
+  const roleUpper = userRole?.toUpperCase();
+  const ALLOWED_TABS = [
+    'my-day',
+    'employees',
+    'employee-status',
+    'attendance',
+    'leave',
+    'approvals',
+    'training-courses',
+    'training-details',
+    'training-calendar',
+    'projects-tasks',
+    'finance-expenses',
+    'comm-chat',
+    'comm-announcements',
+    'settings'
+  ];
+
   const keep = (item: NavItem): boolean => {
+    if (!ALLOWED_TABS.includes(item.id)) return false;
+
+    if (item.module && !featureFlags.modules[item.module]) return false;
+    if (item.page && !featureFlags.pages[item.page]) return false;
+
+    if (roleUpper === 'EMPLOYEE' && (item.id === 'approvals' || item.id === 'employees' || item.id === 'employee-status')) {
+      return false;
+    }
+
     if (!isExecutive) {
-      if (item.module && !featureFlags.modules[item.module]) return false;
-      if (item.page && !featureFlags.pages[item.page]) return false;
       if (item.permission && !canFn(item.permission[0], item.permission[1])) return false;
     }
     return true;

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, StatCard, Button } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useLeave } from '../hooks/useLeave';
+import { useEmployee } from '../../employee/hooks/useEmployee';
 import { Form, SelectField, DatePickerField, TextAreaField, CheckboxField, FileUploadField } from '../../../shared/forms/form';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -13,13 +14,18 @@ import type { LeaveRecord } from '../leave.repository';
 import { googleIntegration, getMonthlyFolderName } from '../../../shared/integration/google';
 
 export function LeaveBoard() {
-  const { leaves, applyLeave, uploadMedicalCertificate, loading } = useLeave();
+  const { leaves, allLeaves, applyLeave, uploadMedicalCertificate, loading } = useLeave();
+  const { employees } = useEmployee();
   const { user } = useAuth();
   const { confirm } = useDialog();
   const { toast } = useNotifications();
   const [applyOpen, setApplyOpen] = useState(false);
   const [uploadCertOpen, setUploadCertOpen] = useState(false);
   const [uploadTargetLeave, setUploadTargetLeave] = useState<LeaveRecord | null>(null);
+
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
 
   const handleApplySubmit = async (values: Record<string, unknown>) => {
     const ok = await confirm({
@@ -94,46 +100,71 @@ export function LeaveBoard() {
     }
   };
 
-  const columns: Column<LeaveRecord>[] = [
-    {
-      key: 'type',
-      header: 'Type',
-      sortable: true,
-      accessor: (r) => r.leaveType,
-    },
-    {
-      key: 'dates',
-      header: 'Duration',
-      render: (r) => `${r.startDate} to ${r.endDate}${r.halfDay ? ' (Half Day)' : ''}`,
-    },
-    {
-      key: 'reason',
-      header: 'Reason',
-      accessor: (r) => r.reason,
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (r) => (
-        <span
-          className={`kvj-badge kvj-badge--${
-            r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : 'danger'
-          }`}
-        >
-          {r.status}
-        </span>
-      ),
-    },
-    {
-      key: 'medicalCert',
-      header: 'Medical Cert',
-      render: (r) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {r.medicalCertUrl ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, color: 'var(--status-success)', fontWeight: 600 }}>
-                📎 {r.medicalCertUrl}
-              </span>
+  const columns = useMemo<Column<LeaveRecord>[]>(() => {
+    const list: Column<LeaveRecord>[] = [];
+    if (isMgmt) {
+      list.push({
+        key: 'employee',
+        header: 'Employee',
+        render: (r) => {
+          const emp = (employees || []).find((e) => e.id === r.employeeId);
+          return emp ? `${emp.firstName} ${emp.lastName}` : r.employeeId || 'Unknown';
+        }
+      });
+    }
+    list.push(
+      {
+        key: 'type',
+        header: 'Type',
+        sortable: true,
+        accessor: (r) => r.leaveType,
+      },
+      {
+        key: 'dates',
+        header: 'Duration',
+        render: (r) => `${r.startDate} to ${r.endDate}${r.halfDay ? ' (Half Day)' : ''}`,
+      },
+      {
+        key: 'reason',
+        header: 'Reason',
+        accessor: (r) => r.reason,
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (r) => (
+          <span
+            className={`kvj-badge kvj-badge--${
+              r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : 'danger'
+            }`}
+          >
+            {r.status}
+          </span>
+        ),
+      },
+      {
+        key: 'medicalCert',
+        header: 'Medical Cert',
+        render: (r) => (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {r.medicalCertUrl ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--status-success)', fontWeight: 600 }}>
+                  📎 {r.medicalCertUrl}
+                </span>
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUploadTargetLeave(r);
+                    setUploadCertOpen(true);
+                  }}
+                >
+                  ✏️ Change
+                </Button>
+              </div>
+            ) : (
               <Button
                 size="xs"
                 variant="secondary"
@@ -143,38 +174,41 @@ export function LeaveBoard() {
                   setUploadCertOpen(true);
                 }}
               >
-                ✏️ Change
+                📤 Upload Cert
               </Button>
-            </div>
-          ) : (
-            <Button
-              size="xs"
-              variant="secondary"
-              onClick={(e) => {
-                e.stopPropagation();
-                setUploadTargetLeave(r);
-                setUploadCertOpen(true);
-              }}
-            >
-              📤 Upload Cert
-            </Button>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'approver',
-      header: 'Details',
-      render: (r) => r.approverNotes ? `Notes: ${r.approverNotes}` : 'No notes.',
-    },
-  ];
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'approver',
+        header: 'Details',
+        render: (r) => r.approverNotes ? `Notes: ${r.approverNotes}` : 'No notes.',
+      }
+    );
+    return list;
+  }, [isMgmt, employees]);
 
   // Exactly two leave types.
   const leaveTypes = businessRules.leave.types.map((t) => ({ value: t, label: t }));
 
-  const safeLeaves = Array.isArray(leaves) ? leaves : [];
-  const pendingCount = safeLeaves.filter((l) => l && l.status === 'pending').length;
-  const approvedCount = safeLeaves.filter((l) => l && l.status === 'approved').length;
+  const filteredLeaves = useMemo(() => {
+    if (!isMgmt) {
+      return Array.isArray(leaves) ? leaves : [];
+    }
+    const safeAll = Array.isArray(allLeaves) ? allLeaves : [];
+    if (selectedEmployee === 'all') {
+      return safeAll;
+    }
+    if (selectedEmployee === 'me') {
+      return Array.isArray(leaves) ? leaves : [];
+    }
+    return safeAll.filter((l) => l.employeeId === selectedEmployee);
+  }, [leaves, allLeaves, selectedEmployee, isMgmt]);
+
+  const safeLeavesListForStats = isMgmt ? (Array.isArray(allLeaves) ? allLeaves : []) : (Array.isArray(leaves) ? leaves : []);
+  const pendingCount = safeLeavesListForStats.filter((l) => l && l.status === 'pending').length;
+  const approvedCount = safeLeavesListForStats.filter((l) => l && l.status === 'approved').length;
 
   return (
     <AppShell>
@@ -187,11 +221,32 @@ export function LeaveBoard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
         <StatCard label="Pending Applications" value={pendingCount} tone="warning" icon="⚑" />
         <StatCard label="Approved Leaves" value={approvedCount} tone="success" icon="✓" />
-        <StatCard label="Total Leaves Taken" value={safeLeaves.filter((l) => l && l.status === 'approved').length} icon="🗓" />
+        <StatCard label="Total Leaves Taken" value={approvedCount} icon="🗓" />
       </div>
 
-      <SectionHeader title="My Leave History" />
-      <DataTable columns={columns} rows={safeLeaves} rowKey={(r) => r.id} loading={loading} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <SectionHeader title={isMgmt ? "Employee Leave History" : "My Leave History"} style={{ margin: 0 }} />
+        {isMgmt && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Filter Employee:</span>
+            <select
+              className="kvj-select"
+              value={selectedEmployee}
+              onChange={(e) => setSelectedEmployee(e.target.value)}
+              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
+            >
+              <option value="all">👥 All Employees</option>
+              <option value="me">Me ({user?.fullName || 'Personal'})</option>
+              {(employees || []).filter(e => e.id !== user?.id).map((e) => {
+                const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email;
+                return <option key={e.id} value={e.id}>{name}</option>;
+              })}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <DataTable columns={columns} rows={filteredLeaves} rowKey={(r) => r.id} loading={loading} />
 
       {/* Apply Leave Drawer */}
       <Drawer open={applyOpen} onClose={() => setApplyOpen(false)} title="Apply for Leave">

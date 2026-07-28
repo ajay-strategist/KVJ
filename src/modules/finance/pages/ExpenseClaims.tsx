@@ -357,14 +357,14 @@ export function ExpenseClaims() {
   const filteredExpenses = useMemo(() => {
     return expenses.filter((exp) => {
       if (!isManagement) {
-        return exp.person.toLowerCase() === (user?.fullName || '').toLowerCase();
+        return true;
       }
       if (selectedPersonFilter !== 'all') {
         return exp.person.toLowerCase() === selectedPersonFilter.toLowerCase();
       }
       return true;
     });
-  }, [expenses, isManagement, selectedPersonFilter, user]);
+  }, [expenses, isManagement, selectedPersonFilter]);
 
   const handleExpenseSubmit = async (values: Record<string, unknown>) => {
     const isSelfTravel = values.expenseType === 'Self Travel';
