@@ -1177,9 +1177,17 @@ const dateNavBtnStyle: React.CSSProperties = {
 
 export const TimelineWidget = memo(function TimelineWidget({
   entries,
+  selectedEmpId,
+  onEmpIdChange,
+  employeeList = [],
 }: {
   entries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral'; date?: string }>;
+  selectedEmpId?: string;
+  onEmpIdChange?: (empId: string) => void;
+  employeeList?: Array<{ id: string; name: string }>;
 }) {
+  const { user } = useAuth();
+  const isExecutive = user && ['CEO', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(String(user.role).toUpperCase());
   const todayDate = toLocalISODate(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(todayDate);
 
@@ -1217,6 +1225,26 @@ export const TimelineWidget = memo(function TimelineWidget({
             {isToday ? '🟢 Current Day' : '📅 History Log'}
           </Badge>
         </div>
+
+        {/* User Level Employee Filter Dropdown for Executive Roles */}
+        {isExecutive && employeeList.length > 0 && onEmpIdChange && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-sunken)', padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)' }}>👤 Filter Timeline:</span>
+            <select
+              value={selectedEmpId || 'me'}
+              onChange={(e) => onEmpIdChange(e.target.value)}
+              className="kvj-input"
+              style={{ padding: '3px 8px', fontSize: 12, borderRadius: 6, flex: 1, background: 'var(--bg-surface)', cursor: 'pointer' }}
+            >
+              <option value="me">My Timeline ({user?.fullName || 'Me'})</option>
+              {employeeList.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Date Navigation Bar */}
         <div style={{
@@ -1499,23 +1527,33 @@ function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; l
 }
 
 export function MyDayPage() {
+  const { user } = useAuth();
+  const { employees } = useEmployee();
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
   const { tasks: projectTasks, projects, createTask, updateTask, submitTask } = useProject();
 
+  const [selectedEmpId, setSelectedEmpId] = useState('me');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
-  const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>(() => {
+
+  const userTimelineKey = useMemo(() => {
+    const activeKey = selectedEmpId !== 'me' ? selectedEmpId : (user?.id || user?.email || 'me');
+    return `${TIMELINE_STORAGE_KEY}_${activeKey}`;
+  }, [selectedEmpId, user]);
+
+  const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
+
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem(TIMELINE_STORAGE_KEY);
+      const saved = localStorage.getItem(userTimelineKey);
       const parsed = saved ? JSON.parse(saved) : [];
       const filtered = parsed.filter((e: any) => !e.title?.includes('System initialized'));
-      localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(filtered));
-      return filtered;
+      setTimelineEntries(filtered);
     } catch {
-      return [];
+      setTimelineEntries([]);
     }
-  });
+  }, [userTimelineKey]);
 
   const handleSyncTask = useCallback((id: string, secondsToday: number, active: boolean, underReview?: boolean) => {
     updateTask(id, {
@@ -1621,7 +1659,7 @@ export function MyDayPage() {
     setTimelineEntries((prev) => {
       const next = [...prev, newEntry];
       try {
-        localStorage.setItem(TIMELINE_STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(userTimelineKey, JSON.stringify(next));
       } catch {}
       return next;
     });
@@ -1731,10 +1769,15 @@ export function MyDayPage() {
     setCreateTaskOpen(false);
   };
 
-
-
   const { applyLeave } = useLeave();
   const [applyLeaveOpen, setApplyLeaveOpen] = useState(false);
+
+  const employeeOptions = useMemo(() => {
+    return (employees || []).map((e) => ({
+      id: e.id,
+      name: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email,
+    }));
+  }, [employees]);
 
   return (
     <AppShell>
@@ -1799,7 +1842,12 @@ export function MyDayPage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AnnouncementWidget />
-          <TimelineWidget entries={timelineEntries} />
+          <TimelineWidget
+            entries={timelineEntries}
+            selectedEmpId={selectedEmpId}
+            onEmpIdChange={setSelectedEmpId}
+            employeeList={employeeOptions}
+          />
         </div>
       </div>
 

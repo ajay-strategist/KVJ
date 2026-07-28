@@ -283,7 +283,7 @@ export class SupabaseAuthService implements IAuthService {
         email,
         role,
         designation,
-        mustChangePassword: true,
+        mustChangePassword: empCheck ? (empCheck as any).must_change_password === true : (email.toLowerCase() === 'info@thestrategist.co.in' ? false : true),
       };
 
       const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;

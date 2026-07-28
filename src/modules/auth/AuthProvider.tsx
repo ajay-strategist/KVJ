@@ -98,11 +98,9 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
 
   const updateUserPassword = useCallback(async (userId: string, newPassword: string) => {
     const res = await authService.updateUserPassword(userId, newPassword);
-    if (session && session.user.id === userId) {
-      setSession((prev) => prev ? { ...prev, user: { ...prev.user, mustChangePassword: false } } : null);
-    }
+    setSession((prev) => (prev ? { ...prev, user: { ...prev.user, mustChangePassword: false } } : null));
     return res;
-  }, [authService, session]);
+  }, [authService]);
 
   const resetToDefaultPassword = useCallback(async (userIdOrEmail: string, fullName?: string) => {
     return authService.resetToDefaultPassword(userIdOrEmail, fullName);
