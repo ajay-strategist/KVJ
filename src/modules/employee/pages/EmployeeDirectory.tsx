@@ -14,7 +14,7 @@ import { supabase } from '../../../shared/integration/supabase';
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
   const { employees, createEmployee, updateProfile, deleteEmployee, loading } = useEmployee();
-  const { createUser, resetToDefaultPassword, updateUser, getUsers } = useAuth();
+  const { createUser, resetToDefaultPassword, updateUser, deleteUser, getUsers } = useAuth();
   const { toast } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -316,6 +316,14 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
               if (window.confirm(`Are you sure you want to delete ${r.firstName} ${r.lastName}?`)) {
                 const res = await deleteEmployee(r.id);
                 if (res.ok) {
+                  try {
+                    const u = getEmployeeUser(r.email);
+                    if (u) {
+                      await deleteUser(u.id);
+                    }
+                  } catch (err) {
+                    console.warn('Auth user deletion note:', err);
+                  }
                   toast({ variant: 'success', title: 'Employee Deleted', message: `${r.firstName} ${r.lastName} has been deleted.` });
                 } else {
                   toast({ variant: 'error', title: 'Delete Failed', message: res.error || 'Could not delete employee.' });

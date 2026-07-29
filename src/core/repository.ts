@@ -17,6 +17,7 @@ export interface IRepository<T extends Entity, TCreate = Partial<T>, TUpdate = P
   findMany(query?: QuerySpec): Promise<Page<T>>;
   update(id: UUID, patch: TUpdate, actor: Actor): Promise<T>;
   softDelete(id: UUID, actor: Actor): Promise<void>;
+  hardDelete(id: UUID): Promise<void>;
   restore(id: UUID, actor: Actor): Promise<T>;
 }
 
@@ -115,6 +116,11 @@ export class MemoryRepository<T extends Entity> implements IRepository<T> {
     const existing = this.store.get(id);
     if (!existing || existing.deletedAt) throw AppError.notFound();
     this.store.set(id, { ...existing, deletedAt: now(), deletedBy: actor.id, updatedAt: now() });
+    this.persist();
+  }
+
+  async hardDelete(id: UUID): Promise<void> {
+    this.store.delete(id);
     this.persist();
   }
 

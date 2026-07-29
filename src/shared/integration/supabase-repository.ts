@@ -242,6 +242,18 @@ export class SupabaseRepository<T extends Entity> implements IRepository<T> {
     }
   }
 
+  async hardDelete(id: UUID): Promise<void> {
+    const { error } = await supabase
+      .from(this.tableName)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error(`Supabase hardDelete error on ${this.tableName}:`, error);
+      throw AppError.internal(error.message);
+    }
+  }
+
   async restore(id: UUID, actor: Actor): Promise<T> {
     const ts = new Date().toISOString();
     const { data, error } = await supabase

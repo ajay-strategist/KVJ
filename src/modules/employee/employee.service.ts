@@ -77,7 +77,7 @@ export class EmployeeService implements IEmployeeService {
 
   async deleteEmployee(employeeId: UUID, actor: Actor): Promise<Result<void>> {
     try {
-      await this.repo.softDelete(employeeId, actor);
+      await this.repo.hardDelete(employeeId);
       return Ok(undefined);
     } catch (err: any) {
       return Err(AppError.internal(err?.message || 'Failed to delete employee.'));
