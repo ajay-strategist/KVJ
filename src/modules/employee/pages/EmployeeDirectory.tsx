@@ -13,7 +13,7 @@ import { supabase } from '../../../shared/integration/supabase';
 
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
-  const { employees, createEmployee, updateProfile, loading } = useEmployee();
+  const { employees, createEmployee, updateProfile, deleteEmployee, loading } = useEmployee();
   const { createUser, resetToDefaultPassword, updateUser, getUsers } = useAuth();
   const { toast } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
@@ -307,6 +307,23 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
             }}
           >
             🔑 Reset Password
+          </Button>
+          <Button
+            size="xs"
+            variant="danger"
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (window.confirm(`Are you sure you want to delete ${r.firstName} ${r.lastName}?`)) {
+                const res = await deleteEmployee(r.id);
+                if (res.ok) {
+                  toast({ variant: 'success', title: 'Employee Deleted', message: `${r.firstName} ${r.lastName} has been deleted.` });
+                } else {
+                  toast({ variant: 'error', title: 'Delete Failed', message: res.error || 'Could not delete employee.' });
+                }
+              }
+            }}
+          >
+            🗑️ Delete
           </Button>
         </div>
       ),

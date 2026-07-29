@@ -44,11 +44,21 @@ export function useEmployee() {
     return { ok: false, error: res.error.message };
   }, [service, principal, user]);
 
+  const deleteEmployee = useCallback(async (id: string) => {
+    const actor = principal || { id: user?.id || 'u-admin', role: user?.role || 'ADMIN' };
+    const res = await service.deleteEmployee(id, actor);
+    if (res.ok) {
+      setEmployees((prev) => prev.filter((e) => e.id !== id));
+      return { ok: true };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, principal, user]);
+
   useEffect(() => {
     fetchEmployees();
   }, [fetchEmployees]);
 
-  return { employees, loading, error, refresh: fetchEmployees, createEmployee, updateProfile };
+  return { employees, loading, error, refresh: fetchEmployees, createEmployee, updateProfile, deleteEmployee };
 }
 
 export function useEmployeeProfile(employeeId?: string) {

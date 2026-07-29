@@ -9,6 +9,7 @@ export interface IEmployeeService {
   updateProfile(employeeId: UUID, patch: Partial<Employee>, actor: Actor): Promise<Result<Employee>>;
   getHierarchy(employeeId: UUID): Promise<Result<{ manager?: Employee; directReports: Employee[] }>>;
   listEmployees(): Promise<Result<Employee[]>>;
+  deleteEmployee(employeeId: UUID, actor: Actor): Promise<Result<void>>;
 }
 
 export class EmployeeService implements IEmployeeService {
@@ -71,6 +72,15 @@ export class EmployeeService implements IEmployeeService {
       return Ok(page.data);
     } catch (err) {
       return Err(AppError.internal());
+    }
+  }
+
+  async deleteEmployee(employeeId: UUID, actor: Actor): Promise<Result<void>> {
+    try {
+      await this.repo.softDelete(employeeId, actor);
+      return Ok(undefined);
+    } catch (err: any) {
+      return Err(AppError.internal(err?.message || 'Failed to delete employee.'));
     }
   }
 }
