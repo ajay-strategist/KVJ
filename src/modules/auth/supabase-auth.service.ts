@@ -152,7 +152,10 @@ export class SupabaseAuthService implements IAuthService {
         .maybeSingle();
 
       if (empByEmail) {
-        return toAuthUser(empByEmail as unknown as EmployeeProfileRow, fallbackEmail);
+        const authUser = toAuthUser(empByEmail as unknown as EmployeeProfileRow, fallbackEmail);
+        // Sync role to DB so RLS is_full_control() works correctly
+        await this.syncRoleToDB(empByEmail.id, authUser.role, empByEmail.role);
+        return authUser;
       }
 
       throw new AppError({
@@ -163,8 +166,32 @@ export class SupabaseAuthService implements IAuthService {
         severity: 'error',
       });
     }
-    return toAuthUser(data as unknown as EmployeeProfileRow, fallbackEmail);
+    const authUser = toAuthUser(data as unknown as EmployeeProfileRow, fallbackEmail);
+    // Sync role to DB so RLS is_full_control() returns true for CEO/ADMIN/MANAGER
+    // This fixes the case where the DB role column is 'EMPLOYEE' but the user
+    // should be CEO (e.g. info@thestrategist.co.in is hardcoded to CEO).
+    await this.syncRoleToDB(data.id, authUser.role, (data as any).role);
+    return authUser;
   }
+
+  /**
+   * Sync the resolved role back to the employees table so that the Postgres
+   * is_full_control() RLS function reads the correct value.
+   * Only updates when the stored role differs from the resolved role.
+   */
+  private async syncRoleToDB(empId: string, resolvedRole: string, storedRole: string | undefined): Promise<void> {
+    if (!empId || storedRole?.toUpperCase() === resolvedRole.toUpperCase()) return;
+    try {
+      await supabase
+        .from('employees')
+        .update({ role: resolvedRole.toUpperCase() })
+        .eq('id', empId);
+    } catch {
+      // Non-critical: role sync failure should not block login
+    }
+  }
+
+
 
   /** Build the app Session from a Supabase session + employee profile. */
   private async buildSession(

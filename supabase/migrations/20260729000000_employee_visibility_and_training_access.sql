@@ -52,3 +52,34 @@ CREATE POLICY "Allow full access for authenticated users" ON public.assessments
 DROP POLICY IF EXISTS "Allow full access for authenticated users" ON public.announcements;
 CREATE POLICY "Allow full access for authenticated users" ON public.announcements
   FOR ALL USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
+
+-- =============================================================================
+-- Role Correction: ensure known accounts have the correct DB role
+-- =============================================================================
+-- The DB role column controls is_full_control() which gates RLS policies.
+-- If a CEO/Admin account was created with default role='EMPLOYEE', they
+-- would see empty data everywhere. This block corrects known accounts.
+-- =============================================================================
+
+-- CEO: info@thestrategist.co.in (Jomon Joseph)
+UPDATE employees
+  SET role = 'CEO'
+  WHERE email ILIKE 'info@thestrategist.co.in'
+    AND role != 'CEO';
+
+-- Ensure any employee whose designation contains 'admin' or 'CEO' gets
+-- the correct role (only if they were accidentally stored as EMPLOYEE).
+UPDATE employees
+  SET role = 'ADMIN'
+  WHERE UPPER(designation) LIKE '%ADMIN%'
+    AND role = 'EMPLOYEE';
+
+UPDATE employees
+  SET role = 'CEO'
+  WHERE UPPER(designation) LIKE '%CEO%'
+    AND role = 'EMPLOYEE';
+
+UPDATE employees
+  SET role = 'MANAGER'
+  WHERE UPPER(designation) LIKE '%MANAGER%'
+    AND role = 'EMPLOYEE';
