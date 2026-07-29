@@ -144,7 +144,8 @@ export class LeaveService implements ILeaveService {
       // 4-role model: Admin/CEO/Manager have full control, so any of them
       // approves a pending leave in a single step. (The multi-step chain is
       // revisited in the Leaves / Approvals Queue modules.)
-      const isApprover = actor.role === 'ADMIN' || actor.role === 'CEO' || actor.role === 'MANAGER';
+      const r = actor.role?.toUpperCase();
+      const isApprover = r === 'ADMIN' || r === 'CEO' || r === 'MANAGER';
       const nextStep = isApprover ? undefined : rec.currentStep;
       const nextStatus = isApprover ? 'approved' : rec.status;
 

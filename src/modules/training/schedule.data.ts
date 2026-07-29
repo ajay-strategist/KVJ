@@ -3,6 +3,7 @@
  */
 
 import { toLocalISODate } from '../../shared/utils/date';
+import { supabase } from '../../shared/integration/supabase';
 
 export interface ScheduleSession {
   id: string;
@@ -79,7 +80,38 @@ export async function fetchScheduleRange(
     }
   }
 
-  return { sessions: [], leaves: [], holidays, daysLoaded: dates.length };
+  const leaves: LeaveRequest[] = [];
+  try {
+    const { data: dbLeaves, error } = await supabase
+      .from('leave_records')
+      .select('*')
+      .eq('status', 'approved')
+      .gte('end_date', q.from)
+      .lte('start_date', q.to)
+      .is('deleted_at', null);
+
+    if (!error && dbLeaves) {
+      for (const row of dbLeaves) {
+        const leaveDates = eachDate(row.start_date, row.end_date);
+        for (const date of leaveDates) {
+          if (dates.includes(date)) {
+             leaves.push({
+               id: `${row.id}-${date}`,
+               trainerId: row.employee_id,
+               date,
+               type: (row.leave_type as any) || 'Casual',
+               duration: row.half_day ? 'Half Day Morning' : 'Full Day',
+               status: 'Approved',
+             });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load leaves for schedule', e);
+  }
+
+  return { sessions: [], leaves, holidays, daysLoaded: dates.length };
 }
 
 // ── Conflict engine ──────────────────────────────────────────────────────────

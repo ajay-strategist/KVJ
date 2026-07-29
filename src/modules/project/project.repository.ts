@@ -53,6 +53,7 @@ export interface Task extends Entity {
   projectId: UUID;
   milestoneId?: UUID;
   assigneeId?: UUID;
+  supervisorId?: UUID;
   title: string;
   description?: string;
   priority: TaskPriority;

@@ -236,6 +236,11 @@ export function ProjectList({
     const matchedClient = clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
     const resolvedClientId = matchedClient ? matchedClient.id : undefined;
 
+    if (!values.supervisorId) {
+      toast({ variant: 'error', title: 'Supervisor Required', message: 'Please select a Project Supervisor.' });
+      return;
+    }
+
     const res = await createProject({
       title: values.title as string,
       code: (values.code as string) || `KVJ-PRJ-${Math.floor(100 + Math.random() * 900)}`,
@@ -269,6 +274,11 @@ export function ProjectList({
     const typedName = (clientNameInput || '').trim();
     const matchedClient = clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
     const resolvedClientId = matchedClient ? matchedClient.id : undefined;
+
+    if (!values.supervisorId) {
+      toast({ variant: 'error', title: 'Supervisor Required', message: 'Please select a Project Supervisor.' });
+      return;
+    }
 
     const res = await updateProject(selectedProject.id as UUID, {
       title: values.title as string,

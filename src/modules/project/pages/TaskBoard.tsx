@@ -151,9 +151,11 @@ export function TaskBoard({
       const project = projects.find((p: any) => p.id === t.projectId);
       const assignee = employees.find((e) => e.id === t.assigneeId);
       
-      const supervisorAlloc = project ? allocations.find((a: any) => a.projectId === project.id && (a.role.toLowerCase().includes('lead') || a.role.toLowerCase().includes('manager'))) : null;
-      const supervisorEmp = supervisorAlloc ? employees.find((e) => e.id === supervisorAlloc.employeeId) : null;
-      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
+      const pSupervisorId = project ? (project as any).supervisorId : null;
+      const tSupervisorId = t.supervisorId;
+      const supervisorId = pSupervisorId || tSupervisorId;
+      const supervisorEmp = supervisorId ? employees.find((e) => e.id === supervisorId) : null;
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName} (Project Supervisor)` : '';
 
       const tTimesheets = timesheets.filter((ts: any) => ts.taskId === t.id);
       const totalHoursWorked = tTimesheets.reduce((sum: number, ts: any) => sum + ts.hoursLogged, 0);
@@ -240,7 +242,8 @@ export function TaskBoard({
 
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       if (dateWindowFilter === 'today') {
-        if (t.dueDate !== todayStr && t.approvalStatus !== 'rework' && t.status !== 'In Progress') return false;
+        if (t.status === 'Completed') return false;
+        if (t.dueDate !== todayStr && t.approvalStatus !== 'rework' && t.status !== 'In Progress' && t.status !== 'Under Review') return false;
       } else if (dateWindowFilter === 'next_3_days') {
         if (t.dueDate < todayStr || t.dueDate > windowEnd) return false;
       }
@@ -265,9 +268,12 @@ export function TaskBoard({
     const isOtherAssignee = assignee && assignee.id !== user?.id;
     const approvalStatus = (!isManagement && isOtherAssignee) ? 'pending_assignment_approval' : null;
 
+    const supervisor = employees.find((e) => `${e.firstName} ${e.lastName}` === values.supervisor);
+
     const res = await createTask({
       projectId: proj?.id,
       assigneeId: assignee?.id,
+      supervisorId: supervisor?.id,
       title: values.name as string,
       status: 'todo',
       dueDate: (values.dueDate as string) || todayStr,
@@ -366,11 +372,37 @@ export function TaskBoard({
         }
       }));
     }
+    setTasksList((prev) =>
+      prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))
+    );
     const res = await submitTask(task.id as UUID, 'Submitted for review');
     if (res.ok) {
       toast({ variant: 'success', title: 'Task Submitted', message: `Task "${task.name}" is now Under Review.` });
     } else {
       toast({ variant: 'error', title: 'Submission Failed', message: res.error });
+      setTasksList((prev) =>
+        prev.map((x) => (x.id === task.id ? { ...x, status: task.status } : x)) // Revert on failure
+      );
+    }
+  };
+
+  const handleApproveTaskSubmission = async (task: TaskItem) => {
+    setTasksList((prev) => prev.map((x) => (x.id === task.id ? { ...x, status: 'Completed' } : x)));
+    const res = await approveTaskSubmission(task.id as UUID);
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Task Approved', message: `Task "${task.name}" is now Completed.` });
+    } else {
+      toast({ variant: 'error', title: 'Approval Failed', message: res.error });
+    }
+  };
+
+  const handleRequestRework = async (task: TaskItem, notes: string) => {
+    setTasksList((prev) => prev.map((x) => (x.id === task.id ? { ...x, status: 'In Progress', approvalStatus: 'rework', reworkNotes: notes } : x)));
+    const res = await requestRework(task.id as UUID, notes);
+    if (res.ok) {
+      toast({ variant: 'warning', title: 'Rework Requested', message: `Task "${task.name}" sent back for rework.` });
+    } else {
+      toast({ variant: 'error', title: 'Rework Failed', message: res.error });
     }
   };
 
@@ -496,10 +528,12 @@ export function TaskBoard({
 
     try {
       const assigneeEmp = employees.find((e) => `${e.firstName} ${e.lastName}` === updatedAssignee);
+      const supervisorEmp = employees.find((e) => `${e.firstName} ${e.lastName}` === updatedSupervisor);
       await updateTask(editingTask.id, {
         title: updatedName,
         dueDate: updatedDueDate,
         assigneeId: assigneeEmp ? assigneeEmp.id : undefined,
+        supervisorId: supervisorEmp ? supervisorEmp.id : undefined,
         status: dbStatusMap[updatedStatus] || 'todo',
       });
     } catch (e) {
@@ -816,6 +850,23 @@ export function TaskBoard({
                       </Button>
                     )}
 
+                    {/* Action: Approve Task (Manager) */}
+                    {t.status === 'Under Review' && isManagement && (
+                      <Button size="sm" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
+                        ✅ Approve
+                      </Button>
+                    )}
+
+                    {/* Action: Rework Task (Manager) */}
+                    {t.status === 'Under Review' && isManagement && (
+                      <Button size="sm" variant="danger" onClick={() => {
+                        const notes = prompt("Enter rework reason:");
+                        if (notes) handleRequestRework(t, notes);
+                      }}>
+                        🔄 Rework
+                      </Button>
+                    )}
+
                     {/* Action 5: Reopen Task */}
                     {t.status === 'Completed' && (
                       <Button size="sm" variant="secondary" onClick={() => handleReopenTask(t)}>
@@ -882,8 +933,16 @@ export function TaskBoard({
             ]}
           />
           <TextField name="projectName" label="Project Name / Department" placeholder="e.g. Academic Training" />
-          <TextField name="assignee" label="Assignee Name" placeholder="e.g. Linto George" />
-          <TextField name="supervisor" label="Supervisor Name" placeholder="e.g. Manager (Operations)" />
+          <SelectField
+            name="assignee"
+            label="Assignee Name"
+            options={[{ value: '', label: 'Unassigned' }, ...employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` }))]}
+          />
+          <SelectField
+            name="supervisor"
+            label="Supervisor Name"
+            options={[{ value: '', label: 'None' }, ...employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` }))]}
+          />
           <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
@@ -935,7 +994,11 @@ export function TaskBoard({
               label="Assignee Name"
               options={employees.length > 0 ? employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` })) : [{ value: editingTask.assignee, label: editingTask.assignee }]}
             />
-            <TextField name="supervisor" label="Supervisor Name" placeholder="Supervisor..." />
+            <SelectField
+              name="supervisor"
+              label="Supervisor Name"
+              options={employees.length > 0 ? employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` })) : [{ value: editingTask.supervisor, label: editingTask.supervisor }]}
+            />
             <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
             <SelectField
               name="status"

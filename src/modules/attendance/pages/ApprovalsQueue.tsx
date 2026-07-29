@@ -35,7 +35,7 @@ export function ApprovalsQueue() {
   const [notes, setNotes] = useState('');
   
   const userRole = user?.role || 'EMPLOYEE';
-  const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole.toUpperCase());
 
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval'>('all');
 
@@ -312,12 +312,17 @@ export function ApprovalsQueue() {
     {
       key: 'actions',
       header: 'Action',
-      render: (r) => (
-        <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" onClick={() => handleDecideLeave(r, 'accept')}>Accept</Button>
-          <Button size="sm" variant="danger" onClick={() => handleDecideLeave(r, 'reject')}>Reject</Button>
-        </div>
-      ),
+      render: (r) => {
+        if (!canApprove) {
+          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>;
+        }
+        return (
+          <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" onClick={() => handleDecideLeave(r, 'accept')}>Accept</Button>
+            <Button size="sm" variant="danger" onClick={() => handleDecideLeave(r, 'reject')}>Reject</Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -355,12 +360,17 @@ export function ApprovalsQueue() {
     {
       key: 'actions',
       header: 'Action',
-      render: (r) => (
-        <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" onClick={() => handleDecideCorrection(r, 'accept')}>Accept</Button>
-          <Button size="sm" variant="danger" onClick={() => handleDecideCorrection(r, 'reject')}>Reject</Button>
-        </div>
-      ),
+      render: (r) => {
+        if (!canApprove) {
+          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>;
+        }
+        return (
+          <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" onClick={() => handleDecideCorrection(r, 'accept')}>Accept</Button>
+            <Button size="sm" variant="danger" onClick={() => handleDecideCorrection(r, 'reject')}>Reject</Button>
+          </div>
+        );
+      },
     },
   ];
 

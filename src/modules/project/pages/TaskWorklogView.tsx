@@ -191,65 +191,62 @@ export function TaskWorklogView({
         </div>
       </Card>
 
-      {/* Main Tabular Work Log Grid */}
+      {/* Main Timeline Work Log Grid */}
       <Card style={{ padding: 16 }}>
-        <SectionHeader title="Daily Task Work Log & Time Audit" />
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '10px 14px' }}>Date</th>
-                <th style={{ padding: '10px 14px' }}>Task Name & Project</th>
-                <th style={{ padding: '10px 14px' }}>Category</th>
-                <th style={{ padding: '10px 14px' }}>Employee / Logged By</th>
-                <th style={{ padding: '10px 14px' }}>Role</th>
-                <th style={{ padding: '10px 14px' }}>Description</th>
-                <th style={{ padding: '10px 14px', textAlign: 'right' }}>Hours Worked</th>
-                <th style={{ padding: '10px 14px' }}>Review Status</th>
-                {isSupervisor && <th style={{ padding: '10px 14px', textAlign: 'center' }}>Action</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLogs.map((log) => (
-                <tr key={log.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
-                  <td style={{ padding: '10px 14px', fontWeight: 600, whiteSpace: 'nowrap' }}>📅 {log.date}</td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{log.taskName}</div>
-                    <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2 }}>{log.projectName}</div>
-                  </td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <Badge tone={log.category === 'Office Task' ? 'warning' : 'info'}>
-                      {log.category}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: '10px 14px', fontWeight: 600 }}>👤 {log.employeeName}</td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <Badge tone={log.role === 'Supervisor' ? 'info' : 'neutral'}>
-                      {log.role === 'Supervisor' ? 'Manager (Operations)' : 'Assignee'}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', maxWidth: 280 }}>{log.description}</td>
-                  <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--accent)' }}>⏱ {(log.durationHrs || 0).toFixed(1)} hrs</td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <Badge tone={log.reviewStatus === 'Approved' ? 'success' : 'warning'}>
-                      {log.reviewStatus}
-                    </Badge>
-                  </td>
-                  {isSupervisor && (
-                    <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                      {log.reviewStatus === 'Pending Review' ? (
-                        <Button size="sm" onClick={() => handleApprove(log.id)} style={{ fontSize: 11 }}>
-                          ✓ Approve
-                        </Button>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Done</span>
-                      )}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <SectionHeader title="Timeline of the Office" />
+        <div style={{ position: 'relative', marginTop: 16, paddingLeft: 24, borderLeft: '2px solid var(--border)' }}>
+          {filteredLogs.map((log) => (
+            <div key={log.id} style={{ position: 'relative', marginBottom: 24 }}>
+              {/* Timeline Dot */}
+              <div style={{
+                position: 'absolute',
+                left: -33,
+                top: 4,
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                background: log.reviewStatus === 'Approved' ? 'var(--status-success)' : 'var(--status-warning)',
+                border: '3px solid var(--bg-surface)'
+              }} />
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg-sunken)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    📅 {log.date} — {log.employeeName}
+                  </div>
+                  <Badge tone={log.reviewStatus === 'Approved' ? 'success' : 'warning'}>
+                    {log.reviewStatus}
+                  </Badge>
+                </div>
+                
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--brand)' }}>
+                  {log.taskName} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({log.projectName})</span>
+                </div>
+                
+                <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
+                  {log.description}
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--border)' }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Badge tone={log.category === 'Office Task' ? 'warning' : 'info'}>{log.category}</Badge>
+                    <Badge tone={log.role === 'Supervisor' ? 'info' : 'neutral'}>{log.role === 'Supervisor' ? 'Manager (Operations)' : 'Assignee'}</Badge>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ fontWeight: 800, color: 'var(--accent)', fontSize: 13 }}>⏱ {(log.durationHrs || 0).toFixed(1)} hrs</div>
+                    {isSupervisor && log.reviewStatus === 'Pending Review' && (
+                      <Button size="sm" onClick={() => handleApprove(log.id)} style={{ fontSize: 11 }}>
+                        ✓ Approve
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filteredLogs.length === 0 && (
+            <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: 13 }}>No work logs match the current filters.</div>
+          )}
         </div>
       </Card>
     </div>

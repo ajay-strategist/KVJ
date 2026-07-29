@@ -13,6 +13,7 @@ import {
 } from '../project.repository';
 import type { UUID } from '../../../core/types';
 import { useAuth } from '../../auth/AuthProvider';
+import { isFullControl } from '../../../shared/permissions/roles';
 
 type CallbackResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -45,17 +46,32 @@ export function useProject() {
         timesheetRepo.findMany(),
       ]);
 
-      setClients(Array.isArray(clPage?.data) ? clPage.data : []);
-      setProjects(Array.isArray(prPage?.data) ? prPage.data : []);
-      setAllocations(Array.isArray(alPage?.data) ? alPage.data : []);
-      setTasks(Array.isArray(tkPage?.data) ? tkPage.data : []);
-      setTimesheets(Array.isArray(tsPage?.data) ? tsPage.data : []);
+      let allClients = Array.isArray(clPage?.data) ? clPage.data : [];
+      let allProjects = Array.isArray(prPage?.data) ? prPage.data : [];
+      let allAllocations = Array.isArray(alPage?.data) ? alPage.data : [];
+      let allTasks = Array.isArray(tkPage?.data) ? tkPage.data : [];
+      let allTimesheets = Array.isArray(tsPage?.data) ? tsPage.data : [];
+
+      if (user && !isFullControl(user.role as any)) {
+        const userAllocations = allAllocations.filter(a => a.employeeId === user.id);
+        const allocatedProjectIds = new Set(userAllocations.map(a => a.projectId));
+        
+        allProjects = allProjects.filter(p => allocatedProjectIds.has(p.id));
+        allTasks = allTasks.filter(t => t.assigneeId === user.id || allocatedProjectIds.has(t.projectId));
+        allTimesheets = allTimesheets.filter(t => t.employeeId === user.id || allocatedProjectIds.has(t.projectId));
+      }
+
+      setClients(allClients);
+      setProjects(allProjects);
+      setAllocations(allAllocations);
+      setTasks(allTasks);
+      setTimesheets(allTimesheets);
       setError(null);
     } catch (e: any) {
       setError(e.message);
     }
     setLoading(false);
-  }, []);
+  }, [user]);
 
   const createClient = useCallback(async (data: Partial<Client>): Promise<CallbackResult<Client>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };

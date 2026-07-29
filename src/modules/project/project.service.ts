@@ -121,8 +121,9 @@ export class ProjectService implements IProjectService {
   async createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
       const isSelfAssigned = !data.assigneeId || data.assigneeId === actor.id;
-      const isAdminOrManager = actor.role === 'ADMIN' || actor.role === 'CEO' || actor.role === 'MANAGER';
-      const needsAssignmentApproval = !isSelfAssigned && !isAdminOrManager;
+      const r = actor.role?.toUpperCase();
+      const isCeo = r === 'CEO';
+      const needsAssignmentApproval = !isSelfAssigned && !isCeo;
 
       const payload: Partial<Task> = {
         ...data,
@@ -151,8 +152,9 @@ export class ProjectService implements IProjectService {
       const existing = await this.taskRepo.findById(taskId);
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
         const isSelfAssigned = patch.assigneeId === actor.id;
-        const isAdminOrManager = actor.role === 'ADMIN' || actor.role === 'CEO' || actor.role === 'MANAGER';
-        if (!isSelfAssigned && !isAdminOrManager) {
+        const r = actor.role?.toUpperCase();
+        const isCeo = r === 'CEO';
+        if (!isSelfAssigned && !isCeo) {
           patch.approvalStatus = 'pending_assignment_approval';
           (patch as any).assignedByEmployeeId = actor.id;
         }
