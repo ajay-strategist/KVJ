@@ -5,6 +5,8 @@ import { usePermissions } from '../../../shared/permissions/react';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 
 import { useProject } from '../hooks/useProject';
+import { useTaskSessions } from '../hooks/useTaskSessions';
+import type { TaskWorkSession } from '../project.repository';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 
@@ -37,6 +39,19 @@ export function TaskWorklogView({
   const [filterRole, setFilterRole] = useState<'all' | 'Assignee' | 'Supervisor'>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | 'Office Task' | 'Project Task'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'Approved' | 'Pending Review'>('all');
+
+  // ── Work Sessions timeline (real per-interval Start → Pause/Submit records) ──
+  const { listSessions } = useTaskSessions();
+  const [sessions, setSessions] = useState<TaskWorkSession[]>([]);
+  const [sessFrom, setSessFrom] = useState('');
+  const [sessTo, setSessTo] = useState('');
+  useEffect(() => {
+    let active = true;
+    const load = () => { listSessions().then((s) => { if (active) setSessions(s); }).catch(() => {}); };
+    load();
+    const iv = window.setInterval(load, 15000); // keep running sessions fresh
+    return () => { active = false; window.clearInterval(iv); };
+  }, [listSessions]);
 
   const [logs, setLogs] = useState<WorklogRecord[]>([]);
 
@@ -119,6 +134,71 @@ export function TaskWorklogView({
         title="Task Worklog & Time Entries Audit"
         subtitle="Role-differentiated daily work logs, hours worked, and supervisor approval workflow"
       />
+
+      {/* ── Work Sessions timeline (real Start → Pause/Submit intervals) ── */}
+      {(() => {
+        const empName = (id?: string) => {
+          const e = employees.find((x) => x.id === id);
+          return e ? `${e.firstName} ${e.lastName}` : '—';
+        };
+        const projName = (id?: string) => projects.find((p: any) => p.id === id)?.title;
+        const fmtDur = (m?: number) => {
+          if (m == null) return '—';
+          const h = Math.floor(m / 60); const mm = m % 60;
+          return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
+        };
+        const dOnly = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-') : '—');
+        const tOnly = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '—');
+        const rows = sessions.filter((s) => {
+          const d = (s.startTime || '').slice(0, 10);
+          if (sessFrom && d < sessFrom) return false;
+          if (sessTo && d > sessTo) return false;
+          return true;
+        });
+        const statusTone = (st?: string) =>
+          st === 'running' ? 'success' : st === 'paused' ? 'warning' : 'neutral';
+        return (
+          <Card>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+              <SectionHeader title={`Work Sessions (${rows.length})`} />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input type="date" className="kvj-input" value={sessFrom} onChange={(e) => setSessFrom(e.target.value)} style={{ maxWidth: 160 }} aria-label="From date" />
+                <input type="date" className="kvj-input" value={sessTo} onChange={(e) => setSessTo(e.target.value)} style={{ maxWidth: 160 }} aria-label="To date" />
+                {(sessFrom || sessTo) && <Button variant="ghost" size="sm" onClick={() => { setSessFrom(''); setSessTo(''); }}>Show All</Button>}
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase' }}>
+                    {['Employee', 'Supervisor', 'Work Code', 'Work / Project', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Duration', 'Status'].map((h) => (
+                      <th key={h} style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr><td colSpan={10} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
+                  ) : rows.map((s) => (
+                    <tr key={s.id} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{empName(s.employeeId)}</td>
+                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.supervisorName || empName(s.supervisorId) || '—'}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.workCode || '—'}</td>
+                      <td style={{ padding: '10px 12px' }}>{s.workTitle}{projName(s.projectId) ? <span style={{ color: 'var(--text-muted)' }}> · {projName(s.projectId)}</span> : null}</td>
+                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.startTime)}</td>
+                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{tOnly(s.startTime)}</td>
+                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.endTime)}</td>
+                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.endTime ? tOnly(s.endTime) : '—'}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes)}</td>
+                      <td style={{ padding: '10px 12px' }}><Badge tone={statusTone(s.status)}>{(s.status || 'completed').charAt(0).toUpperCase() + (s.status || 'completed').slice(1)}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* KPI Cards Banner */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>

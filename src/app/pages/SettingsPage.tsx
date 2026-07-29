@@ -441,7 +441,7 @@ function AdminUserManagementCard() {
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<import('../../shared/permissions/roles').RoleKey>('TRAINER');
+  const [role, setRole] = useState<import('../../shared/permissions/roles').RoleKey>('EMPLOYEE');
   const [password, setPassword] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -470,7 +470,7 @@ function AdminUserManagementCard() {
     setUsername('');
     setFullName('');
     setEmail('');
-    setRole('TRAINER');
+    setRole('EMPLOYEE');
     setPassword('');
     setMsg(null);
     setModalOpen(true);
@@ -481,7 +481,7 @@ function AdminUserManagementCard() {
     setUsername(u.username || '');
     setFullName(u.fullName || '');
     setEmail(u.email || '');
-    setRole(u.role || 'TRAINER');
+    setRole(u.role || 'EMPLOYEE');
     setPassword('');
     setMsg(null);
     setModalOpen(true);
@@ -596,9 +596,8 @@ function AdminUserManagementCard() {
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Role</label>
                 <select className="kvj-select" style={{ width: '100%' }} value={role} onChange={(e) => setRole(e.target.value as any)}>
-                  <option value="TRAINER">TRAINER</option>
-                  <option value="MANAGER">COORDINATOR / MANAGER</option>
                   <option value="EMPLOYEE">EMPLOYEE</option>
+                  <option value="MANAGER">MANAGER</option>
                   <option value="ADMIN">ADMIN</option>
                   <option value="CEO">CEO</option>
                 </select>

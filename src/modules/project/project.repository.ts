@@ -110,6 +110,29 @@ export interface ITimesheetRepository extends IRepository<TimesheetRecord> {
 }
 export interface IClientMeetingRepository extends IRepository<ClientMeeting> {}
 
+/**
+ * One Start → Pause/Submit interval of work on a task. Drives the Work Sessions
+ * timeline on the Task Worklog page.
+ */
+export interface TaskWorkSession extends Entity {
+  taskId?: UUID;
+  projectId?: UUID;
+  employeeId?: UUID;
+  supervisorId?: UUID;
+  workCode?: string;
+  workTitle: string;
+  supervisorName?: string;
+  startTime: string;
+  endTime?: string;
+  durationMinutes?: number;
+  // status is inherited from Entity ('running' | 'paused' | 'completed').
+}
+
+export interface ITaskWorkSessionRepository extends IRepository<TaskWorkSession> {
+  /** The currently-open (not ended) session for a user + task, if any. */
+  findOpenSession(employeeId: UUID, taskId: UUID): Promise<TaskWorkSession | null>;
+}
+
 export const CLIENT_REPOSITORY_TOKEN = createToken<IClientRepository>('ClientRepository');
 export const PROJECT_REPOSITORY_TOKEN = createToken<IProjectRepository>('ProjectRepository');
 export const MILESTONE_REPOSITORY_TOKEN = createToken<IMilestoneRepository>('MilestoneRepository');
@@ -117,3 +140,4 @@ export const RESOURCE_ALLOCATION_REPOSITORY_TOKEN = createToken<IResourceAllocat
 export const TASK_REPOSITORY_TOKEN = createToken<ITaskRepository>('TaskRepository');
 export const TIMESHEET_REPOSITORY_TOKEN = createToken<ITimesheetRepository>('TimesheetRepository');
 export const CLIENT_MEETING_REPOSITORY_TOKEN = createToken<IClientMeetingRepository>('ClientMeetingRepository');
+export const TASK_WORK_SESSION_REPOSITORY_TOKEN = createToken<ITaskWorkSessionRepository>('TaskWorkSessionRepository');

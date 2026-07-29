@@ -185,12 +185,10 @@ export function TrainingCalendar() {
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
       if (r.ok) {
-        if (isExecutive) {
-          setTrainers(r.value);
-        } else if (user) {
-          const selfTrainer = r.value.filter((emp) => emp.id === user.id);
-          setTrainers(selfTrainer.length > 0 ? selfTrainer : r.value.filter((emp) => emp.email?.toLowerCase() === user.email?.toLowerCase()));
-        }
+        // Training Calendar is a shared resource: EVERY user (Admin/CEO/Manager
+        // and all employees) sees and can edit ALL trainers' schedules — no
+        // user-level filter. Previously non-executives saw only their own row.
+        setTrainers(r.value);
       }
     });
 

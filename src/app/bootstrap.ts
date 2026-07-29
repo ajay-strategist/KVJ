@@ -71,7 +71,8 @@ import {
   RESOURCE_ALLOCATION_REPOSITORY_TOKEN,
   TASK_REPOSITORY_TOKEN,
   TIMESHEET_REPOSITORY_TOKEN,
-  CLIENT_MEETING_REPOSITORY_TOKEN
+  CLIENT_MEETING_REPOSITORY_TOKEN,
+  TASK_WORK_SESSION_REPOSITORY_TOKEN
 } from '../modules/project/project.repository';
 import {
   SupabaseClientRepository,
@@ -80,7 +81,8 @@ import {
   SupabaseResourceAllocationRepository,
   SupabaseTaskRepository,
   SupabaseTimesheetRepository,
-  SupabaseClientMeetingRepository
+  SupabaseClientMeetingRepository,
+  SupabaseTaskWorkSessionRepository
 } from '../modules/project/supabase-project.repository';
 
 // Import Phase 5 repositories
@@ -162,6 +164,7 @@ export function bootstrap() {
   container.register(TASK_REPOSITORY_TOKEN, () => new SupabaseTaskRepository());
   container.register(TIMESHEET_REPOSITORY_TOKEN, () => new SupabaseTimesheetRepository());
   container.register(CLIENT_MEETING_REPOSITORY_TOKEN, () => new SupabaseClientMeetingRepository());
+  container.register(TASK_WORK_SESSION_REPOSITORY_TOKEN, () => new SupabaseTaskWorkSessionRepository());
 
   // Finance
   container.register(BUDGET_REPOSITORY_TOKEN, () => new SupabaseBudgetRepository());

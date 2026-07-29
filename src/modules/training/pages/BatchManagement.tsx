@@ -3159,7 +3159,7 @@ export function BatchManagement() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {isExecutive && safeTrainers.length > 0 && (
+          {safeTrainers.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>👤 Trainer:</span>
               <select

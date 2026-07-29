@@ -8,7 +8,8 @@ import type {
   ResourceAllocation, IResourceAllocationRepository,
   Task, ITaskRepository,
   TimesheetRecord, ITimesheetRepository,
-  ClientMeeting, IClientMeetingRepository
+  ClientMeeting, IClientMeetingRepository,
+  TaskWorkSession, ITaskWorkSessionRepository
 } from './project.repository';
 
 export class SupabaseClientRepository extends SupabaseRepository<Client> implements IClientRepository {
@@ -107,5 +108,27 @@ export class SupabaseTimesheetRepository extends SupabaseRepository<TimesheetRec
 
 export class SupabaseClientMeetingRepository extends SupabaseRepository<ClientMeeting> implements IClientMeetingRepository {
   constructor() { super('client_meetings'); }
+}
+
+export class SupabaseTaskWorkSessionRepository extends SupabaseRepository<TaskWorkSession> implements ITaskWorkSessionRepository {
+  constructor() { super('task_work_sessions'); }
+
+  async findOpenSession(employeeId: UUID, taskId: UUID): Promise<TaskWorkSession | null> {
+    const { data, error } = await supabase
+      .from('task_work_sessions')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .eq('task_id', taskId)
+      .is('end_time', null)
+      .is('deleted_at', null)
+      .order('start_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.warn('findOpenSession warning:', error.message);
+      return null;
+    }
+    return data ? (toCamelCaseObject(data) as TaskWorkSession) : null;
+  }
 }
 

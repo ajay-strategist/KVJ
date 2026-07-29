@@ -15,6 +15,7 @@ import { useLeave } from '../../../modules/leave/hooks/useLeave';
 import { Form, SelectField, TextField, DatePickerField, CheckboxField, FileUploadField, TextAreaField, useForm } from '../../../shared/forms/form';
 
 import { useProject } from '../../../modules/project/hooks/useProject';
+import { useTaskSessions } from '../../../modules/project/hooks/useTaskSessions';
 import { useEmployee } from '../../../modules/employee/hooks/useEmployee';
 import { useTraining } from '../../../modules/training/hooks/useTraining';
 import { container } from '../../../core/registry';
@@ -1552,6 +1553,7 @@ export function MyDayPage() {
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
   const { tasks: projectTasks, projects, createTask, updateTask, submitTask } = useProject();
+  const { startSession, pauseSession, completeSession } = useTaskSessions();
 
   const [selectedEmpId, setSelectedEmpId] = useState('me');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -1723,33 +1725,58 @@ export function MyDayPage() {
         status: nextActive ? 'in_progress' : 'todo',
         actualHours: targetTask.secondsToday / 3600,
       }).catch((e) => console.warn('Failed to update task status in DB:', e));
+
+      // Record the real work session interval (Start opens one, Pause closes it).
+      const raw = (projectTasks || []).find((t) => t.id === id);
+      const proj = raw ? (projects || []).find((p) => p.id === raw.projectId) : undefined;
+      if (nextActive) {
+        startSession({
+          taskId: id as any,
+          projectId: raw?.projectId,
+          workTitle: taskTitle,
+          supervisorId: (raw as any)?.supervisorId,
+        });
+      } else {
+        pauseSession(id as any);
+      }
+      void proj;
     }
 
     handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
   };
 
-  const handleSubmitReview = (id: string, taskTitle: string) => {
-    let targetTask: any = null;
-    setTasks((prev) => {
-      const found = prev.find((t) => t.id === id);
-      if (found) targetTask = found;
-      const updated = prev.map((t) =>
-        t.id === id ? { ...t, active: false, underReview: true, isRework: false, reworkNotes: undefined } : t
-      );
+  const handleSubmitReview = async (id: string, taskTitle: string) => {
+    // Optimistically mark under review.
+    const applyUnderReview = (val: boolean) => {
+      setTasks((prev) => prev.map((t) =>
+        t.id === id ? { ...t, active: false, underReview: val, isRework: false, reworkNotes: undefined } : t
+      ));
       const states = getStoredTaskStates();
       if (states[id]) {
         states[id].active = false;
-        states[id].underReview = true;
+        states[id].underReview = val;
         delete states[id].lastStartTime;
+        saveStoredTaskStates(states);
       }
-      saveStoredTaskStates(states);
-      return updated;
-    });
+    };
+    applyUnderReview(true);
 
-    if (targetTask) {
-      submitTask(id as any, 'Submitted from Workspace').catch((e) => {
-        console.warn('submitTask error:', e);
+    // PERSIST to the database. Errors were previously swallowed, so a failed
+    // submit silently reverted the task on the next refresh with no explanation.
+    // Now we surface the real reason and roll back the optimistic change so the
+    // UI reflects the true saved state.
+    // Close any open work session for this task as completed.
+    completeSession(id as any);
+
+    const res = await submitTask(id as any, 'Submitted from Workspace');
+    if (!res.ok) {
+      applyUnderReview(false); // roll back — it did NOT persist
+      toast({
+        variant: 'error',
+        title: 'Submit Failed',
+        message: `"${taskTitle}" could not be submitted: ${res.error}. Please try again.`,
       });
+      return;
     }
 
     toast({
