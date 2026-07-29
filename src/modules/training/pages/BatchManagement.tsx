@@ -588,7 +588,7 @@ export function BatchManagement() {
   useEffect(() => {
     try {
       const repo = container.resolve(COLLEGE_REPOSITORY_TOKEN);
-      repo.findMany().then((p) => {
+      repo.findMany({ pageSize: 1000, page: 1 }).then((p) => {
         if (p.data && p.data.length > 0) {
           setDbColleges(p.data);
         }
@@ -1189,7 +1189,7 @@ export function BatchManagement() {
     let active = true;
     try {
       const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
-      repo.findMany().then((p: Page<any>) => {
+      repo.findMany({ pageSize: 1000, page: 1 }).then((p: Page<any>) => {
         if (!active) return;
         if (p.data && p.data.length > 0) {
           const mapped: StudentRecord[] = p.data.map((s: any) => {

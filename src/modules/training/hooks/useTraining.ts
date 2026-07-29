@@ -37,11 +37,14 @@ export function useTraining() {
       const batchRepo = container.resolve(BATCH_REPOSITORY_TOKEN);
       const enrollmentRepo = container.resolve(ENROLLMENT_REPOSITORY_TOKEN);
 
+      // Use a large pageSize to ensure all records are fetched (not just the default 20)
+      const BIG = { pageSize: 1000, page: 1 };
+
       const [sPage, cPage, bPage, ePage] = await Promise.all([
-        studentRepo.findMany(),
-        courseRepo.findMany(),
-        batchRepo.findMany(),
-        enrollmentRepo.findMany(),
+        studentRepo.findMany(BIG),
+        courseRepo.findMany(BIG),
+        batchRepo.findMany({ ...BIG, sort: [{ field: 'createdAt', dir: 'desc' }] }),
+        enrollmentRepo.findMany(BIG),
       ]);
 
       setStudents(Array.isArray(sPage?.data) ? sPage.data : []);
@@ -54,6 +57,7 @@ export function useTraining() {
     }
     setLoading(false);
   }, []);
+
 
   const registerStudent = useCallback(async (data: Partial<Student>): Promise<CallbackResult<Student>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };

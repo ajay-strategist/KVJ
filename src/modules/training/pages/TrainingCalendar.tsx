@@ -194,7 +194,10 @@ export function TrainingCalendar() {
 
     const batchRepo = container.resolve(BATCH_REPOSITORY_TOKEN);
     const courseRepo = container.resolve(COURSE_REPOSITORY_TOKEN);
-    Promise.all([batchRepo.findMany(), courseRepo.findMany()]).then(([bRes, cRes]) => {
+    Promise.all([
+      batchRepo.findMany({ pageSize: 1000, page: 1 }),
+      courseRepo.findMany({ pageSize: 1000, page: 1 }),
+    ]).then(([bRes, cRes]) => {
       setBatches(bRes.data);
       setCourses(cRes.data);
     });
