@@ -499,6 +499,50 @@ export function AttendanceLogPage() {
 
   const selectedEmployeeDisplay = selectedEmployee === 'All Employees' ? 'All Employees' : selectedEmployee;
 
+  // ── Office Timeline data (today's snapshot for all employees) ──
+  const todayStr = todayISO();
+  const timelineRows = useMemo(() => {
+    const empList = Array.isArray(employees) ? employees : [];
+    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
+    const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
+    const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
+    const today = todayStr;
+    const isHolidayToday = holList.some((h: any) => h.date === today) || new Date().getDay() === 0;
+    const targetEmps = isManagement ? empList : empList.filter((e) => e.id === user?.id);
+    return targetEmps.map((emp) => {
+      const empId = emp.id;
+      const name = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.email;
+      const initials = name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+      const onLeave = leaveList.find(
+        (l) => l.employeeId === empId && today >= l.startDate && today <= l.endDate && l.status !== 'rejected'
+      );
+      const todayRec = recList.find((r) => r.employeeId === empId && r.workDate === today);
+      let status: 'present' | 'leave' | 'holiday' | 'absent' = 'absent';
+      if (isHolidayToday) status = 'holiday';
+      else if (onLeave) status = 'leave';
+      else if (todayRec) status = 'present';
+      const clockIn = todayRec?.firstClockIn ? safeFormatTime(todayRec.firstClockIn) : null;
+      const clockOut = todayRec?.lastClockOut ? safeFormatTime(todayRec.lastClockOut) : null;
+      const workMins = todayRec?.totalWorkingMinutes || 0;
+      const workType = (todayRec?.sessions?.[0]?.workType || 'Office') as string;
+      const barPct = Math.min(100, Math.round((workMins / 540) * 100));
+      return { empId, name, initials, status, clockIn, clockOut, workMins, workType, barPct, leaveType: onLeave?.leaveType };
+    });
+  }, [employees, attendanceRecords, leaveRecords, declaredHolidays, isManagement, user, todayStr]);
+
+  const STATUS_COLORS: Record<string, string> = {
+    present: 'var(--status-success)',
+    leave: '#f59e0b',
+    holiday: 'var(--status-danger)',
+    absent: 'var(--text-muted)',
+  };
+  const STATUS_LABELS: Record<string, string> = {
+    present: '\u2705 Present',
+    leave: '\ud83c\udfd6 On Leave',
+    holiday: '\ud83c\udf89 Holiday',
+    absent: '\u26ab Absent',
+  };
+
   const tabs = [
     {
       id: 'calendar',
@@ -753,13 +797,115 @@ export function AttendanceLogPage() {
         </div>
       ),
     },
+    {
+      id: 'office_timeline',
+      label: '🏢 Office Timeline',
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>📅 Today — {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--brand)', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'present').length} Present</span>
+            <span style={{ fontSize: 11, fontWeight: 600, background: '#f59e0b', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'leave').length} On Leave</span>
+            <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--bg-sunken)', color: 'var(--text-muted)', borderRadius: 999, padding: '2px 10px', border: '1px solid var(--border)' }}>{timelineRows.filter(r => r.status === 'absent').length} Absent</span>
+          </div>
+
+          {timelineRows.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>No employee data available.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {timelineRows.map((row) => (
+                <div
+                  key={row.empId}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '48px 1fr auto',
+                    alignItems: 'center',
+                    gap: 16,
+                    padding: '14px 18px',
+                    background: 'var(--bg-surface)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)',
+                    borderLeft: `4px solid ${STATUS_COLORS[row.status]}`,
+                    transition: 'box-shadow 150ms',
+                  }}
+                >
+                  {/* Avatar */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: `${STATUS_COLORS[row.status]}22`,
+                    border: `2px solid ${STATUS_COLORS[row.status]}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 15, fontWeight: 800, color: STATUS_COLORS[row.status],
+                    flexShrink: 0,
+                  }}>
+                    {row.initials}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{row.name}</span>
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999,
+                        background: `${STATUS_COLORS[row.status]}22`,
+                        color: STATUS_COLORS[row.status],
+                        border: `1px solid ${STATUS_COLORS[row.status]}55`,
+                      }}>
+                        {row.status === 'leave' && row.leaveType ? `🏖 On ${row.leaveType} Leave` : STATUS_LABELS[row.status]}
+                      </span>
+                      {row.status === 'present' && row.workType !== 'Office' && (
+                        <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>📍 {row.workType}</span>
+                      )}
+                    </div>
+                    {row.status === 'present' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          🕐 {row.clockIn || '—'} → {row.clockOut || 'Still Working'}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
+                          ⏱ {Math.floor(row.workMins / 60)}h {row.workMins % 60}m worked
+                        </span>
+                      </div>
+                    )}
+                    {/* Work progress bar */}
+                    {row.status === 'present' && (
+                      <div style={{ height: 5, background: 'var(--bg-sunken)', borderRadius: 99, overflow: 'hidden', maxWidth: 320 }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${row.barPct}%`,
+                          background: row.barPct >= 80 ? 'var(--status-success)' : row.barPct >= 50 ? 'var(--brand)' : '#f59e0b',
+                          borderRadius: 99,
+                          transition: 'width 600ms ease',
+                        }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Hours badge */}
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {row.status === 'present' ? (
+                      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-success)' }}>
+                        {Math.floor(row.workMins / 60)}<span style={{ fontSize: 12, fontWeight: 600 }}>h</span>
+                        {row.workMins % 60}<span style={{ fontSize: 12, fontWeight: 600 }}>m</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13, color: STATUS_COLORS[row.status], fontWeight: 600 }}>—</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
     <AppShell>
       <PageHeader
-        title="My Attendance Log & Reports"
-        subtitle="Comprehensive attendance calendar, detailed tabular logs, and expense audits"
+        title={isManagement ? 'Attendance Log & Office Timeline' : 'My Attendance Log & Reports'}
+        subtitle={isManagement ? 'Overview of all employee activity, attendance logs, and expense audits' : 'Comprehensive attendance calendar, detailed tabular logs, and expense audits'}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

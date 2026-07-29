@@ -14,7 +14,7 @@ import type { LeaveRecord } from '../leave.repository';
 import { googleIntegration, getMonthlyFolderName } from '../../../shared/integration/google';
 
 export function LeaveBoard() {
-  const { leaves, allLeaves, applyLeave, uploadMedicalCertificate, loading } = useLeave();
+  const { leaves, allLeaves, applyLeave, approveLeave, rejectLeave, uploadMedicalCertificate, loading, refreshAll, refreshMyLeaves } = useLeave();
   const { employees } = useEmployee();
   const { user } = useAuth();
   const { confirm } = useDialog();
@@ -26,6 +26,7 @@ export function LeaveBoard() {
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const handleApplySubmit = async (values: Record<string, unknown>) => {
     const ok = await confirm({
@@ -184,27 +185,76 @@ export function LeaveBoard() {
         key: 'approver',
         header: 'Details',
         render: (r) => r.approverNotes ? `Notes: ${r.approverNotes}` : 'No notes.',
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        render: (r) => {
+          if (!isMgmt || r.status !== 'pending') return <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.status === 'approved' ? '✅ Approved' : r.status === 'rejected' ? '❌ Rejected' : '—'}</span>;
+          return (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button
+                size="xs"
+                variant="primary"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const res = await approveLeave(r.id, 'Approved via Leave Board');
+                  if (res && res.ok) {
+                    toast({ variant: 'success', title: 'Leave Approved', message: `Leave for ${r.startDate} has been approved.` });
+                    refreshAll(); refreshMyLeaves();
+                  } else {
+                    toast({ variant: 'error', title: 'Error', message: 'Could not approve leave.' });
+                  }
+                }}
+              >
+                ✅ Approve
+              </Button>
+              <Button
+                size="xs"
+                variant="danger"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const res = await rejectLeave(r.id, 'Rejected via Leave Board');
+                  if (res && res.ok) {
+                    toast({ variant: 'error', title: 'Leave Rejected', message: `Leave for ${r.startDate} has been rejected.` });
+                    refreshAll(); refreshMyLeaves();
+                  } else {
+                    toast({ variant: 'error', title: 'Error', message: 'Could not reject leave.' });
+                  }
+                }}
+              >
+                ❌ Reject
+              </Button>
+            </div>
+          );
+        },
       }
     );
     return list;
-  }, [isMgmt, employees]);
+  }, [isMgmt, employees, approveLeave, rejectLeave, toast, refreshAll, refreshMyLeaves]);
 
   // Exactly two leave types.
   const leaveTypes = businessRules.leave.types.map((t) => ({ value: t, label: t }));
 
   const filteredLeaves = useMemo(() => {
+    let base: typeof leaves = [];
     if (!isMgmt) {
-      return Array.isArray(leaves) ? leaves : [];
+      base = Array.isArray(leaves) ? leaves : [];
+    } else {
+      const safeAll = Array.isArray(allLeaves) ? allLeaves : [];
+      if (selectedEmployee === 'all') {
+        base = safeAll;
+      } else if (selectedEmployee === 'me') {
+        base = Array.isArray(leaves) ? leaves : [];
+      } else {
+        base = safeAll.filter((l) => l.employeeId === selectedEmployee);
+      }
     }
-    const safeAll = Array.isArray(allLeaves) ? allLeaves : [];
-    if (selectedEmployee === 'all') {
-      return safeAll;
+    if (statusFilter !== 'all') {
+      base = base.filter((l) => l.status === statusFilter);
     }
-    if (selectedEmployee === 'me') {
-      return Array.isArray(leaves) ? leaves : [];
-    }
-    return safeAll.filter((l) => l.employeeId === selectedEmployee);
-  }, [leaves, allLeaves, selectedEmployee, isMgmt]);
+    return base;
+  }, [leaves, allLeaves, selectedEmployee, isMgmt, statusFilter]);
 
   const safeLeavesListForStats = isMgmt ? (Array.isArray(allLeaves) ? allLeaves : []) : (Array.isArray(leaves) ? leaves : []);
   const pendingCount = safeLeavesListForStats.filter((l) => l && l.status === 'pending').length;
@@ -228,9 +278,9 @@ export function LeaveBoard() {
         <div style={{ margin: 0 }}>
           <SectionHeader title={isMgmt ? "Employee Leave History" : "My Leave History"} />
         </div>
-        {isMgmt && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Filter Employee:</span>
+      {isMgmt && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Employee:</span>
             <select
               className="kvj-select"
               value={selectedEmployee}
@@ -243,6 +293,18 @@ export function LeaveBoard() {
                 const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email;
                 return <option key={e.id} value={e.id}>{name}</option>;
               })}
+            </select>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginLeft: 8 }}>📊 Status:</span>
+            <select
+              className="kvj-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 140 }}
+            >
+              <option value="all">All Status</option>
+              <option value="pending">⏳ Pending</option>
+              <option value="approved">✅ Approved</option>
+              <option value="rejected">❌ Rejected</option>
             </select>
           </div>
         )}
