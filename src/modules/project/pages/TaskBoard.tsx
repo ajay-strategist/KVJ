@@ -241,9 +241,10 @@ export function TaskBoard({
       }
 
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+      // Date Window Filtering
       if (dateWindowFilter === 'today') {
-        if (t.status === 'Completed') return false;
-        if (t.dueDate !== todayStr && t.approvalStatus !== 'rework' && t.status !== 'In Progress' && t.status !== 'Under Review') return false;
+        if (t.dueDate !== todayStr) return false;
+        if (t.status === 'Completed' || t.status === 'Under Review') return false; // Hide submitted/completed tasks from "Due Today" list
       } else if (dateWindowFilter === 'next_3_days') {
         if (t.dueDate < todayStr || t.dueDate > windowEnd) return false;
       }
@@ -435,16 +436,19 @@ export function TaskBoard({
       setTasksList((prev) =>
         prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))
       );
-      try {
-        await submitTask(task.id as UUID, 'Submitted for completion approval');
-      } catch (e) {
-        console.warn('Submit task error:', e);
+      const res = await submitTask(task.id as UUID, 'Submitted for completion approval');
+      if (res.ok) {
+        toast({
+          variant: 'success',
+          title: 'Submitted for Review',
+          message: `Task "${task.name}" submitted to Manager/Admin Approval Queue.`,
+        });
+      } else {
+        toast({ variant: 'error', title: 'Submission Failed', message: res.error });
+        setTasksList((prev) =>
+          prev.map((x) => (x.id === task.id ? { ...x, status: task.status } : x))
+        );
       }
-      toast({
-        variant: 'success',
-        title: 'Submitted for Review',
-        message: `Task "${task.name}" submitted to Manager/Admin Approval Queue.`,
-      });
     }
   };
 
@@ -545,7 +549,7 @@ export function TaskBoard({
     setEditingTask(null);
   };
 
-  const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval').length;
+  const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval' && t.status !== 'Completed' && t.status !== 'Under Review').length;
   const totalHoursSum = tasksList.reduce((acc, t) => acc + t.totalHoursWorked, 0);
 
   const getWorkflowStep = (status: TaskStatus, approvalStatus?: string | null) => {
