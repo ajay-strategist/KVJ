@@ -231,7 +231,7 @@ export const DailyReportBuilderModal: React.FC<DailyReportBuilderModalProps> = (
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
             {SECTIONS.map((sec) => {
               const isChecked = selectedSections.includes(sec.id);
               return (

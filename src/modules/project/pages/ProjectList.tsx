@@ -795,7 +795,7 @@ export function ProjectList({
             <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
 
               {/* KPI Strip */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
                 {[
                   { label: 'Status', value: selectedProject.status, icon: '🏷️', bg: '#ede9fe', border: '#6366f1', color: '#4f46e5' },
                   { label: 'Total Hours', value: `${selectedProject.totalHours} hrs`, icon: '⏱️', bg: '#e0f2fe', border: '#0891b2', color: '#0284c7' },

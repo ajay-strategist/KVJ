@@ -181,7 +181,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             }}>
               <img
                 src="/logo.png"
-                alt="Nexus by KVJ Logo"
+                alt={`${appConfig.app.company} Logo`}
                 style={{
                   height: collapsed && !isMobile ? 28 : 34,
                   maxWidth: '100%',
@@ -191,16 +191,19 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               />
               {(!collapsed || isMobile) && (
                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                    <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                      Nexus
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
-                      by KVJ
-                    </span>
-                  </div>
+                  {/* Product wordmark shows only once a product name is set. */}
+                  {appConfig.app.productTitle && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                      <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
+                        {appConfig.app.productTitle}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+                        {appConfig.app.byCompany}
+                      </span>
+                    </div>
+                  )}
                   <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.03em', marginTop: 2 }}>
-                    Connect. Manage. Transform.
+                    {appConfig.app.tagline}
                   </span>
                 </div>
               )}
@@ -644,8 +647,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               gap: 12
             }}>
               <div>
-                <span style={{ fontWeight: 900, color: 'var(--text-primary)' }}>Nexus</span>{' '}
-                <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>by KVJ</span>{' '}
+                <span style={{ fontWeight: 900, color: 'var(--text-primary)' }}>{appConfig.app.productTitle || appConfig.app.company}</span>{' '}
+                <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{appConfig.app.productTitle ? appConfig.app.byCompany : ''}</span>{' '}
                 <span style={{ color: 'var(--border)', margin: '0 6px' }}>|</span>{' '}
                 <span>Enterprise Operations Platform</span>
               </div>

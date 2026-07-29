@@ -130,7 +130,7 @@ import {
 } from '../modules/analytics/supabase-analytics.repository';
 
 export function bootstrap() {
-  console.info('[Nexus Platform] Live Supabase PostgreSQL database persistence is active unconditionally.');
+  console.info('[KVJ Platform] Live Supabase PostgreSQL database persistence is active unconditionally.');
 
   // Employee
   container.register(EMPLOYEE_REPOSITORY_TOKEN, () => new SupabaseEmployeeRepository());

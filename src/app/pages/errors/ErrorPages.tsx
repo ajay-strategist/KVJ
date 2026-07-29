@@ -63,9 +63,9 @@ export function RouteLoading() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      <img src="/logo.png" alt="Nexus Logo" style={{ height: 48, width: 'auto', marginBottom: 16 }} />
+      <img src="/logo.png" alt="KVJ Analytics Logo" style={{ height: 48, width: 'auto', marginBottom: 16 }} />
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <h2 style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: 'var(--text-primary)' }}>Nexus</h2>
+        <h2 style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: 'var(--text-primary)' }}>KVJ Analytics</h2>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>by KVJ</span>
       </div>
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', marginTop: 4, letterSpacing: '0.05em' }}>

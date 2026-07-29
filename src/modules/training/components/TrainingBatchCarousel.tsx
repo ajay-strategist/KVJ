@@ -333,7 +333,8 @@ const BatchCard = memo(function BatchCard({
           {/* ── Details Grid (Row 1: COLLEGE, COURSE, PROGRAM, ACADEMIC YEAR, COORDINATOR | Row 2: TRAINER, START DATE, END DATE) ── */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            // Wraps on narrow/mobile screens instead of squeezing 5 fields across.
+            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
             gap: '12px 16px',
             marginBottom: 18,
           }}>

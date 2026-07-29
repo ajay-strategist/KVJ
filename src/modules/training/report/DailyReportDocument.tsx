@@ -149,10 +149,10 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
         {/* Top Header Row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo.png" alt="Nexus Logo" style={{ height: 44, width: 'auto', display: 'block' }} />
+            <img src="/logo.png" alt="KVJ Analytics Logo" style={{ height: 44, width: 'auto', display: 'block' }} />
             <div>
               <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                Nexus <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>by KVJ</span>
+                KVJ Analytics <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>by KVJ</span>
               </div>
               <div style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', marginTop: 1 }}>
                 Enterprise Operations Platform
@@ -244,7 +244,7 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontWeight: 900, color: '#1e40af' }}>Nexus by KVJ</span>
+          <span style={{ fontWeight: 900, color: '#1e40af' }}>KVJ Analytics</span>
           <span>·</span>
           <span>Enterprise Operations Platform</span>
           <span>·</span>

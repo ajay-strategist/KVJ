@@ -9,15 +9,18 @@
 
 export const appConfig = {
   app: {
-    name: 'Nexus by KVJ',                   // Official Product Brand
-    productName: 'Nexus by KVJ',
-    productTitle: 'Nexus',
+    // Product name intentionally left blank — a name will be chosen later. Set
+    // `productTitle` (and `name`/`productName`/`shortName`) here and it flows to
+    // the sidebar header, login screen, error pages, page title and reports.
+    name: 'KVJ Analytics',                  // falls back to company until named
+    productName: 'KVJ Analytics',
+    productTitle: '',                       // the product wordmark — empty for now
     byCompany: 'by KVJ',
     tagline: 'Connect. Manage. Transform.',
     description: 'Enterprise Operations Platform',
     company: 'KVJ Analytics',
     copyright: '© 2026 KVJ Analytics. All Rights Reserved.',
-    shortName: 'Nexus',
+    shortName: 'KVJ',
     version: '1.0',
     environment: (import.meta as { env?: Record<string, string> }).env?.MODE ?? 'development',
   },

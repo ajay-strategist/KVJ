@@ -466,8 +466,8 @@ export function BatchManagement() {
     name: '',
     email: '',
     phone: '',
-    college: 'Christ University',
-    department: 'BCOM B',
+    college: '',
+    department: '',
     attendancePct: 0,
     ass1: 0,
     ass2: 0,
@@ -1128,12 +1128,12 @@ export function BatchManagement() {
       ass1: Number(newStudentForm.ass1),
       ass2: Number(newStudentForm.ass2),
       ass3: Number(newStudentForm.ass3),
-      project: 80,
+      project: 0,
       finalExam: 0,
       overallScore: Math.round((Number(newStudentForm.ass1) + Number(newStudentForm.ass2) + Number(newStudentForm.ass3)) / 3),
       voucherId: eligible ? `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}` : '',
       voucherStatus: eligible ? 'Assigned' : 'Unassigned',
-      certificateStatus: 'Generated',
+      certificateStatus: 'Pending',
     };
 
     setStudents((prev) => [...prev, newStudent]);
@@ -1142,12 +1142,12 @@ export function BatchManagement() {
       name: '',
       email: '',
       phone: '',
-      college: 'Christ University',
-      department: 'BCOM B',
-      attendancePct: 85,
-      ass1: 80,
-      ass2: 80,
-      ass3: 80,
+      college: '',
+      department: '',
+      attendancePct: 0,
+      ass1: 0,
+      ass2: 0,
+      ass3: 0,
     });
     toast({
       variant: 'success',
@@ -1165,20 +1165,20 @@ export function BatchManagement() {
         message: `Importing records from "${file.name}"...`,
       });
 
-      setTimeout(() => {
-        const importedStudents: StudentRecord[] = [
-          { id: `s-imp-${Date.now()}-1`, name: 'Anoop Varghese', photo: '👨‍🎓', phone: '+91 98950 12345', email: 'anoop.v@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 90, attendanceStatus: 'Regular', ass1: 88, ass2: 84, ass3: 92, project: 85, finalExam: 86, overallScore: 87.5, voucherId: 'VOUCH-CHRIST-105', voucherStatus: 'Assigned', certificateStatus: 'Printed' },
-          { id: `s-imp-${Date.now()}-2`, name: 'Sneha Kurian', photo: '👩‍🎓', phone: '+91 94960 67890', email: 'sneha.k@student.edu', college: 'Christ University', department: 'BCOM B', attendancePct: 86, attendanceStatus: 'Regular', ass1: 80, ass2: 78, ass3: 85, project: 82, finalExam: 80, overallScore: 81.2, voucherId: 'VOUCH-CHRIST-106', voucherStatus: 'Assigned', certificateStatus: 'Generated' },
-        ];
-
-        setStudents((prev) => [...prev, ...importedStudents]);
-        setUploadModalOpen(false);
-        toast({
-          variant: 'success',
-          title: 'Excel Import Successful',
-          message: `Imported ${importedStudents.length} student records from ${file.name}.`,
-        });
-      }, 500);
+      // NOTE: student data must come from the real registration flow, which
+      // syncs into the student_records table (see syncGoogleSheetData). This
+      // uploader previously injected two hardcoded demo students with fabricated
+      // marks/attendance and reported success — that dummy data has been removed.
+      // Real spreadsheet parsing + persistence to the student repository is a
+      // separate feature to wire.
+      setUploadModalOpen(false);
+      toast({
+        variant: 'info',
+        title: 'Import Not Yet Connected',
+        message:
+          'Student records are loaded from the live registration data. Direct Excel import ' +
+          'is not wired yet — add students via the registration sync or "Add Student Data".',
+      });
     }
   };
 

@@ -57,6 +57,38 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     return () => { active = false; };
   }, [authService]);
 
+  // Re-sync the session from the backend on tab focus and periodically, so a
+  // role change made by an admin (e.g. EMPLOYEE → CEO) takes effect for the
+  // affected user without a manual log-out/in. getSession() re-reads
+  // employees.role, so the user's permissions and nav update on their next
+  // focus or within a minute.
+  useEffect(() => {
+    let cancelled = false;
+    const resync = async () => {
+      try {
+        const s = await authService.getSession();
+        if (cancelled) return;
+        if (s) {
+          // Only replace state when something actually changed, to avoid
+          // needless re-renders.
+          setSession((prev) =>
+            prev && prev.user.role === s.user.role && prev.user.id === s.user.id ? prev : s,
+          );
+        }
+      } catch {
+        // Ignore transient errors; the initial-load effect owns hard failures.
+      }
+    };
+    const onFocus = () => { void resync(); };
+    window.addEventListener('focus', onFocus);
+    const interval = window.setInterval(() => { void resync(); }, 60_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(interval);
+    };
+  }, [authService]);
+
   const login = useCallback(async (creds: Credentials) => {
     const s = await authService.login(creds);
     setSession(s);

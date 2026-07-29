@@ -97,7 +97,7 @@ export function SettingsPage() {
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
               Switch workspace optimization mode to protect eyes, enhance readability, or scale elements for presentations.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
               {(['Standard', 'Focus', 'Presentation', 'Executive'] as const).map((modeOption) => {
                 const isActive = viewMode === modeOption;
                 return (
@@ -308,8 +308,8 @@ export function SettingsPage() {
           </Card>
 
           <Card>
-            <SectionHeader title="About Nexus by KVJ" />
-            <Row label="Product Name">Nexus by KVJ</Row>
+            <SectionHeader title="About KVJ Analytics" />
+            <Row label="Product Name">KVJ Analytics</Row>
             <Row label="Description">Enterprise Operations Platform</Row>
             <Row label="Version">Version 1.0</Row>
             <Row label="Developed by">Developed by KVJ Analytics</Row>
@@ -678,7 +678,7 @@ function EmailSetupCard() {
 
   return (
     <Card>
-      <SectionHeader title="📧 Email Setup & SMTP Configuration" subtitle="Configure server credentials for outbound email notifications sent by Nexus" />
+      <SectionHeader title="📧 Email Setup & SMTP Configuration" subtitle="Configure server credentials for outbound email notifications sent by the platform" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginTop: 12 }}>
         <div>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>SMTP Host Server</label>

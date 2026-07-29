@@ -28,7 +28,7 @@ function Greeting() {
   const { user } = useAuth();
   return (
     <PageHeader
-      title="Welcome to Nexus by KVJ"
+      title="Welcome to KVJ Analytics"
       subtitle="Connect. Manage. Transform."
       actions={
         <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -280,7 +280,8 @@ export const AttendancePanel = memo(function AttendancePanel({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            // Wraps to fewer columns on narrow/mobile screens instead of squashing 5 across.
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: 16,
             padding: '16px 24px',
             borderRadius: 16,
@@ -1824,7 +1825,7 @@ export function MyDayPage() {
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
         <ResizedStatPill
           label="TODAY ATTENDANCE"
           value={record?.firstClockIn ? `Logged: ${record.firstClockIn}` : 'Not Clocked In'}

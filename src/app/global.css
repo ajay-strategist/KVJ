@@ -35,3 +35,46 @@ button { font-family: inherit; }
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+
+/* =============================================================================
+   MOBILE (≤640px) — responsive layer
+   Components style themselves inline off design-system CSS variables, so the
+   most reliable way to make the whole app fit a phone is to (a) shrink the
+   oversized heading/spacing tokens at this breakpoint — which cascades into
+   every inline style referencing them — and (b) handle the two structural
+   things tokens can't: wide tables and horizontal page overflow.
+   ============================================================================= */
+@media (max-width: 640px) {
+  /* Never let the page scroll sideways. */
+  html, body { max-width: 100%; overflow-x: hidden; }
+
+  :root,
+  [data-theme='light'],
+  [data-theme='dark'] {
+    /* Headings: large desktop display sizes are too big on a 375px screen. */
+    --font-size-3xl: 24px;
+    --font-size-2xl: 20px;
+    --font-size-xl: 18px;
+    --font-size-lg: 16px;
+    /* Tighten the biggest spacing steps so sections don't waste vertical space. */
+    --space-12: 56px;
+    --space-10: 48px;
+    --space-8: 40px;
+    --space-6: 32px;
+    /* Softer corners read better on small cards. */
+    --radius-xl: 18px;
+  }
+
+  /* Wide data tables (23 across the app) must scroll inside their own box
+     instead of forcing the whole page wider than the screen. */
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  /* Comfortable touch targets. */
+  button, a[role='button'], .kvj-btn { min-height: 40px; }
+}

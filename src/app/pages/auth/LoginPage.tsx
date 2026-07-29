@@ -10,6 +10,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Button } from '../../../shared/ui/components';
 import { AppError } from '../../../core/result';
 import { InitialAdminBootstrapScreen } from './InitialAdminBootstrapScreen';
+import { appConfig } from '../../../config/app-config';
 
 type View = 'login' | 'forgot' | 'first_time_reset';
 
@@ -152,11 +153,11 @@ export function LoginPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: 'var(--text-primary)' }}>Nexus</h1>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>by KVJ</span>
+                <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: 'var(--text-primary)' }}>{appConfig.app.productTitle || appConfig.app.company}</h1>
+                {appConfig.app.productTitle && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>{appConfig.app.byCompany}</span>}
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Enterprise Operations Platform</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--brand)', marginTop: 2 }}>Connect. Manage. Transform.</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{appConfig.app.description}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--brand)', marginTop: 2 }}>{appConfig.app.tagline}</div>
             </div>
             <button onClick={toggle} aria-label="Toggle theme" style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderRadius: 10, width: 36, height: 36, cursor: 'pointer' }}>{theme === 'dark' ? '☀' : '☾'}</button>
           </div>
@@ -171,7 +172,7 @@ export function LoginPage() {
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: '0 0 20px' }}>
               {view === 'login'
-                ? 'Sign in to your Nexus enterprise platform.'
+                ? 'Sign in to your enterprise platform.'
                 : view === 'forgot'
                 ? "We'll email you a reset link."
                 : 'Welcome! Your account uses a default password. Please choose a new secure password.'}
