@@ -2,7 +2,7 @@ import type { IRepository } from '../../core/repository';
 import type { Entity, UUID } from '../../core/types';
 import { createToken } from '../../core/registry';
 
-export type LeaveStatus = 'pending' | 'approved' | 'rejected';
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
 export interface LeaveRecord extends Entity {
   employeeId: UUID;

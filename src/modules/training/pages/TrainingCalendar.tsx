@@ -98,11 +98,9 @@ export function TrainingCalendar() {
         return;
       }
 
-      if (rows && rows.length > 0) {
+      if (rows) {
         const dbSess: ScheduleSession[] = rows.map((r: any) => {
-          const matchedBatch = batches.find(
-            (b) => b.id === r.batch_id || (b.code && r.topic && cleanBatchCode(b.code) === cleanBatchCode(r.topic))
-          );
+          const matchedBatch = batches.find((b) => b.id === r.batch_id);
           const matchedCourse = matchedBatch ? courses.find((c) => c.id === matchedBatch.courseId) : undefined;
 
           return {
@@ -110,9 +108,9 @@ export function TrainingCalendar() {
             trainerId: r.trainer_id || '',
             date: r.date,
             name: r.session_title || matchedBatch?.trainingName || matchedCourse?.title || 'Training Session',
-            batchCode: matchedBatch?.code || r.topic || 'KVJ Batch',
+            batchCode: matchedBatch?.code || 'KVJ Batch',
             college: matchedBatch?.college || 'College',
-            course: matchedCourse?.title || r.topic || 'Training',
+            course: matchedCourse?.title || 'Training',
             academicYear: matchedBatch?.academicYear || '2026-27',
             coordinator: matchedBatch?.coordinator || 'Coordinator',
             startTime: r.start_time || '09:00',
@@ -525,41 +523,26 @@ export function TrainingCalendar() {
       color: '#3b82f6',
     };
 
-    // Persist to Supabase schedule_sessions DB table with full self-healing column stripping
+    // Persist to Supabase schedule_sessions DB table
     const payload: Record<string, any> = {
       id: sessId,
       date: sessionObj.date,
       session_title: sessionObj.name,
-      topic: sessionObj.batchCode,
       trainer_id: validTrainerId,
       batch_id: validBatchId,
       start_time: sessionObj.startTime,
       end_time: sessionObj.endTime,
       venue: sessionObj.venue,
       mode: sessionObj.mode,
+      student_count: sessionObj.studentCount,
       status: sessionObj.status,
+      color: sessionObj.color || '#3b82f6',
     };
 
     let { error } = await supabase.from('schedule_sessions').upsert(payload);
 
-    let retries = 10;
-    while (error && retries > 0) {
-      const msg = error.message || '';
-      const match = msg.match(/Could not find the '([^']+)' column/) || msg.match(/column "([^"]+)"/);
-      if (match && match[1] && payload[match[1]] !== undefined) {
-        const missingCol = match[1];
-        console.warn(`Supabase schedule_sessions missing column '${missingCol}'. Stripping and retrying.`);
-        delete payload[missingCol];
-        const retryRes = await supabase.from('schedule_sessions').upsert(payload);
-        error = retryRes.error;
-      } else {
-        break;
-      }
-      retries--;
-    }
-
     if (error) {
-      console.warn('Supabase schedule_sessions full upsert degraded, trying minimal payload:', error.message);
+      console.warn('Supabase schedule_sessions upsert error, trying minimal payload:', error.message);
       const minimalPayload = {
         id: sessId,
         date: sessionObj.date,
@@ -572,6 +555,8 @@ export function TrainingCalendar() {
         console.error('Minimal schedule_sessions upsert error:', minRes.error.message);
       }
     }
+
+    await loadDbSessions();
 
     if (editingSessionId) {
       setCustomSessions((prev) =>

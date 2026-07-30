@@ -24,40 +24,8 @@ export interface College {
   imageUrl?: string;
 }
 
-const INITIAL_COLLEGES: College[] = [
-  {
-    id: 'col-1',
-    name: 'Christ Irinjalakkuda',
-    code: 'CHRIST-IRK',
-    location: 'Irinjalakkuda, Thrissur',
-    principalName: 'Dr. Fr. Jolly Andrews',
-    contactEmail: 'info@christcollegeijk.edu.in',
-    contactPhone: '+91 480 2825258',
-    logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?w=100&auto=format&fit=crop&q=80',
-    imageUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'col-2',
-    name: 'MIM Kuttikkanam',
-    code: 'MIM-KUTT',
-    location: 'Kuttikkanam, Idukki',
-    principalName: 'Dr. Joby Thomas',
-    contactEmail: 'info@mim.edu',
-    contactPhone: '+91 4869 232203',
-  },
-  {
-    id: 'col-3',
-    name: 'St. Thomas College',
-    code: 'STC-THR',
-    location: 'Thrissur',
-    principalName: 'Dr. Martin K. A.',
-    contactEmail: 'info@stthomas.ac.in',
-    contactPhone: '+91 487 2420435',
-  },
-];
-
 export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' | 'colleges' }) {
-  const { courses, createCourse, updateCourse, loading } = useTraining();
+  const { courses, createCourse, updateCourse, loading, refresh } = useTraining();
   const { toast } = useNotifications();
 
   // Active Tab State
@@ -68,18 +36,17 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
 
   const { user } = useAuth();
+  const courseRepo = useMemo(() => container.resolve(COURSE_REPOSITORY_TOKEN), []);
   const collegeRepo = useMemo(() => container.resolve(COLLEGE_REPOSITORY_TOKEN), []);
 
-  // Colleges Management State (Persisted in Supabase)
-  const [colleges, setColleges] = useState<College[]>(INITIAL_COLLEGES);
+  // Colleges Management State (Persisted in Supabase DB)
+  const [colleges, setColleges] = useState<College[]>([]);
 
   useEffect(() => {
     async function fetchColleges() {
       try {
-        const p = await collegeRepo.findMany();
-        if (p.data && p.data.length > 0) {
-          setColleges(p.data as any);
-        }
+        const p = await collegeRepo.findMany({ pageSize: 1000, page: 1 });
+        setColleges((p.data as any) || []);
       } catch (e) {
         console.warn('Could not fetch colleges from Supabase:', e);
       }
@@ -101,34 +68,22 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     imageUrl: '',
   });
 
-  const DEFAULT_COURSE_CHECKLIST = [
-    'College Confirmation Form Signed',
-    'Trainer Assigned',
-    'Student Registry Uploaded',
-    'Syllabus Dispatched',
-    'Daily Sessions Logged',
-    'Final Report Generated',
-    'Certificates Dispatched',
-    'Signed Receipt Uploaded',
-  ];
-
-  // Dynamic checklist builder state for create/edit drawers
-  const [checklistItems, setChecklistItems] = useState<string[]>(DEFAULT_COURSE_CHECKLIST);
+  // Dynamic checklist builder state for create/edit drawers (Stored in Supabase DB)
+  const [checklistItems, setChecklistItems] = useState<string[]>([]);
   const [newCheckitemText, setNewCheckitemText] = useState('');
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
   const handleOpenEditCourse = (c: Course) => {
     setEditingCourse(c);
-    setChecklistItems(
-      c.checklist && c.checklist.length > 0
-        ? [...c.checklist]
-        : DEFAULT_COURSE_CHECKLIST
-    );
+    setNewCheckitemText('');
+    setChecklistItems(Array.isArray(c.checklist) ? [...c.checklist] : []);
   };
 
   const handleOpenCreateCourse = () => {
+    setEditingCourse(null);
+    setNewCheckitemText('');
+    setChecklistItems([]);
     setOpenCourseModal(true);
-    setChecklistItems(DEFAULT_COURSE_CHECKLIST);
   };
 
   const handleAddChecklistItem = () => {
@@ -293,6 +248,18 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     }
   };
 
+  const handleDeleteCourse = async (id: string, title: string) => {
+    if (confirm(`Are you sure you want to delete ${title}?`)) {
+      try {
+        await courseRepo.softDelete(id, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+        toast({ variant: 'info', title: 'Course Deleted', message: `${title} removed from catalog.` });
+        refresh();
+      } catch (err: any) {
+        toast({ variant: 'error', title: 'Delete Failed', message: err.message || 'Error occurred.' });
+      }
+    }
+  };
+
   const handleDeleteCollege = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
       try {
@@ -331,10 +298,10 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       key: 'checklist',
       header: 'Course Execution Checklist',
       render: (c) => {
-        const items = c.checklist && c.checklist.length > 0 ? c.checklist : DEFAULT_COURSE_CHECKLIST;
+        const items = Array.isArray(c.checklist) ? c.checklist : [];
         return (
-          <Badge tone="info">
-            📋 {items.length} Course Task{items.length > 1 ? 's' : ''} Configured
+          <Badge tone={items.length > 0 ? 'info' : 'neutral'}>
+            📋 {items.length} Course Task{items.length !== 1 ? 's' : ''} Configured
           </Badge>
         );
       },
@@ -343,9 +310,14 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       key: 'actions',
       header: 'Actions',
       render: (c) => (
-        <Button variant="secondary" size="sm" onClick={() => handleOpenEditCourse(c)}>
-          Edit Course & Tasks
-        </Button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Button variant="secondary" size="sm" onClick={() => handleOpenEditCourse(c)}>
+            Edit Course & Tasks
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => handleDeleteCourse(c.id, c.title)} style={{ color: 'var(--status-danger)' }}>
+            Delete
+          </Button>
+        </div>
       ),
     },
   ];

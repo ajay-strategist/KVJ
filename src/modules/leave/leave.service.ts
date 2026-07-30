@@ -21,6 +21,7 @@ export interface ILeaveService {
   listPendingApprovals(): Promise<Result<LeaveRecord[]>>;
   approveLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
   rejectLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
+  cancelLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
   getEmployeeLeaves(employeeId: UUID): Promise<Result<LeaveRecord[]>>;
   listAllLeaves(): Promise<Result<LeaveRecord[]>>;
 }
@@ -200,6 +201,28 @@ export class LeaveService implements ILeaveService {
       );
 
       eventBus.emit('leave.rejected' as any, { leaveId, employeeId: rec.employeeId } as any);
+
+      return Ok(updated);
+    } catch {
+      return Err(AppError.internal());
+    }
+  }
+
+  async cancelLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>> {
+    try {
+      const rec = await this.repo.findById(leaveId);
+      if (!rec) return Err(AppError.notFound('Leave record not found.'));
+
+      const updated = await this.repo.update(
+        leaveId,
+        {
+          status: 'cancelled',
+          currentStep: undefined,
+          approverId: actor.id,
+          approverNotes: notes || 'Leave cancelled',
+        },
+        actor
+      );
 
       return Ok(updated);
     } catch {

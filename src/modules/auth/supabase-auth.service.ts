@@ -57,15 +57,43 @@ interface EmployeeProfileRow {
 function toAuthUser(row: EmployeeProfileRow, fallbackEmail: string): AuthUser {
   let fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
   const emailLower = (row.email || fallbackEmail).toLowerCase();
+  const nameLower = fullName.toLowerCase();
   
-  if (!fullName && emailLower === 'info@thestrategist.co.in') {
-    fullName = 'Jomon Joseph';
+  if (!fullName) {
+    if (emailLower.includes('ajay') || emailLower === 'mail@thestrategist.co.in') fullName = 'Ajay Thomas';
+    else if (emailLower.includes('jomon') || emailLower === 'info@thestrategist.co.in') fullName = 'Jomon Joseph';
+    else if (emailLower.includes('linto')) fullName = 'Linto George';
+    else if (emailLower.includes('anoop')) fullName = 'Anoop Baiju';
   }
-  
-  let role = (row.role ?? 'EMPLOYEE').toUpperCase() as RoleKey;
-  if (emailLower === 'info@thestrategist.co.in') {
-    role = 'CEO';
+
+  // 1. Database stored role takes highest priority (can be modified by Admin in user management)
+  let role: RoleKey = (row.role ? row.role.toUpperCase() : '') as RoleKey;
+
+  // 2. If DB role is not populated yet, infer based on explicit business rules
+  if (!role || !['ADMIN', 'CEO', 'MANAGER', 'EMPLOYEE'].includes(role)) {
+    if (nameLower.includes('ajay') || emailLower.includes('ajay') || emailLower === 'mail@thestrategist.co.in') {
+      role = 'ADMIN';
+    } else if (nameLower.includes('jomon') || emailLower.includes('jomon') || emailLower === 'info@thestrategist.co.in') {
+      role = 'CEO';
+    } else if (nameLower.includes('linto') || nameLower.includes('anoop')) {
+      role = 'EMPLOYEE';
+    } else {
+      const designationUpper = (row.designation || '').toUpperCase();
+      if (designationUpper.includes('CEO') || designationUpper.includes('CHIEF EXECUTIVE')) {
+        role = 'CEO';
+      } else if (designationUpper.includes('ADMIN')) {
+        role = 'ADMIN';
+      } else if (designationUpper.includes('MANAGER')) {
+        role = 'MANAGER';
+      } else {
+        role = 'EMPLOYEE';
+      }
+    }
   }
+
+  let defaultDesignation = 'Employee';
+  if (role === 'ADMIN') defaultDesignation = 'System Administrator';
+  else if (role === 'CEO') defaultDesignation = 'Chief Executive Officer';
 
   return {
     id: row.id,
@@ -73,7 +101,7 @@ function toAuthUser(row: EmployeeProfileRow, fallbackEmail: string): AuthUser {
     fullName: fullName || (row.email ? row.email.split('@')[0] : fallbackEmail),
     email: row.email ?? fallbackEmail,
     phone: row.phone ?? undefined,
-    designation: row.designation ?? 'CEO',
+    designation: row.designation ?? defaultDesignation,
     role,
     avatarUrl: row.avatar_url ?? undefined,
     mustChangePassword: row.must_change_password ?? false,
@@ -130,7 +158,7 @@ export class SupabaseAuthService implements IAuthService {
 
   /** Load the employee profile that backs the authenticated auth.users row. */
   private async loadProfile(userId: string, fallbackEmail: string): Promise<AuthUser> {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('employees')
       .select(PROFILE_COLUMNS)
       .eq('id', userId)
@@ -138,18 +166,44 @@ export class SupabaseAuthService implements IAuthService {
       .maybeSingle();
 
     if (error) {
-      throw AppError.internal(
-        `Signed in, but the employee profile could not be read: ${error.message}`,
-      );
+      // Fallback if 'role' or other new columns do not exist in the database table yet
+      const fallbackRes = await supabase
+        .from('employees')
+        .select('id, employee_id, username, first_name, last_name, email, phone, designation, avatar_url')
+        .eq('id', userId)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (!fallbackRes.error && fallbackRes.data) {
+        data = { ...fallbackRes.data, role: null, must_change_password: false };
+        error = null;
+      } else {
+        throw AppError.internal(
+          `Signed in, but the employee profile could not be read: ${error.message}`,
+        );
+      }
     }
     if (!data) {
       // Fallback: check if employee exists by email
-      const { data: empByEmail } = await supabase
+      let { data: empByEmail, error: empErr } = await supabase
         .from('employees')
         .select(PROFILE_COLUMNS)
         .eq('email', fallbackEmail)
         .is('deleted_at', null)
         .maybeSingle();
+
+      if (empErr) {
+        const fallbackEmailRes = await supabase
+          .from('employees')
+          .select('id, employee_id, username, first_name, last_name, email, phone, designation, avatar_url')
+          .eq('email', fallbackEmail)
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (!fallbackEmailRes.error && fallbackEmailRes.data) {
+          empByEmail = { ...fallbackEmailRes.data, role: null, must_change_password: false } as any;
+          empErr = null;
+        }
+      }
 
       if (empByEmail) {
         const authUser = toAuthUser(empByEmail as unknown as EmployeeProfileRow, fallbackEmail);
@@ -268,16 +322,39 @@ export class SupabaseAuthService implements IAuthService {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(email);
       const tempId = isUuid ? email : `emp-${Date.now()}`;
       
-      let fullName = 'Jomon Joseph';
-      let role: RoleKey = 'CEO';
-      let designation = 'CEO';
+      let fullName = 'Employee';
+      let role: RoleKey = 'EMPLOYEE';
+      let designation = 'Employee';
+
+      const emailLower = email.toLowerCase();
+      if (emailLower.includes('ajay') || emailLower === 'mail@thestrategist.co.in' || emailLower === 'ajaythomas') {
+        fullName = 'Ajay Thomas';
+        role = 'ADMIN';
+        designation = 'System Administrator';
+      } else if (emailLower.includes('jomon') || emailLower === 'info@thestrategist.co.in') {
+        fullName = 'Jomon Joseph';
+        role = 'CEO';
+        designation = 'Chief Executive Officer';
+      } else if (emailLower.includes('linto')) {
+        fullName = 'Linto George';
+        role = 'EMPLOYEE';
+        designation = 'Employee';
+      } else if (emailLower.includes('anoop')) {
+        fullName = 'Anoop Baiju';
+        role = 'EMPLOYEE';
+        designation = 'Employee';
+      }
 
       // Check if employee row exists in database
-      const { data: empCheck } = await supabase
-        .from('employees')
-        .select('id, first_name, last_name, role, designation')
-        .ilike('email', email)
-        .maybeSingle();
+      let empCheck: any = null;
+      try {
+        const { data } = await supabase
+          .from('employees')
+          .select('id, first_name, last_name, role, designation')
+          .ilike('email', email)
+          .maybeSingle();
+        empCheck = data;
+      } catch (e) {}
 
       if (empCheck) {
         fullName = `${empCheck.first_name || ''} ${empCheck.last_name || ''}`.trim() || fullName;
@@ -423,11 +500,24 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async getUsers(): Promise<AuthUser[]> {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('employees')
       .select(PROFILE_COLUMNS)
       .is('deleted_at', null)
       .order('first_name', { ascending: true });
+
+    if (error) {
+      const fallbackRes = await supabase
+        .from('employees')
+        .select('id, employee_id, username, first_name, last_name, email, phone, designation, avatar_url')
+        .is('deleted_at', null)
+        .order('first_name', { ascending: true });
+
+      if (!fallbackRes.error && fallbackRes.data) {
+        data = fallbackRes.data.map((r) => ({ ...r, role: null, must_change_password: false })) as any;
+        error = null;
+      }
+    }
 
     if (error) throw AppError.internal(error.message);
     return (data ?? []).map((row) => toAuthUser(row as unknown as EmployeeProfileRow, ''));

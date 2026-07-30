@@ -73,8 +73,10 @@ export function useTraining() {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.createCourse(data, { id: user.id, role: user.role });
     if (res.ok) {
-      setCourses((prev) => [res.value, ...prev]);
-      return { ok: true, value: res.value };
+      const merged = { ...res.value, ...data };
+      if (data.checklist) merged.checklist = data.checklist;
+      setCourses((prev) => [merged, ...prev]);
+      return { ok: true, value: merged };
     }
     return { ok: false, error: res.error.message };
   }, [service, user]);
@@ -83,8 +85,10 @@ export function useTraining() {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.updateCourse(id, data, { id: user.id, role: user.role });
     if (res.ok) {
-      setCourses((prev) => prev.map((c) => (c.id === id ? res.value : c)));
-      return { ok: true, value: res.value };
+      const merged = { ...res.value, ...data };
+      if (data.checklist) merged.checklist = data.checklist;
+      setCourses((prev) => prev.map((c) => (c.id === id ? merged : c)));
+      return { ok: true, value: merged };
     }
     return { ok: false, error: res.error.message };
   }, [service, user]);

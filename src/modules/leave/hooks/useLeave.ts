@@ -99,6 +99,21 @@ export function useLeave() {
     return { ok: false, error: res.error.message };
   }, [service, principal]);
 
+  const cancelLeave = useCallback(async (id: string, notes?: string) => {
+    const actorId = user?.id || principal?.id || 'emp-user';
+    const actorRole = user?.role || principal?.role || 'Employee';
+    setLoading(true);
+    const res = await service.cancelLeave(id, { id: actorId, role: actorRole }, notes);
+    setLoading(false);
+    if (res.ok) {
+      setLeaves((prev) => prev.map((l) => (l.id === id ? res.value : l)));
+      setAllLeaves((prev) => prev.map((l) => (l.id === id ? res.value : l)));
+      setPendingApprovals((prev) => prev.filter((l) => l.id !== id));
+      return { ok: true, value: res.value };
+    }
+    return { ok: false, error: res.error.message };
+  }, [service, user, principal]);
+
   const uploadMedicalCertificate = useCallback(async (leaveId: string, medicalCertUrl: string) => {
     setLoading(true);
     const res = await service.updateMedicalCertificate(leaveId, medicalCertUrl);
@@ -126,6 +141,7 @@ export function useLeave() {
     uploadMedicalCertificate,
     approveLeave,
     rejectLeave,
+    cancelLeave,
     refreshMyLeaves: fetchMyLeaves,
     refreshPending: fetchPendingApprovals,
     refreshAll: fetchAllLeaves,

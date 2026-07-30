@@ -883,20 +883,13 @@ export function TaskBoard({
 
                           {/* Submit Task for Review */}
                           {t.status === 'In Progress' && (
-                            <Button size="sm" variant="secondary" onClick={() => handleSubmitTaskForApproval(t)}>
+                            <Button size="sm" variant="primary" onClick={() => handleSubmitTaskForApproval(t)}>
                               🚀 Submit Task
                             </Button>
                           )}
                         </>
                       );
                     })()}
-
-                    {/* Action: Mark Complete for Management */}
-                    {t.status === 'In Progress' && isManagement && (
-                      <Button size="sm" variant="secondary" onClick={() => handleMarkComplete(t)}>
-                        ✓ Mark Complete
-                      </Button>
-                    )}
 
                     {/* Action: Approve Task (Manager / Supervisor) */}
                     {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (

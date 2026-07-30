@@ -37,7 +37,7 @@ function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean)
 }
 
 export function LeaveBoard() {
-  const { leaves, allLeaves, applyLeave, approveLeave, rejectLeave, uploadMedicalCertificate, loading, refreshAll, refreshMyLeaves } = useLeave();
+  const { leaves, allLeaves, applyLeave, approveLeave, rejectLeave, cancelLeave, uploadMedicalCertificate, loading, refreshAll, refreshMyLeaves } = useLeave();
   const { employees } = useEmployee();
   const { user } = useAuth();
   const { confirm } = useDialog();
@@ -244,69 +244,100 @@ export function LeaveBoard() {
         key: 'actions',
         header: 'Actions',
         render: (r) => {
-          if (!isMgmt || r.status !== 'pending') {
-            const isApproved = r.status === 'approved';
-            const isRejected = r.status === 'rejected';
-            return (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  color: isApproved ? '#166534' : isRejected ? '#991b1b' : 'var(--text-muted)',
-                  background: isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : 'var(--bg-sunken)',
-                  padding: '2px 8px',
-                  borderRadius: 6,
-                  border: `1px solid ${isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : 'var(--border)'}`,
-                }}
-              >
-                {isApproved ? '✓ Approved' : isRejected ? '✕ Rejected' : '—'}
-              </span>
-            );
-          }
+          const isOwner = r.employeeId === user?.id;
+          const canCancel = (r.status === 'pending' || r.status === 'approved') && (isMgmt || isOwner);
+
+          const handleCancel = async (e: React.MouseEvent) => {
+            e.stopPropagation();
+            const ok = await confirm({
+              title: 'Cancel Leave Request?',
+              message: 'Are you sure you want to cancel this leave application?',
+            });
+            if (!ok) return;
+            const res = await cancelLeave(r.id, 'Cancelled by user');
+            if (res && res.ok) {
+              toast({ variant: 'info', title: 'Leave Cancelled', message: `Leave for ${r.startDate} has been cancelled.` });
+              refreshAll(); refreshMyLeaves();
+            } else {
+              toast({ variant: 'error', title: 'Error', message: 'Could not cancel leave.' });
+            }
+          };
+
           return (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Button
-                size="xs"
-                variant="primary"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const res = await approveLeave(r.id, 'Approved via Leave Board');
-                  if (res && res.ok) {
-                    toast({ variant: 'success', title: 'Leave Approved', message: `Leave for ${r.startDate} has been approved.` });
-                    refreshAll(); refreshMyLeaves();
-                  } else {
-                    toast({ variant: 'error', title: 'Error', message: 'Could not approve leave.' });
-                  }
-                }}
-              >
-                ✓ Approve
-              </Button>
-              <Button
-                size="xs"
-                variant="danger"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const res = await rejectLeave(r.id, 'Rejected via Leave Board');
-                  if (res && res.ok) {
-                    toast({ variant: 'error', title: 'Leave Rejected', message: `Leave for ${r.startDate} has been rejected.` });
-                    refreshAll(); refreshMyLeaves();
-                  } else {
-                    toast({ variant: 'error', title: 'Error', message: 'Could not reject leave.' });
-                  }
-                }}
-              >
-                ✕ Reject
-              </Button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {isMgmt && r.status === 'pending' && (
+                <>
+                  <Button
+                    size="xs"
+                    variant="primary"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const res = await approveLeave(r.id, 'Approved via Leave Board');
+                      if (res && res.ok) {
+                        toast({ variant: 'success', title: 'Leave Approved', message: `Leave for ${r.startDate} has been approved.` });
+                        refreshAll(); refreshMyLeaves();
+                      } else {
+                        toast({ variant: 'error', title: 'Error', message: 'Could not approve leave.' });
+                      }
+                    }}
+                  >
+                    ✓ Approve
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="danger"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const res = await rejectLeave(r.id, 'Rejected via Leave Board');
+                      if (res && res.ok) {
+                        toast({ variant: 'error', title: 'Leave Rejected', message: `Leave for ${r.startDate} has been rejected.` });
+                        refreshAll(); refreshMyLeaves();
+                      } else {
+                        toast({ variant: 'error', title: 'Error', message: 'Could not reject leave.' });
+                      }
+                    }}
+                  >
+                    ✕ Reject
+                  </Button>
+                </>
+              )}
+
+              {(!isMgmt || r.status !== 'pending') && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: r.status === 'approved' ? '#166534' : r.status === 'rejected' ? '#991b1b' : r.status === 'cancelled' ? '#6b7280' : '#b45309',
+                    background: r.status === 'approved' ? '#f0fdf4' : r.status === 'rejected' ? '#fef2f2' : r.status === 'cancelled' ? '#f3f4f6' : '#fffbeb',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    border: `1px solid ${r.status === 'approved' ? '#bbf7d0' : r.status === 'rejected' ? '#fecaca' : r.status === 'cancelled' ? '#e5e7eb' : '#fde68a'}`,
+                  }}
+                >
+                  {r.status === 'approved' ? '✓ Approved' : r.status === 'rejected' ? '✕ Rejected' : r.status === 'cancelled' ? '🚫 Cancelled' : '⏳ Pending'}
+                </span>
+              )}
+
+              {canCancel && (
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  onClick={handleCancel}
+                  style={{ color: '#dc2626' }}
+                >
+                  🚫 Cancel
+                </Button>
+              )}
             </div>
           );
         },
       }
     );
     return list;
-  }, [isMgmt, employees, approveLeave, rejectLeave, toast, refreshAll, refreshMyLeaves]);
+  }, [isMgmt, employees, user, approveLeave, rejectLeave, cancelLeave, confirm, toast, refreshAll, refreshMyLeaves]);
 
   // Exactly two leave types.
   const leaveTypes = businessRules.leave.types.map((t) => ({ value: t, label: t }));
@@ -426,6 +457,7 @@ export function LeaveBoard() {
                 <option value="pending">⏳ Pending</option>
                 <option value="approved">✅ Approved</option>
                 <option value="rejected">❌ Rejected</option>
+                <option value="cancelled">🚫 Cancelled</option>
               </select>
             </div>
           </div>
