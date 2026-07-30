@@ -3,6 +3,7 @@ import { PageHeader, Card, SectionHeader, Badge, Button } from '../../../shared/
 import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { isFullControl } from '../../../shared/permissions/roles';
 
 import { useProject } from '../hooks/useProject';
 import { useTaskSessions } from '../hooks/useTaskSessions';
@@ -56,6 +57,8 @@ export function TaskWorklogView({
   const { toast } = useNotifications();
   const { can } = usePermissions();
   const isSupervisor = can('task', 'approve');
+  // Admin / CEO / Manager see ALL employees; regular employees see only themselves
+  const isManagement = user ? isFullControl(user.role as any) : false;
 
   const [filterRole, setFilterRole] = useState<'all' | 'Assignee' | 'Supervisor'>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | 'Office Task' | 'Project Task'>('all');
@@ -90,7 +93,6 @@ export function TaskWorklogView({
   const sessions: TaskWorkSession[] = useMemo(() => {
     if (dbSessions.length > 0) return dbSessions;
 
-    // Fall back: build display rows from tasks + timer state
     const timerStates = getTimerStates();
     const synth: TaskWorkSession[] = [];
 
@@ -99,19 +101,17 @@ export function TaskWorklogView({
       const actualSec = stored?.secondsToday || Math.round((t.actualHours || 0) * 3600);
       if (actualSec <= 0) return;
 
+      // Scope: employees only see their own sessions
+      if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
+
       const proj = (projects || []).find((p: any) => p.id === t.projectId);
-      const emp = employees.find((e) => e.id === t.assigneeId);
       const now = Date.now();
       const isActive = stored?.active;
-
-      // Estimate start time: lastStartTime or (now - actualSec * 1000)
       const startMs = stored?.lastStartTime
         ? stored.lastStartTime - (stored.secondsToday - actualSec) * 1000
         : now - actualSec * 1000;
-
       const startISO = new Date(startMs).toISOString();
       const endISO = isActive ? undefined : new Date(startMs + actualSec * 1000).toISOString();
-
       const supervisorAlloc = proj
         ? (allocations || []).find(
             (a: any) =>
@@ -133,31 +133,27 @@ export function TaskWorklogView({
           ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}`
           : undefined,
         workTitle: t.title,
-        workCode: t.title
-          .split(/\s+/)
-          .filter(Boolean)
-          .map((w: string) => w[0])
-          .join('')
-          .toUpperCase()
-          .slice(0, 6),
+        workCode: t.title.split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
         startTime: startISO,
         endTime: endISO,
         durationMinutes: isActive ? undefined : Math.round(actualSec / 60),
-        status: t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval'
-          ? 'completed'
-          : isActive
-          ? 'running'
-          : 'paused',
+        status:
+          t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval'
+            ? 'completed'
+            : isActive
+            ? 'running'
+            : 'paused',
         createdAt: startISO,
         updatedAt: new Date().toISOString(),
         deletedAt: undefined,
       } as any);
     });
 
-    // Also include tasks that are in_progress but not in timerStates
+    // Also pick up in_progress tasks not yet in timerStates
     (tasks || []).forEach((t: any) => {
       if (synth.find((s) => s.taskId === t.id)) return;
       if (t.status !== 'in_progress' && !((t.actualHours || 0) > 0)) return;
+      if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
       const proj = (projects || []).find((p: any) => p.id === t.projectId);
       const actualSec = Math.round((t.actualHours || 0) * 3600);
       if (actualSec <= 0) return;
@@ -192,7 +188,7 @@ export function TaskWorklogView({
     });
 
     return synth;
-  }, [dbSessions, tasks, projects, employees, allocations, user]);
+  }, [dbSessions, tasks, projects, employees, allocations, user, isManagement]);
 
   // ── Build worklog from timesheets + synthetic task-hour entries ───────────────
   const mappedLogs = useMemo(() => {
@@ -201,10 +197,12 @@ export function TaskWorklogView({
     // Timesheet-based entries
     const fromTimesheets = (timesheets || [])
       .filter((ts: any) => {
+        // Specific employee filter (from parent dropdown)
         if (selectedEmployeeId && selectedEmployeeId !== 'all') {
           return ts.employeeId === selectedEmployeeId;
         }
-        if (!isSupervisor && user) {
+        // Employees only see their own; management sees everyone
+        if (!isManagement && user) {
           return ts.employeeId === user.id;
         }
         return true;
@@ -253,9 +251,9 @@ export function TaskWorklogView({
       .filter((t: any) => {
         const actualSec =
           timerStates[t.id]?.secondsToday || Math.round((t.actualHours || 0) * 3600);
-        if (actualSec <= 10) return false; // ignore tasks with less than 10s tracked
-        // Scope to current user if not supervisor
-        if (!isSupervisor && user) {
+        if (actualSec <= 10) return false; // ignore tasks with <10s tracked
+        // Employees only see their own tasks
+        if (!isManagement && user) {
           const isMyTask =
             t.assigneeId === user.id ||
             t.assigneeId === user.email ||
@@ -264,6 +262,7 @@ export function TaskWorklogView({
               (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
           if (!isMyTask) return false;
         }
+        // Management can further filter by a specific employee
         if (selectedEmployeeId && selectedEmployeeId !== 'all') {
           return t.assigneeId === selectedEmployeeId;
         }
