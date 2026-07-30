@@ -55,7 +55,7 @@ CREATE OR REPLACE FUNCTION public.current_role()
   RETURNS user_role
   LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
 AS $$
-  SELECT role FROM flwdsk_employees WHERE id = auth.uid();
+  SELECT role::user_role FROM flwdsk_employees WHERE id = auth.uid();
 $$;
 
 CREATE OR REPLACE FUNCTION public.resolve_login_email(identifier text)
