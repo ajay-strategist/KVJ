@@ -1,4 +1,5 @@
 import { AppShell } from '../../../shared/layout/AppShell';
+import { useDevice } from '../../../shared/hooks/responsive';
 import { WorkspaceShell, type WorkspaceRole } from '../../../shared/workspace/WorkspaceShell';
 import { DashboardGrid } from '../../../shared/dashboard/dashboard';
 import { PageHeader, Card, SectionHeader, StatCard, QuickActionCard, Badge, Timeline, ActivityCard, Button } from '../../../shared/ui/components';
@@ -104,6 +105,8 @@ export const AttendancePanel = memo(function AttendancePanel({
   endBreak,
   onActivityLog,
 }: AttendancePanelProps) {
+  const device = useDevice();
+  const isMobile = device === 'mobile';
   const { confirm } = useDialog();
   const { toast } = useNotifications();
   const { user } = useAuth();
@@ -1941,6 +1944,9 @@ export function MyDayPage() {
   const { applyLeave } = useLeave();
   const [applyLeaveOpen, setApplyLeaveOpen] = useState(false);
 
+  const device = useDevice();
+  const isMobile = device === 'mobile';
+
   const employeeOptions = useMemo(() => {
     return (employees || []).map((e) => ({
       id: e.id,
@@ -1960,7 +1966,7 @@ export function MyDayPage() {
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         <ResizedStatPill
           label="TODAY ATTENDANCE"
           value={record?.firstClockIn ? `Logged: ${record.firstClockIn}` : 'Not Clocked In'}
@@ -1996,7 +2002,7 @@ export function MyDayPage() {
         onActivityLog={handleActivityLog}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginTop: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: 16, marginTop: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <TaskWidget
             tasks={tasks}
