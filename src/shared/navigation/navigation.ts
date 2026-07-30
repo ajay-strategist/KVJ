@@ -96,9 +96,8 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
   ];
 
   // ── Executive-only tabs — CEO / ADMIN / MANAGER only ─────────────────────
-  const EXEC_TABS = [
-    'analytics-exec',   // Executive Console only — Report Builder / KPI / Power BI removed
-  ];
+  // All analytics tabs removed per user request
+  const EXEC_TABS: string[] = [];
 
   const ALLOWED_TABS = isExecutive ? [...CORE_TABS, ...EXEC_TABS] : CORE_TABS;
 

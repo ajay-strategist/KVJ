@@ -36,11 +36,11 @@ export const featureFlags = {
     // Communication — hidden
     emailCenter: false,
     reminders: false,
-    // Analytics suite — only Executive Console is shown in sidebar
-    executiveConsole: true,
-    reportBuilder: false,   // removed from nav per user request
-    kpiRegistry: false,     // removed from nav per user request
-    powerBiGateway: false,  // removed from nav per user request
+    // Analytics suite — all tabs removed from sidebar per user request
+    executiveConsole: false,
+    reportBuilder: false,
+    kpiRegistry: false,
+    powerBiGateway: false,
     // Finance extras — hidden (Expenses & Travel stays)
     procurement: false,
     assets: false,
