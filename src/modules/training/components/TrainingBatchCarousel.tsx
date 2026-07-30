@@ -108,19 +108,9 @@ function loadPrefs(): Prefs {
 // ── Workflow Checklist Items (per card) ────────────────────────────
 interface ChecklistTask { id: string; label: string; done: boolean }
 
-const DEFAULT_FALLBACK_CHECKLIST = [
-  'College Confirmation Form Signed',
-  'Trainer Assigned',
-  'Student Registry Uploaded',
-  'Syllabus Dispatched',
-  'Daily Sessions Logged',
-  'Final Report Generated',
-  'Certificates Dispatched',
-  'Signed Receipt Uploaded',
-];
-
-function getBatchChecklist(batchId: string): ChecklistTask[] {
-  return DEFAULT_FALLBACK_CHECKLIST.map((label, idx) => ({
+function getBatchChecklist(batchId: string, courseChecklist?: string[]): ChecklistTask[] {
+  if (!courseChecklist || courseChecklist.length === 0) return [];
+  return courseChecklist.map((label, idx) => ({
     id: `${batchId}-cl-${idx + 1}`,
     label,
     done: false,
@@ -160,16 +150,16 @@ const BatchCard = memo(function BatchCard({
 }) {
   const [showAllChecklist, setShowAllChecklist] = useState(true);
   const [checklist, setChecklist] = useState(() => {
-    const base = getBatchChecklist(vm.id);
+    const base = getBatchChecklist(vm.id, vm.courseChecklist);
     const saved = loadChecklistDoneState(vm.id);
     return base.map((t) => ({ ...t, done: saved[t.label] ?? false }));
   });
 
   useEffect(() => {
-    const base = getBatchChecklist(vm.id);
+    const base = getBatchChecklist(vm.id, vm.courseChecklist);
     const saved = loadChecklistDoneState(vm.id);
     setChecklist(base.map((t) => ({ ...t, done: saved[t.label] ?? false })));
-  }, [vm.id]);
+  }, [vm.id, vm.courseChecklist]);
 
   const tone = PHASE_TONE[vm.phase];
 
@@ -405,54 +395,67 @@ const BatchCard = memo(function BatchCard({
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               CHECKLIST
             </span>
-            <button
-              type="button"
-              onClick={() => setShowAllChecklist((s) => !s)}
-              style={{
-                fontSize: 11.5, fontWeight: 700,
-                background: 'var(--bg-surface)', border: '1px solid var(--brand)',
-                borderRadius: 999, color: 'var(--brand)',
-                padding: '2px 10px', cursor: 'pointer',
-              }}
-            >
-              {showAllChecklist ? 'Hide done' : `Show done (${doneCount})`}
-            </button>
+            {checklist.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAllChecklist((s) => !s)}
+                style={{
+                  fontSize: 11.5, fontWeight: 700,
+                  background: 'var(--bg-surface)', border: '1px solid var(--brand)',
+                  borderRadius: 999, color: 'var(--brand)',
+                  padding: '2px 10px', cursor: 'pointer',
+                }}
+              >
+                {showAllChecklist ? 'Hide done' : `Show done (${doneCount})`}
+              </button>
+            )}
           </div>
 
-          <ul style={{
-            listStyle: 'none', margin: 0, padding: 0,
-            display: 'flex', flexDirection: 'column', gap: 8,
-            overflowY: 'auto', maxHeight: 210, paddingRight: 4,
-          }}>
-            {visibleChecklist.map((task) => (
-              <li key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => toggleTask(task.id)}
-                  style={{
-                    width: 20, height: 20, flexShrink: 0,
-                    borderRadius: 5,
-                    border: task.done ? 'none' : '1.5px solid var(--border)',
-                    background: task.done ? 'var(--status-success, #10b981)' : 'var(--bg-surface)',
-                    cursor: 'pointer',
-                    display: 'grid', placeItems: 'center',
-                    padding: 0,
-                  }}
-                >
-                  {task.done && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
-                </button>
-                <span style={{
-                  fontSize: 12,
-                  color: task.done ? 'var(--text-muted)' : 'var(--text-primary)',
-                  textDecoration: task.done ? 'line-through' : 'none',
-                  fontWeight: task.done ? 500 : 600,
-                  lineHeight: 1.3,
-                }}>
-                  {task.label}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {checklist.length === 0 ? (
+            <div style={{
+              fontSize: 12, color: 'var(--text-muted)',
+              textAlign: 'center', padding: '20px 8px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ fontSize: 20 }}>📋</span>
+              <span>No checklist configured.<br />Add tasks in <strong>Course Catalog</strong>.</span>
+            </div>
+          ) : (
+            <ul style={{
+              listStyle: 'none', margin: 0, padding: 0,
+              display: 'flex', flexDirection: 'column', gap: 8,
+              overflowY: 'auto', maxHeight: 210, paddingRight: 4,
+            }}>
+              {visibleChecklist.map((task) => (
+                <li key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleTask(task.id)}
+                    style={{
+                      width: 20, height: 20, flexShrink: 0,
+                      borderRadius: 5,
+                      border: task.done ? 'none' : '1.5px solid var(--border)',
+                      background: task.done ? 'var(--status-success, #10b981)' : 'var(--bg-surface)',
+                      cursor: 'pointer',
+                      display: 'grid', placeItems: 'center',
+                      padding: 0,
+                    }}
+                  >
+                    {task.done && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                  </button>
+                  <span style={{
+                    fontSize: 12,
+                    color: task.done ? 'var(--text-muted)' : 'var(--text-primary)',
+                    textDecoration: task.done ? 'line-through' : 'none',
+                    fontWeight: task.done ? 500 : 600,
+                    lineHeight: 1.3,
+                  }}>
+                    {task.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </aside>
     </div>
