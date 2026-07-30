@@ -119,12 +119,8 @@ const DEFAULT_FALLBACK_CHECKLIST = [
   'Signed Receipt Uploaded',
 ];
 
-function getBatchChecklist(batchId: string, courseChecklist?: string[]): ChecklistTask[] {
-  const items = (courseChecklist && courseChecklist.length > 0)
-    ? courseChecklist
-    : DEFAULT_FALLBACK_CHECKLIST;
-
-  return items.map((label, idx) => ({
+function getBatchChecklist(batchId: string): ChecklistTask[] {
+  return DEFAULT_FALLBACK_CHECKLIST.map((label, idx) => ({
     id: `${batchId}-cl-${idx + 1}`,
     label,
     done: false,
@@ -164,16 +160,16 @@ const BatchCard = memo(function BatchCard({
 }) {
   const [showAllChecklist, setShowAllChecklist] = useState(true);
   const [checklist, setChecklist] = useState(() => {
-    const base = getBatchChecklist(vm.id, vm.courseChecklist);
+    const base = getBatchChecklist(vm.id);
     const saved = loadChecklistDoneState(vm.id);
     return base.map((t) => ({ ...t, done: saved[t.label] ?? false }));
   });
 
   useEffect(() => {
-    const base = getBatchChecklist(vm.id, vm.courseChecklist);
+    const base = getBatchChecklist(vm.id);
     const saved = loadChecklistDoneState(vm.id);
     setChecklist(base.map((t) => ({ ...t, done: saved[t.label] ?? false })));
-  }, [vm.id, vm.courseChecklist]);
+  }, [vm.id]);
 
   const tone = PHASE_TONE[vm.phase];
 
