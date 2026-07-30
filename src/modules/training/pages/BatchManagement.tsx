@@ -19,6 +19,7 @@ import { DailyReportBuilderModal } from '../report/DailyReportBuilderModal';
 import { DailyReportPreview } from '../report/DailyReportPreview';
 import type { DailyReportConfig, DailyReportData } from '../report/daily-report.types';
 import { useMemo } from 'react';
+import { cleanBatchCode } from '../utils/batch-formatter';
 
 // Workspace Navigation Tabs
 type WorkspaceTab =
@@ -1505,7 +1506,7 @@ export function BatchManagement() {
                 📊 Students Performance & Exam Eligibility Matrix
               </h1>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                Active Batch: <strong>{activeBatch?.code || 'Christ 3BBA Data Analytics B1'}</strong> ({activeBatch?.college || 'Christ College'}) · Minimum attendance for voucher: <strong>84%</strong>.
+                Active Batch: <strong>{cleanBatchCode(activeBatch?.code, activeBatch?.batchNo) || 'Christ 3BBA Data Analytics B1'}</strong> ({activeBatch?.college || 'Christ College'}) · Minimum attendance for voucher: <strong>84%</strong>.
               </p>
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -3168,7 +3169,7 @@ export function BatchManagement() {
             🎓 Training Batch Management & Analytics
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-            Batch: <strong>{activeBatch?.code || 'Christ 3BBA Data Analytics B1'}</strong> ({activeBatch?.college || 'Christ College'})
+            Batch: <strong>{cleanBatchCode(activeBatch?.code, activeBatch?.batchNo) || 'Christ 3BBA Data Analytics B1'}</strong> ({activeBatch?.college || 'Christ College'})
           </p>
         </div>
 

@@ -224,7 +224,7 @@ export function TrainingCalendar() {
 
     (batches || []).forEach((b) => {
       const course = courses.find((c) => c.id === b.courseId);
-      const cleanCode = cleanBatchCode(b.code) || b.code || 'Training Batch';
+      const cleanCode = cleanBatchCode(b.code, b.batchNo) || b.code || 'Training Batch';
       const courseTitle = course?.title || b.trainingName || '';
       const name = b.trainingName || courseTitle || cleanCode;
 
@@ -234,11 +234,7 @@ export function TrainingCalendar() {
       }
 
       if (seenLabels.has(fullLabel)) {
-        if (b.batchNo && !cleanCode.includes(b.batchNo)) {
-          fullLabel = `${cleanCode} (${b.batchNo}) - ${courseTitle}`;
-        } else {
-          return; // Skip duplicate batch option label
-        }
+        return; // Skip duplicate batch option label
       }
 
       seenLabels.add(fullLabel);
