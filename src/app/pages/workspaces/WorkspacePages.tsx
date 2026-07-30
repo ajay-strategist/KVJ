@@ -108,33 +108,88 @@ export const AttendancePanel = memo(function AttendancePanel({
   const { toast } = useNotifications();
   const { user } = useAuth();
   const { batches, courses } = useTraining();
+  const { employees } = useEmployee();
   const [clockInOpen, setClockInOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState('Office');
 
+  const currentEmployee = useMemo(() => {
+    if (!user) return null;
+    return (employees || []).find(
+      (e) => e.id === user.id || (e.email && user.email && e.email.toLowerCase() === user.email.toLowerCase())
+    );
+  }, [employees, user]);
+
+  const [assignedBatchIds, setAssignedBatchIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    async function loadAssignedSessions() {
+      try {
+        const { data } = await supabase.from('schedule_sessions').select('*').is('deleted_at', null);
+        if (data) {
+          const set = new Set<string>();
+          const userEmail = user?.email?.toLowerCase();
+          const userName = user?.fullName?.toLowerCase();
+          const empId = currentEmployee?.id;
+
+          data.forEach((s: any) => {
+            const isTrainerMatch =
+              (s.trainer_id && (s.trainer_id === user?.id || s.trainer_id === empId)) ||
+              (s.employee_id && (s.employee_id === user?.id || s.employee_id === empId)) ||
+              (s.trainer_name && userName && s.trainer_name.toLowerCase().includes(userName)) ||
+              (s.trainer && userName && String(s.trainer).toLowerCase().includes(userName));
+
+            if (isTrainerMatch && s.batch_id) {
+              set.add(s.batch_id);
+            }
+          });
+          setAssignedBatchIds(set);
+        }
+      } catch (e) {}
+    }
+    loadAssignedSessions();
+  }, [user, currentEmployee]);
+
   const availableBatches = useMemo(() => {
     if (!batches || batches.length === 0) return [];
+
+    const userEmail = user?.email?.toLowerCase();
+    const userName = user?.fullName?.toLowerCase();
+    const empId = currentEmployee?.id;
+
     const mapped = batches.map((b) => {
       const courseObj = courses.find((c) => c.id === b.courseId);
       const name = cleanBatchCode(b.code) || b.trainingName || 'Training Batch';
+
+      const isMyAssigned =
+        (b.trainerId && (b.trainerId === user?.id || b.trainerId === empId)) ||
+        (b.coordinatorEmail && userEmail && b.coordinatorEmail.toLowerCase() === userEmail) ||
+        (b.coordinatorEmail2 && userEmail && b.coordinatorEmail2.toLowerCase() === userEmail) ||
+        (b.coordinator && userName && b.coordinator.toLowerCase().includes(userName)) ||
+        (b.coordinator2 && userName && b.coordinator2.toLowerCase().includes(userName)) ||
+        ((b as any).trainer && userName && String((b as any).trainer).toLowerCase().includes(userName)) ||
+        assignedBatchIds.has(b.id);
+
       return {
         id: b.id,
         name,
+        rawCode: b.code,
         college: b.college || '—',
         course: courseObj?.title || b.trainingName || 'Training Program',
         time: '09:00 AM - 12:00 PM',
         students: b.capacity || 30,
-        trainer: b.coordinator || 'Assigned Trainer',
+        trainer: b.coordinator || (b as any).trainer || 'Assigned Trainer',
+        isMyAssigned: Boolean(isMyAssigned),
       };
     });
 
-    const seen = new Set<string>();
-    return mapped.filter((b) => {
-      if (seen.has(b.name)) return false;
-      seen.add(b.name);
-      return true;
+    // Sort employee assigned batches TO THE TOP, followed by remaining batches
+    return mapped.sort((a, b) => {
+      if (a.isMyAssigned && !b.isMyAssigned) return -1;
+      if (!a.isMyAssigned && b.isMyAssigned) return 1;
+      return 0;
     });
-  }, [batches, courses]);
+  }, [batches, courses, user, currentEmployee, assignedBatchIds]);
 
   const [selectedBatch, setSelectedBatch] = useState('');
 
@@ -530,8 +585,11 @@ export const AttendancePanel = memo(function AttendancePanel({
           {/* Group 2: Training Batch Selector */}
           {selectedMode === 'Training' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Select Training Batch</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Select Training Batch</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{availableBatches.length} Batches Available</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
                 {availableBatches.length === 0 ? (
                   <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', background: 'var(--bg-sunken)', borderRadius: 8, border: '1px dashed var(--border)' }}>
                     No training batches found. Create batches in Training Details page.
@@ -544,7 +602,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                         key={b.id}
                         onClick={() => setSelectedBatch(b.name)}
                         style={{
-                          border: active ? '2px solid var(--brand)' : '1px solid var(--border)',
+                          border: active ? '2px solid var(--brand)' : (b.isMyAssigned ? '1.5px solid var(--status-success)' : '1px solid var(--border)'),
                           background: active ? 'var(--bg-sunken)' : 'var(--bg-surface)',
                           borderRadius: 8,
                           padding: '10px 14px',
@@ -552,15 +610,20 @@ export const AttendancePanel = memo(function AttendancePanel({
                           transition: 'all 0.15s ease',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{b.name}</span>
-                          <Badge tone={active ? 'success' : 'neutral'}>{b.course}</Badge>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{b.name}</span>
+                            {b.isMyAssigned && (
+                              <Badge tone="success">⭐ Assigned to You</Badge>
+                            )}
+                          </div>
+                          <Badge tone={active ? 'info' : 'neutral'}>{b.course}</Badge>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
                           <span>🏫 {b.college}</span>
                           <span>👥 {b.students} Students</span>
                           <span>🕒 {b.time}</span>
-                          <span>👤 {b.trainer}</span>
+                          <span>👤 Trainer: {b.trainer}</span>
                         </div>
                       </div>
                     );
