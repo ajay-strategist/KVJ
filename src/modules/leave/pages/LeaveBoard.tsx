@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Card, SectionHeader, StatCard, Button } from '../../../shared/ui/components';
+import { PageHeader, Card, SectionHeader, StatCard, Button, Avatar, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useLeave } from '../hooks/useLeave';
 import { useEmployee } from '../../employee/hooks/useEmployee';
@@ -12,6 +12,29 @@ import { businessRules } from '../../../config/business-rules';
 import Drawer from '../../../shared/ui/Drawer';
 import type { LeaveRecord } from '../leave.repository';
 import { googleIntegration, getMonthlyFolderName } from '../../../shared/integration/google';
+
+function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean): string {
+  if (!startDate) return '—';
+  
+  const formatDate = (dateStr: string) => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+    } catch (e) {}
+    return dateStr;
+  };
+
+  const startFormatted = formatDate(startDate);
+  const endFormatted = formatDate(endDate);
+
+  if (startDate === endDate || !endDate) {
+    return `${startFormatted}${halfDay ? ' (Half Day)' : ''}`;
+  }
+  return `${startFormatted} – ${endFormatted}${halfDay ? ' (Half Day)' : ''}`;
+}
 
 export function LeaveBoard() {
   const { leaves, allLeaves, applyLeave, approveLeave, rejectLeave, uploadMedicalCertificate, loading, refreshAll, refreshMyLeaves } = useLeave();
@@ -109,7 +132,13 @@ export function LeaveBoard() {
         header: 'Employee',
         render: (r) => {
           const emp = (employees || []).find((e) => e.id === r.employeeId);
-          return emp ? `${emp.firstName} ${emp.lastName}` : r.employeeId || 'Unknown';
+          const name = emp ? `${emp.firstName} ${emp.lastName}` : r.employeeId || 'Unknown';
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+              <Avatar name={name} size={24} />
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{name}</span>
+            </div>
+          );
         }
       });
     }
@@ -123,7 +152,11 @@ export function LeaveBoard() {
       {
         key: 'dates',
         header: 'Duration',
-        render: (r) => `${r.startDate} to ${r.endDate}${r.halfDay ? ' (Half Day)' : ''}`,
+        render: (r) => (
+          <div style={{ whiteSpace: 'nowrap', fontWeight: 500, color: 'var(--text-primary)', fontSize: 12.5 }}>
+            🗓️ {formatLeaveDates(r.startDate, r.endDate, r.halfDay)}
+          </div>
+        ),
       },
       {
         key: 'reason',
@@ -133,15 +166,11 @@ export function LeaveBoard() {
       {
         key: 'status',
         header: 'Status',
-        render: (r) => (
-          <span
-            className={`kvj-badge kvj-badge--${
-              r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : 'danger'
-            }`}
-          >
-            {r.status}
-          </span>
-        ),
+        render: (r) => {
+          const tone = r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : 'danger';
+          const label = r.status === 'approved' ? 'Approved' : r.status === 'pending' ? 'Pending' : 'Rejected';
+          return <Badge tone={tone}>{label}</Badge>;
+        },
       },
       {
         key: 'medicalCert',
@@ -150,9 +179,30 @@ export function LeaveBoard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {r.medicalCertUrl ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--status-success)', fontWeight: 600 }}>
-                  📎 {r.medicalCertUrl}
-                </span>
+                <a
+                  href="#"
+                  title={r.medicalCertUrl}
+                  onClick={(e) => e.preventDefault()}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: '#059669',
+                    background: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    maxWidth: 160,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    textDecoration: 'none',
+                  }}
+                >
+                  📄 {r.medicalCertUrl.replace(/^.*?_MedicalCert_/i, '') || 'Certificate'}
+                </a>
                 <Button
                   size="xs"
                   variant="secondary"
@@ -184,13 +234,38 @@ export function LeaveBoard() {
       {
         key: 'approver',
         header: 'Details',
-        render: (r) => r.approverNotes ? `Notes: ${r.approverNotes}` : 'No notes.',
+        render: (r) => (
+          <div style={{ fontSize: 12, color: r.approverNotes ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+            {r.approverNotes ? r.approverNotes : <span style={{ fontStyle: 'italic', opacity: 0.7 }}>No notes</span>}
+          </div>
+        ),
       },
       {
         key: 'actions',
         header: 'Actions',
         render: (r) => {
-          if (!isMgmt || r.status !== 'pending') return <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.status === 'approved' ? '✅ Approved' : r.status === 'rejected' ? '❌ Rejected' : '—'}</span>;
+          if (!isMgmt || r.status !== 'pending') {
+            const isApproved = r.status === 'approved';
+            const isRejected = r.status === 'rejected';
+            return (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: isApproved ? '#166534' : isRejected ? '#991b1b' : 'var(--text-muted)',
+                  background: isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : 'var(--bg-sunken)',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  border: `1px solid ${isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : 'var(--border)'}`,
+                }}
+              >
+                {isApproved ? '✓ Approved' : isRejected ? '✕ Rejected' : '—'}
+              </span>
+            );
+          }
           return (
             <div style={{ display: 'flex', gap: 6 }}>
               <Button
@@ -207,7 +282,7 @@ export function LeaveBoard() {
                   }
                 }}
               >
-                ✅ Approve
+                ✓ Approve
               </Button>
               <Button
                 size="xs"
@@ -223,7 +298,7 @@ export function LeaveBoard() {
                   }
                 }}
               >
-                ❌ Reject
+                ✕ Reject
               </Button>
             </div>
           );
@@ -274,38 +349,85 @@ export function LeaveBoard() {
         <StatCard label="Total Leaves Taken" value={approvedCount} icon="🗓" />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ margin: 0 }}>
-          <SectionHeader title={isMgmt ? "Employee Leave History" : "My Leave History"} />
-        </div>
-      {isMgmt && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Employee:</span>
-            <select
-              className="kvj-select"
-              value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
-            >
-              <option value="all">👥 All Employees</option>
-              <option value="me">Me ({user?.fullName || 'Personal'})</option>
-              {(employees || []).filter(e => e.id !== user?.id).map((e) => {
-                const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email;
-                return <option key={e.id} value={e.id}>{name}</option>;
-              })}
-            </select>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginLeft: 8 }}>📊 Status:</span>
-            <select
-              className="kvj-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 140 }}
-            >
-              <option value="all">All Status</option>
-              <option value="pending">⏳ Pending</option>
-              <option value="approved">✅ Approved</option>
-              <option value="rejected">❌ Rejected</option>
-            </select>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+          flexWrap: 'wrap',
+          gap: 12,
+        }}
+      >
+        <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+          {isMgmt ? 'Employee Leave History' : 'My Leave History'}
+        </h2>
+
+        {isMgmt && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              background: 'var(--bg-panel)',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-md, 10px)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Employee:</span>
+              <select
+                value={selectedEmployee}
+                onChange={(e) => setSelectedEmployee(e.target.value)}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  minWidth: 180,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">👥 All Employees</option>
+                <option value="me">Me ({user?.fullName || 'Personal'})</option>
+                {(employees || []).filter((e) => e.id !== user?.id).map((e) => {
+                  const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email;
+                  return <option key={e.id} value={e.id}>{name}</option>;
+                })}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>📊 Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  minWidth: 140,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">All Status</option>
+                <option value="pending">⏳ Pending</option>
+                <option value="approved">✅ Approved</option>
+                <option value="rejected">❌ Rejected</option>
+              </select>
+            </div>
           </div>
         )}
       </div>
