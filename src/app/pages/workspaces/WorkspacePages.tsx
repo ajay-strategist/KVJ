@@ -854,8 +854,8 @@ export const TaskWidget = memo(function TaskWidget({
   onSubmitReview: (id: string, title: string) => void;
   onSyncTask?: (id: string, secondsToday: number, active: boolean, underReview?: boolean) => void;
 }) {
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -910,36 +910,53 @@ export const TaskWidget = memo(function TaskWidget({
     return `${h}h ${m}m ${s}s`;
   };
 
-  const handleDragStart = (e: React.DragEvent, idx: number) => {
-    setDraggedIndex(idx);
-    e.dataTransfer.setData('text/plain', String(idx));
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedTaskId(id);
+    e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent, idx: number) => {
+  const handleDragOver = (e: React.DragEvent, id: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== idx) {
-      setDragOverIndex(idx);
+    if (dragOverTaskId !== id) {
+      setDragOverTaskId(id);
     }
   };
 
-  const handleDrop = (e: React.DragEvent, targetIdx: number) => {
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
-    const sourceIdxStr = e.dataTransfer.getData('text/plain');
-    const sourceIdx = sourceIdxStr !== '' ? parseInt(sourceIdxStr, 10) : draggedIndex;
+    e.stopPropagation();
 
-    if (sourceIdx !== null && !isNaN(sourceIdx) && sourceIdx !== targetIdx) {
-      setTasks((prev) => {
-        const updated = [...prev];
-        const [moved] = updated.splice(sourceIdx, 1);
-        updated.splice(targetIdx, 0, moved);
-        saveStoredTaskOrder(updated.map((t) => t.id));
-        return updated;
-      });
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedTaskId;
+    if (!sourceId || sourceId === targetId) {
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      return;
     }
-    setDraggedIndex(null);
-    setDragOverIndex(null);
+
+    setTasks((prev) => {
+      const activeIds = prev.filter((t) => !t.isApproved).map((t) => t.id);
+      const fromIndex = activeIds.indexOf(sourceId);
+      const toIndex = activeIds.indexOf(targetId);
+
+      if (fromIndex === -1 || toIndex === -1) return prev;
+
+      const newActiveIds = [...activeIds];
+      const [movedId] = newActiveIds.splice(fromIndex, 1);
+      newActiveIds.splice(toIndex, 0, movedId);
+
+      const activeMap = new Map(prev.filter((t) => !t.isApproved).map((t) => [t.id, t]));
+      const orderedActive = newActiveIds.map((id) => activeMap.get(id)!).filter(Boolean);
+      const inactive = prev.filter((t) => t.isApproved);
+
+      const updated = [...orderedActive, ...inactive];
+      saveStoredTaskOrder(updated.map((t) => t.id));
+      return updated;
+    });
+
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
   };
 
   const activeTasks = useMemo(() => {
@@ -958,7 +975,7 @@ export const TaskWidget = memo(function TaskWidget({
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
         }
         .task-card-dragging {
-          opacity: 0.5;
+          opacity: 0.4;
           border: 2px dashed var(--brand) !important;
           background: var(--bg-sunken) !important;
         }
@@ -972,18 +989,23 @@ export const TaskWidget = memo(function TaskWidget({
             📋 No pending or active tasks for today. Click <strong>Add Task</strong> to create a new task.
           </div>
         ) : (
-          activeTasks.map((t, idx) => (
+          activeTasks.map((t) => (
           <div
             key={t.id}
             draggable
-            onDragStart={(e) => handleDragStart(e, idx)}
-            onDragOver={(e) => handleDragOver(e, idx)}
-            onDrop={(e) => handleDrop(e, idx)}
+            onDragStart={(e) => handleDragStart(e, t.id)}
+            onDragOver={(e) => handleDragOver(e, t.id)}
+            onDrop={(e) => handleDrop(e, t.id)}
             onDragEnd={() => {
-              setDraggedIndex(null);
-              setDragOverIndex(null);
+              setDraggedTaskId(null);
+              setDragOverTaskId(null);
             }}
-            className={`task-card-hover ${draggedIndex === idx ? 'task-card-dragging' : ''} ${dragOverIndex === idx && draggedIndex !== idx ? 'task-card-drop-target' : ''}`}
+            onDragLeave={(e) => {
+              if (dragOverTaskId === t.id) {
+                setDragOverTaskId(null);
+              }
+            }}
+            className={`task-card-hover ${draggedTaskId === t.id ? 'task-card-dragging' : ''} ${dragOverTaskId === t.id && draggedTaskId !== t.id ? 'task-card-drop-target' : ''}`}
             style={{
               padding: 16,
               border: '1px solid var(--border)',
