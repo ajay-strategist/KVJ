@@ -811,6 +811,8 @@ export interface TaskItem {
   isRework?: boolean;
   reworkNotes?: string;
   secondsToday: number;
+  assignee?: string;
+  supervisor?: string;
 }
 
 function getTimeLeftInfo(dueStr: string): { label: string; tone: 'danger' | 'warning' | 'neutral' } {
@@ -1051,6 +1053,12 @@ export const TaskWidget = memo(function TaskWidget({
                         </span>
                       );
                     })()}
+                    {t.assignee && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• 👤 Assignee: <strong style={{ color: 'var(--text-primary)' }}>{t.assignee}</strong></span>
+                    )}
+                    {t.supervisor && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• 🧑‍💼 Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{t.supervisor}</strong></span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1768,6 +1776,8 @@ export function MyDayPage() {
           isRework,
           reworkNotes,
           secondsToday,
+          assignee: (t as any).assignee || undefined,
+          supervisor: (t as any).supervisor || undefined,
         };
       });
 
