@@ -1705,19 +1705,24 @@ export function MyDayPage() {
     const now = Date.now();
     const updatedStates = { ...storedStates };
 
-    const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
-    const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
-
     const mapped: TaskItem[] = (projectTasks || [])
       .filter((t) => {
         if (!t) return false;
-        // Don't show unapproved assignment requests to assignee until approved by manager
+        // Don't show unapproved assignment requests until approved by manager
         if ((t as any).approvalStatus === 'pending_assignment_approval') return false;
 
-        if (!isManagement) {
-          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || ((t as any).assignee && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
-          if (!isMyTask) return false;
-        }
+        // My Day always shows ONLY the current user's own tasks.
+        // Management roles have full visibility in other modules (TaskBoard, etc.)
+        // but My Day is personal — it shows tasks where you are the assignee OR supervisor.
+        const myId = user?.id;
+        const myEmail = user?.email?.toLowerCase();
+        const myName = (user?.fullName || '').toLowerCase();
+        const isMyTask =
+          t.assigneeId === myId ||
+          t.assigneeId === myEmail ||
+          t.supervisorId === myId ||
+          ((t as any).assignee && myName && (t as any).assignee.toLowerCase() === myName);
+        if (!isMyTask) return false;
 
         const d = (t.dueDate || '').slice(0, 10);
         return d === todayStr || d < todayStr || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || (t as any).approvalStatus === 'rework' || storedStates[t.id];
@@ -1764,6 +1769,17 @@ export function MyDayPage() {
           underReview,
         };
 
+        // Resolve UUID IDs to display names using the employees list
+        const assigneeEmp = employees?.find((e) => e.id === t.assigneeId);
+        const supervisorEmpId = t.supervisorId || (t as any).assignedByEmployeeId;
+        const supervisorEmp = supervisorEmpId ? employees?.find((e) => e.id === supervisorEmpId) : null;
+        const assigneeName = assigneeEmp
+          ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}`
+          : ((t as any).assignee || undefined);
+        const supervisorName = supervisorEmp
+          ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}`
+          : ((t as any).supervisor || undefined);
+
         return {
           id: t.id,
           title: t.title,
@@ -1776,8 +1792,8 @@ export function MyDayPage() {
           isRework,
           reworkNotes,
           secondsToday,
-          assignee: (t as any).assignee || undefined,
-          supervisor: (t as any).supervisor || undefined,
+          assignee: assigneeName,
+          supervisor: supervisorName,
         };
       });
 
