@@ -8,6 +8,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Student, Enrollment } from '../training.repository';
+import { cleanBatchCode } from '../utils/batch-formatter';
 
 export function StudentLifecycle() {
   const { students, enrollments, batches, registerStudent, enrollStudent, loading } = useTraining();
@@ -78,7 +79,7 @@ export function StudentLifecycle() {
   ];
 
   const studentOptions = students.map((s) => ({ value: s.id, label: `${s.firstName} ${s.lastName}` }));
-  const batchOptions = batches.map((b) => ({ value: b.id, label: b.code }));
+  const batchOptions = batches.map((b) => ({ value: b.id, label: cleanBatchCode(b.code) || b.code }));
 
   const tabs = [
     {

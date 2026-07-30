@@ -23,6 +23,7 @@ import {
   type ConflictStatus, type PresetId,
 } from '../schedule.data';
 import { BATCH_REPOSITORY_TOKEN, COURSE_REPOSITORY_TOKEN, type Batch, type Course } from '../training.repository';
+import { cleanBatchCode } from '../utils/batch-formatter';
 import { supabase } from '../../../shared/integration/supabase';
 
 const EMPTY: ScheduleRangeResult = { sessions: [], leaves: [], holidays: [], daysLoaded: 0 };
@@ -206,9 +207,10 @@ export function TrainingCalendar() {
   const dynamicBatchPresets = useMemo(() => {
     return batches.map((b) => {
       const course = courses.find((c) => c.id === b.courseId);
+      const cleanCode = cleanBatchCode(b.code) || b.code;
       return {
-        batchCode: b.code,
-        name: b.trainingName || course?.title || b.code,
+        batchCode: cleanCode,
+        name: b.trainingName || course?.title || cleanCode,
         college: b.college || '—',
         course: course?.title || '—',
         coordinator: b.coordinator || '—',

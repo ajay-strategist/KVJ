@@ -380,9 +380,23 @@ export function BatchManagement() {
     const target = batches.find((b) => b.id === batchId);
     if (!target) return;
 
-    const copyCode = `${target.code || target.batchNo || 'Batch'} - Copy`;
-    const copyBatchNo = `${target.batchNo || target.code || 'Batch 1'} (Copy)`;
-    const copyTrainingName = target.trainingName ? `${target.trainingName} (Copy)` : copyCode;
+    const rawBatch = target.batchNo || target.code || '';
+    const match = rawBatch.match(/Batch\s*(\d+)/i);
+    let nextBatchNo = 'Batch 2';
+    if (match) {
+      nextBatchNo = `Batch ${parseInt(match[1], 10) + 1}`;
+    }
+
+    const cleanBaseCode = (target.code || '')
+      .replace(/(\s*-\s*Copy|\s*\(Copy\))+/gi, '')
+      .replace(/Batch\s*\d+/gi, nextBatchNo)
+      .trim();
+
+    const copyCode = cleanBaseCode || `${target.college || 'Batch'} - ${nextBatchNo}`;
+    const copyBatchNo = nextBatchNo;
+    const copyTrainingName = (target.trainingName || '')
+      .replace(/(\s*-\s*Copy|\s*\(Copy\))+/gi, '')
+      .trim() || copyCode;
 
     const newBatchPayload: Partial<Batch> = {
       code: copyCode,

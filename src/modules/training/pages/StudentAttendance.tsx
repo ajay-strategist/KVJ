@@ -8,6 +8,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { container } from '../../../core/registry';
 import { TRAINING_SERVICE_TOKEN } from '../training.service';
 import type { Batch } from '../training.repository';
+import { cleanBatchCode } from '../utils/batch-formatter';
 
 export function StudentAttendance() {
   const { batches, enrollments, students, loading } = useTraining();
@@ -43,7 +44,7 @@ export function StudentAttendance() {
   };
 
   const columns: Column<Batch>[] = [
-    { key: 'code', header: 'Batch Code', sortable: true, accessor: (b) => b.code },
+    { key: 'code', header: 'Batch Code', sortable: true, accessor: (b) => cleanBatchCode(b.code) || b.code },
     { key: 'dates', header: 'Duration', render: (b) => `${b.startDate} to ${b.endDate}` },
     { key: 'action', header: 'Actions', render: (b) => (
       <Button size="sm" onClick={() => setSelectedBatchId(b.id)}>Take Session Attendance</Button>
@@ -62,7 +63,7 @@ export function StudentAttendance() {
       ) : (
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <SectionHeader title={`Log Attendance for Batch: ${batches.find((b) => b.id === selectedBatchId)?.code}`} />
+            <SectionHeader title={`Log Attendance for Batch: ${cleanBatchCode(batches.find((b) => b.id === selectedBatchId)?.code)}`} />
             <Button variant="secondary" onClick={() => setSelectedBatchId(null)}>Back to Batches</Button>
           </div>
 

@@ -15,26 +15,22 @@ import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { toLocalISODate, todayISO } from '../../../shared/utils/date';
 import { useTraining } from '../../training/hooks/useTraining';
+import { cleanBatchCode } from '../../training/utils/batch-formatter';
 import { supabase } from '../../../shared/integration/supabase';
 
 /**
  * Human-readable name of a training batch, e.g.
  * "Christ Irinjalakkuda - 3 BBA - 2026-2027 - Batch 1".
- *
- * The attendance log used to show a batch's `trainingName` (the course, e.g.
- * "Power BI") in the Organization/Location columns. Those columns should carry
- * the BATCH identity, so we compose it from college · program · academic year ·
- * batch number, falling back to the course/code only when those are absent.
  */
 function batchDisplayName(b?: {
   college?: string; program?: string; academicYear?: string;
   batchNo?: string; trainingName?: string; code?: string;
 } | null): string {
   if (!b) return 'Training Batch';
+  const cleaned = cleanBatchCode(b.code);
+  if (cleaned) return cleaned;
   const parts = [b.college, b.program, b.academicYear, b.batchNo].filter(Boolean);
   if (parts.length) return parts.join(' - ');
-  if (b.code && b.code !== '—') return b.code;
-  if (b.batchNo && b.batchNo !== '—') return b.batchNo;
   return b.trainingName || 'Training Batch';
 }
 

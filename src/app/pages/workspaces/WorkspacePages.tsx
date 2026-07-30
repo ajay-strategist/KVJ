@@ -18,6 +18,7 @@ import { useProject } from '../../../modules/project/hooks/useProject';
 import { useTaskSessions } from '../../../modules/project/hooks/useTaskSessions';
 import { useEmployee } from '../../../modules/employee/hooks/useEmployee';
 import { useTraining } from '../../../modules/training/hooks/useTraining';
+import { cleanBatchCode } from '../../../modules/training/utils/batch-formatter';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attendance.repository';
 import { ATTENDANCE_SERVICE_TOKEN } from '../../../modules/attendance/attendance.service';
@@ -113,17 +114,25 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   const availableBatches = useMemo(() => {
     if (!batches || batches.length === 0) return [];
-    return batches.map((b) => {
+    const mapped = batches.map((b) => {
       const courseObj = courses.find((c) => c.id === b.courseId);
+      const name = cleanBatchCode(b.code) || b.trainingName || 'Training Batch';
       return {
         id: b.id,
-        name: b.code,
+        name,
         college: b.college || '—',
         course: courseObj?.title || b.trainingName || 'Training Program',
         time: '09:00 AM - 12:00 PM',
         students: b.capacity || 30,
         trainer: b.coordinator || 'Assigned Trainer',
       };
+    });
+
+    const seen = new Set<string>();
+    return mapped.filter((b) => {
+      if (seen.has(b.name)) return false;
+      seen.add(b.name);
+      return true;
     });
   }, [batches, courses]);
 
