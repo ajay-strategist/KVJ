@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
+import { useDevice } from '../hooks/responsive';
 
 export interface DrawerProps {
   open: boolean;
@@ -10,6 +11,9 @@ export interface DrawerProps {
 }
 
 export function Drawer({ open, onClose, title, children, footer, size = 'md' }: DrawerProps) {
+  const device = useDevice();
+  const isMobile = device === 'mobile';
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
@@ -24,9 +28,9 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
   if (!open) return null;
 
   const widthMap = {
-    sm: 'min(360px, 100%)',
-    md: 'min(480px, 100%)',
-    lg: 'min(640px, 100%)',
+    sm: 'min(360px, 100vw)',
+    md: 'min(480px, 100vw)',
+    lg: 'min(640px, 100vw)',
   };
 
   return (
@@ -47,7 +51,7 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
         className="kvj-drawer-content"
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: widthMap[size],
+          width: isMobile ? '100vw' : widthMap[size],
           height: '100vh',
           maxHeight: '100vh',
           backgroundColor: 'var(--bg-surface)',

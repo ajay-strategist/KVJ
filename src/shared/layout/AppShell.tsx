@@ -124,6 +124,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const { items: notifItems, unreadCount, markRead, markAllRead, dismissNotification } = useNotifications();
   const { setOpen: setCmdOpen } = useCommandPalette();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const items = visibleNav(can, user?.role);
   const isMobile = device === 'mobile';
@@ -625,7 +626,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            padding: isMobile ? '12px' : '16px 20px 36px 20px',
+            padding: isMobile ? '12px 12px 72px 12px' : '16px 20px 36px 20px',
             maxWidth: '100%',
             width: '100%',
             margin: 0,
@@ -658,6 +659,63 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               </div>
             </footer>
           </main>
+
+          {/* ── Mobile Bottom Navigation Bar (< 640px) ── */}
+          {isMobile && (
+            <nav
+              aria-label="Mobile bottom navigation"
+              style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 56,
+                background: 'var(--bg-surface)',
+                borderTop: '1px solid var(--border)',
+                boxShadow: '0 -2px 10px rgba(0,0,0,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-around',
+                zIndex: 1150,
+                padding: '0 4px',
+                boxSizing: 'border-box',
+              }}
+            >
+              {[
+                { to: '/app/workspaces/my-day', label: 'My Day', icon: 'Home' },
+                { to: '/app/employees', label: 'Employees', icon: 'Users' },
+                { to: '/app/training/calendar', label: 'Training', icon: 'CalendarDays' },
+                { to: '/app/projects/tasks', label: 'Tasks', icon: 'FolderKanban' },
+                { to: '/app/leave', label: 'Leave', icon: 'Clock' },
+              ].map((item) => {
+                const { pathname } = useLocation();
+                const active = pathname === item.to || (item.to !== '/app' && pathname.startsWith(item.to));
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                      flex: 1,
+                      height: '100%',
+                      color: active ? 'var(--brand)' : 'var(--text-secondary)',
+                      textDecoration: 'none',
+                      fontSize: 10,
+                      fontWeight: active ? 700 : 500,
+                      transition: 'color 140ms ease',
+                    }}
+                  >
+                    <Icon name={item.icon} size={18} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
         </div>
       </div>
     </InsideShellContext.Provider>

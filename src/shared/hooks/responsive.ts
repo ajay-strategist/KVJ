@@ -33,7 +33,7 @@ export function useBreakpoint(bp: Breakpoint): boolean {
 
 /** Coarse device class for layout decisions. */
 export function useDevice(): 'mobile' | 'tablet' | 'desktop' {
-  const isTablet = useBreakpoint('md');
+  const isTablet = useBreakpoint('sm');
   const isDesktop = useBreakpoint('lg');
   return isDesktop ? 'desktop' : isTablet ? 'tablet' : 'mobile';
 }
