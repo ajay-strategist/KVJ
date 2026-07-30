@@ -9,12 +9,14 @@ import { useAuth } from '../../auth/AuthProvider';
 import Drawer from '../../../shared/ui/Drawer';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Employee } from '../employee.repository';
+import { useProject } from '../../project/hooks/useProject';
 import { supabase } from '../../../shared/integration/supabase';
 
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
   const { employees, createEmployee, updateProfile, deleteEmployee, loading } = useEmployee();
-  const { createUser, resetToDefaultPassword, updateUser, deleteUser, getUsers } = useAuth();
+  const { createUser, resetToDefaultPassword, updateUser, deleteUser, getUsers, user } = useAuth();
+  const { tasks } = useProject();
   const { toast } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -69,23 +71,120 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       }
     }
     loadStatusInfo();
-    const interval = setInterval(loadStatusInfo, 10000);
+    const interval = setInterval(loadStatusInfo, 5000);
     return () => clearInterval(interval);
   }, [employees]);
 
-  const getEmployeeStatus = (empId: string) => {
-    const record = attendanceRecords.find((r) => r.employee_id === empId);
-    if (!record) return { label: 'Offline', tone: 'neutral' as const };
-    const status = record.status;
-    if (status === 'present') return { label: '🟢 Clocked In', tone: 'success' as const };
-    if (status === 'on_break') return { label: '☕ On Break', tone: 'warning' as const };
-    if (status === 'clocked_out') return { label: '🔴 Clocked Out', tone: 'danger' as const };
-    return { label: 'Offline', tone: 'neutral' as const };
+  const getEmployeeActiveTask = (emp: Employee) => {
+    const empId = emp.id;
+    const empEmail = emp.email?.toLowerCase();
+    const empFullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim().toLowerCase();
+
+    // 1. Check active running timers from localStorage (My Day & Task Board)
+    const runningTaskIds = new Set<string>();
+    try {
+      const rawMyDay = localStorage.getItem('kvj_task_timer_state_v1');
+      if (rawMyDay) {
+        const parsed = JSON.parse(rawMyDay);
+        for (const [tId, s] of Object.entries(parsed)) {
+          if (s && typeof s === 'object' && (s as any).active === true) {
+            runningTaskIds.add(tId);
+          }
+        }
+      }
+      const rawBoard = localStorage.getItem('kvj_task_timers');
+      if (rawBoard) {
+        const parsed = JSON.parse(rawBoard);
+        for (const [tId, s] of Object.entries(parsed)) {
+          if (s && typeof s === 'object' && (s as any).isRunning === true) {
+            runningTaskIds.add(tId);
+          }
+        }
+      }
+    } catch {}
+
+    // Match task in useProject context
+    const matchingTask = (tasks || []).find((t: any) => {
+      const isRunningLocally = runningTaskIds.has(t.id);
+      const isStatusInProgress = t.status === 'in_progress' || t.status === 'In Progress' || isRunningLocally;
+      if (!isStatusInProgress) return false;
+
+      const isForThisEmp =
+        t.assigneeId === empId ||
+        (t.assigneeId && empEmail && t.assigneeId.toLowerCase() === empEmail) ||
+        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName) ||
+        (user && user.email?.toLowerCase() === empEmail && (t.assigneeId === user.id || (t.assignee && t.assignee.toLowerCase() === user.fullName?.toLowerCase())));
+
+      return isForThisEmp;
+    });
+
+    if (matchingTask) {
+      return `📝 ${matchingTask.title}`;
+    }
+
+    // Check DB active tasks fallback
+    const dbTask = activeTasks.find((t: any) => {
+      return (
+        t.assignee_id === empId ||
+        (t.assignee_id && empEmail && t.assignee_id.toLowerCase() === empEmail) ||
+        (user && user.email?.toLowerCase() === empEmail && t.assignee_id === user.id) ||
+        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName)
+      );
+    });
+
+    if (dbTask) {
+      return `📝 ${dbTask.title}`;
+    }
+
+    // Check if current user is running a task locally (fallback)
+    if (user && user.email?.toLowerCase() === empEmail && runningTaskIds.size > 0) {
+      const firstRunningId = Array.from(runningTaskIds)[0];
+      const runTask = (tasks || []).find((t: any) => t.id === firstRunningId);
+      if (runTask) return `📝 ${runTask.title}`;
+    }
+
+    return 'No active task in progress';
   };
 
-  const getEmployeeActiveTask = (empId: string) => {
-    const task = activeTasks.find((t) => t.assignee_id === empId || t.assignee === empId);
-    return task ? `📝 ${task.title}` : 'No active task in progress';
+  const getEmployeeStatus = (emp: Employee) => {
+    const empId = emp.id;
+    const empEmail = emp.email?.toLowerCase();
+
+    // Check local clock-in state if this employee is the logged-in user
+    if (user && user.email?.toLowerCase() === empEmail) {
+      try {
+        const rawClock = localStorage.getItem('kvj_clock_in_state');
+        if (rawClock) {
+          const parsed = JSON.parse(rawClock);
+          if (parsed.isClockedIn) {
+            return { label: '🟢 Clocked In', tone: 'success' as const };
+          }
+        }
+      } catch {}
+    }
+
+    // Check DB attendance records
+    const record = attendanceRecords.find(
+      (r) =>
+        r.employee_id === empId ||
+        (r.employee_email && empEmail && r.employee_email.toLowerCase() === empEmail) ||
+        (user && user.email?.toLowerCase() === empEmail && r.employee_id === user.id)
+    );
+
+    if (record) {
+      const status = record.status;
+      if (status === 'present') return { label: '🟢 Clocked In', tone: 'success' as const };
+      if (status === 'on_break') return { label: '☕ On Break', tone: 'warning' as const };
+      if (status === 'clocked_out') return { label: '🔴 Clocked Out', tone: 'danger' as const };
+    }
+
+    // If an active task is running for this employee, mark as active!
+    const activeTaskStr = getEmployeeActiveTask(emp);
+    if (activeTaskStr !== 'No active task in progress') {
+      return { label: '🟢 Clocked In (Active Work)', tone: 'success' as const };
+    }
+
+    return { label: 'Offline', tone: 'neutral' as const };
   };
 
   const [form, setForm] = useState({
@@ -391,7 +490,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
                 key: 'status',
                 header: 'Current Status',
                 render: (r: Employee) => {
-                  const stat = getEmployeeStatus(r.id);
+                  const stat = getEmployeeStatus(r);
                   return (
                     <Badge tone={stat.tone}>
                       {stat.label}
@@ -404,7 +503,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
                 header: 'Current Task In Progress',
                 render: (r: Employee) => (
                   <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    {getEmployeeActiveTask(r.id)}
+                    {getEmployeeActiveTask(r)}
                   </span>
                 ),
               },
