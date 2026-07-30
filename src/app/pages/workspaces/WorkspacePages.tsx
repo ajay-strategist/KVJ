@@ -120,30 +120,39 @@ export const AttendancePanel = memo(function AttendancePanel({
     );
   }, [employees, user]);
 
-  const [assignedBatchIds, setAssignedBatchIds] = useState<Set<string>>(new Set());
+  const [assignedTodayBatchIds, setAssignedTodayBatchIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function loadAssignedSessions() {
       try {
-        const { data } = await supabase.from('schedule_sessions').select('*').is('deleted_at', null);
-        if (data) {
+        const todayStr = toLocalISODate(new Date());
+        const { data } = await supabase
+          .from('schedule_sessions')
+          .select('*')
+          .eq('date', todayStr)
+          .is('deleted_at', null);
+
+        if (data && data.length > 0) {
           const set = new Set<string>();
-          const userEmail = user?.email?.toLowerCase();
-          const userName = user?.fullName?.toLowerCase();
+          const userEmail = user?.email?.toLowerCase()?.trim();
+          const userName = user?.fullName?.toLowerCase()?.trim();
           const empId = currentEmployee?.id;
 
           data.forEach((s: any) => {
             const isTrainerMatch =
               (s.trainer_id && (s.trainer_id === user?.id || s.trainer_id === empId)) ||
               (s.employee_id && (s.employee_id === user?.id || s.employee_id === empId)) ||
-              (s.trainer_name && userName && s.trainer_name.toLowerCase().includes(userName)) ||
-              (s.trainer && userName && String(s.trainer).toLowerCase().includes(userName));
+              (s.trainer_name && userName && s.trainer_name.toLowerCase().trim() === userName) ||
+              (s.trainer_email && userEmail && s.trainer_email.toLowerCase().trim() === userEmail);
 
-            if (isTrainerMatch && s.batch_id) {
-              set.add(s.batch_id);
+            if (isTrainerMatch) {
+              if (s.batch_id) set.add(s.batch_id);
+              if (s.topic) set.add(s.topic);
             }
           });
-          setAssignedBatchIds(set);
+          setAssignedTodayBatchIds(set);
+        } else {
+          setAssignedTodayBatchIds(new Set());
         }
       } catch (e) {}
     }
@@ -153,22 +162,26 @@ export const AttendancePanel = memo(function AttendancePanel({
   const availableBatches = useMemo(() => {
     if (!batches || batches.length === 0) return [];
 
-    const userEmail = user?.email?.toLowerCase();
-    const userName = user?.fullName?.toLowerCase();
+    const userEmail = user?.email?.toLowerCase()?.trim();
+    const userName = user?.fullName?.toLowerCase()?.trim();
     const empId = currentEmployee?.id;
+    const userId = user?.id;
 
     const mapped = batches.map((b) => {
       const courseObj = courses.find((c) => c.id === b.courseId);
       const name = cleanBatchCode(b.code) || b.trainingName || 'Training Batch';
 
-      const isMyAssigned =
-        (b.trainerId && (b.trainerId === user?.id || b.trainerId === empId)) ||
-        (b.coordinatorEmail && userEmail && b.coordinatorEmail.toLowerCase() === userEmail) ||
-        (b.coordinatorEmail2 && userEmail && b.coordinatorEmail2.toLowerCase() === userEmail) ||
-        (b.coordinator && userName && b.coordinator.toLowerCase().includes(userName)) ||
-        (b.coordinator2 && userName && b.coordinator2.toLowerCase().includes(userName)) ||
-        ((b as any).trainer && userName && String((b as any).trainer).toLowerCase().includes(userName)) ||
-        assignedBatchIds.has(b.id);
+      const isCalendarAssignedToday = assignedTodayBatchIds.has(b.id) || (b.code && assignedTodayBatchIds.has(b.code));
+
+      const isDirectTrainerMatch = Boolean(
+        (b.trainerId && (b.trainerId === userId || b.trainerId === empId)) ||
+        (b.coordinatorEmail && userEmail && b.coordinatorEmail.toLowerCase().trim() === userEmail) ||
+        (b.coordinatorEmail2 && userEmail && b.coordinatorEmail2.toLowerCase().trim() === userEmail) ||
+        (b.coordinator && userName && b.coordinator.toLowerCase().trim() === userName)
+      );
+
+      // Only mark as assigned if scheduled in today's calendar for this trainer or direct exact trainer match
+      const isMyAssigned = isCalendarAssignedToday || isDirectTrainerMatch;
 
       return {
         id: b.id,
@@ -189,7 +202,7 @@ export const AttendancePanel = memo(function AttendancePanel({
       if (!a.isMyAssigned && b.isMyAssigned) return 1;
       return 0;
     });
-  }, [batches, courses, user, currentEmployee, assignedBatchIds]);
+  }, [batches, courses, user, currentEmployee, assignedTodayBatchIds]);
 
   const [selectedBatch, setSelectedBatch] = useState('');
 
@@ -614,7 +627,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{b.name}</span>
                             {b.isMyAssigned && (
-                              <Badge tone="success">⭐ Assigned to You</Badge>
+                              <Badge tone="success">Assigned</Badge>
                             )}
                           </div>
                           <Badge tone={active ? 'info' : 'neutral'}>{b.course}</Badge>
