@@ -26,7 +26,7 @@ export function normalizeStudentKey(phone: string | undefined | null): string {
 }
 
 export class SupabaseStudentRepository extends SupabaseRepository<Student> implements IStudentRepository {
-  constructor() { super('student_records'); }
+  constructor() { super('flwdsk_student_records'); }
 
   /**
    * BUSINESS RULE (locked): register_no IS the student's phone number and is the
@@ -63,7 +63,7 @@ export class SupabaseStudentRepository extends SupabaseRepository<Student> imple
     const key = normalizeStudentKey(phone);
     if (!key) return null;
     const { data, error } = await supabase
-      .from('student_records')
+      .from('flwdsk_student_records')
       .select('*')
       .eq('register_no', key)
       .is('deleted_at', null)
@@ -74,23 +74,23 @@ export class SupabaseStudentRepository extends SupabaseRepository<Student> imple
 }
 
 export class SupabaseCourseRepository extends SupabaseRepository<Course> implements ICourseRepository {
-  constructor() { super('courses'); }
+  constructor() { super('flwdsk_courses'); }
 }
 
 export class SupabaseBatchRepository extends SupabaseRepository<Batch> implements IBatchRepository {
-  constructor() { super('batches'); }
+  constructor() { super('flwdsk_batches'); }
 }
 
 export class SupabaseCollegeRepository extends SupabaseRepository<College> implements ICollegeRepository {
-  constructor() { super('colleges'); }
+  constructor() { super('flwdsk_colleges'); }
 }
 
 export class SupabaseEnrollmentRepository extends SupabaseRepository<Enrollment> implements IEnrollmentRepository {
-  constructor() { super('enrollments'); }
+  constructor() { super('flwdsk_enrollments'); }
 }
 
 export class SupabaseSessionAttendanceRepository extends SupabaseRepository<SessionAttendanceRecord> implements ISessionAttendanceRepository {
-  constructor() { super('schedule_sessions'); }
+  constructor() { super('flwdsk_schedule_sessions'); }
 
   async findByBatch(batchId: UUID, dateStr: string): Promise<SessionAttendanceRecord[]> {
     const { data, error } = await supabase
@@ -109,7 +109,7 @@ export class SupabaseSessionAttendanceRepository extends SupabaseRepository<Sess
 }
 
 export class SupabaseAssessmentRepository extends SupabaseRepository<AssessmentRecord> implements IAssessmentRepository {
-  constructor() { super('assessments'); }
+  constructor() { super('flwdsk_assessments'); }
 
   async findByEnrollment(enrollmentId: UUID): Promise<AssessmentRecord[]> {
     const { data, error } = await supabase
@@ -127,18 +127,18 @@ export class SupabaseAssessmentRepository extends SupabaseRepository<AssessmentR
 }
 
 export class SupabaseExamVoucherRepository extends SupabaseRepository<ExamVoucher> implements IExamVoucherRepository {
-  constructor() { super('vouchers'); }
+  constructor() { super('flwdsk_vouchers'); }
 }
 
 export class SupabaseCertificateRepository extends SupabaseRepository<CertificateRecord> implements ICertificateRepository {
-  constructor() { super('certificates'); }
+  constructor() { super('flwdsk_certificates'); }
 }
 
 export class SupabaseReferralRepository extends SupabaseRepository<ReferralRecord> implements IReferralRepository {
-  constructor() { super('referrals'); }
+  constructor() { super('flwdsk_referrals'); }
 }
 
 export class SupabaseAlumniRepository extends SupabaseRepository<AlumniProfile> implements IAlumniRepository {
-  constructor() { super('alumni_profiles'); }
+  constructor() { super('flwdsk_alumni_profiles'); }
 }
 

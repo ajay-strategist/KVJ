@@ -5,7 +5,7 @@ import { supabase } from '../../shared/integration/supabase';
 
 export class SupabaseLeaveRepository extends SupabaseRepository<LeaveRecord> implements ILeaveRepository {
   constructor() {
-    super('leave_records');
+    super('flwdsk_leave_records');
   }
 
   async create(data: Partial<LeaveRecord>, actor: any): Promise<LeaveRecord> {

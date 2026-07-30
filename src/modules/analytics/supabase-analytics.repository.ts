@@ -6,7 +6,7 @@ import type {
 } from './analytics.repository';
 
 export class SupabaseKpiDefinitionRepository extends SupabaseRepository<KpiDefinition> implements IKpiDefinitionRepository {
-  constructor() { super('kpi_definitions'); }
+  constructor() { super('flwdsk_kpi_definitions'); }
 
   async findByCode(code: string): Promise<KpiDefinition | null> {
     const { data, error } = await supabase
@@ -25,6 +25,6 @@ export class SupabaseKpiDefinitionRepository extends SupabaseRepository<KpiDefin
 }
 
 export class SupabaseSavedReportRepository extends SupabaseRepository<SavedReport> implements ISavedReportRepository {
-  constructor() { super('saved_reports'); }
+  constructor() { super('flwdsk_saved_reports'); }
 }
 

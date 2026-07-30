@@ -102,7 +102,7 @@ export function TrainingCalendar() {
   const loadDbSessions = useCallback(async () => {
     try {
       const { data: rows, error } = await supabase
-        .from('schedule_sessions')
+        .from('flwdsk_schedule_sessions')
         .select('*')
         .is('deleted_at', null);
 
@@ -559,7 +559,7 @@ export function TrainingCalendar() {
       color: sessionObj.color || '#3b82f6',
     };
 
-    let { error } = await supabase.from('schedule_sessions').upsert(payload);
+    let { error } = await supabase.from('flwdsk_schedule_sessions').upsert(payload);
 
     if (error) {
       console.warn('Supabase schedule_sessions upsert error, trying minimal payload:', error.message);
@@ -570,7 +570,7 @@ export function TrainingCalendar() {
         trainer_id: validTrainerId,
         batch_id: validBatchId,
       };
-      const minRes = await supabase.from('schedule_sessions').upsert(minimalPayload);
+      const minRes = await supabase.from('flwdsk_schedule_sessions').upsert(minimalPayload);
       if (minRes.error) {
         console.error('Minimal schedule_sessions upsert error:', minRes.error.message);
       }
@@ -605,7 +605,7 @@ export function TrainingCalendar() {
     const deletedId = editingSessionId;
 
     if (UUID_RE.test(deletedId)) {
-      const { error } = await supabase.from('schedule_sessions').delete().eq('id', deletedId);
+      const { error } = await supabase.from('flwdsk_schedule_sessions').delete().eq('id', deletedId);
       if (error) {
         console.error('Supabase schedule_sessions delete error:', error.message);
         toast({

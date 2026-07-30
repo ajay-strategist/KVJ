@@ -13,15 +13,15 @@ import type {
 } from './project.repository';
 
 export class SupabaseClientRepository extends SupabaseRepository<Client> implements IClientRepository {
-  constructor() { super('clients'); }
+  constructor() { super('flwdsk_clients'); }
 }
 
 export class SupabaseProjectRepository extends SupabaseRepository<Project> implements IProjectRepository {
-  constructor() { super('projects'); }
+  constructor() { super('flwdsk_projects'); }
 }
 
 export class SupabaseMilestoneRepository extends SupabaseRepository<Milestone> implements IMilestoneRepository {
-  constructor() { super('milestones'); }
+  constructor() { super('flwdsk_milestones'); }
 
   async findByProject(projectId: UUID): Promise<Milestone[]> {
     const { data, error } = await supabase
@@ -39,7 +39,7 @@ export class SupabaseMilestoneRepository extends SupabaseRepository<Milestone> i
 }
 
 export class SupabaseResourceAllocationRepository extends SupabaseRepository<ResourceAllocation> implements IResourceAllocationRepository {
-  constructor() { super('resource_allocations'); }
+  constructor() { super('flwdsk_resource_allocations'); }
 
   async findByProject(projectId: UUID): Promise<ResourceAllocation[]> {
     const { data, error } = await supabase
@@ -71,7 +71,7 @@ export class SupabaseResourceAllocationRepository extends SupabaseRepository<Res
 }
 
 export class SupabaseTaskRepository extends SupabaseRepository<Task> implements ITaskRepository {
-  constructor() { super('tasks'); }
+  constructor() { super('flwdsk_tasks'); }
 
   async findByProject(projectId: UUID): Promise<Task[]> {
     const { data, error } = await supabase
@@ -89,7 +89,7 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
 }
 
 export class SupabaseTimesheetRepository extends SupabaseRepository<TimesheetRecord> implements ITimesheetRepository {
-  constructor() { super('timesheets'); }
+  constructor() { super('flwdsk_timesheets'); }
 
   async findByEmployee(employeeId: UUID): Promise<TimesheetRecord[]> {
     const { data, error } = await supabase
@@ -107,15 +107,15 @@ export class SupabaseTimesheetRepository extends SupabaseRepository<TimesheetRec
 }
 
 export class SupabaseClientMeetingRepository extends SupabaseRepository<ClientMeeting> implements IClientMeetingRepository {
-  constructor() { super('client_meetings'); }
+  constructor() { super('flwdsk_client_meetings'); }
 }
 
 export class SupabaseTaskWorkSessionRepository extends SupabaseRepository<TaskWorkSession> implements ITaskWorkSessionRepository {
-  constructor() { super('task_work_sessions'); }
+  constructor() { super('flwdsk_task_work_sessions'); }
 
   async findOpenSession(employeeId: UUID, taskId: UUID): Promise<TaskWorkSession | null> {
     const { data, error } = await supabase
-      .from('task_work_sessions')
+      .from('flwdsk_task_work_sessions')
       .select('*')
       .eq('employee_id', employeeId)
       .eq('task_id', taskId)

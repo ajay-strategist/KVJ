@@ -27,7 +27,7 @@ export function AnnouncementsBoard() {
 
   useEffect(() => {
     const fetchHolidays = async () => {
-      const { data } = await supabase.from('declared_holidays').select('*');
+      const { data } = await supabase.from('flwdsk_declared_holidays').select('*');
       if (data && data.length > 0) {
         setHolidays(
           data.map((h) => ({
@@ -81,7 +81,7 @@ export function AnnouncementsBoard() {
       // whole upsert fail, so holidays never persisted and never reached the
       // attendance calendar. Conflict on the UNIQUE date so re-declaring updates.
       const { error } = await supabase
-        .from('declared_holidays')
+        .from('flwdsk_declared_holidays')
         .upsert({ id: newH.id, date: newH.date, name: newH.name }, { onConflict: 'date' });
       if (error) {
         console.error('Declared holiday save failed:', error);
@@ -115,7 +115,7 @@ export function AnnouncementsBoard() {
       prev.map((h) => (h.id === id ? { ...h, status: nextStatus } : h))
     );
     try {
-      await supabase.from('declared_holidays').update({ status: nextStatus }).eq('id', id);
+      await supabase.from('flwdsk_declared_holidays').update({ status: nextStatus }).eq('id', id);
     } catch (e) {
       console.warn('Holiday status update error:', e);
     }

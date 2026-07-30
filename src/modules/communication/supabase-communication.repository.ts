@@ -10,11 +10,11 @@ import type {
 } from './communication.repository';
 
 export class SupabaseChatChannelRepository extends SupabaseRepository<ChatChannel> implements IChatChannelRepository {
-  constructor() { super('chat_channels'); }
+  constructor() { super('flwdsk_chat_channels'); }
 }
 
 export class SupabaseChatMessageRepository extends SupabaseRepository<ChatMessage> implements IChatMessageRepository {
-  constructor() { super('chat_messages'); }
+  constructor() { super('flwdsk_chat_messages'); }
 
   async findByChannel(channelId: UUID): Promise<ChatMessage[]> {
     const { data, error } = await supabase
@@ -33,11 +33,11 @@ export class SupabaseChatMessageRepository extends SupabaseRepository<ChatMessag
 }
 
 export class SupabaseAnnouncementRepository extends SupabaseRepository<Announcement> implements IAnnouncementRepository {
-  constructor() { super('announcements'); }
+  constructor() { super('flwdsk_announcements'); }
 }
 
 export class SupabaseEmailLogRepository extends SupabaseRepository<EmailLog> implements IEmailLogRepository {
-  constructor() { super('email_logs'); }
+  constructor() { super('flwdsk_email_logs'); }
 
   async findPending(): Promise<EmailLog[]> {
     const { data, error } = await supabase
@@ -55,7 +55,7 @@ export class SupabaseEmailLogRepository extends SupabaseRepository<EmailLog> imp
 }
 
 export class SupabaseNotificationPreferenceRepository extends SupabaseRepository<NotificationPreference> implements INotificationPreferenceRepository {
-  constructor() { super('notification_preferences'); }
+  constructor() { super('flwdsk_notification_preferences'); }
 
   async findByEmployee(employeeId: UUID): Promise<NotificationPreference | null> {
     const { data, error } = await supabase

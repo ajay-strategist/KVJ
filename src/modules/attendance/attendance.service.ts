@@ -281,7 +281,7 @@ export class AttendanceService implements IAttendanceService {
   async listPendingCorrections(): Promise<Result<any[]>> {
     try {
       const { data, error } = await supabase
-        .from('attendance_corrections')
+        .from('flwdsk_attendance_corrections')
         .select('*')
         .eq('status', 'pending')
         .is('deleted_at', null)
@@ -323,7 +323,7 @@ export class AttendanceService implements IAttendanceService {
       };
 
       const { error } = await supabase
-        .from('attendance_corrections')
+        .from('flwdsk_attendance_corrections')
         .insert(payload);
 
       if (error) {
@@ -351,7 +351,7 @@ export class AttendanceService implements IAttendanceService {
   async approveCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>> {
     try {
       const { data: corrData } = await supabase
-        .from('attendance_corrections')
+        .from('flwdsk_attendance_corrections')
         .select('*')
         .eq('id', correctionId)
         .maybeSingle();
@@ -521,7 +521,7 @@ export class AttendanceService implements IAttendanceService {
       }
 
       await supabase
-        .from('attendance_corrections')
+        .from('flwdsk_attendance_corrections')
         .update({
           status: 'approved',
           approver_id: actor.id,
@@ -543,7 +543,7 @@ export class AttendanceService implements IAttendanceService {
   async rejectCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>> {
     try {
       await supabase
-        .from('attendance_corrections')
+        .from('flwdsk_attendance_corrections')
         .update({
           status: 'rejected',
           approver_id: actor.id,

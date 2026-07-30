@@ -50,7 +50,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       try {
         const todayStr = new Date().toISOString().slice(0, 10);
         const { data: attData } = await supabase
-          .from('attendance_records')
+          .from('flwdsk_attendance_records')
           .select('*')
           .eq('work_date', todayStr)
           .is('deleted_at', null);
@@ -59,7 +59,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         }
 
         const { data: taskData } = await supabase
-          .from('tasks')
+          .from('flwdsk_tasks')
           .select('*')
           .in('status', ['in_progress', 'In Progress'])
           .is('deleted_at', null);

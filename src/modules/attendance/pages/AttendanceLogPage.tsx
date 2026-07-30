@@ -149,12 +149,12 @@ export function AttendanceLogPage() {
         setAttendanceRecords(Array.isArray(records) ? records : []);
         setExpenseClaims(Array.isArray(claims) ? claims : []);
 
-        const { data: hData } = await supabase.from('declared_holidays').select('*');
+        const { data: hData } = await supabase.from('flwdsk_declared_holidays').select('*');
         if (hData) {
           setDeclaredHolidays(hData.map((h: any) => ({ date: h.date || h.holiday_date, name: h.title || h.name || 'Company Holiday' })));
         }
 
-        const { data: lData } = await supabase.from('leave_records').select('*');
+        const { data: lData } = await supabase.from('flwdsk_leave_records').select('*');
         if (lData) {
           setLeaveRecords(
             lData.map((l: any) => ({

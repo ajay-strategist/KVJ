@@ -295,7 +295,7 @@ export function ExpenseClaims() {
   useEffect(() => {
     async function loadCustomTypes() {
       try {
-        const { data } = await supabase.from('expense_types').select('name');
+        const { data } = await supabase.from('flwdsk_expense_types').select('name');
         if (data && data.length > 0) {
           setCustomExpenseTypes(data.map((d: any) => d.name));
         }
@@ -310,7 +310,7 @@ export function ExpenseClaims() {
     if (!user) return;
     try {
       let query = supabase
-        .from('expense_claims')
+        .from('flwdsk_expense_claims')
         .select('*');
       
       if (!isManagement) {
@@ -348,7 +348,7 @@ export function ExpenseClaims() {
     setCustomExpenseTypes((prev) => Array.from(new Set([...prev, typeName])));
     toast({ variant: 'success', title: 'Expense Type Registered', message: `Registered "${typeName}" in database.` });
     try {
-      await supabase.from('expense_types').insert({ name: typeName });
+      await supabase.from('flwdsk_expense_types').insert({ name: typeName });
     } catch (e) {
       console.warn('Supabase expense_types insert warning:', e);
     }
@@ -439,7 +439,7 @@ export function ExpenseClaims() {
     };
 
     try {
-      const { error } = await supabase.from('expense_claims').insert({
+      const { error } = await supabase.from('flwdsk_expense_claims').insert({
         employee_id: validEmpId,
         person_name: user?.fullName || 'Employee',
         category: values.categoryType || 'Office Expense',
@@ -476,7 +476,7 @@ export function ExpenseClaims() {
   const handleApprove = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('expense_claims')
+        .from('flwdsk_expense_claims')
         .update({
           status: 'approved',
           approved_by: user?.id,
@@ -498,7 +498,7 @@ export function ExpenseClaims() {
   const handleReject = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('expense_claims')
+        .from('flwdsk_expense_claims')
         .update({
           status: 'rejected',
         })
@@ -518,7 +518,7 @@ export function ExpenseClaims() {
   const handleBulkApprove = async () => {
     try {
       const { error } = await supabase
-        .from('expense_claims')
+        .from('flwdsk_expense_claims')
         .update({
           status: 'approved',
           approved_by: user?.id,

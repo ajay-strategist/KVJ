@@ -146,7 +146,7 @@ export class SupabaseAuthService implements IAuthService {
 
     try {
       const { data } = await supabase
-        .from('employees')
+        .from('flwdsk_employees')
         .select('email')
         .or(`username.ilike.${raw},email.ilike.${raw}`)
         .maybeSingle();
@@ -159,7 +159,7 @@ export class SupabaseAuthService implements IAuthService {
   /** Load the employee profile that backs the authenticated auth.users row. */
   private async loadProfile(userId: string, fallbackEmail: string): Promise<AuthUser> {
     let { data, error } = await supabase
-      .from('employees')
+      .from('flwdsk_employees')
       .select(PROFILE_COLUMNS)
       .eq('id', userId)
       .is('deleted_at', null)
@@ -168,7 +168,7 @@ export class SupabaseAuthService implements IAuthService {
     if (error) {
       // Fallback if 'role' or other new columns do not exist in the database table yet
       const fallbackRes = await supabase
-        .from('employees')
+        .from('flwdsk_employees')
         .select('id, employee_id, username, first_name, last_name, email, phone, designation, avatar_url')
         .eq('id', userId)
         .is('deleted_at', null)
@@ -186,7 +186,7 @@ export class SupabaseAuthService implements IAuthService {
     if (!data) {
       // Fallback: check if employee exists by email
       let { data: empByEmail, error: empErr } = await supabase
-        .from('employees')
+        .from('flwdsk_employees')
         .select(PROFILE_COLUMNS)
         .eq('email', fallbackEmail)
         .is('deleted_at', null)
@@ -194,7 +194,7 @@ export class SupabaseAuthService implements IAuthService {
 
       if (empErr) {
         const fallbackEmailRes = await supabase
-          .from('employees')
+          .from('flwdsk_employees')
           .select('id, employee_id, username, first_name, last_name, email, phone, designation, avatar_url')
           .eq('email', fallbackEmail)
           .is('deleted_at', null)
@@ -237,7 +237,7 @@ export class SupabaseAuthService implements IAuthService {
     if (!empId || storedRole?.toUpperCase() === resolvedRole.toUpperCase()) return;
     try {
       await supabase
-        .from('employees')
+        .from('flwdsk_employees')
         .update({ role: resolvedRole.toUpperCase() })
         .eq('id', empId);
     } catch {
@@ -291,7 +291,7 @@ export class SupabaseAuthService implements IAuthService {
 
     if (authRes.error) {
       const { data: empRow } = await supabase
-        .from('employees')
+        .from('flwdsk_employees')
         .select('id, email, first_name, last_name, role, must_change_password')
         .ilike('email', email)
         .maybeSingle();
@@ -349,7 +349,7 @@ export class SupabaseAuthService implements IAuthService {
       let empCheck: any = null;
       try {
         const { data } = await supabase
-          .from('employees')
+          .from('flwdsk_employees')
           .select('id, first_name, last_name, role, designation')
           .ilike('email', email)
           .maybeSingle();
@@ -501,14 +501,14 @@ export class SupabaseAuthService implements IAuthService {
 
   async getUsers(): Promise<AuthUser[]> {
     let { data, error } = await supabase
-      .from('employees')
+      .from('flwdsk_employees')
       .select(PROFILE_COLUMNS)
       .is('deleted_at', null)
       .order('first_name', { ascending: true });
 
     if (error) {
       const fallbackRes = await supabase
-        .from('employees')
+        .from('flwdsk_employees')
         .select('id, employee_id, username, first_name, last_name, email, phone, designation, avatar_url')
         .is('deleted_at', null)
         .order('first_name', { ascending: true });
@@ -565,7 +565,7 @@ export class SupabaseAuthService implements IAuthService {
     }
 
     const { data: updated, error } = await supabase
-      .from('employees')
+      .from('flwdsk_employees')
       .update(patch)
       .eq('id', userId)
       .select(PROFILE_COLUMNS)
@@ -594,9 +594,9 @@ export class SupabaseAuthService implements IAuthService {
       const updateData = { must_change_password: false, updated_at: new Date().toISOString() };
       
       if (isUuid) {
-        await supabase.from('employees').update(updateData).eq('id', userId);
+        await supabase.from('flwdsk_employees').update(updateData).eq('id', userId);
       } else {
-        await supabase.from('employees').update(updateData).ilike('email', userId);
+        await supabase.from('flwdsk_employees').update(updateData).ilike('email', userId);
       }
     } catch (e) {
       console.warn('Supabase employees update note:', e);
@@ -611,7 +611,7 @@ export class SupabaseAuthService implements IAuthService {
     const { data: sessionData } = await supabase.auth.getSession();
 
     const { error } = await supabase
-      .from('employees')
+      .from('flwdsk_employees')
       .update({
         deleted_at: ts,
         deleted_by: sessionData.session?.user.id ?? null,
@@ -647,7 +647,7 @@ export class SupabaseAuthService implements IAuthService {
     const ts = new Date().toISOString();
     const empCode = 'EMP-' + Math.floor(100 + Math.random() * 900);
 
-    const { error: dbError } = await supabase.from('employees').upsert(
+    const { error: dbError } = await supabase.from('flwdsk_employees').upsert(
       {
         id: userId,
         employee_id: empCode,
@@ -683,8 +683,8 @@ export class SupabaseAuthService implements IAuthService {
       };
 
       const { error } = isUuid
-        ? await supabase.from('employees').update(updateData).eq('id', identifier)
-        : await supabase.from('employees').update(updateData).eq('email', identifier);
+        ? await supabase.from('flwdsk_employees').update(updateData).eq('id', identifier)
+        : await supabase.from('flwdsk_employees').update(updateData).eq('email', identifier);
 
       if (error) {
         console.warn('Supabase resetToDefaultPassword note:', error.message);
@@ -714,7 +714,7 @@ export class SupabaseAuthService implements IAuthService {
     const ts = new Date().toISOString();
     const empCode = 'EMP-' + Math.floor(100 + Math.random() * 900);
 
-    const { error: dbError } = await supabase.from('employees').upsert(
+    const { error: dbError } = await supabase.from('flwdsk_employees').upsert(
       {
         id: data.user.id,
         employee_id: empCode,

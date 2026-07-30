@@ -131,7 +131,7 @@ export const AttendancePanel = memo(function AttendancePanel({
       try {
         const todayStr = toLocalISODate(new Date());
         const { data } = await supabase
-          .from('schedule_sessions')
+          .from('flwdsk_schedule_sessions')
           .select('*')
           .eq('date', todayStr)
           .is('deleted_at', null);
@@ -1144,7 +1144,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
   useEffect(() => {
     async function loadSchedules() {
       try {
-        const { data } = await supabase.from('schedule_sessions').select('*').is('deleted_at', null);
+        const { data } = await supabase.from('flwdsk_schedule_sessions').select('*').is('deleted_at', null);
         if (data) {
           setDbSchedules(
             data.map((r: any) => ({

@@ -5,13 +5,13 @@ import { supabase } from '../../shared/integration/supabase';
 
 export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceRecord> implements IAttendanceRepository {
   constructor() {
-    super('attendance_records');
+    super('flwdsk_attendance_records');
   }
 
   private async syncWorkSessions(attendanceRecordId: UUID, sessions?: WorkSession[]): Promise<void> {
     if (!sessions || sessions.length === 0) return;
     try {
-      await supabase.from('work_sessions').delete().eq('attendance_record_id', attendanceRecordId);
+      await supabase.from('flwdsk_work_sessions').delete().eq('attendance_record_id', attendanceRecordId);
       const rows = sessions.map((s) => ({
         attendance_record_id: attendanceRecordId,
         clock_in: s.clockIn,
@@ -19,7 +19,7 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
         work_type: s.workType || 'Office',
         notes: s.notes || null,
       }));
-      await supabase.from('work_sessions').insert(rows);
+      await supabase.from('flwdsk_work_sessions').insert(rows);
     } catch (e) {
       console.warn('Could not sync work_sessions to Supabase:', e);
     }
@@ -32,7 +32,7 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
 
     try {
       const { data: wsData } = await supabase
-        .from('work_sessions')
+        .from('flwdsk_work_sessions')
         .select('*')
         .in('attendance_record_id', ids);
 
@@ -65,13 +65,13 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
     if (!breaks || breaks.length === 0) return;
     try {
       const { data: sessions } = await supabase
-        .from('work_sessions')
+        .from('flwdsk_work_sessions')
         .select('id')
         .eq('attendance_record_id', attendanceRecordId);
         
       const sessionIds = (sessions || []).map((s) => s.id);
       if (sessionIds.length > 0) {
-        await supabase.from('break_records').delete().in('work_session_id', sessionIds);
+        await supabase.from('flwdsk_break_records').delete().in('work_session_id', sessionIds);
       }
       
       const rows = breaks.map((b) => ({
@@ -82,7 +82,7 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
         reason: b.reason || null,
       }));
       
-      await supabase.from('break_records').insert(rows);
+      await supabase.from('flwdsk_break_records').insert(rows);
     } catch (e) {
       console.warn('Could not sync break_records to Supabase:', e);
     }
@@ -95,7 +95,7 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
 
     try {
       const { data: wsData } = await supabase
-        .from('work_sessions')
+        .from('flwdsk_work_sessions')
         .select('id, attendance_record_id')
         .in('attendance_record_id', ids);
 
@@ -107,7 +107,7 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
         });
 
         const { data: bData } = await supabase
-          .from('break_records')
+          .from('flwdsk_break_records')
           .select('*')
           .in('work_session_id', sessionIds);
 

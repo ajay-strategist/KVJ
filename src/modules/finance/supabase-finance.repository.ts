@@ -12,31 +12,31 @@ import type {
 } from './finance.repository';
 
 export class SupabaseBudgetRepository extends SupabaseRepository<Budget> implements IBudgetRepository {
-  constructor() { super('budgets'); }
+  constructor() { super('flwdsk_budgets'); }
 }
 
 export class SupabaseExpenseClaimRepository extends SupabaseRepository<ExpenseClaim> implements IExpenseClaimRepository {
-  constructor() { super('expense_claims'); }
+  constructor() { super('flwdsk_expense_claims'); }
 }
 
 export class SupabaseTravelRequestRepository extends SupabaseRepository<TravelRequest> implements ITravelRequestRepository {
-  constructor() { super('travel_requests'); }
+  constructor() { super('flwdsk_travel_requests'); }
 }
 
 export class SupabaseVendorRepository extends SupabaseRepository<Vendor> implements IVendorRepository {
-  constructor() { super('vendors'); }
+  constructor() { super('flwdsk_vendors'); }
 }
 
 export class SupabasePurchaseOrderRepository extends SupabaseRepository<PurchaseOrder> implements IPurchaseOrderRepository {
-  constructor() { super('purchase_orders'); }
+  constructor() { super('flwdsk_purchase_orders'); }
 }
 
 export class SupabaseAssetRepository extends SupabaseRepository<Asset> implements IAssetRepository {
-  constructor() { super('assets'); }
+  constructor() { super('flwdsk_assets'); }
 }
 
 export class SupabaseSalaryStructureRepository extends SupabaseRepository<SalaryStructure> implements ISalaryStructureRepository {
-  constructor() { super('salary_structures'); }
+  constructor() { super('flwdsk_salary_structures'); }
 
   async findByEmployee(employeeId: UUID): Promise<SalaryStructure | null> {
     const { data, error } = await supabase

@@ -640,7 +640,7 @@ export function BatchManagement() {
     async function loadAttendanceFromDb() {
       try {
         const { data, error } = await supabase
-          .from('schedule_sessions')
+          .from('flwdsk_schedule_sessions')
           .select('*')
           .eq('batch_id', selectedBatchId);
         
@@ -704,7 +704,7 @@ export function BatchManagement() {
             
             const sessionTitle = `Hour ${col.hour || 1}`;
             const { data, error } = await supabase
-              .from('schedule_sessions')
+              .from('flwdsk_schedule_sessions')
               .select('id')
               .eq('batch_id', selectedBatchId)
               .eq('student_id', studentId)
@@ -723,9 +723,9 @@ export function BatchManagement() {
               };
               
               if (data?.id) {
-                await supabase.from('schedule_sessions').update(payload).eq('id', data.id);
+                await supabase.from('flwdsk_schedule_sessions').update(payload).eq('id', data.id);
               } else {
-                await supabase.from('schedule_sessions').insert(payload);
+                await supabase.from('flwdsk_schedule_sessions').insert(payload);
               }
             }
           }
@@ -1283,9 +1283,9 @@ export function BatchManagement() {
           };
 
           if (isRealUuid) {
-            await supabase.from('student_records').update(payload).eq('id', s.id);
+            await supabase.from('flwdsk_student_records').update(payload).eq('id', s.id);
           } else {
-            const { data, error } = await supabase.from('student_records').insert({
+            const { data, error } = await supabase.from('flwdsk_student_records').insert({
               ...payload,
               register_no: normalizeStudentKey(s.phone || '9876500000'),
             }).select('id');

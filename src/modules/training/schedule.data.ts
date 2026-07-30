@@ -83,7 +83,7 @@ export async function fetchScheduleRange(
   const leaves: LeaveRequest[] = [];
   try {
     const { data: dbLeaves, error } = await supabase
-      .from('leave_records')
+      .from('flwdsk_leave_records')
       .select('*')
       .eq('status', 'approved')
       .gte('end_date', q.from)

@@ -5,7 +5,7 @@ import { supabase } from '../../shared/integration/supabase';
 
 export class SupabaseEmployeeRepository extends SupabaseRepository<Employee> implements IEmployeeRepository {
   constructor() {
-    super('employees');
+    super('flwdsk_employees');
   }
 
   async findByEmail(email: string): Promise<Employee | null> {
