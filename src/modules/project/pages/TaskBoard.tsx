@@ -827,6 +827,13 @@ export function TaskBoard({
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Action: Approve Assignment for Management */}
+                    {t.approvalStatus === 'pending_assignment_approval' && isManagement && (
+                      <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
+                        ✓ Approve Assignment
+                      </Button>
+                    )}
+
                     {/* Action 1: Assign to Me */}
                     {t.assignee === 'Unassigned' && (
                       <Button size="sm" variant="secondary" onClick={() => handleAssignToMe(t)}>
@@ -834,57 +841,72 @@ export function TaskBoard({
                       </Button>
                     )}
 
-                    {/* Action 2: Start / Resume Task */}
-                    {(t.status === 'To Do' || t.status === 'Pending Approval' || t.approvalStatus === 'rework') && (
-                      <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
-                        ▶️ {timers[t.id]?.elapsedMs ? 'Resume' : 'Start'} Task
-                      </Button>
-                    )}
+                    {/* Assignee-Only Actions: Start / Pause / Resume / Log Time / Submit */}
+                    {(() => {
+                      const isAssignee =
+                        t.assigneeId === user?.id ||
+                        t.assigneeId === user?.email ||
+                        (t.assignee && user?.fullName && t.assignee.toLowerCase() === user.fullName.toLowerCase());
+                      const isPendingAssignment = t.approvalStatus === 'pending_assignment_approval';
 
-                    {/* Action: Pause Task */}
-                    {t.status === 'In Progress' && timers[t.id]?.isRunning && (
-                      <Button size="sm" variant="secondary" onClick={() => handlePauseTask(t.id)}>
-                        ⏸️ Pause Task
-                      </Button>
-                    )}
+                      if (!isAssignee || isPendingAssignment) return null;
 
-                    {/* Action: Resume Task */}
-                    {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
-                      <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
-                        ▶️ Resume Task
-                      </Button>
-                    )}
+                      return (
+                        <>
+                          {/* Start / Resume Task */}
+                          {(t.status === 'To Do' || t.approvalStatus === 'rework') && (
+                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
+                              ▶️ {timers[t.id]?.elapsedMs ? 'Resume' : 'Start'} Task
+                            </Button>
+                          )}
 
-                    {/* Action 3: Log Hours */}
-                    {t.status === 'In Progress' && (
-                      <Button size="sm" onClick={() => { setSelectedTask(t); setTimeEntryOpen(true); }}>
-                        ⏱ Log Time
-                      </Button>
-                    )}
+                          {/* Pause Task */}
+                          {t.status === 'In Progress' && timers[t.id]?.isRunning && (
+                            <Button size="sm" variant="secondary" onClick={() => handlePauseTask(t.id)}>
+                              ⏸️ Pause Task
+                            </Button>
+                          )}
 
-                    {/* Action: Submit Task for Review */}
-                    {t.status === 'In Progress' && (
-                      <Button size="sm" variant="secondary" onClick={() => handleSubmitTaskForApproval(t)}>
-                        🚀 Submit Task
-                      </Button>
-                    )}
+                          {/* Resume Task */}
+                          {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
+                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
+                              ▶️ Resume Task
+                            </Button>
+                          )}
 
-                    {/* Action 4: Mark Complete */}
+                          {/* Log Hours */}
+                          {t.status === 'In Progress' && (
+                            <Button size="sm" onClick={() => { setSelectedTask(t); setTimeEntryOpen(true); }}>
+                              ⏱ Log Time
+                            </Button>
+                          )}
+
+                          {/* Submit Task for Review */}
+                          {t.status === 'In Progress' && (
+                            <Button size="sm" variant="secondary" onClick={() => handleSubmitTaskForApproval(t)}>
+                              🚀 Submit Task
+                            </Button>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* Action: Mark Complete for Management */}
                     {t.status === 'In Progress' && isManagement && (
                       <Button size="sm" variant="secondary" onClick={() => handleMarkComplete(t)}>
                         ✓ Mark Complete
                       </Button>
                     )}
 
-                    {/* Action: Approve Task (Manager) */}
-                    {t.status === 'Under Review' && isManagement && (
+                    {/* Action: Approve Task (Manager / Supervisor) */}
+                    {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
                       <Button size="sm" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
                         ✅ Approve
                       </Button>
                     )}
 
-                    {/* Action: Rework Task (Manager) */}
-                    {t.status === 'Under Review' && isManagement && (
+                    {/* Action: Rework Task (Manager / Supervisor) */}
+                    {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
                       <Button size="sm" variant="danger" onClick={() => {
                         const notes = prompt("Enter rework reason:");
                         if (notes) handleRequestRework(t, notes);
@@ -893,14 +915,14 @@ export function TaskBoard({
                       </Button>
                     )}
 
-                    {/* Action 5: Reopen Task */}
+                    {/* Action: Reopen Task */}
                     {t.status === 'Completed' && (
                       <Button size="sm" variant="secondary" onClick={() => handleReopenTask(t)}>
                         ↩️ Reopen
                       </Button>
                     )}
 
-                    {/* Action 6: Edit Task */}
+                    {/* Action: Edit Task */}
                     <Button
                       size="sm"
                       variant="secondary"
