@@ -36,21 +36,20 @@ export const featureFlags = {
     // Communication — hidden
     emailCenter: false,
     reminders: false,
-    // Analytics suite — hidden
-    executiveConsole: false,
-    reportBuilder: false,
-    kpiRegistry: false,
-    powerBiGateway: false,
+    // Analytics suite — enabled for CEO/executive visibility
+    executiveConsole: true,
+    reportBuilder: true,
+    kpiRegistry: true,
+    powerBiGateway: true,
     // Finance extras — hidden (Expenses & Travel stays)
     procurement: false,
     assets: false,
     budgets: false,
     payroll: false,
-    // Absorbed into Batches → Training Details (students, session attendance and
-    // assessments live inside a training, not as separate top-level pages).
-    studentLifecycle: false,
-    sessionAttendance: false,
-    assessments: false,
+    // Training sub-pages — enabled (live inside Batch Management)
+    studentLifecycle: true,
+    sessionAttendance: true,
+    assessments: true,
     // Absorbed into Projects & Tasks (two tabs).
     clientsMaster: false,
     projectCatalog: false,

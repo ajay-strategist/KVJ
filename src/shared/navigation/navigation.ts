@@ -31,10 +31,12 @@ export const NAV_TREE: NavItem[] = [
   { id: 'approvals', label: 'Approvals Queue', path: '/app/approvals', icon: 'CheckSquare', permission: ['leave', 'approve'] },
   { id: 'training-courses', label: 'Courses & Colleges', path: '/app/training/courses', icon: 'BookOpen', permission: ['training', 'view'], module: 'training' },
   { id: 'training-details', label: 'Training Details', path: '/app/training/details', icon: 'Layers', permission: ['training', 'view'], module: 'training' },
+  { id: 'training-batches', label: 'Batch Management', path: '/app/training/batches', icon: 'LayoutList', permission: ['training', 'view'], module: 'training' },
   { id: 'training-calendar', label: 'Training Calendar', path: '/app/training/calendar', icon: 'CalendarDays', permission: ['training', 'view'], module: 'training' },
   { id: 'training-students', label: 'Student Lifecycle', path: '/app/training/students', icon: 'GraduationCap', permission: ['training', 'view'], module: 'training', page: 'studentLifecycle' },
   { id: 'training-attendance', label: 'Session Attendance', path: '/app/training/attendance', icon: 'CheckSquare', permission: ['training', 'view'], module: 'training', page: 'sessionAttendance' },
   { id: 'training-assessments', label: 'Assessments & Vouchers', path: '/app/training/assessments', icon: 'Award', permission: ['training', 'view'], module: 'training', page: 'assessments' },
+  { id: 'training-final-exam', label: 'Final Exam', path: '/app/training/final-exam', icon: 'ClipboardList', permission: ['training', 'view'], module: 'training' },
 
   // Projects & Tasks — one entry, two tabs (Projects | Tasks).
   { id: 'projects-tasks', label: 'Projects & Tasks', path: '/app/projects', icon: 'FolderKanban', permission: ['project', 'view'], module: 'project' },
@@ -75,13 +77,27 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
     'attendance',
     'leave',
     'approvals',
+    // Training — all tabs
     'training-courses',
     'training-details',
     'training-calendar',
+    'training-batches',
+    'training-students',
+    'training-attendance',
+    'training-assessments',
+    'training-final-exam',
+    // Projects
     'projects-tasks',
+    // Finance
     'finance-expenses',
+    // Communication
     'comm-chat',
     'comm-announcements',
+    // Analytics — all tabs (CEO must see these)
+    'analytics-exec',
+    'analytics-builder',
+    'analytics-kpis',
+    'analytics-powerbi',
     'settings'
   ];
 
