@@ -100,7 +100,9 @@ export function TrainingCalendar() {
 
       if (rows && rows.length > 0) {
         const dbSess: ScheduleSession[] = rows.map((r: any) => {
-          const matchedBatch = batches.find((b) => b.id === r.batch_id || b.code === r.topic);
+          const matchedBatch = batches.find(
+            (b) => b.id === r.batch_id || (b.code && r.topic && cleanBatchCode(b.code) === cleanBatchCode(r.topic))
+          );
           const matchedCourse = matchedBatch ? courses.find((c) => c.id === matchedBatch.courseId) : undefined;
 
           return {
@@ -1254,7 +1256,7 @@ function FilterPill({ label, onClear }: { label: string; onClear: () => void }) 
 function HeadCell({ w, left, children }: { w: number; left: number; children: React.ReactNode }) {
   return (
     <div style={{
-      position: 'sticky', left, width: w, minWidth: w, zIndex: 16,
+      position: 'sticky', left, width: w, minWidth: w, zIndex: 25,
       background: 'var(--bg-sunken)', borderRight: '1px solid var(--border)',
       display: 'flex', alignItems: 'center', padding: '0 10px',
       fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em',
@@ -1264,11 +1266,11 @@ function HeadCell({ w, left, children }: { w: number; left: number; children: Re
 }
 
 function FrozenCell({ w, left, bg, children }: { w: number; left: number; bg: string; children: React.ReactNode }) {
-  const solidBg = bg && bg !== 'transparent' ? bg : 'var(--bg-surface)';
+  const solidBg = bg === '#fff1f2' ? '#fff1f2' : bg && bg !== 'transparent' ? '#eff6ff' : 'var(--bg-surface)';
 
   return (
     <div style={{
-      position: 'sticky', left, width: w, minWidth: w, zIndex: 10,
+      position: 'sticky', left, width: w, minWidth: w, zIndex: 15,
       background: solidBg,
       backgroundColor: solidBg,
       borderRight: '1px solid var(--border)',

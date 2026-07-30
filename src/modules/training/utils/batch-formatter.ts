@@ -3,10 +3,19 @@
  * clean, professional display titles for training batches across all pages.
  */
 
-export function cleanBatchCode(code: string | undefined | null): string {
+export function cleanBatchCode(code: string | undefined | null, batchNo?: string | null): string {
   if (!code) return '';
-  return code
+  let cleaned = code
     .replace(/(\s*-\s*Copy|\s*\(Copy\))+/gi, '')
+    .trim();
+
+  // If a distinct batchNo is provided (e.g. "Batch 2"), sync it if code contains an outdated "Batch 1" from cloning
+  if (batchNo && batchNo.trim()) {
+    const cleanNo = batchNo.trim();
+    cleaned = cleaned.replace(/Batch\s*\d+/gi, cleanNo);
+  }
+
+  return cleaned
     .replace(/\s*-\s*/g, ' - ')
     .replace(/\s+/g, ' ')
     .trim();
