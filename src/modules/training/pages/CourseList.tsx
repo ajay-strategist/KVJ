@@ -8,7 +8,7 @@ import Tabs from '../../../shared/ui/Tabs';
 import { Form, TextField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Course } from '../training.repository';
-import { COLLEGE_REPOSITORY_TOKEN } from '../training.repository';
+import { COLLEGE_REPOSITORY_TOKEN, COURSE_REPOSITORY_TOKEN } from '../training.repository';
 import { container } from '../../../core/registry';
 import { useAuth } from '../../auth/AuthProvider';
 
