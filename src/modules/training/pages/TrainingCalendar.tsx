@@ -79,8 +79,21 @@ export function TrainingCalendar() {
   const [data, setData] = useState<ScheduleRangeResult>(EMPTY);
   const [loading, setLoading] = useState(false);
 
-  // Additional user-created sessions in state loaded from Supabase
-  const [customSessions, setCustomSessions] = useState<ScheduleSession[]>([]);
+  // Additional user-created sessions in state loaded from Supabase + localStorage
+  const [customSessions, setCustomSessions] = useState<ScheduleSession[]>(() => {
+    try {
+      const saved = localStorage.getItem('kvj_planner_custom_sessions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kvj_planner_custom_sessions', JSON.stringify(customSessions));
+    } catch {}
+  }, [customSessions]);
 
   const [batches, setBatches] = useState<Batch[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -98,14 +111,14 @@ export function TrainingCalendar() {
         return;
       }
 
-      if (rows) {
+      if (rows && rows.length > 0) {
         const dbSess: ScheduleSession[] = rows.map((r: any) => {
           const matchedBatch = batches.find((b) => b.id === r.batch_id);
           const matchedCourse = matchedBatch ? courses.find((c) => c.id === matchedBatch.courseId) : undefined;
 
           return {
             id: r.id,
-            trainerId: r.trainer_id || '',
+            trainerId: r.trainer_id || user?.id || (trainers[0]?.id ?? ''),
             date: r.date,
             name: r.session_title || matchedBatch?.trainingName || matchedCourse?.title || 'Training Session',
             batchCode: matchedBatch?.code || 'KVJ Batch',
@@ -123,12 +136,18 @@ export function TrainingCalendar() {
           };
         });
 
-        setCustomSessions(dbSess);
+        // Merge DB sessions with local sessions so no session disappears
+        setCustomSessions((prevLocal) => {
+          const map = new Map<string, ScheduleSession>();
+          prevLocal.forEach((s) => map.set(s.id, s));
+          dbSess.forEach((s) => map.set(s.id, s));
+          return Array.from(map.values());
+        });
       }
     } catch (e) {
       console.warn('Could not load DB schedule_sessions:', e);
     }
-  }, [batches, courses]);
+  }, [batches, courses, user, trainers]);
 
   useEffect(() => {
     loadDbSessions();
@@ -487,7 +506,8 @@ export function TrainingCalendar() {
   };
 
   const handleSaveSession = async () => {
-    if (!assignForm.trainerId) {
+    const effectiveTrainerId = assignForm.trainerId || user?.id || trainers[0]?.id || '';
+    if (!effectiveTrainerId) {
       toast({ variant: 'error', title: 'Trainer Required', message: 'Please select a trainer for the schedule.' });
       return;
     }
@@ -501,12 +521,12 @@ export function TrainingCalendar() {
     const isEdit = Boolean(editingSessionId && UUID_RE.test(editingSessionId));
     const sessId = isEdit && editingSessionId ? editingSessionId : crypto.randomUUID();
 
-    const validTrainerId = toValidUuid(assignForm.trainerId);
+    const validTrainerId = toValidUuid(effectiveTrainerId) || (toValidUuid(user?.id) ?? null);
     const validBatchId = assocBatch ? toValidUuid(assocBatch.id) : null;
 
     const sessionObj: ScheduleSession = {
       id: sessId,
-      trainerId: assignForm.trainerId,
+      trainerId: effectiveTrainerId,
       date: assignForm.date,
       name: finalName,
       batchCode: finalBatchCode,

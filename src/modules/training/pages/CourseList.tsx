@@ -149,7 +149,11 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       toast({ variant: 'success', title: 'Course Created', message: `${values.title} added with Max Marks: ${maxMarks}, Pass Criteria: ${passPct}%.` });
       setOpenCourseModal(false);
     } else {
-      toast({ variant: 'error', title: 'Error', message: res.error });
+      const isDuplicate = res.error?.includes('courses_code_key') || res.error?.includes('unique constraint');
+      const msg = isDuplicate
+        ? `A course with code "${values.code}" already exists in the catalog. Please use a unique Course Code.`
+        : (res.error || 'Failed to create course.');
+      toast({ variant: 'error', title: isDuplicate ? 'Duplicate Course Code' : 'Error', message: msg });
     }
   };
 
@@ -169,7 +173,11 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       toast({ variant: 'success', title: 'Course Updated', message: `${values.title} details updated successfully.` });
       setEditingCourse(null);
     } else {
-      toast({ variant: 'error', title: 'Error', message: res.error });
+      const isDuplicate = res.error?.includes('courses_code_key') || res.error?.includes('unique constraint');
+      const msg = isDuplicate
+        ? `A course with code "${values.code}" already exists in the catalog. Please use a unique Course Code.`
+        : (res.error || 'Failed to update course.');
+      toast({ variant: 'error', title: isDuplicate ? 'Duplicate Course Code' : 'Error', message: msg });
     }
   };
 

@@ -26,6 +26,7 @@ import { ATTENDANCE_SERVICE_TOKEN } from '../../../modules/attendance/attendance
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
 import { toLocalISODate } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
+import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
 
 function Greeting() {
   const { user } = useAuth();
@@ -1789,6 +1790,29 @@ export function MyDayPage() {
     }
   }, [projectTasks, projects]);
 
+  useEffect(() => {
+    const unsubscribe = taskTimerStore.subscribe((allTimers) => {
+      setTasks((prev) =>
+        prev.map((t) => {
+          const tState = allTimers[t.id];
+          if (tState) {
+            let sec = Math.floor(tState.elapsedMs / 1000);
+            if (tState.isRunning) {
+              sec += Math.floor((Date.now() - tState.startTime) / 1000);
+            }
+            return {
+              ...t,
+              active: tState.isRunning,
+              secondsToday: sec,
+            };
+          }
+          return t;
+        })
+      );
+    });
+    return unsubscribe;
+  }, []);
+
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const dateStr = toLocalISODate(new Date());
@@ -1806,6 +1830,12 @@ export function MyDayPage() {
     const nextActive = !currentActive;
     const now = Date.now();
     let targetTask: any = null;
+
+    if (nextActive) {
+      taskTimerStore.startTask(id);
+    } else {
+      taskTimerStore.pauseTask(id);
+    }
 
     setTasks((prev) => {
       const found = prev.find((t) => t.id === id);

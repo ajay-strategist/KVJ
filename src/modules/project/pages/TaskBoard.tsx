@@ -23,6 +23,7 @@ import { todayISO, addDaysISO } from '../../../shared/utils/date';
 import { useProject } from '../hooks/useProject';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
+import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
 
 export type TaskStatus = 'Pending Approval' | 'To Do' | 'In Progress' | 'Under Review' | 'Completed';
 
@@ -100,22 +101,17 @@ export function TaskBoard({
     approveTimesheet
   } = actualProjectData;
 
-
-  // Active timers tracking in localStorage
+  // Active timers tracking synced with taskTimerStore
   const [timers, setTimers] = useState<Record<string, { startTime: number; elapsedMs: number; isRunning: boolean }>>(() => {
-    try {
-      const saved = localStorage.getItem('kvj_task_timers');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
+    return taskTimerStore.getTimers();
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem('kvj_task_timers', JSON.stringify(timers));
-    } catch {}
-  }, [timers]);
+    const unsubscribe = taskTimerStore.subscribe((updated) => {
+      setTimers(updated);
+    });
+    return unsubscribe;
+  }, []);
 
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -178,14 +174,21 @@ export function TaskBoard({
       });
 
       let status: TaskStatus = 'To Do';
-      if (t.approvalStatus === 'pending_assignment_approval') status = 'Pending Approval';
-      else if (t.status === 'in_progress') status = 'In Progress';
-      else if (t.status === 'review') status = 'Under Review';
-      else if (t.status === 'done' || t.status === 'completed') status = 'Completed';
+      if ((t as any).approvalStatus === 'pending_assignment_approval') {
+        status = 'Pending Approval';
+      } else if (t.status === 'done' || t.status === 'completed' || (t as any).approvalStatus === 'approved') {
+        status = 'Completed';
+      } else if (t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval') {
+        status = 'Under Review';
+      } else if (t.status === 'in_progress' || timers[t.id]?.isRunning) {
+        status = 'In Progress';
+      } else if ((t as any).approvalStatus === 'rework') {
+        status = 'To Do';
+      }
 
       return {
         id: t.id,
-        name: t.title,
+        name: t.title || 'Untitled Task',
         category: 'Project Task' as const,
         projectName: project ? project.title : 'General Operations',
         supervisor: supervisorName,
@@ -353,14 +356,7 @@ export function TaskBoard({
     setTasksList((prev) =>
       prev.map((x) => (x.id === task.id ? { ...x, status: 'In Progress', assignee: updatedAssignee } : x))
     );
-    setTimers(prev => ({
-      ...prev,
-      [task.id]: {
-        startTime: Date.now(),
-        elapsedMs: prev[task.id]?.elapsedMs || 0,
-        isRunning: true
-      }
-    }));
+    taskTimerStore.startTask(task.id);
     try {
       await updateTask(task.id, { status: 'in_progress', approvalStatus: null });
     } catch (e) {
@@ -370,31 +366,13 @@ export function TaskBoard({
   };
 
   const handlePauseTask = (taskId: string) => {
-    const timer = timers[taskId];
-    if (!timer || !timer.isRunning) return;
-    setTimers(prev => ({
-      ...prev,
-      [taskId]: {
-        startTime: Date.now(),
-        elapsedMs: prev[taskId].elapsedMs + (Date.now() - prev[taskId].startTime),
-        isRunning: false
-      }
-    }));
+    taskTimerStore.pauseTask(taskId);
     toast({ variant: 'info', title: 'Task Paused', message: 'Work timer has been paused.' });
   };
 
   const handleSubmitTaskForApproval = async (task: TaskItem) => {
-    // Pause timer if running
-    if (timers[task.id]?.isRunning) {
-      setTimers(prev => ({
-        ...prev,
-        [task.id]: {
-          startTime: Date.now(),
-          elapsedMs: prev[task.id].elapsedMs + (Date.now() - prev[task.id].startTime),
-          isRunning: false
-        }
-      }));
-    }
+    // Pause timer if running via shared store
+    taskTimerStore.pauseTask(task.id);
     setTasksList((prev) =>
       prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))
     );
@@ -505,12 +483,8 @@ export function TaskBoard({
 
     if (res.ok) {
       toast({ variant: 'success', title: 'Time Entry Logged', message: 'Time entry submitted for review.' });
-      // Reset timer on success
-      setTimers(prev => {
-        const next = { ...prev };
-        delete next[selectedTask.id];
-        return next;
-      });
+      // Reset timer via shared store on success
+      taskTimerStore.resetTask(selectedTask.id);
       setTimeEntryOpen(false);
     } else {
       toast({ variant: 'error', title: 'Logging Failed', message: res.error });
