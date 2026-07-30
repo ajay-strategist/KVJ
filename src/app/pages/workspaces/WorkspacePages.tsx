@@ -147,7 +147,10 @@ export const AttendancePanel = memo(function AttendancePanel({
 
             if (isTrainerMatch) {
               if (s.batch_id) set.add(s.batch_id);
-              if (s.topic) set.add(s.topic);
+              if (s.topic) {
+                set.add(s.topic);
+                set.add(cleanBatchCode(s.topic));
+              }
             }
           });
           setAssignedTodayBatchIds(set);
@@ -162,26 +165,19 @@ export const AttendancePanel = memo(function AttendancePanel({
   const availableBatches = useMemo(() => {
     if (!batches || batches.length === 0) return [];
 
-    const userEmail = user?.email?.toLowerCase()?.trim();
-    const userName = user?.fullName?.toLowerCase()?.trim();
-    const empId = currentEmployee?.id;
-    const userId = user?.id;
-
     const mapped = batches.map((b) => {
       const courseObj = courses.find((c) => c.id === b.courseId);
-      const name = cleanBatchCode(b.code) || b.trainingName || 'Training Batch';
+      const cleanCode = cleanBatchCode(b.code, b.batchNo);
+      const name = cleanCode || b.trainingName || 'Training Batch';
 
-      const isCalendarAssignedToday = assignedTodayBatchIds.has(b.id) || (b.code && assignedTodayBatchIds.has(b.code));
-
-      const isDirectTrainerMatch = Boolean(
-        (b.trainerId && (b.trainerId === userId || b.trainerId === empId)) ||
-        (b.coordinatorEmail && userEmail && b.coordinatorEmail.toLowerCase().trim() === userEmail) ||
-        (b.coordinatorEmail2 && userEmail && b.coordinatorEmail2.toLowerCase().trim() === userEmail) ||
-        (b.coordinator && userName && b.coordinator.toLowerCase().trim() === userName)
+      const isCalendarAssignedToday = Boolean(
+        assignedTodayBatchIds.has(b.id) ||
+        (b.code && (assignedTodayBatchIds.has(b.code) || assignedTodayBatchIds.has(cleanBatchCode(b.code)))) ||
+        (cleanCode && assignedTodayBatchIds.has(cleanCode))
       );
 
-      // Only mark as assigned if scheduled in today's calendar for this trainer or direct exact trainer match
-      const isMyAssigned = isCalendarAssignedToday || isDirectTrainerMatch;
+      // ONLY mark as assigned if scheduled in today's training calendar for this trainer
+      const isMyAssigned = isCalendarAssignedToday;
 
       return {
         id: b.id,
@@ -192,7 +188,7 @@ export const AttendancePanel = memo(function AttendancePanel({
         time: '09:00 AM - 12:00 PM',
         students: b.capacity || 30,
         trainer: b.coordinator || (b as any).trainer || 'Assigned Trainer',
-        isMyAssigned: Boolean(isMyAssigned),
+        isMyAssigned,
       };
     });
 
