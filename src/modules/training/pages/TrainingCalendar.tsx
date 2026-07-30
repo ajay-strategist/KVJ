@@ -205,20 +205,56 @@ export function TrainingCalendar() {
   }, [isExecutive, user]);
 
   const dynamicBatchPresets = useMemo(() => {
-    return batches.map((b) => {
+    const list: Array<{
+      id: string;
+      batchCode: string;
+      name: string;
+      college: string;
+      course: string;
+      coordinator: string;
+      venue: string;
+      mode: 'Online' | 'Offline';
+      studentCount: number;
+      fullLabel: string;
+    }> = [];
+
+    const seenLabels = new Set<string>();
+
+    (batches || []).forEach((b) => {
       const course = courses.find((c) => c.id === b.courseId);
-      const cleanCode = cleanBatchCode(b.code) || b.code;
-      return {
+      const cleanCode = cleanBatchCode(b.code) || b.code || 'Training Batch';
+      const courseTitle = course?.title || b.trainingName || '';
+      const name = b.trainingName || courseTitle || cleanCode;
+
+      let fullLabel = cleanCode;
+      if (courseTitle && !cleanCode.toLowerCase().includes(courseTitle.toLowerCase())) {
+        fullLabel = `${cleanCode} - ${courseTitle}`;
+      }
+
+      if (seenLabels.has(fullLabel)) {
+        if (b.batchNo && !cleanCode.includes(b.batchNo)) {
+          fullLabel = `${cleanCode} (${b.batchNo}) - ${courseTitle}`;
+        } else {
+          return; // Skip duplicate batch option label
+        }
+      }
+
+      seenLabels.add(fullLabel);
+      list.push({
+        id: b.id,
         batchCode: cleanCode,
-        name: b.trainingName || course?.title || cleanCode,
+        name,
         college: b.college || '—',
         course: course?.title || '—',
         coordinator: b.coordinator || '—',
         venue: b.venue || '—',
         mode: (b.onlineLink ? 'Online' : 'Offline') as 'Online' | 'Offline',
         studentCount: b.capacity || 0,
-      };
+        fullLabel,
+      });
     });
+
+    return list;
   }, [batches, courses]);
 
   const trainerIds = useMemo(() => trainers.map((t) => t.id), [trainers]);
@@ -1054,16 +1090,11 @@ export function TrainingCalendar() {
                 style={{ width: '100%', padding: '9px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
               >
                 {dynamicBatchPresets.length > 0 ? (
-                  dynamicBatchPresets.map((b) => {
-                    const fullLabel = b.batchCode.toLowerCase().includes(b.name.toLowerCase())
-                      ? b.batchCode
-                      : `${b.batchCode} - ${b.name}`;
-                    return (
-                      <option key={b.batchCode} value={b.batchCode}>
-                        {fullLabel}
-                      </option>
-                    );
-                  })
+                  dynamicBatchPresets.map((b) => (
+                    <option key={b.id} value={b.batchCode}>
+                      {b.fullLabel}
+                    </option>
+                  ))
                 ) : (
                   <option value="">No batches found</option>
                 )}
