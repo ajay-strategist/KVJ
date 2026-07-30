@@ -9,7 +9,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { Button } from '../../../shared/ui/components';
+import { Button, Avatar } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
@@ -933,14 +933,33 @@ export function TrainingCalendar() {
           <div style={{ position: 'relative', width: colVirt.getTotalSize(), height: '100%' }}>
             {vCols.map((vc) => {
               const t = visibleTrainers[vc.index];
+              const fullName = `${t.firstName} ${t.lastName}`;
               return (
-                <div key={t.id} style={{
-                  position: 'absolute', left: vc.start, width: vc.size, height: '100%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11.5, fontWeight: 700, borderRight: '1px solid var(--border)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', background: 'var(--bg-sunken)',
-                }}>
-                  👤 {t.firstName} {t.lastName}
+                <div
+                  key={t.id}
+                  title={fullName}
+                  style={{
+                    position: 'absolute',
+                    left: vc.start,
+                    width: vc.size,
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    borderRight: '1px solid var(--border)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    background: 'var(--bg-sunken)',
+                    color: 'var(--text-primary)',
+                    padding: '0 8px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <Avatar name={fullName} size={20} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</span>
                 </div>
               );
             })}
@@ -1329,28 +1348,32 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
         </div>
       )}
       {sessions.map((s) => {
-        let batchDisplay = s.batchCode;
+        let rawCode = s.batchCode || s.name || s.course || '';
+        let batchDisplay = cleanBatchCode(rawCode);
+
         if (!batchDisplay || batchDisplay === 'Training Batch' || batchDisplay === 'Custom') {
-          batchDisplay = (s.name && s.name !== 'Training Batch' && s.name !== 'Custom')
-            ? s.name
-            : (s.course && s.course !== '—' ? s.course : 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI');
+          batchDisplay = s.name && s.name !== 'Training Batch' && s.name !== 'Custom'
+            ? cleanBatchCode(s.name)
+            : (s.course && s.course !== '—' ? cleanBatchCode(s.course) : 'Training Session');
         }
+
         const timeDisplay = `${s.startTime}–${s.endTime}`;
         return (
           <button
             key={s.id}
             type="button"
+            title={`${batchDisplay} (${timeDisplay})`}
             onClick={(e) => {
               e.stopPropagation();
               onOpen(s);
             }}
             style={{
               textAlign: 'left',
-              borderLeft: `3.5px solid ${s.color}`,
+              borderLeft: `4px solid ${s.color || '#3b82f6'}`,
               background: 'var(--bg-panel)',
               border: '1px solid var(--border)',
               borderRadius: 6,
-              padding: '5px 8px',
+              padding: '6px 8px',
               cursor: 'pointer',
               fontSize: 11,
               color: 'var(--text-primary)',
@@ -1358,17 +1381,38 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
               boxSizing: 'border-box',
               width: '100%',
               flexShrink: 0,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              transition: 'all 0.15s ease',
             }}
           >
-            <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--brand-primary, #1e40af)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 11,
+                color: 'var(--brand-primary, #1e40af)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                lineHeight: 1.3,
+              }}
+            >
               🎓 {batchDisplay}
             </div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 10, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
-              ⏰ {timeDisplay} {s.name && s.name !== batchDisplay ? `· ${s.name}` : ''}
+            <div
+              style={{
+                color: 'var(--text-secondary)',
+                fontSize: 10,
+                fontWeight: 500,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                marginTop: 2,
+              }}
+            >
+              ⏰ {timeDisplay} {s.name && cleanBatchCode(s.name) !== batchDisplay ? `· ${cleanBatchCode(s.name)}` : ''}
             </div>
             {expanded && (
-              <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
                 📍 {s.venue} · {s.mode} · 👥 {s.studentCount}<br />🏛️ {s.college} · 👤 {s.coordinator}
               </div>
             )}

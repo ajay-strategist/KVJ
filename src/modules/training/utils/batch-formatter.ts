@@ -7,6 +7,8 @@ export function cleanBatchCode(code: string | undefined | null): string {
   if (!code) return '';
   return code
     .replace(/(\s*-\s*Copy|\s*\(Copy\))+/gi, '')
+    .replace(/\s*-\s*/g, ' - ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
