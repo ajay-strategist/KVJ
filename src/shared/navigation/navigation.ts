@@ -70,22 +70,21 @@ export const NAV_TREE: NavItem[] = [
 export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?: string): NavItem[] {
   const isExecutive = userRole && ['CEO', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(String(userRole).toUpperCase());
   const roleUpper = userRole?.toUpperCase();
-  const ALLOWED_TABS = [
+
+  // ── Core tabs — visible to every role ────────────────────────────────────
+  const CORE_TABS = [
     'my-day',
     'employees',
     'employee-status',
     'attendance',
     'leave',
     'approvals',
-    // Training — all tabs
+    // Training: 3 top-level tabs only.
+    // Student Lifecycle, Session Attendance, Assessments & Vouchers, Final Exam
+    // are workspace tabs INSIDE Batch Management — not standalone nav items.
     'training-courses',
-    'training-details',
-    'training-calendar',
     'training-batches',
-    'training-students',
-    'training-attendance',
-    'training-assessments',
-    'training-final-exam',
+    'training-calendar',
     // Projects
     'projects-tasks',
     // Finance
@@ -93,13 +92,18 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
     // Communication
     'comm-chat',
     'comm-announcements',
-    // Analytics — all tabs (CEO must see these)
+    'settings',
+  ];
+
+  // ── Executive-only tabs — CEO / ADMIN / MANAGER only ─────────────────────
+  const EXEC_TABS = [
     'analytics-exec',
     'analytics-builder',
     'analytics-kpis',
     'analytics-powerbi',
-    'settings'
   ];
+
+  const ALLOWED_TABS = isExecutive ? [...CORE_TABS, ...EXEC_TABS] : CORE_TABS;
 
   const keep = (item: NavItem): boolean => {
     if (!ALLOWED_TABS.includes(item.id)) return false;
@@ -107,13 +111,24 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
     if (item.module && !featureFlags.modules[item.module]) return false;
     if (item.page && !featureFlags.pages[item.page]) return false;
 
-    if (roleUpper === 'EMPLOYEE' && (item.id === 'approvals' || item.id === 'employees' || item.id === 'employee-status')) {
+    // Employees list and Approvals are hidden from plain employees
+    if (roleUpper === 'EMPLOYEE' && (
+      item.id === 'approvals' ||
+      item.id === 'employees' ||
+      item.id === 'employee-status'
+    )) {
       return false;
     }
 
     if (!isExecutive) {
       if (item.permission && !canFn(item.permission[0], item.permission[1])) return false;
     }
+
+    // Analytics are restricted to Executives
+    if (item.id.startsWith('analytics-') && !isExecutive) {
+      return false;
+    }
+
     return true;
   };
   return NAV_TREE.filter(keep).map((i) => ({ ...i, children: i.children?.filter(keep) }));

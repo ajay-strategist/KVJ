@@ -36,7 +36,7 @@ export const featureFlags = {
     // Communication — hidden
     emailCenter: false,
     reminders: false,
-    // Analytics suite — enabled for CEO/executive visibility
+    // Analytics suite — enabled for CEO / ADMIN / MANAGER visibility
     executiveConsole: true,
     reportBuilder: true,
     kpiRegistry: true,
@@ -46,10 +46,11 @@ export const featureFlags = {
     assets: false,
     budgets: false,
     payroll: false,
-    // Training sub-pages — enabled (live inside Batch Management)
-    studentLifecycle: true,
-    sessionAttendance: true,
-    assessments: true,
+    // Training sub-pages — these live as workspace tabs INSIDE Batch Management.
+    // Keeping them false removes them from the top-level nav; the routes still work.
+    studentLifecycle: false,
+    sessionAttendance: false,
+    assessments: false,
     // Absorbed into Projects & Tasks (two tabs).
     clientsMaster: false,
     projectCatalog: false,
