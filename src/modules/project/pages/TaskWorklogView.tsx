@@ -268,7 +268,7 @@ export function TaskWorklogView({
         }
         // Don't duplicate if there's already a timesheet for this task today
         const alreadyHasSheet = fromTimesheets.some(
-          (l) => l.taskName === t.title && l.date === today,
+          (l: WorklogRecord) => l.taskName === t.title && l.date === today,
         );
         return !alreadyHasSheet;
       })
