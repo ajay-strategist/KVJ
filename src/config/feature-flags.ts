@@ -36,11 +36,11 @@ export const featureFlags = {
     // Communication — hidden
     emailCenter: false,
     reminders: false,
-    // Analytics suite — enabled for CEO / ADMIN / MANAGER visibility
+    // Analytics suite — only Executive Console is shown in sidebar
     executiveConsole: true,
-    reportBuilder: true,
-    kpiRegistry: true,
-    powerBiGateway: true,
+    reportBuilder: false,   // removed from nav per user request
+    kpiRegistry: false,     // removed from nav per user request
+    powerBiGateway: false,  // removed from nav per user request
     // Finance extras — hidden (Expenses & Travel stays)
     procurement: false,
     assets: false,
