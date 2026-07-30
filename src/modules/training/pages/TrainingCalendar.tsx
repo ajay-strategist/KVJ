@@ -711,6 +711,7 @@ export function TrainingCalendar() {
                 {Object.entries(PRESETS).map(([id, p]) => (
                   <option key={id} value={id}>{p.label}</option>
                 ))}
+                <option value="custom">Custom Date Range</option>
               </select>
 
               {preset === 'custom' && (
