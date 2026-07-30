@@ -299,6 +299,40 @@ export class SupabaseAuthService implements IAuthService {
         designation = 'Employee';
       }
 
+      // Last-resort: try to create a Supabase auth account so RLS-dependent
+      // reads (auth.uid() IS NOT NULL) return data instead of empty rows.
+      // signUp returns a session immediately on projects with email confirmation
+      // disabled (the default for internal/corporate apps).
+      const signUpAttempt = await supabase.auth.signUp({
+        email,
+        password: pwd,
+        options: { data: { full_name: fullName, role } },
+      });
+      if (signUpAttempt.data?.session && signUpAttempt.data?.user) {
+        // A real Supabase session was established — use it fully.
+        return await this.buildSession(
+          signUpAttempt.data.session.access_token,
+          signUpAttempt.data.session.expires_at,
+          signUpAttempt.data.user.id,
+          signUpAttempt.data.user.email ?? email,
+          !!credentials.rememberMe,
+        );
+      }
+      // If signUp returned a user but no session (email confirmation required),
+      // try signing in one more time — the account now exists.
+      if (signUpAttempt.data?.user && !signUpAttempt.data.session) {
+        const lastAttempt = await supabase.auth.signInWithPassword({ email, password: pwd });
+        if (lastAttempt.data?.session && lastAttempt.data?.user) {
+          return await this.buildSession(
+            lastAttempt.data.session.access_token,
+            lastAttempt.data.session.expires_at,
+            lastAttempt.data.user.id,
+            lastAttempt.data.user.email ?? email,
+            !!credentials.rememberMe,
+          );
+        }
+      }
+
       const fallbackUser: AuthUser = {
         id: tempId,
         fullName,
