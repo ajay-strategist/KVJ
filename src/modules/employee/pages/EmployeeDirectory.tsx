@@ -80,40 +80,37 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     const empEmail = emp.email?.toLowerCase();
     const empFullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim().toLowerCase();
 
-    // 1. Check active running timers from localStorage (My Day & Task Board)
+    // 1. Read actively RUNNING timers from taskTimerStore (kvj_task_timers)
+    //    A paused task has isRunning=false and must NOT appear here.
     const runningTaskIds = new Set<string>();
     try {
-      const rawMyDay = localStorage.getItem('kvj_task_timer_state_v1');
-      if (rawMyDay) {
-        const parsed = JSON.parse(rawMyDay);
+      const rawTimers = localStorage.getItem('kvj_task_timers');
+      if (rawTimers) {
+        const parsed: Record<string, { isRunning: boolean }> = JSON.parse(rawTimers);
         for (const [tId, s] of Object.entries(parsed)) {
-          if (s && typeof s === 'object' && (s as any).active === true) {
-            runningTaskIds.add(tId);
-          }
+          if (s?.isRunning === true) runningTaskIds.add(tId);
         }
       }
-      const rawBoard = localStorage.getItem('kvj_task_timers');
-      if (rawBoard) {
-        const parsed = JSON.parse(rawBoard);
+      // Also check MyDay legacy key
+      const rawMyDay = localStorage.getItem('kvj_task_timer_state_v1');
+      if (rawMyDay) {
+        const parsed: Record<string, { active: boolean }> = JSON.parse(rawMyDay);
         for (const [tId, s] of Object.entries(parsed)) {
-          if (s && typeof s === 'object' && (s as any).isRunning === true) {
-            runningTaskIds.add(tId);
-          }
+          if (s?.active === true) runningTaskIds.add(tId);
         }
       }
     } catch {}
 
-    // Match task in useProject context
+    // 2. Only consider tasks whose timer is ACTIVELY running right now
     const matchingTask = (tasks || []).find((t: any) => {
-      const isRunningLocally = runningTaskIds.has(t.id);
-      const isStatusInProgress = t.status === 'in_progress' || t.status === 'In Progress' || isRunningLocally;
-      if (!isStatusInProgress) return false;
+      if (!runningTaskIds.has(t.id)) return false; // not running → skip (covers paused)
 
       const isForThisEmp =
         t.assigneeId === empId ||
         (t.assigneeId && empEmail && t.assigneeId.toLowerCase() === empEmail) ||
         (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName) ||
-        (user && user.email?.toLowerCase() === empEmail && (t.assigneeId === user.id || (t.assignee && t.assignee.toLowerCase() === user.fullName?.toLowerCase())));
+        (user && user.email?.toLowerCase() === empEmail &&
+          (t.assigneeId === user.id || (t.assignee && t.assignee.toLowerCase() === user.fullName?.toLowerCase())));
 
       return isForThisEmp;
     });
@@ -122,8 +119,10 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       return `📝 ${matchingTask.title}`;
     }
 
-    // Check DB active tasks fallback
+    // 3. Fallback: check DB active tasks — but only if timer is also running
     const dbTask = activeTasks.find((t: any) => {
+      const isTimerRunning = runningTaskIds.has(t.id);
+      if (!isTimerRunning) return false; // paused → skip
       return (
         t.assignee_id === empId ||
         (t.assignee_id && empEmail && t.assignee_id.toLowerCase() === empEmail) ||
@@ -134,13 +133,6 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
     if (dbTask) {
       return `📝 ${dbTask.title}`;
-    }
-
-    // Check if current user is running a task locally (fallback)
-    if (user && user.email?.toLowerCase() === empEmail && runningTaskIds.size > 0) {
-      const firstRunningId = Array.from(runningTaskIds)[0];
-      const runTask = (tasks || []).find((t: any) => t.id === firstRunningId);
-      if (runTask) return `📝 ${runTask.title}`;
     }
 
     return 'No active task in progress';
