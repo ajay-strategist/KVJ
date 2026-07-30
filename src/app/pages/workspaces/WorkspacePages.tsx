@@ -1798,10 +1798,15 @@ export function MyDayPage() {
     const title = (values.name as string) || 'New Task';
     const projName = (values.projectName as string) || 'General Project';
 
-    const proj = projects.find((p) => p.title === projName || p.id === values.projectId);
+    let proj = projects.find((p) => p.title === projName || p.id === values.projectId);
+    if (!proj && projects.length > 0) {
+      proj = projects[0];
+    }
     const res = await createTask({
       projectId: proj?.id,
       title,
+      supervisorId: user?.id,
+      assignedByEmployeeId: user?.id,
       dueDate: todayStr,
       status: 'todo',
       priority: 'medium',

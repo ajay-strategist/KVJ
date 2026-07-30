@@ -121,14 +121,42 @@ export class ProjectService implements IProjectService {
   async createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
       const isSelfAssigned = !data.assigneeId || data.assigneeId === actor.id;
-      const r = actor.role?.toUpperCase();
-      const isCeo = r === 'CEO';
-      const needsAssignmentApproval = !isSelfAssigned && !isCeo;
+      const r = (actor.role || '').toUpperCase();
+      const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(r);
+      const needsAssignmentApproval = !isSelfAssigned && !isManagement;
+
+      // Automatically set supervisor to assigning employee (actor.id) if not specified
+      const supervisorId = data.supervisorId || actor.id;
+
+      // Auto-resolve projectId to avoid NULL constraint violations in PostgreSQL
+      let projectId = data.projectId;
+      if (!projectId) {
+        const prjPage = await this.projectRepo.findMany({ pageSize: 1 });
+        if (prjPage.data && prjPage.data.length > 0) {
+          projectId = prjPage.data[0].id;
+        } else {
+          const gen = await this.projectRepo.create(
+            {
+              title: 'General Operations',
+              code: 'GEN-01',
+              category: 'Office',
+              type: 'Internal',
+              status: 'execution',
+              priority: 'medium',
+            },
+            actor
+          );
+          projectId = gen.id;
+        }
+      }
 
       const payload: Partial<Task> = {
         ...data,
+        projectId,
+        supervisorId,
+        assigneeId: data.assigneeId || actor.id,
         approvalStatus: needsAssignmentApproval ? 'pending_assignment_approval' : (data.approvalStatus ?? null),
-        assignedByEmployeeId: !isSelfAssigned ? actor.id : undefined,
+        assignedByEmployeeId: actor.id,
       };
 
       const task = await this.taskRepo.create(payload, actor);
@@ -152,11 +180,12 @@ export class ProjectService implements IProjectService {
       const existing = await this.taskRepo.findById(taskId);
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
         const isSelfAssigned = patch.assigneeId === actor.id;
-        const r = actor.role?.toUpperCase();
-        const isCeo = r === 'CEO';
-        if (!isSelfAssigned && !isCeo) {
+        const r = (actor.role || '').toUpperCase();
+        const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(r);
+        if (!isSelfAssigned && !isManagement) {
           patch.approvalStatus = 'pending_assignment_approval';
           (patch as any).assignedByEmployeeId = actor.id;
+          if (!patch.supervisorId) patch.supervisorId = actor.id;
         }
       }
       const updated = await this.taskRepo.update(taskId, patch, actor);

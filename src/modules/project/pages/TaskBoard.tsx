@@ -32,6 +32,7 @@ export interface TaskItem {
   category: 'Office Task' | 'Project Task';
   projectName?: string;
   supervisor: string;
+  supervisorId?: string;
   assignee: string;
   dueDate: string;
   status: TaskStatus;
@@ -42,6 +43,7 @@ export interface TaskItem {
   approvalStatus?: string | null;
   reworkNotes?: string;
   assigneeId?: string;
+  assignedByEmployeeId?: string;
   dailyTimeEntries: Array<{
     id: string;
     date: string;
@@ -151,11 +153,11 @@ export function TaskBoard({
       const project = projects.find((p: any) => p.id === t.projectId);
       const assignee = employees.find((e) => e.id === t.assigneeId);
       
+      const tSupervisorId = t.supervisorId || t.assignedByEmployeeId;
       const pSupervisorId = project ? (project as any).supervisorId : null;
-      const tSupervisorId = t.supervisorId;
-      const supervisorId = pSupervisorId || tSupervisorId;
+      const supervisorId = tSupervisorId || pSupervisorId;
       const supervisorEmp = supervisorId ? employees.find((e) => e.id === supervisorId) : null;
-      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName} (Project Supervisor)` : '';
+      const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : (t.supervisorName || '');
 
       const tTimesheets = timesheets.filter((ts: any) => ts.taskId === t.id);
       const totalHoursWorked = tTimesheets.reduce((sum: number, ts: any) => sum + ts.hoursLogged, 0);
@@ -179,22 +181,24 @@ export function TaskBoard({
       if (t.approvalStatus === 'pending_assignment_approval') status = 'Pending Approval';
       else if (t.status === 'in_progress') status = 'In Progress';
       else if (t.status === 'review') status = 'Under Review';
-      else if (t.status === 'done') status = 'Completed';
+      else if (t.status === 'done' || t.status === 'completed') status = 'Completed';
 
       return {
         id: t.id,
         name: t.title,
         category: 'Project Task' as const,
-        projectName: project ? project.title : 'General Project',
+        projectName: project ? project.title : 'General Operations',
         supervisor: supervisorName,
+        supervisorId,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
+        assigneeId: t.assigneeId,
+        assignedByEmployeeId: t.assignedByEmployeeId,
         dueDate: t.dueDate || todayStr,
         status,
         totalHoursWorked,
         dailyTimeEntries,
         approvalStatus: t.approvalStatus,
         reworkNotes: t.reworkNotes,
-        assigneeId: t.assigneeId,
       };
     });
   }, [tasks, projects, employees, allocations, timesheets, todayStr]);
@@ -218,18 +222,21 @@ export function TaskBoard({
     const query = searchQuery.trim().toLowerCase();
     const myName = (user?.fullName || '').toLowerCase();
 
-    const filtered = tasksList.filter((t) => {
+    const filtered = tasksList.filter((t: any) => {
       if (t.status === 'Pending Approval') return false;
 
-      // User-level filtering
+      // User-level filtering: Supervisors and assignees both see tasks
       if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-        const isTarget = t.assigneeId === selectedEmployeeId;
+        const isTarget = t.assigneeId === selectedEmployeeId || t.supervisorId === selectedEmployeeId || t.assignedByEmployeeId === selectedEmployeeId;
         if (!isTarget) return false;
       } else if (!isManagement) {
         const isMyTask =
           t.assigneeId === user?.id ||
-          t.assignee.toLowerCase() === myName ||
-          t.supervisor.toLowerCase() === myName ||
+          t.assigneeId === user?.email ||
+          t.supervisorId === user?.id ||
+          t.assignedByEmployeeId === user?.id ||
+          (t.assignee && t.assignee.toLowerCase() === myName) ||
+          (t.supervisor && t.supervisor.toLowerCase().includes(myName)) ||
           t.approvedBy?.toLowerCase() === myName;
         if (!isMyTask) return false;
       } else if (selectedAssignee !== 'all') {
@@ -263,18 +270,23 @@ export function TaskBoard({
   }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
-    const proj = projects.find((p: any) => p.title === values.projectName || p.id === values.projectId);
+    let proj = projects.find((p: any) => p.title === values.projectName || p.id === values.projectId);
+    if (!proj && projects.length > 0) {
+      proj = projects[0];
+    }
     const assignee = employees.find((e) => `${e.firstName} ${e.lastName}` === values.assignee || e.id === values.assigneeId);
+    const supervisor = employees.find((e) => `${e.firstName} ${e.lastName}` === values.supervisor || e.id === values.supervisorId);
+
+    // If supervisor is not explicitly selected, assigning employee is automatically the supervisor
+    const finalSupervisorId = supervisor ? supervisor.id : user?.id;
 
     const isOtherAssignee = assignee && assignee.id !== user?.id;
     const approvalStatus = (!isManagement && isOtherAssignee) ? 'pending_assignment_approval' : null;
 
-    const supervisor = employees.find((e) => `${e.firstName} ${e.lastName}` === values.supervisor);
-
     const res = await createTask({
       projectId: proj?.id,
-      assigneeId: assignee?.id,
-      supervisorId: supervisor?.id,
+      assigneeId: assignee?.id || user?.id,
+      supervisorId: finalSupervisorId,
       title: values.name as string,
       status: 'todo',
       dueDate: (values.dueDate as string) || todayStr,
@@ -289,21 +301,25 @@ export function TaskBoard({
         id: res.value.id,
         name: res.value.title,
         category: (values.category as any) || 'Project Task',
-        projectName: proj ? proj.title : (values.projectName as string) || 'General Project',
-        supervisor: (values.supervisor as string) || '',
+        projectName: proj ? proj.title : (values.projectName as string) || 'General Operations',
+        supervisor: supervisor ? `${supervisor.firstName} ${supervisor.lastName}` : (user?.fullName || ''),
+        supervisorId: finalSupervisorId,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (values.assignee as string) || user?.fullName || 'Unassigned',
+        assigneeId: assignee?.id || user?.id,
+        assignedByEmployeeId: user?.id,
         dueDate: res.value.dueDate || todayStr,
         status: statusLabel as any,
         totalHoursWorked: 0,
         dailyTimeEntries: [],
+        approvalStatus,
       };
       setTasksList((prev) => [newTaskItem, ...prev]);
       toast({ 
         variant: approvalStatus ? 'warning' : 'success', 
-        title: approvalStatus ? 'Assignment Pending' : 'Task Created', 
+        title: approvalStatus ? 'Assignment Pending Approval' : 'Task Created', 
         message: approvalStatus 
-          ? `Assignment request for "${values.name}" sent to manager queue.` 
-          : `Task "${values.name}" created.` 
+          ? `Assignment request sent to Manager/Admin/CEO queue for approval.` 
+          : `Task "${values.name}" created successfully.` 
       });
       setCreateTaskOpen(false);
     } else {
@@ -313,12 +329,18 @@ export function TaskBoard({
 
   const handleApproveTask = async (id: string) => {
     setTasksList((prev) =>
-      prev.map((x) => (x.id === id ? { ...x, status: 'To Do' } : x))
+      prev.map((x) => (x.id === id ? { ...x, status: 'To Do', approvalStatus: null } : x))
     );
     try {
-      await updateTask(id, { status: 'todo' });
-    } catch (e) {}
-    toast({ variant: 'success', title: 'Task Approved', message: 'Task is now active in To Do queue.' });
+      const res = await approveTaskAssignment(id as any);
+      if (res.ok) {
+        toast({ variant: 'success', title: 'Assignment Approved', message: 'Task is now active in assignee\'s To Do queue.' });
+      } else {
+        toast({ variant: 'error', title: 'Approval Failed', message: res.error });
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Approval Failed', message: e.message });
+    }
   };
 
   const handleRejectTask = async (id: string) => {

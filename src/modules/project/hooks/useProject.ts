@@ -56,8 +56,14 @@ export function useProject() {
         const userAllocations = allAllocations.filter(a => a.employeeId === user.id);
         const allocatedProjectIds = new Set(userAllocations.map(a => a.projectId));
         
-        allProjects = allProjects.filter(p => allocatedProjectIds.has(p.id));
-        allTasks = allTasks.filter(t => t.assigneeId === user.id || allocatedProjectIds.has(t.projectId));
+        allTasks = allTasks.filter(t => 
+          t.assigneeId === user.id || 
+          t.assigneeId === user.email ||
+          t.supervisorId === user.id ||
+          (t as any).assignedByEmployeeId === user.id ||
+          (t as any).supervisorName === user.fullName ||
+          allocatedProjectIds.has(t.projectId)
+        );
         allTimesheets = allTimesheets.filter(t => t.employeeId === user.id || allocatedProjectIds.has(t.projectId));
       }
 
