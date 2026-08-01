@@ -7,6 +7,9 @@ import { LEAVE_REPOSITORY_TOKEN, type LeaveRecord } from './leave.repository';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../employee/employee.repository';
 import { googleIntegration } from '../../shared/integration/google';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (val?: string): boolean => !!val && UUID_RE.test(val);
+
 export interface ILeaveService {
   applyLeave(
     employeeId: UUID,
@@ -155,7 +158,7 @@ export class LeaveService implements ILeaveService {
         {
           status: nextStatus,
           currentStep: nextStep,
-          approverId: actor.id,
+          approverId: isUuid(actor.id) ? actor.id : undefined,
           approverNotes: notes,
           approvedAt: new Date().toISOString(),
         },
@@ -193,7 +196,7 @@ export class LeaveService implements ILeaveService {
         {
           status: 'rejected',
           currentStep: undefined,
-          approverId: actor.id,
+          approverId: isUuid(actor.id) ? actor.id : undefined,
           approverNotes: notes,
           approvedAt: new Date().toISOString(),
         },
@@ -218,7 +221,7 @@ export class LeaveService implements ILeaveService {
         {
           status: 'cancelled',
           currentStep: undefined,
-          approverId: actor.id,
+          approverId: isUuid(actor.id) ? actor.id : undefined,
           approverNotes: notes || 'Leave cancelled',
         },
         actor

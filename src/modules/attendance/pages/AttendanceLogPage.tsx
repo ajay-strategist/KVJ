@@ -301,7 +301,8 @@ export function AttendanceLogPage() {
       const activeLeave = leaveList.find(l =>
         (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
         dateStr >= l.startDate && dateStr <= l.endDate &&
-        l.status !== 'rejected'
+        l.status !== 'rejected' &&
+        l.status !== 'cancelled'
       );
 
       if (record) {
@@ -382,7 +383,8 @@ export function AttendanceLogPage() {
       const activeLeave = leaveList.find(l =>
         (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
         dateStr >= l.startDate && dateStr <= l.endDate &&
-        l.status !== 'rejected'
+        l.status !== 'rejected' &&
+        l.status !== 'cancelled'
       );
 
       const empName = currentEmployee
@@ -510,7 +512,7 @@ export function AttendanceLogPage() {
       const name = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.email;
       const initials = name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
       const onLeave = leaveList.find(
-        (l) => l.employeeId === empId && today >= l.startDate && today <= l.endDate && l.status !== 'rejected'
+        (l) => l.employeeId === empId && today >= l.startDate && today <= l.endDate && l.status !== 'rejected' && l.status !== 'cancelled'
       );
       const todayRec = recList.find((r) => r.employeeId === empId && r.workDate === today);
       let status: 'present' | 'leave' | 'holiday' | 'absent' = 'absent';

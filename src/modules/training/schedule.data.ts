@@ -204,7 +204,8 @@ export function detectConflicts(
 
   // 2. Leave Conflicts
   for (const l of leaves) {
-    if (l.status === 'Rejected') continue;
+    const statusLower = (l.status as string)?.toLowerCase();
+    if (statusLower === 'rejected' || statusLower === 'cancelled') continue;
     const trainerSessions = sessions.filter((s) => s.trainerId === l.trainerId && s.date === l.date);
     for (const s of trainerSessions) {
       conflicts.push({
