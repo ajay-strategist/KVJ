@@ -1069,8 +1069,11 @@ AS $$
     AND (
       lower(e.email)    = lower(trim(identifier))
       OR lower(e.username) = lower(trim(identifier))
-      OR regexp_replace(coalesce(e.phone,''), '[^0-9]', '', 'g') =
-         regexp_replace(trim(identifier), '[^0-9]', '', 'g')
+      OR (
+        regexp_replace(trim(identifier), '[^0-9]', '', 'g') <> ''
+        AND regexp_replace(coalesce(e.phone,''), '[^0-9]', '', 'g') =
+            regexp_replace(trim(identifier), '[^0-9]', '', 'g')
+      )
     )
     AND length(trim(identifier)) > 0
   LIMIT 1;

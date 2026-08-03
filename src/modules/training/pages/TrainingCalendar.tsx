@@ -136,13 +136,9 @@ export function TrainingCalendar() {
           };
         });
 
-        // Merge DB sessions with local sessions so no session disappears
-        setCustomSessions((prevLocal) => {
-          const map = new Map<string, ScheduleSession>();
-          prevLocal.forEach((s) => map.set(s.id, s));
-          dbSess.forEach((s) => map.set(s.id, s));
-          return Array.from(map.values());
-        });
+        setCustomSessions(dbSess);
+      } else {
+        setCustomSessions([]);
       }
     } catch (e) {
       console.warn('Could not load DB schedule_sessions:', e);

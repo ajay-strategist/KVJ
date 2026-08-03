@@ -1783,7 +1783,7 @@ export function MyDayPage() {
         return {
           id: t.id,
           title: t.title,
-          project: proj ? proj.title : 'Flow Desk',
+          project: proj ? proj.title : 'Office',
           due: (t.dueDate || '').slice(0, 10) || todayStr,
           priority: t.priority === 'high' ? 'High' : 'Normal',
           active,
@@ -1958,12 +1958,13 @@ export function MyDayPage() {
   const handleCreateTaskSubmit = async (values: Record<string, unknown>) => {
     const todayStr = toLocalISODate(new Date());
     const title = (values.name as string) || 'New Task';
-    const projName = (values.projectName as string) || 'General Project';
+    const projName = (values.projectName as string) || '';
 
-    let proj = projects.find((p) => p.title === projName || p.id === values.projectId);
-    if (!proj && projects.length > 0) {
-      proj = projects[0];
-    }
+    // Link a project ONLY when one is explicitly selected. Without a project the
+    // task is an Office Task — do not force it into the first project.
+    const proj = projName || values.projectId
+      ? projects.find((p) => p.title === projName || p.id === values.projectId)
+      : undefined;
     const res = await createTask({
       projectId: proj?.id,
       title,

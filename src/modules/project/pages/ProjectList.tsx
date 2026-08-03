@@ -42,6 +42,8 @@ export function ProjectList({
   const { toast } = useNotifications();
   const { confirm } = useDialog();
   const { user } = useAuth();
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
@@ -59,7 +61,7 @@ export function ProjectList({
 
   const localProjectData = useProject();
   const actualProjectData = projectData || localProjectData;
-  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, submitTask, deleteTask } = actualProjectData;
+  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, submitTask, deleteTask, deleteProject } = actualProjectData;
   const { employees } = useEmployee();
 
   const assigneeOptions = useMemo(() => {
@@ -227,8 +229,6 @@ export function ProjectList({
   }, [selectedProject, tasks, timesheets, employees]);
 
   const handleCreateProject = async (values: Record<string, unknown>) => {
-    const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
-    const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
     const initialStatus = isMgmt ? ((values.status as any) || 'execution') : 'planning';
 
     // Resolve client: match typed name to existing client, or pass name for new client creation
@@ -793,6 +793,33 @@ export function ProjectList({
                 >
                   ✏️ Edit Details
                 </Button>
+                {isMgmt && (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 12
+                    }}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Delete Project?',
+                        message: `Are you sure you want to delete project "${selectedProject.title}"? This will permanently delete the project, milestones, tasks, and timesheets.`
+                      });
+                      if (ok) {
+                        const res = await deleteProject(selectedProject.id as UUID);
+                        if (res.ok) {
+                          toast({ variant: 'warning', title: 'Project Deleted', message: `"${selectedProject.title}" has been deleted.` });
+                          setReportOpen(false);
+                        } else {
+                          toast({ variant: 'error', title: 'Delete Failed', message: res.error });
+                        }
+                      }
+                    }}
+                  >
+                    🗑️ Delete Project
+                  </Button>
+                )}
                 <button
                   type="button"
                   onClick={() => setReportOpen(false)}

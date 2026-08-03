@@ -6,7 +6,7 @@ import { AttendanceCalendarView, type CalendarDayDetail } from '../components/At
 import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, useForm } from '../../../shared/forms/form';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { ATTENDANCE_REPOSITORY_TOKEN, type AttendanceRecord, type WorkSessionType } from '../attendance.repository';
@@ -62,6 +62,36 @@ export interface AttendanceLogRow {
   tasks: string[];
 }
 
+function ConditionalAttendanceFields() {
+  const { values } = useForm();
+  const { batches } = useTraining();
+  
+  if (values.classification === 'Training') {
+    const options = batches.length > 0
+      ? batches.map((b) => ({ value: b.code, label: b.code }))
+      : [{ value: 'No Batches Available', label: 'No Batches Available' }];
+    return (
+      <SelectField
+        name="location"
+        label="Select Training Batch"
+        options={options}
+      />
+    );
+  }
+
+  if (values.classification === 'Marketing') {
+    return (
+      <TextField
+        name="organisationsVisited"
+        label="Organisations Visited"
+        placeholder="e.g. Christ College, Rajagiri College"
+      />
+    );
+  }
+
+  return null;
+}
+
 export function AttendanceLogPage() {
   const { user } = useAuth();
   const { toast } = useNotifications();
@@ -89,6 +119,8 @@ export function AttendanceLogPage() {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
   const [declaredHolidays, setDeclaredHolidays] = useState<Array<{ date: string; name: string }>>([]);
   const [leaveRecords, setLeaveRecords] = useState<Array<{ employeeId: string; startDate: string; endDate: string; leaveType: string; status: string }>>([]);
@@ -172,7 +204,23 @@ export function AttendanceLogPage() {
       setLoading(false);
     };
     fetchHistory();
-  }, [startDate, endDate, currentEmployee, selectedEmployee, user, isManagement]);
+  }, [startDate, endDate, currentEmployee, selectedEmployee, user, isManagement, refetchTrigger]);
+
+  useEffect(() => {
+    const fetchTodayRecords = async () => {
+      try {
+        const attendanceRepo = container.resolve(ATTENDANCE_REPOSITORY_TOKEN);
+        const today = todayISO();
+        const allRes = await attendanceRepo.findMany();
+        const rawRecords = Array.isArray(allRes?.data) ? allRes.data : Array.isArray(allRes) ? allRes : [];
+        const filtered = rawRecords.filter((r: any) => r && r.workDate === today);
+        setTodayRecords(filtered);
+      } catch (e) {
+        console.error('Error fetching today records:', e);
+      }
+    };
+    fetchTodayRecords();
+  }, [attendanceRecords, refetchTrigger]);
 
   const handleFilterPreset = (preset: 'current_month' | 'last_month' | 'last_1_year' | 'custom') => {
     setActiveFilterPreset(preset);
@@ -205,21 +253,37 @@ export function AttendanceLogPage() {
     setSelectedExpenses((prev) => ({ ...prev, [id]: checked }));
   };
 
-  const handleBulkApprove = () => {
+  const handleBulkApprove = async () => {
     const selectedIds = Object.keys(selectedExpenses).filter((id) => selectedExpenses[id]);
     if (selectedIds.length === 0) return;
 
-    setExpenseRows((prev) =>
-      prev.map((r) => (selectedExpenses[r.id] ? { ...r, status: 'Approved' } : r))
-    );
+    try {
+      const expenseRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
+      const updatePromises = selectedIds.map(id =>
+        expenseRepo.update(
+          id,
+          { status: 'approved', approvedBy: user?.id, approvedAt: new Date().toISOString() },
+          { id: user?.id || 'emp-user', role: user?.role || 'Employee' }
+        )
+      );
+      await Promise.all(updatePromises);
 
-    toast({
-      variant: 'success',
-      title: 'Bulk Approval Complete',
-      message: `${selectedIds.length} expense claims approved successfully.`,
-    });
+      toast({
+        variant: 'success',
+        title: 'Bulk Approval Complete',
+        message: `${selectedIds.length} expense claims approved successfully.`,
+      });
 
-    setSelectedExpenses({});
+      setSelectedExpenses({});
+      setRefetchTrigger(prev => prev + 1);
+    } catch (e) {
+      console.error('Error approving expenses:', e);
+      toast({
+        variant: 'error',
+        title: 'Approval Failed',
+        message: 'Could not approve selected expense claims.',
+      });
+    }
   };
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
@@ -338,6 +402,7 @@ export function AttendanceLogPage() {
           tasks: record.sessions?.map(s => ({ title: s.notes || 'Task', duration: '' })) || [],
           hoursWorked: `${totalHrs}h ${remMins}m`,
           expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '',
+          breakMinutes: record.totalBreakMinutes || 0,
         });
       } else {
         const isSunday = dayOfWeekIdx === 0;
@@ -501,7 +566,7 @@ export function AttendanceLogPage() {
   const todayStr = todayISO();
   const timelineRows = useMemo(() => {
     const empList = Array.isArray(employees) ? employees : [];
-    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
+    const recList = Array.isArray(todayRecords) ? todayRecords : [];
     const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
     const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
     const today = todayStr;
@@ -526,7 +591,7 @@ export function AttendanceLogPage() {
       const barPct = Math.min(100, Math.round((workMins / 540) * 100));
       return { empId, name, initials, status, clockIn, clockOut, workMins, workType, barPct, leaveType: onLeave?.leaveType };
     });
-  }, [employees, attendanceRecords, leaveRecords, declaredHolidays, isManagement, user, todayStr]);
+  }, [employees, todayRecords, leaveRecords, declaredHolidays, isManagement, user, todayStr]);
 
   const STATUS_COLORS: Record<string, string> = {
     present: 'var(--status-success)',
@@ -945,29 +1010,26 @@ export function AttendanceLogPage() {
                 </div>
               )}
 
-              <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Employee:</span>
-                {isManagement ? (
-                  <select
-                    className="kvj-select"
-                    value={selectedEmployee}
-                    onChange={(e) => setSelectedEmployee(e.target.value)}
-                    style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
-                  >
-                    <option value={user?.fullName || 'System Admin'}>Me ({user?.fullName || 'Personal'})</option>
-                    <option value="All Employees">All Employees (Manager Access)</option>
-                    {employeeNames.filter((name) => name !== user?.fullName).map((name) => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
-                    👤 {user?.fullName || 'System Admin'}
-                  </span>
-                )}
-              </div>
+              {isManagement && (
+                <>
+                  <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Employee:</span>
+                    <select
+                      className="kvj-select"
+                      value={selectedEmployee}
+                      onChange={(e) => setSelectedEmployee(e.target.value)}
+                      style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
+                    >
+                      <option value={user?.fullName || 'System Admin'}>Me ({user?.fullName || 'Personal'})</option>
+                      <option value="All Employees">All Employees (Manager Access)</option>
+                      {employeeNames.filter((name) => name !== user?.fullName).map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
 
             <Button onClick={() => setSubmitDrawerOpen(true)} style={{ padding: '6px 16px', fontSize: 12 }}>
@@ -979,27 +1041,31 @@ export function AttendanceLogPage() {
         <Tabs items={tabs} />
       </div>
 
-      <Drawer open={submitDrawerOpen} onClose={() => setSubmitDrawerOpen(false)} title="Submit / Claim Attendance Request">
+      <Drawer open={submitDrawerOpen} onClose={() => setSubmitDrawerOpen(false)} title="Submit Attendance Request">
         <Form
           initial={{
-            date: new Date().toISOString().slice(0, 10),
-            location: 'Office Work',
+            date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+            classification: 'Office',
+            location: batches.length > 0 ? batches[0].code : '',
+            organisationsVisited: '',
             startTime: '08:30 AM',
             endTime: '05:00 PM',
             notes: '',
           }}
           onSubmit={async (values) => {
+            const locText = values.classification === 'Training' 
+              ? values.location 
+              : values.classification === 'Marketing' 
+              ? `Marketing: ${values.organisationsVisited}` 
+              : 'Office Work';
+            
             try {
               const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
-              const locText = values.location || 'Office Work';
-              const isOffice = locText === 'Office Work';
-              const classification = isOffice ? 'Office' : 'Training';
-
               await attService.requestCorrection(
                 String(Date.now()),
                 'attendance_claim',
                 `${values.date} (${values.startTime} - ${values.endTime})`,
-                `Classification: ${classification}, Location: ${locText}. ${values.notes || ''}`,
+                `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
                 { id: user?.id || 'emp-user', role: user?.role || 'Employee' }
               );
             } catch (e) {
@@ -1008,24 +1074,26 @@ export function AttendanceLogPage() {
 
             toast({
               variant: 'success',
-              title: 'Attendance Claim Submitted',
-              message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Manager/Admin review.`,
+              title: 'Attendance Request Submitted',
+              message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
             });
             setSubmitDrawerOpen(false);
           }}
         >
           <TextField name="date" label="Attendance Date" placeholder="YYYY-MM-DD" />
           <SelectField
-            name="location"
-            label="Location (Training Batch / Office)"
+            name="classification"
+            label="Attendance Type"
             options={[
-              { value: 'Office Work', label: 'Office Work' },
-              ...batches.map((b) => ({ value: b.code, label: b.code })),
+              { value: 'Office', label: 'Office Work' },
+              { value: 'Training', label: 'Training Batch Session' },
+              { value: 'Marketing', label: 'Marketing Visit' },
             ]}
           />
+          <ConditionalAttendanceFields />
           <TextField name="startTime" label="Start Time" placeholder="08:30 AM" />
           <TextField name="endTime" label="End Time" placeholder="05:00 PM" />
-          <TextField name="notes" label="Reason / Description (Optional)" placeholder="Emergency, system delay, or missed clock-in..." />
+          <TextField name="notes" label="Reason / Notes (Optional)" placeholder="Emergency, system delay, or missed clock-in..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setSubmitDrawerOpen(false)}>Cancel</Button>
             <Button type="submit">Submit for Review</Button>

@@ -19,6 +19,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { useAuth } from '../../auth/AuthProvider';
 import { useTraining } from '../../training/hooks/useTraining';
 import { supabase } from '../../../shared/integration/supabase';
+import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 import { googleIntegration } from '../../../shared/integration/google';
 
@@ -276,6 +277,7 @@ function DynamicExpenseForm({
 
 export function ExpenseClaims() {
   const { toast } = useNotifications();
+  const { confirm } = useDialog();
   const { user } = useAuth();
   const { batches } = useTraining();
 
@@ -515,6 +517,24 @@ export function ExpenseClaims() {
     }
   };
 
+  const handleDeleteClaim = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('flwdsk_expense_claims')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        toast({ variant: 'error', title: 'Deletion Failed', message: error.message });
+      } else {
+        toast({ variant: 'warning', title: 'Claim Deleted', message: 'Expense claim has been deleted.' });
+        loadClaims();
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Deletion Failed', message: e.message });
+    }
+  };
+
   const handleBulkApprove = async () => {
     try {
       const { error } = await supabase
@@ -658,18 +678,36 @@ export function ExpenseClaims() {
                       )}
                     </td>
                     <td>
-                      {!isLocked && exp.status === 'submitted' && isManagement ? (
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)}>Approve</Button>
-                          <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)}>Reject</Button>
-                        </div>
-                      ) : isLocked ? (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          🔒 Locked
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
-                      )}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {!isLocked && exp.status === 'submitted' && isManagement && (
+                          <>
+                            <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)}>Approve</Button>
+                            <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)}>Reject</Button>
+                          </>
+                        )}
+                        {!isLocked && (
+                          <Button
+                            size="xs"
+                            variant="danger"
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Delete Expense Claim?',
+                                message: `Are you sure you want to delete this expense claim for ₹${exp.amount.toFixed(2)}? This cannot be undone.`,
+                              });
+                              if (ok) {
+                                await handleDeleteClaim(exp.id);
+                              }
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                        {isLocked && (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            🔒 Locked
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

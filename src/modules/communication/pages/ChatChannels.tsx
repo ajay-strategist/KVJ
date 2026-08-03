@@ -4,6 +4,8 @@ import { Button, Avatar, Badge, SearchInput } from '../../../shared/ui/component
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { useDialog } from '../../../shared/feedback/DialogProvider';
+import { supabase } from '../../../shared/integration/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { useCommunication } from '../hooks/useCommunication';
 import { useEmployee } from '../../employee/hooks/useEmployee';
@@ -24,10 +26,14 @@ const CATEGORY_LABELS: Record<ChannelCategory, { label: string; icon: string }> 
 export function ChatChannels() {
   const { user } = useAuth();
   const { toast } = useNotifications();
+  const { confirm } = useDialog();
   const { employees, loading: employeesLoading } = useEmployee();
 
   // Active channel and layout state
-  const [activeChannelId, setActiveChannelId] = useState<string>('c-general');
+  // Empty until channels load, so the auto-select effect can pick the first real
+  // channel. (Was 'c-general' — a dead id that pointed at no real channel, so
+  // messages never loaded and sends failed.)
+  const [activeChannelId, setActiveChannelId] = useState<string>('');
   const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
   const [activeCategory, setActiveCategory] = useState<ChannelCategory>('department');
 
@@ -55,6 +61,7 @@ export function ChatChannels() {
   // Modal states
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [createDmOpen, setCreateDmOpen] = useState(false);
+  const [newChannelMembers, setNewChannelMembers] = useState<string[]>([]);
 
   // Layout refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -72,6 +79,7 @@ export function ChatChannels() {
     togglePinMessage: hookTogglePinMessage,
     sendTypingStatus,
     createChannel: hookCreateChannel,
+    refresh,
   } = useCommunication(activeChannelId ? (activeChannelId as UUID) : undefined);
 
   // Map database channels to local view model contract
@@ -292,18 +300,66 @@ export function ChatChannels() {
     }
   };
 
+  // Delete a chat AND all of its messages. Only the creator or a full-control
+  // role (Admin/CEO/Manager) may delete. Uses soft-delete (deleted_at) so it
+  // disappears everywhere but nothing is hard-erased.
+  const handleDeleteChannel = async (cId: string) => {
+    if (!user?.id) return;
+    const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
+    const target = await channelRepo.findById(cId as UUID);
+    if (!target) return;
+
+    const isFullControl = ['ADMIN', 'CEO', 'MANAGER'].includes((user.role || '').toUpperCase());
+    if (target.createdBy && target.createdBy !== user.id && !isFullControl) {
+      toast({ variant: 'error', title: 'Not Allowed', message: 'Only the creator or an admin can delete this chat.' });
+      return;
+    }
+
+    const chatName = mappedChannels.find((c) => c.id === cId)?.name || 'this chat';
+    const ok = await confirm({
+      title: 'Delete Chat',
+      message: `Delete "${chatName}" and ALL its messages? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'delete',
+    });
+    if (!ok) return;
+
+    try {
+      const ts = new Date().toISOString();
+      // 1) Delete the entire content — every message in the chat.
+      const { error: msgErr } = await supabase
+        .from('flwdsk_chat_messages')
+        .update({ deleted_at: ts, deleted_by: user.id })
+        .eq('channel_id', cId)
+        .is('deleted_at', null);
+      if (msgErr) throw msgErr;
+
+      // 2) Delete the chat itself.
+      await channelRepo.softDelete(cId as UUID, { id: user.id, role: user.role });
+
+      toast({ variant: 'success', title: 'Chat Deleted', message: `"${chatName}" and its messages were removed.` });
+      if (activeChannelId === cId) setActiveChannelId('');
+      await refresh();
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Delete Failed', message: e?.message || 'Could not delete the chat.' });
+    }
+  };
+
   // Group creation handler
   const handleCreateChannelSubmit = async (values: Record<string, unknown>) => {
     const cat = (values.category as ChannelType) || 'department';
+    // Members = creator + everyone selected in the picker (deduped).
+    const memberSet = new Set<string>([user?.id as string, ...newChannelMembers]);
     const res = await hookCreateChannel({
       name: values.name as string,
       type: cat,
       department: values.description as string,
-      members: [user?.id as UUID],
+      members: Array.from(memberSet).filter(Boolean) as UUID[],
     });
 
     if (res.ok) {
       setActiveChannelId(res.value.id);
+      setNewChannelMembers([]);
       toast({ variant: 'success', title: 'Channel Created', message: `#${res.value.name} is ready.` });
       setCreateChannelOpen(false);
     } else {
@@ -534,6 +590,13 @@ export function ChatChannels() {
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
               >
                 📥
+              </button>
+              <button
+                onClick={() => handleDeleteChannel(activeChannel.id)}
+                title="Delete Chat (removes all messages)"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
+              >
+                🗑️
               </button>
               <Button
                 variant="secondary"
@@ -1143,8 +1206,34 @@ export function ChatChannels() {
             ]}
           />
           <TextField name="description" label="Room Purpose / Description" placeholder="Explain what is discussed here..." />
+
+          {/* Members — only the people added here (plus you) will see the channel. */}
+          <div style={{ marginTop: 4 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              Add Members ({newChannelMembers.length} selected)
+            </label>
+            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 6 }}>
+              {employees.filter((e) => e.id !== user?.id).map((e) => {
+                const checked = newChannelMembers.includes(e.id);
+                return (
+                  <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', cursor: 'pointer', borderRadius: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(ev) => setNewChannelMembers((prev) => ev.target.checked ? [...prev, e.id] : prev.filter((id) => id !== e.id))}
+                    />
+                    <span style={{ fontSize: 13 }}>{e.firstName} {e.lastName}<span style={{ color: 'var(--text-muted)' }}> · {e.designation}</span></span>
+                  </label>
+                );
+              })}
+              {employees.filter((e) => e.id !== user?.id).length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>No other employees to add yet.</div>
+              )}
+            </div>
+          </div>
+
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setCreateChannelOpen(false)}>Cancel</Button>
+            <Button variant="secondary" type="button" onClick={() => { setCreateChannelOpen(false); setNewChannelMembers([]); }}>Cancel</Button>
             <Button type="submit">Create Channel</Button>
           </div>
         </Form>

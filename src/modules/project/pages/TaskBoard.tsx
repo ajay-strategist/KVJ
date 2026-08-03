@@ -189,8 +189,9 @@ export function TaskBoard({
       return {
         id: t.id,
         name: t.title || 'Untitled Task',
-        category: 'Project Task' as const,
-        projectName: project ? project.title : 'General Operations',
+        // A task with no linked project is an Office Task; otherwise a Project Task.
+        category: (t.projectId && project ? 'Project Task' : 'Office Task') as 'Office Task' | 'Project Task',
+        projectName: project ? project.title : 'Office',
         supervisor: supervisorName,
         supervisorId,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
@@ -273,10 +274,9 @@ export function TaskBoard({
   }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
-    let proj = projects.find((p: any) => p.title === values.projectName || p.id === values.projectId);
-    if (!proj && projects.length > 0) {
-      proj = projects[0];
-    }
+    // Only link a project when one is explicitly chosen. A task with no project
+    // is an Office Task — it must NOT be forced into the first project.
+    const proj = projects.find((p: any) => p.title === values.projectName || p.id === values.projectId);
     const assignee = employees.find((e) => `${e.firstName} ${e.lastName}` === values.assignee || e.id === values.assigneeId);
     const supervisor = employees.find((e) => `${e.firstName} ${e.lastName}` === values.supervisor || e.id === values.supervisorId);
 
@@ -303,8 +303,8 @@ export function TaskBoard({
       const newTaskItem: TaskItem = {
         id: res.value.id,
         name: res.value.title,
-        category: (values.category as any) || 'Project Task',
-        projectName: proj ? proj.title : (values.projectName as string) || 'General Operations',
+        category: proj ? 'Project Task' : 'Office Task',
+        projectName: proj ? proj.title : 'Office',
         supervisor: supervisor ? `${supervisor.firstName} ${supervisor.lastName}` : (user?.fullName || ''),
         supervisorId: finalSupervisorId,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (values.assignee as string) || user?.fullName || 'Unassigned',

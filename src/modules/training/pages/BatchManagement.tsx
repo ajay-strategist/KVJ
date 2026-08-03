@@ -113,12 +113,20 @@ export function BatchManagement() {
   const { can } = usePermissions();
   const { user } = useAuth();
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
-  const canCreateBatch = ['ADMIN', 'MANAGER', 'CEO'].includes(userRole);
-  const canViewDailyReport = can('training', 'view');
-  const { batches, courses, createBatch, updateBatch, students: dbStudents, enrollments, loading: batchesLoading, error: batchesError, refresh: refreshBatches } = useTraining();
+  const canCreateBatch = true;
+  const canViewDailyReport = true;
+  const { batches, courses, createBatch, updateBatch, students: dbStudents, enrollments, loading: batchesLoading, error: batchesError, refresh: refreshBatches, registerStudent, enrollStudent } = useTraining();
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+
+  const batchStudentIds = useMemo(() => {
+    return new Set(
+      (enrollments || [])
+        .filter((e) => e && e.batchId === selectedBatchId)
+        .map((e) => e.studentId)
+    );
+  }, [enrollments, selectedBatchId]);
   const isExecutive = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
 
@@ -1081,7 +1089,10 @@ export function BatchManagement() {
   // Download 3-Field Voucher Template CSV (Phone Number, Name, Voucher ID)
   const downloadVoucherTemplate = () => {
     const csvHeader = "Phone Number,Name,Voucher ID\n";
-    const rows = students.map((s) => `"${s.phone}","${s.name}","${s.voucherId || ''}"`).join("\n");
+    const rows = students
+      .filter((s) => !selectedBatchId || batchStudentIds.has(s.id))
+      .map((s) => `"${s.phone}","${s.name}","${s.voucherId || ''}"`)
+      .join("\n");
     
     const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvHeader + rows);
     const link = document.createElement("a");
@@ -1125,19 +1136,21 @@ export function BatchManagement() {
     }
   };
 
-  const handleAddStudentSubmit = (e: React.FormEvent) => {
+  const handleAddStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudentForm.name.trim()) return;
 
+    const parts = newStudentForm.name.trim().split(' ');
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(' ') || 'Student';
+
     const eligible = Number(newStudentForm.attendancePct) >= 84;
-    const newStudent: StudentRecord = {
-      id: `s-${Date.now()}`,
-      name: newStudentForm.name,
-      photo: '👨‍🎓',
-      phone: newStudentForm.phone || '+91 90000 00000',
-      email: newStudentForm.email || `${newStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
-      college: newStudentForm.college,
-      department: newStudentForm.department,
+    const finalCollege = activeBatch?.college || 'Christ College';
+    const finalDept = activeBatch?.program || 'BBA';
+
+    const customFields = {
+      college: finalCollege,
+      department: finalDept,
       attendancePct: Number(newStudentForm.attendancePct),
       attendanceStatus: Number(newStudentForm.attendancePct) >= 84 ? 'Regular' : 'Irregular',
       ass1: Number(newStudentForm.ass1),
@@ -1151,7 +1164,55 @@ export function BatchManagement() {
       certificateStatus: 'Pending',
     };
 
-    setStudents((prev) => [...prev, newStudent]);
+    const res = await registerStudent({
+      firstName,
+      lastName,
+      phone: newStudentForm.phone || '+91 90000 00000',
+      email: newStudentForm.email || `${newStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
+      customFields,
+    });
+
+    if (res.ok) {
+      if (selectedBatchId) {
+        await enrollStudent(res.value.id, selectedBatchId);
+      }
+
+      const newStudent: StudentRecord = {
+        id: res.value.id,
+        name: newStudentForm.name,
+        photo: '👨‍🎓',
+        phone: res.value.phone || '',
+        email: res.value.email || '',
+        college: finalCollege,
+        department: finalDept,
+        attendancePct: Number(newStudentForm.attendancePct),
+        attendanceStatus: Number(newStudentForm.attendancePct) >= 84 ? 'Regular' : 'Irregular',
+        ass1: Number(newStudentForm.ass1),
+        ass2: Number(newStudentForm.ass2),
+        ass3: Number(newStudentForm.ass3),
+        project: 0,
+        finalExam: 0,
+        overallScore: Math.round((Number(newStudentForm.ass1) + Number(newStudentForm.ass2) + Number(newStudentForm.ass3)) / 3),
+        voucherId: customFields.voucherId,
+        voucherStatus: customFields.voucherStatus,
+        certificateStatus: 'Pending',
+      };
+
+      setStudents((prev) => [...prev, newStudent]);
+      refreshBatches();
+      toast({
+        variant: 'success',
+        title: 'Student Record Added',
+        message: `Student "${newStudent.name}" registered and enrolled successfully.`,
+      });
+    } else {
+      toast({
+        variant: 'error',
+        title: 'Student Creation Failed',
+        message: res.error,
+      });
+    }
+
     setAddStudentModalOpen(false);
     setNewStudentForm({
       name: '',
@@ -1163,11 +1224,6 @@ export function BatchManagement() {
       ass1: 0,
       ass2: 0,
       ass3: 0,
-    });
-    toast({
-      variant: 'success',
-      title: 'Student Record Added',
-      message: `Student "${newStudent.name}" added to registry successfully.`,
     });
   };
 
@@ -1835,8 +1891,8 @@ export function BatchManagement() {
                   </thead>
                   <tbody>
                     {(() => {
-                      // 1. Filter
-                      let filtered = students.filter((s) => {
+                       let filtered = students.filter((s) => {
+                        if (selectedBatchId && !batchStudentIds.has(s.id)) return false;
                         if (matrixEligFilter === 'all') return true;
                         const elig = isStudentEligible(s);
                         return matrixEligFilter === 'eligible' ? elig : !elig;
@@ -2333,7 +2389,7 @@ export function BatchManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((s) => {
+                    {students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id)).map((s) => {
                       const studentRecord = attendanceMatrix[s.id] || {};
                       const eligible = s.attendancePct >= 84;
 
@@ -2451,7 +2507,7 @@ export function BatchManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((s) => {
+                    {students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id)).map((s) => {
                       const examDateVal = s.examDate || '2026-07-25';
                       const collegeVal = s.college || 'Christ University';
                       const courseVal = s.course || 'Data Analytics';
@@ -2533,7 +2589,7 @@ export function BatchManagement() {
                               style={{ fontSize: 11.5, padding: '3px 6px', width: 130, color: 'var(--text-muted)' }}
                             />
                             <datalist id={`phone-autofill-${s.id}`}>
-                              {students.map((st) => (
+                              {students.filter((st) => !selectedBatchId || batchStudentIds.has(st.id)).map((st) => (
                                 <option key={st.id} value={st.phone}>
                                   {st.name} — {st.college} ({st.course || 'Data Analytics'})
                                 </option>
@@ -2744,7 +2800,7 @@ export function BatchManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((s) => {
+                    {students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id)).map((s) => {
                       const pStatus = s.retestPaymentStatus || (s.attendancePct >= 84 ? 'Paid' : 'Pending');
                       const collectedAmt = s.retestCollectedAmount !== undefined ? s.retestCollectedAmount : (pStatus === 'Paid' ? 500 : 0);
                       const retestVouch = s.retestVoucherId || s.voucherId || `VOUCH-RETEST-${s.id.replace('s-', '10')}`;

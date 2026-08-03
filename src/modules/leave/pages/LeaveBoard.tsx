@@ -93,8 +93,8 @@ export function LeaveBoard() {
           base64Content,
           uploadedBy: user?.fullName || 'Employee',
         });
-        if (driveRes && driveRes.storedFileName) {
-          certName = driveRes.storedFileName;
+        if (driveRes && driveRes.googleDriveViewUrl) {
+          certName = driveRes.googleDriveViewUrl;
         }
       } catch (e) {
         console.warn('Google Drive medical cert upload warning:', e);
@@ -180,9 +180,15 @@ export function LeaveBoard() {
             {r.medicalCertUrl ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <a
-                  href="#"
+                  href={r.medicalCertUrl && r.medicalCertUrl.includes('http') ? r.medicalCertUrl : '#'}
+                  target={r.medicalCertUrl && r.medicalCertUrl.includes('http') ? '_blank' : undefined}
+                  rel={r.medicalCertUrl && r.medicalCertUrl.includes('http') ? 'noopener noreferrer' : undefined}
                   title={r.medicalCertUrl}
-                  onClick={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    if (!r.medicalCertUrl || !r.medicalCertUrl.includes('http')) {
+                      e.preventDefault();
+                    }
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -201,7 +207,7 @@ export function LeaveBoard() {
                     textDecoration: 'none',
                   }}
                 >
-                  📄 {r.medicalCertUrl.replace(/^.*?_MedicalCert_/i, '') || 'Certificate'}
+                  📄 {r.medicalCertUrl && r.medicalCertUrl.includes('http') ? 'View Certificate' : (r.medicalCertUrl ? r.medicalCertUrl.replace(/^.*?_MedicalCert_/i, '') : '') || 'Certificate'}
                 </a>
                 <Button
                   size="xs"
@@ -529,8 +535,8 @@ export function LeaveBoard() {
                   base64Content,
                   uploadedBy: user?.fullName || 'Employee',
                 });
-                if (driveRes && driveRes.storedFileName) {
-                  certName = driveRes.storedFileName;
+                if (driveRes && driveRes.googleDriveViewUrl) {
+                  certName = driveRes.googleDriveViewUrl;
                 }
               } catch (e) {
                 console.warn('Google Drive medical cert upload warning:', e);

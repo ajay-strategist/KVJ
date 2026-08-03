@@ -22,6 +22,7 @@ export interface CalendarDayDetail {
   tasks?: Array<{ title: string; duration: string }>;
   hoursWorked: string;
   expenses: string;
+  breakMinutes?: number;
 }
 
 export interface AttendanceCalendarViewProps {
@@ -32,6 +33,15 @@ export interface AttendanceCalendarViewProps {
   showCalendarGrid?: boolean;
 }
 
+function getCurrentFinancialYear(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-indexed: 3 = April
+  const startYear = month >= 3 ? year : year - 1;
+  const endYearSuffix = String(startYear + 1).slice(-2);
+  return `FY ${startYear}-${endYearSuffix}`;
+}
+
 export function AttendanceCalendarView({
   days,
   selectedEmployeeName,
@@ -40,7 +50,7 @@ export function AttendanceCalendarView({
   showCalendarGrid = true,
 }: AttendanceCalendarViewProps) {
   const [selectedDay, setSelectedDay] = useState<CalendarDayDetail | null>(null);
-  const [selectedFY, setSelectedFY] = useState('FY 2026-27');
+  const [selectedFY, setSelectedFY] = useState(getCurrentFinancialYear());
 
   const getStatusColor = (status: 'present' | 'absent' | 'leave' | 'holiday') => {
     switch (status) {
@@ -58,17 +68,25 @@ export function AttendanceCalendarView({
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  // Helper to parse time strings like "08:30 AM" into minutes from midnight
+  // Helper to parse time strings like "08:30 AM" or "08:30" robustly
   const parseTime = (timeStr?: string) => {
     if (!timeStr) return null;
-    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (!match) return null;
-    let [_, hrs, mins, amp] = match;
-    let h = parseInt(hrs, 10);
-    const m = parseInt(mins, 10);
-    if (amp.toUpperCase() === 'PM' && h < 12) h += 12;
-    if (amp.toUpperCase() === 'AM' && h === 12) h = 0;
-    return h * 60 + m;
+    const match12 = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (match12) {
+      let [_, hrs, mins, amp] = match12;
+      let h = parseInt(hrs, 10);
+      const m = parseInt(mins, 10);
+      if (amp.toUpperCase() === 'PM' && h < 12) h += 12;
+      if (amp.toUpperCase() === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    }
+    const match24 = timeStr.match(/(\d+):(\d+)/);
+    if (match24) {
+      const h = parseInt(match24[1], 10);
+      const m = parseInt(match24[2], 10);
+      return h * 60 + m;
+    }
+    return null;
   };
 
   const isLate = (timeStr?: string) => {
@@ -91,7 +109,8 @@ export function AttendanceCalendarView({
     const lateReporting = days.filter((d) => d.status === 'present' && isLate(d.startTime)).length;
     const earlyLeaving = days.filter((d) => d.status === 'present' && isEarly(d.endTime)).length;
 
-    const totalBreakHrs = 0; // Not logged daily in detail array
+    const totalBreakMins = days.reduce((sum, d) => sum + (d.breakMinutes || 0), 0);
+    const totalBreakHrs = Math.round((totalBreakMins / 60) * 10) / 10;
 
     const totalExpenses = days.reduce((sum, d) => {
       const amt = parseFloat(d.expenses.replace(/[^\d.]/g, '')) || 0;

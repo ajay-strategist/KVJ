@@ -8,13 +8,14 @@
  *  - Email automation: send voucher via email button
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge, ProgressBar, SectionHeader, SearchInput } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { supabase } from '../../../shared/integration/supabase';
 
 export interface ExamRecord {
   id: string;
@@ -52,6 +53,83 @@ export function FinalExamModule() {
 
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '');
 
+  // Load student records from Supabase on mount
+  useEffect(() => {
+    async function loadStudents() {
+      try {
+        const { data: dbStudents, error } = await supabase
+          .from('flwdsk_student_records')
+          .select('*')
+          .is('deleted_at', null);
+
+        if (error) {
+          console.warn('Failed to load students for final exams:', error.message);
+          return;
+        }
+
+        if (dbStudents && dbStudents.length > 0) {
+          const mapped: ExamRecord[] = dbStudents.map((s: any) => {
+            const fields = s.custom_fields || {};
+            const orig = fields.originalScore ?? fields.ass1 ?? 0;
+            const retest = fields.retestScore;
+            const finalScore = fields.finalExam ?? 0;
+            const attPct = fields.attendancePct ?? 85;
+
+            return {
+              id: s.id,
+              studentName: s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.fullName || s.name || 'Student',
+              phone: s.phone || '',
+              email: s.email || '',
+              college: fields.college || 'Christ College',
+              batch: fields.department || 'BBA',
+              attendancePct: attPct,
+              voucherCode: fields.voucherId || '',
+              voucherStatus: (fields.voucherStatus || 'Unassigned') as any,
+              originalScore: orig,
+              retestScore: retest,
+              finalScore: finalScore,
+              isRetestEligible: finalScore < 50,
+              retestStatus: retest !== undefined ? 'Completed' : 'None',
+              certificateEligible: finalScore >= 50 && attPct >= 80,
+            };
+          });
+          setRecords(mapped);
+        }
+      } catch (e) {
+        console.warn('Failed to load students for final exams:', e);
+      }
+    }
+    loadStudents();
+  }, []);
+
+  const syncRecordToDb = async (r: ExamRecord) => {
+    try {
+      const { data: current } = await supabase
+        .from('flwdsk_student_records')
+        .select('custom_fields')
+        .eq('id', r.id)
+        .single();
+      
+      const currentFields = current?.custom_fields || {};
+      const updatedFields = {
+        ...currentFields,
+        originalScore: r.originalScore,
+        retestScore: r.retestScore,
+        finalExam: r.finalScore,
+        voucherId: r.voucherCode,
+        voucherStatus: r.voucherStatus,
+        certificateStatus: r.certificateEligible ? 'issued' : 'unissued',
+      };
+
+      await supabase
+        .from('flwdsk_student_records')
+        .update({ custom_fields: updatedFields })
+        .eq('id', r.id);
+    } catch (e) {
+      console.warn('Failed to sync student exam details to Supabase:', e);
+    }
+  };
+
   const filteredRecords = useMemo(() => {
     const q = search.trim().toLowerCase();
     return records.filter((r) => {
@@ -62,22 +140,38 @@ export function FinalExamModule() {
     });
   }, [records, search, filterBatch, filterVoucher]);
 
-  const handleAssignVoucher = (id: string) => {
+  const handleAssignVoucher = async (id: string) => {
     const code = `VOUCH-${Math.floor(100000 + Math.random() * 900000)}`;
+    let updatedRecord: ExamRecord | null = null;
     setRecords((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, voucherCode: code, voucherStatus: 'Assigned' } : r
-      )
+      prev.map((r) => {
+        if (r.id === id) {
+          updatedRecord = { ...r, voucherCode: code, voucherStatus: 'Assigned' as const };
+          return updatedRecord;
+        }
+        return r;
+      })
     );
+    if (updatedRecord) {
+      await syncRecordToDb(updatedRecord);
+    }
     toast({ variant: 'success', title: 'Voucher Assigned', message: `Assigned voucher code ${code}.` });
   };
 
-  const handleRevokeVoucher = (id: string) => {
+  const handleRevokeVoucher = async (id: string) => {
+    let updatedRecord: ExamRecord | null = null;
     setRecords((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, voucherCode: '', voucherStatus: 'Unassigned' } : r
-      )
+      prev.map((r) => {
+        if (r.id === id) {
+          updatedRecord = { ...r, voucherCode: '', voucherStatus: 'Unassigned' as const };
+          return updatedRecord;
+        }
+        return r;
+      })
     );
+    if (updatedRecord) {
+      await syncRecordToDb(updatedRecord);
+    }
     toast({ variant: 'info', title: 'Voucher Revoked' });
   };
 
@@ -89,7 +183,7 @@ export function FinalExamModule() {
     });
   };
 
-  const handleUpdateMarks = (values: Record<string, unknown>) => {
+  const handleUpdateMarks = async (values: Record<string, unknown>) => {
     if (!selectedRecord) return;
     const orig = Number(values.originalScore || selectedRecord.originalScore || 0);
     const retest = values.retestScore ? Number(values.retestScore) : selectedRecord.retestScore;
@@ -99,39 +193,48 @@ export function FinalExamModule() {
     const isRetestEligible = finalScore < 50;
     const certEligible = finalScore >= 50 && selectedRecord.attendancePct >= 80;
 
+    const updatedRecord: ExamRecord = {
+      ...selectedRecord,
+      originalScore: orig,
+      retestScore: retest,
+      finalScore,
+      isRetestEligible,
+      retestStatus: retest !== undefined ? 'Completed' : selectedRecord.retestStatus,
+      certificateEligible: certEligible,
+    };
+
     setRecords((prev) =>
       prev.map((r) =>
-        r.id === selectedRecord.id
-          ? {
-              ...r,
-              originalScore: orig,
-              retestScore: retest,
-              finalScore,
-              isRetestEligible,
-              retestStatus: retest !== undefined ? 'Completed' : r.retestStatus,
-              certificateEligible: certEligible,
-            }
-          : r
+        r.id === selectedRecord.id ? updatedRecord : r
       )
     );
+
+    await syncRecordToDb(updatedRecord);
 
     toast({ variant: 'success', title: 'Exam Marks Updated', message: `Final Score: ${finalScore}% (Highest Mark Applied)` });
     setMarksDrawerOpen(false);
   };
 
-  const handleBulkVoucherSubmit = (values: Record<string, unknown>) => {
+  const handleBulkVoucherSubmit = async (values: Record<string, unknown>) => {
     const prefix = (values.prefix as string) || 'VOUCH-BATCH';
+    const updatedRecords: ExamRecord[] = [];
     setRecords((prev) =>
-      prev.map((r, i) =>
-        !r.voucherCode
-          ? {
-              ...r,
-              voucherCode: `${prefix}-${100 + i}`,
-              voucherStatus: 'Assigned',
-            }
-          : r
-      )
+      prev.map((r, i) => {
+        if (!r.voucherCode) {
+          const updated = {
+            ...r,
+            voucherCode: `${prefix}-${100 + i}`,
+            voucherStatus: 'Assigned' as const,
+          };
+          updatedRecords.push(updated);
+          return updated;
+        }
+        return r;
+      })
     );
+    for (const r of updatedRecords) {
+      await syncRecordToDb(r);
+    }
     toast({ variant: 'success', title: 'Bulk Vouchers Assigned', message: 'Vouchers generated for all unassigned students.' });
     setBulkVoucherOpen(false);
   };

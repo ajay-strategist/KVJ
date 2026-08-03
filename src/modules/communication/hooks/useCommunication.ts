@@ -11,6 +11,7 @@ import {
 } from '../communication.repository';
 import type { UUID } from '../../../core/types';
 import { useAuth } from '../../auth/AuthProvider';
+import { supabase } from '../../../shared/integration/supabase';
 
 type CallbackResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -33,11 +34,24 @@ export function useCommunication(activeChannelId?: UUID) {
     try {
       const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
       const res = await channelRepo.findMany();
-      setChannels(Array.isArray(res?.data) ? res.data : []);
+      const all = Array.isArray(res?.data) ? res.data : [];
+      const uid = user?.id;
+      // Membership-based visibility:
+      //  • Direct messages are visible ONLY to their participants.
+      //  • Group channels are visible to their members; legacy group channels
+      //    with no membership list stay visible to everyone (backward compat).
+      const visible = all.filter((c) => {
+        const m = c.members;
+        const isMember = !!uid && Array.isArray(m) && m.includes(uid as UUID);
+        if (c.type === 'direct') return isMember; // DMs are always private
+        if (!m || m.length === 0) return true;      // ungoverned legacy channel
+        return isMember;
+      });
+      setChannels(visible);
     } catch (e: any) {
       setError(e.message);
     }
-  }, []);
+  }, [user]);
 
   const fetchMessages = useCallback(async () => {
     if (!activeChannelId) return;
@@ -272,6 +286,35 @@ export function useCommunication(activeChannelId?: UUID) {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // ── Supabase Realtime: instant cross-user delivery ────────────────────────
+  // New/updated messages in the OPEN channel are pushed live to every viewer.
+  // Requires Realtime enabled on flwdsk_chat_messages (see setup note).
+  useEffect(() => {
+    if (!activeChannelId) return;
+    const sub = supabase
+      .channel(`chat-msgs-${activeChannelId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'flwdsk_chat_messages', filter: `channel_id=eq.${activeChannelId}` },
+        () => { fetchMessages(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [activeChannelId, fetchMessages]);
+
+  // Live channel-list changes (new channels, membership, pins) for this user.
+  useEffect(() => {
+    const sub = supabase
+      .channel('chat-channels')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'flwdsk_chat_channels' },
+        () => { fetchChannels(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [fetchChannels]);
 
   useEffect(() => {
     if (!chatSyncChannel) return;

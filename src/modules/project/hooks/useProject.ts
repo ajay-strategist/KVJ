@@ -155,6 +155,21 @@ export function useProject() {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const deleteProject = useCallback(async (projectId: UUID): Promise<CallbackResult<void>> => {
+    if (!user) return { ok: false, error: 'Unauthenticated' };
+    try {
+      const projectRepo = container.resolve(PROJECT_REPOSITORY_TOKEN);
+      await projectRepo.hardDelete(projectId);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setAllocations((prev) => prev.filter((a) => a.projectId !== projectId));
+      setTasks((prev) => prev.filter((t) => t.projectId !== projectId));
+      setTimesheets((prev) => prev.filter((ts) => ts.projectId !== projectId));
+      return { ok: true, value: undefined };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  }, [user]);
+
   const submitTask = useCallback(async (taskId: UUID, notes: string): Promise<CallbackResult<Task>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.submitTask(taskId, notes, { id: user.id, role: user.role });
@@ -245,6 +260,7 @@ export function useProject() {
     createTask,
     updateTask,
     deleteTask,
+    deleteProject,
     submitTask,
     requestRework,
     approveTaskSubmission,

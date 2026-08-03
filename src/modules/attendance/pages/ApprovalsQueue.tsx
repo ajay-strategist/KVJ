@@ -129,6 +129,22 @@ export function ApprovalsQueue() {
     }
   };
 
+  const handleRejectCorrection = async () => {
+    if (!selectedCorrection) return;
+    const ok = await confirm({ title: 'Reject Correction?', message: 'Are you sure you want to reject this correction request?' });
+    if (!ok) return;
+
+    const res = await attService.rejectCorrection(selectedCorrection.id, { id: user!.id, role: user!.role }, notes);
+    if (res.ok) {
+      toast({ variant: 'warning', title: 'Correction Rejected' });
+      setSelectedCorrection(null);
+      setNotes('');
+      fetchCorrectionsAndEmployees();
+    } else {
+      toast({ variant: 'error', title: 'Rejection Failed', message: res.error.message });
+    }
+  };
+
   /** Inline Accept/Reject straight from the queue row (no drawer needed). */
   const handleDecideLeave = async (rec: LeaveRecord, decision: 'accept' | 'reject') => {
     const accept = decision === 'accept';
@@ -464,8 +480,21 @@ export function ApprovalsQueue() {
               {selectedLeave.medicalCertUrl && (
                 <div>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Medical Certificate</span>
-                  <div style={{ fontSize: 13, color: 'var(--brand)', textDecoration: 'underline', marginTop: 4 }}>
-                    📎 {selectedLeave.medicalCertUrl}
+                  <div style={{ marginTop: 4 }}>
+                    {selectedLeave.medicalCertUrl.includes('http') ? (
+                      <a
+                        href={selectedLeave.medicalCertUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: 13, color: 'var(--brand)', fontWeight: 600, textDecoration: 'underline' }}
+                      >
+                        📎 View Attached Certificate
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                        📎 {selectedLeave.medicalCertUrl}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -565,7 +594,7 @@ export function ApprovalsQueue() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <Button variant="danger" onClick={() => setSelectedCorrection(null)}>Reject</Button>
+              <Button variant="danger" onClick={handleRejectCorrection}>Reject</Button>
               <Button onClick={handleApproveCorrection}>Approve & Update</Button>
             </div>
           </div>
