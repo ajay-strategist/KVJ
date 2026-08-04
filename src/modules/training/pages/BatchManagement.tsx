@@ -410,6 +410,7 @@ export function BatchManagement() {
 
   // Modals & Action Handlers for Student Data Management
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
   const [addStudentModalOpen, setAddStudentModalOpen] = useState(false);
   const [newStudentForm, setNewStudentForm] = useState({
     name: '',
@@ -1441,8 +1442,7 @@ export function BatchManagement() {
     });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = async (file: File) => {
     if (!file) return;
 
     toast({
@@ -1602,6 +1602,7 @@ export function BatchManagement() {
           }
 
           setImportProgress(null);
+          setSelectedUploadFile(null);
           setStudents((prev) => [...prev, ...newStudentsList]);
           setUploadModalOpen(false);
           refreshBatches();
@@ -3749,27 +3750,118 @@ export function BatchManagement() {
 
       {/* UPLOAD EXCEL FILE MODAL */}
       {uploadModalOpen && (
-        <Drawer open={true} onClose={() => setUploadModalOpen(false)} title="📤 Upload Students Data (Excel / CSV)">
+        <Drawer
+          open={true}
+          onClose={() => {
+            setUploadModalOpen(false);
+            setSelectedUploadFile(null);
+            setImportProgress(null);
+          }}
+          title="📤 Upload Students Data (Excel / CSV)"
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
               Select an Excel file (<code>.xlsx</code> / <code>.csv</code>) to import multiple student records directly into the active batch registry.
             </p>
-            <div style={{
-              border: '2px dashed var(--brand)',
-              borderRadius: 12,
-              padding: 30,
-              textAlign: 'center',
-              background: 'var(--bg-sunken)',
-            }}>
-              <span style={{ fontSize: 32 }}>📄</span>
-              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>Choose Excel / CSV File</div>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                style={{ marginTop: 12 }}
-              />
-            </div>
+
+            {!importProgress ? (
+              <>
+                <div style={{
+                  border: '2px dashed var(--brand)',
+                  borderRadius: 12,
+                  padding: 30,
+                  textAlign: 'center',
+                  background: 'var(--bg-sunken)',
+                }}>
+                  <span style={{ fontSize: 32 }}>📄</span>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>Choose Excel / CSV File</div>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setSelectedUploadFile(file);
+                      }
+                    }}
+                    style={{ marginTop: 12 }}
+                  />
+                  {selectedUploadFile && (
+                    <div style={{
+                      marginTop: 12,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: 'var(--brand)',
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      display: 'inline-block'
+                    }}>
+                      📁 Selected: {selectedUploadFile.name} ({(selectedUploadFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => {
+                      setUploadModalOpen(false);
+                      setSelectedUploadFile(null);
+                      setImportProgress(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!selectedUploadFile}
+                    onClick={() => {
+                      if (selectedUploadFile) {
+                        handleFileUpload(selectedUploadFile);
+                      }
+                    }}
+                  >
+                    📤 Start Upload
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div style={{
+                border: '1px solid var(--border)',
+                borderRadius: 12,
+                padding: 24,
+                background: 'var(--bg-surface)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>⏳</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Uploading and Parsing File...
+                  </span>
+                </div>
+                
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+                  {importProgress.message}
+                </p>
+
+                <ProgressBar
+                  value={importProgress.current}
+                  max={importProgress.total}
+                  tone="brand"
+                  size="md"
+                  showLabel
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  <span>{Math.round((importProgress.current / importProgress.total) * 100)}% Complete</span>
+                  <span>{importProgress.current} / {importProgress.total} records</span>
+                </div>
+              </div>
+            )}
           </div>
         </Drawer>
       )}
@@ -4266,27 +4358,118 @@ export function BatchManagement() {
 
       {/* UPLOAD EXCEL FILE MODAL */}
       {uploadModalOpen && (
-        <Drawer open={true} onClose={() => setUploadModalOpen(false)} title="📤 Upload Students Data (Excel / CSV)">
+        <Drawer
+          open={true}
+          onClose={() => {
+            setUploadModalOpen(false);
+            setSelectedUploadFile(null);
+            setImportProgress(null);
+          }}
+          title="📤 Upload Students Data (Excel / CSV)"
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
               Select an Excel file (<code>.xlsx</code> / <code>.csv</code>) to import multiple student records directly into the active batch registry.
             </p>
-            <div style={{
-              border: '2px dashed var(--brand)',
-              borderRadius: 12,
-              padding: 30,
-              textAlign: 'center',
-              background: 'var(--bg-sunken)',
-            }}>
-              <span style={{ fontSize: 32 }}>📄</span>
-              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>Choose Excel / CSV File</div>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                style={{ marginTop: 12 }}
-              />
-            </div>
+
+            {!importProgress ? (
+              <>
+                <div style={{
+                  border: '2px dashed var(--brand)',
+                  borderRadius: 12,
+                  padding: 30,
+                  textAlign: 'center',
+                  background: 'var(--bg-sunken)',
+                }}>
+                  <span style={{ fontSize: 32 }}>📄</span>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>Choose Excel / CSV File</div>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setSelectedUploadFile(file);
+                      }
+                    }}
+                    style={{ marginTop: 12 }}
+                  />
+                  {selectedUploadFile && (
+                    <div style={{
+                      marginTop: 12,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: 'var(--brand)',
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      display: 'inline-block'
+                    }}>
+                      📁 Selected: {selectedUploadFile.name} ({(selectedUploadFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => {
+                      setUploadModalOpen(false);
+                      setSelectedUploadFile(null);
+                      setImportProgress(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!selectedUploadFile}
+                    onClick={() => {
+                      if (selectedUploadFile) {
+                        handleFileUpload(selectedUploadFile);
+                      }
+                    }}
+                  >
+                    📤 Start Upload
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div style={{
+                border: '1px solid var(--border)',
+                borderRadius: 12,
+                padding: 24,
+                background: 'var(--bg-surface)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>⏳</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Uploading and Parsing File...
+                  </span>
+                </div>
+                
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+                  {importProgress.message}
+                </p>
+
+                <ProgressBar
+                  value={importProgress.current}
+                  max={importProgress.total}
+                  tone="brand"
+                  size="md"
+                  showLabel
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  <span>{Math.round((importProgress.current / importProgress.total) * 100)}% Complete</span>
+                  <span>{importProgress.current} / {importProgress.total} records</span>
+                </div>
+              </div>
+            )}
           </div>
         </Drawer>
       )}
@@ -4724,7 +4907,7 @@ export function BatchManagement() {
         </Drawer>
       )}
 
-      {importProgress && (
+      {importProgress && !uploadModalOpen && (
         <div style={{
           position: 'fixed',
           top: 0,
