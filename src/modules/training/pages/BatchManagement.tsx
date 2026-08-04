@@ -1372,6 +1372,16 @@ export function BatchManagement() {
 
     if (existing) {
       studentId = existing.id;
+      const alreadyEnrolled = enrollments.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
+      if (alreadyEnrolled) {
+        toast({
+          variant: 'warning',
+          title: 'Already Enrolled',
+          message: `Student with phone "${phone}" is already enrolled in this batch.`,
+        });
+        setAddStudentModalOpen(false);
+        return;
+      }
     } else {
       const res = await registerStudent({
         firstName,
@@ -1419,7 +1429,10 @@ export function BatchManagement() {
         certificateStatus: 'Pending',
       };
 
-      setStudents((prev) => [...prev, newStudent]);
+      const alreadyInState = students.some(s => s.id === studentId);
+      if (!alreadyInState) {
+        setStudents((prev) => [...prev, newStudent]);
+      }
       refreshBatches();
       toast({
         variant: 'success',
@@ -1493,6 +1506,7 @@ export function BatchManagement() {
           let importedCount = 0;
           const newStudentsList: StudentRecord[] = [];
           const totalRows = parsed.length - 1;
+          const processedPhones = new Set<string>();
 
           for (let i = 1; i < parsed.length; i++) {
             const row = parsed[i];
@@ -1501,13 +1515,26 @@ export function BatchManagement() {
             const name = String(row[nameIdx] || '').trim();
             if (!name) continue;
 
+            const phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '+91 90000 00000';
+            const normalizedPhone = normalizeStudentKey(phone);
+
+            if (processedPhones.has(normalizedPhone)) {
+              continue;
+            }
+            processedPhones.add(normalizedPhone);
+
+            const alreadyInBatch = students.some(
+              (s) => normalizeStudentKey(s.phone) === normalizedPhone && batchStudentIds.has(s.id)
+            );
+            if (alreadyInBatch) {
+              continue;
+            }
+
             setImportProgress({
               current: i,
               total: totalRows,
               message: `Importing ${name} (${i} of ${totalRows})...`,
             });
-
-            const phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '+91 90000 00000';
             const email = emailIdx !== -1 ? String(row[emailIdx] || '').trim() : `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu`;
             const college = collegeIdx !== -1 ? String(row[collegeIdx] || '').trim() : activeBatch?.college || 'Christ College';
             const department = deptIdx !== -1 ? String(row[deptIdx] || '').trim() : activeBatch?.program || 'BBA';
@@ -1627,7 +1654,17 @@ export function BatchManagement() {
   const [students, setStudents] = useState<StudentRecord[]>([]);
 
   const filteredStudents = useMemo(() => {
-    return students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id));
+    const enrolled = students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id));
+    const seenPhones = new Set<string>();
+    const unique: StudentRecord[] = [];
+    for (const student of enrolled) {
+      const phoneKey = normalizeStudentKey(student.phone);
+      if (!seenPhones.has(phoneKey)) {
+        seenPhones.add(phoneKey);
+        unique.push(student);
+      }
+    }
+    return unique;
   }, [students, selectedBatchId, batchStudentIds]);
 
   const dailyReportFixture = useMemo<DailyReportData>(() => {
@@ -1761,6 +1798,72 @@ export function BatchManagement() {
     } catch {}
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!selectedBatchId || students.length === 0 || enrollments.length === 0) return;
+
+    const cleanDuplicates = async () => {
+      const enrolled = students.filter((s) => batchStudentIds.has(s.id));
+      const groups: Record<string, StudentRecord[]> = {};
+      
+      for (const student of enrolled) {
+        const key = normalizeStudentKey(student.phone);
+        if (!groups[key]) {
+          groups[key] = [];
+        }
+        groups[key].push(student);
+      }
+
+      const enrollmentsToDelete: string[] = [];
+      const studentsToDelete: string[] = [];
+
+      for (const [phone, list] of Object.entries(groups)) {
+        if (list.length > 1) {
+          const duplicates = list.slice(1);
+          for (const dupe of duplicates) {
+            enrollmentsToDelete.push(dupe.id);
+            studentsToDelete.push(dupe.id);
+          }
+        }
+      }
+
+      if (enrollmentsToDelete.length > 0) {
+        try {
+          const { error: enrollError } = await supabase
+            .from('flwdsk_enrollments')
+            .delete()
+            .eq('batch_id', selectedBatchId)
+            .in('student_id', enrollmentsToDelete);
+
+          if (enrollError) {
+            console.error('Error deleting duplicate enrollments:', enrollError.message);
+          } else {
+            const { error: studentError } = await supabase
+              .from('flwdsk_student_records')
+              .delete()
+              .in('id', studentsToDelete);
+
+            if (studentError) {
+              console.error('Error deleting duplicate student records:', studentError.message);
+            }
+
+            refreshBatches();
+            setStudents((prev) => prev.filter((s) => !studentsToDelete.includes(s.id)));
+            
+            toast({
+              variant: 'info',
+              title: 'Duplicates Cleaned',
+              message: `Automatically removed ${enrollmentsToDelete.length} duplicate student records from this batch.`,
+            });
+          }
+        } catch (err: any) {
+          console.error('Error cleaning duplicate student records:', err.message);
+        }
+      }
+    };
+
+    cleanDuplicates();
+  }, [selectedBatchId, students, enrollments, batchStudentIds, refreshBatches]);
 
   const saveStudentToDb = async (student: StudentRecord) => {
     try {
