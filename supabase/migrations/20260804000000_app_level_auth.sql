@@ -141,7 +141,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.flwdsk_set_password(uuid, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.flwdsk_set_password(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.flwdsk_set_password(uuid, text) TO anon, authenticated;
 
 
 -- 5. Initialise existing employees with default password -----------------------
