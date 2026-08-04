@@ -121,9 +121,8 @@ export class ProjectService implements IProjectService {
   async createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
       const isSelfAssigned = !data.assigneeId || data.assigneeId === actor.id;
-      const r = (actor.role || '').toUpperCase();
-      const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(r);
-      const needsAssignmentApproval = !isSelfAssigned && !isManagement;
+      const roleUpper = (actor.role || '').toUpperCase();
+      const needsAssignmentApproval = !isSelfAssigned && roleUpper !== 'CEO';
 
       // Automatically set supervisor to assigning employee (actor.id) if not specified
       const supervisorId = data.supervisorId || actor.id;
@@ -180,9 +179,8 @@ export class ProjectService implements IProjectService {
       const existing = await this.taskRepo.findById(taskId);
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
         const isSelfAssigned = patch.assigneeId === actor.id;
-        const r = (actor.role || '').toUpperCase();
-        const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(r);
-        if (!isSelfAssigned && !isManagement) {
+        const roleUpper = (actor.role || '').toUpperCase();
+        if (!isSelfAssigned && roleUpper !== 'CEO') {
           patch.approvalStatus = 'pending_assignment_approval';
           (patch as any).assignedByEmployeeId = actor.id;
           if (!patch.supervisorId) patch.supervisorId = actor.id;

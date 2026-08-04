@@ -285,7 +285,7 @@ export function TaskBoard({
     const finalSupervisorId = supervisor ? supervisor.id : user?.id;
 
     const isSelfAssigned = assignee?.id === user?.id || (!assignee && !values.assignee);
-    const approvalStatus = (!isManagement && !isSelfAssigned) ? 'pending_assignment_approval' : null;
+    const approvalStatus = (!isSelfAssigned && user?.role?.toUpperCase() !== 'CEO') ? 'pending_assignment_approval' : null;
 
     const res = await createTask({
       projectId: proj?.id,
@@ -802,12 +802,37 @@ export function TaskBoard({
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Action: Approve Assignment for Management */}
-                    {t.approvalStatus === 'pending_assignment_approval' && isManagement && (
-                      <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
-                        ✓ Approve Assignment
-                      </Button>
-                    )}
+                    {/* Action: Approve Assignment */}
+                    {(() => {
+                      if (t.approvalStatus !== 'pending_assignment_approval') return null;
+
+                      // Check if creator is Admin or Manager
+                      const creator = employees.find(e => e.id === t.assignedByEmployeeId);
+                      const creatorRole = (creator?.role || '').toUpperCase();
+                      const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
+
+                      if (needsCeoOnly) {
+                        if (user?.role?.toUpperCase() === 'CEO') {
+                          return (
+                            <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
+                              ✓ Approve Assignment (CEO)
+                            </Button>
+                          );
+                        } else {
+                          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Requires CEO Approval</span>;
+                        }
+                      }
+
+                      if (isManagement) {
+                        return (
+                          <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
+                            ✓ Approve Assignment
+                          </Button>
+                        );
+                      }
+
+                      return null;
+                    })()}
 
                     {/* Action 1: Assign to Me */}
                     {t.assignee === 'Unassigned' && (
