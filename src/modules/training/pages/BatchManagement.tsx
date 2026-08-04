@@ -87,11 +87,15 @@ interface StudentRecord {
   selectedVoucherId?: string;
   retestPaymentStatus?: 'Paid' | 'Pending';
   retestCollectedAmount?: number;
-  voucherStatus: string;
-  certificateStatus: string;
   retestApproved?: boolean;
   retestDate?: string;
   retestScore?: number;
+  gender?: 'Male' | 'Female';
+  qualification?: string;
+  hasComputer?: 'Yes' | 'No';
+  learnedBefore?: 'Yes' | 'No';
+  voucherStatus: string;
+  certificateStatus: string;
 }
 
 interface EmailHistoryItem {
@@ -226,87 +230,7 @@ export function BatchManagement() {
     }
   };
 
-  // Daily Report Builder & Preview States
-  const [dailyReportBuilderOpen, setDailyReportBuilderOpen] = useState(false);
-  const [dailyReportPreviewOpen, setDailyReportPreviewOpen] = useState(false);
-
-  const dailyReportFixture = useMemo<DailyReportData>(() => {
-    const selectedBatch = (batches || []).find((b) => b.id === selectedBatchId);
-    const batchStudents = (dbStudents || []).filter((s) => {
-      return (enrollments || []).some((e) => e.batchId === selectedBatchId && e.studentId === s.id);
-    });
-
-    return {
-      reportDate: todayISO(),
-      batchId: selectedBatchId,
-      batchCode: selectedBatch?.code || '',
-      batchName: selectedBatch?.trainingName || '',
-      collegeName: selectedBatch?.college || '',
-      courseName: selectedBatch?.courseId || '',
-      academicYear: '2026',
-      trainerName: 'Ajay V. Strategy',
-      coordinatorName: 'Ajay V. Strategy',
-      totalStudents: batchStudents.length,
-      courseMaxMarks: 100,
-      finalExamPassMarkPercent: 50,
-      assessments: [],
-      sessions: [],
-      students: batchStudents.map((s) => ({
-        id: s.id,
-        avatarUrl: s.photoUrl || s.customFields?.photoUrl || '',
-        registerNo: s.registerNo || '',
-        phone: s.phone || '',
-        name: `${s.firstName} ${s.lastName}`,
-        email: s.email || '',
-        college: selectedBatch?.college || '',
-        batch: selectedBatch?.trainingName || '',
-        gender: (s.customFields?.gender || 'Female') as 'Male' | 'Female',
-        qualification: s.academicQualification || '',
-        hasComputer: (s.customFields?.hasComputer || 'Yes') as 'Yes' | 'No',
-        learnedBefore: (s.customFields?.learnedBefore || 'No') as 'Yes' | 'No',
-        attendancePct: 100,
-        totalPresent: 0,
-        totalSessions: 0,
-        assessmentScores: {},
-        assessmentStatus: 'Pending',
-        finalExamEligibility: 'Eligible',
-      })),
-      progressMilestones: [],
-      riskItems: [],
-      defaultTrainerNotes: 'No notes registered.',
-    };
-  }, [selectedBatchId, batches, dbStudents, enrollments]);
-
-  const [dailyReportConfig, setDailyReportConfig] = useState<DailyReportConfig>(() => ({
-    selectedSections: [
-      'executive-summary',
-      'datewise-attendance',
-      'assessment-status',
-      'final-exam-eligibility',
-      'student-data',
-    ],
-    selectedAssessmentIds: [],
-    selectedStudentColumns: ['studentName', 'gender', 'hasComputer', 'learnedBefore', 'attendancePct', 'assessmentStatus', 'finalExamEligibility'],
-    trainerNotes: 'No notes registered.',
-  }));
-
-  useEffect(() => {
-    setDailyReportConfig((prev) => ({
-      ...prev,
-      trainerNotes: dailyReportFixture.defaultTrainerNotes,
-      selectedAssessmentIds: dailyReportFixture.assessments.map((a) => a.id),
-      selectedStudentColumns: [
-        'studentName',
-        'gender',
-        'hasComputer',
-        'learnedBefore',
-        'attendancePct',
-        ...dailyReportFixture.assessments.map((a) => a.id),
-        'assessmentStatus',
-        'finalExamEligibility',
-      ],
-    }));
-  }, [dailyReportFixture]);
+  // dailyReportFixture and dailyReportConfig states are defined lower down.
 
   // Batch selection - declared at the top of the component
   
@@ -1056,8 +980,21 @@ export function BatchManagement() {
           const hasPhotoChanged = reg.photoUrl && reg.photoUrl !== currentStudent.photoUrl;
           const hasPhoneChanged = reg.phone && reg.phone !== currentStudent.phone;
           const hasEmailChanged = reg.email && reg.email !== currentStudent.email;
+          const hasGenderChanged = reg.gender && reg.gender !== currentStudent.gender;
+          const hasQualChanged = reg.qualification && reg.qualification !== currentStudent.qualification;
+          const hasCompChanged = reg.hasComputer && reg.hasComputer !== currentStudent.hasComputer;
+          const hasLearnedChanged = reg.learnedBefore && reg.learnedBefore !== currentStudent.learnedBefore;
 
-          if (hasPhotoChanged || hasPhoneChanged || hasEmailChanged) {
+          if (
+            hasPhotoChanged ||
+            hasPhoneChanged ||
+            hasEmailChanged ||
+            hasGenderChanged ||
+            hasQualChanged ||
+            hasCompChanged ||
+            hasLearnedChanged ||
+            !currentStudent.gender
+          ) {
             const updatedStudent: StudentRecord = {
               ...currentStudent,
               photoUrl: reg.photoUrl || currentStudent.photoUrl,
@@ -1066,6 +1003,10 @@ export function BatchManagement() {
               email: reg.email || currentStudent.email,
               college: reg.college || currentStudent.college,
               department: reg.batch || currentStudent.department,
+              gender: (reg.gender || currentStudent.gender || 'Female') as 'Male' | 'Female',
+              qualification: reg.qualification || currentStudent.qualification || '',
+              hasComputer: (reg.hasComputer || currentStudent.hasComputer || 'Yes') as 'Yes' | 'No',
+              learnedBefore: (reg.learnedBefore || currentStudent.learnedBefore || 'No') as 'Yes' | 'No',
             };
             updatedStudents[existingIdx] = updatedStudent;
 
@@ -1109,7 +1050,7 @@ export function BatchManagement() {
               college: reg.college,
               department: reg.batch,
               attendancePct: 100,
-              attendanceStatus: 'Regular',
+              attendanceStatus: 'Regular' as const,
               ass1: 0,
               ass2: 0,
               ass3: 0,
@@ -1119,23 +1060,40 @@ export function BatchManagement() {
               voucherId: `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}`,
               voucherStatus: 'Assigned',
               certificateStatus: 'Pending',
+              gender: reg.gender || 'Female',
+              qualification: reg.qualification || '',
+              hasComputer: reg.hasComputer || 'Yes',
+              learnedBefore: reg.learnedBefore || 'No',
             };
 
-            const res = await registerStudent({
-              firstName,
-              lastName,
-              phone: reg.phone,
-              email: reg.email,
-              customFields,
-            });
+            const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
+            const existing = await repo.findByRegisterNo(reg.phone);
+            let studentId = '';
 
-            if (res.ok) {
-              if (selectedBatchId) {
-                await enrollStudent(res.value.id, selectedBatchId);
+            if (existing) {
+              studentId = existing.id;
+            } else {
+              const res = await registerStudent({
+                firstName,
+                lastName,
+                phone: reg.phone,
+                email: reg.email,
+                photoUrl: reg.photoUrl,
+                customFields,
+              });
+              if (res.ok) {
+                studentId = res.value.id;
+              }
+            }
+
+            if (studentId) {
+              const alreadyEnrolled = enrollments.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
+              if (!alreadyEnrolled && selectedBatchId) {
+                await enrollStudent(studentId, selectedBatchId);
               }
 
               const newStudent: StudentRecord = {
-                id: res.value.id,
+                id: studentId,
                 name: reg.name,
                 photo: reg.photoUrl ? '📷' : '🎓',
                 photoUrl: reg.photoUrl,
@@ -1154,6 +1112,10 @@ export function BatchManagement() {
                 voucherId: customFields.voucherId,
                 voucherStatus: 'Assigned',
                 certificateStatus: 'Pending',
+                gender: (reg.gender || 'Female') as 'Male' | 'Female',
+                qualification: reg.qualification || '',
+                hasComputer: (reg.hasComputer || 'Yes') as 'Yes' | 'No',
+                learnedBefore: (reg.learnedBefore || 'No') as 'Yes' | 'No',
               };
               updatedStudents.push(newStudent);
               dbCreated++;
@@ -1514,6 +1476,10 @@ export function BatchManagement() {
           const ass1Idx = headerRow.findIndex(h => h.includes('ass1') || h.includes('assessment1'));
           const ass2Idx = headerRow.findIndex(h => h.includes('ass2') || h.includes('assessment2'));
           const ass3Idx = headerRow.findIndex(h => h.includes('ass3') || h.includes('assessment3'));
+          const genderIdx = headerRow.findIndex(h => h.includes('gender') || h.includes('sex'));
+          const qualIdx = headerRow.findIndex(h => h.includes('qualification') || h.includes('degree'));
+          const compIdx = headerRow.findIndex(h => h.includes('computer') || h.includes('laptop') || h.includes('hasacomputer'));
+          const prevIdx = headerRow.findIndex(h => h.includes('learned') || h.includes('prior') || h.includes('experienced'));
 
           if (nameIdx === -1) {
             toast({
@@ -1549,6 +1515,13 @@ export function BatchManagement() {
             const ass1 = ass1Idx !== -1 ? Number(row[ass1Idx]) || 0 : 0;
             const ass2 = ass2Idx !== -1 ? Number(row[ass2Idx]) || 0 : 0;
             const ass3 = ass3Idx !== -1 ? Number(row[ass3Idx]) || 0 : 0;
+            const rawGender = genderIdx !== -1 ? String(row[genderIdx] || '').trim() : 'Female';
+            const gender = (rawGender.toLowerCase().startsWith('m') ? 'Male' : 'Female') as 'Male' | 'Female';
+            const qualification = qualIdx !== -1 ? String(row[qualIdx] || '').trim() : '';
+            const rawComp = compIdx !== -1 ? String(row[compIdx] || '').trim() : 'Yes';
+            const hasComputer = (rawComp.toLowerCase().includes('no') || rawComp.toLowerCase() === 'lab') ? 'No' : 'Yes';
+            const rawPrev = prevIdx !== -1 ? String(row[prevIdx] || '').trim() : 'No';
+            const learnedBefore = (rawPrev.toLowerCase().includes('yes') || rawPrev.toLowerCase() === 'experienced') ? 'Yes' : 'No';
 
             const names = name.split(' ');
             const firstName = names[0] || 'Student';
@@ -1569,6 +1542,10 @@ export function BatchManagement() {
               voucherId: eligible ? `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}` : '',
               voucherStatus: eligible ? 'Assigned' : 'Unassigned',
               certificateStatus: 'Pending',
+              gender,
+              qualification,
+              hasComputer,
+              learnedBefore,
             };
 
             const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
@@ -1615,6 +1592,10 @@ export function BatchManagement() {
                 voucherId: customFields.voucherId,
                 voucherStatus: customFields.voucherStatus,
                 certificateStatus: 'Pending',
+                gender,
+                qualification,
+                hasComputer: hasComputer as 'Yes' | 'No',
+                learnedBefore: learnedBefore as 'Yes' | 'No',
               });
               importedCount++;
             }
@@ -1643,6 +1624,94 @@ export function BatchManagement() {
 
   // Student list state — initialized from and saved to localStorage with DB sync fallback
   const [students, setStudents] = useState<StudentRecord[]>([]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id));
+  }, [students, selectedBatchId, batchStudentIds]);
+
+  const dailyReportFixture = useMemo<DailyReportData>(() => {
+    const selectedBatch = (batches || []).find((b) => b.id === selectedBatchId);
+    
+    // Resolve active trainer name dynamically
+    const safeTrainers = Array.isArray(trainers) ? trainers : [];
+    const activeTrainer = selectedBatch ? safeTrainers.find((t) => t && t.id === selectedBatch.trainerId) : null;
+    const trainerNameStr = activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'Lead Trainer';
+
+    return {
+      reportDate: todayISO(),
+      batchId: selectedBatchId,
+      batchCode: selectedBatch?.code || '',
+      batchName: selectedBatch?.trainingName || '',
+      collegeName: selectedBatch?.college || '',
+      courseName: selectedBatch?.courseId || '',
+      academicYear: '2026',
+      trainerName: trainerNameStr,
+      coordinatorName: selectedBatch?.coordinator || 'Coordinator',
+      totalStudents: filteredStudents.length,
+      courseMaxMarks: 100,
+      finalExamPassMarkPercent: 50,
+      assessments: [],
+      sessions: [],
+      students: filteredStudents.map((s) => ({
+        id: s.id,
+        avatarUrl: s.photoUrl || '',
+        registerNo: s.phone || '',
+        phone: s.phone || '',
+        name: s.name,
+        email: s.email || '',
+        college: selectedBatch?.college || '',
+        batch: selectedBatch?.trainingName || '',
+        gender: (s.gender || 'Female') as 'Male' | 'Female',
+        qualification: s.qualification || '',
+        hasComputer: (s.hasComputer || 'Yes') as 'Yes' | 'No',
+        learnedBefore: (s.learnedBefore || 'No') as 'Yes' | 'No',
+        attendancePct: s.attendancePct,
+        totalPresent: 0,
+        totalSessions: 0,
+        assessmentScores: {},
+        assessmentStatus: 'Pending',
+        finalExamEligibility: 'Eligible',
+      })),
+      progressMilestones: [],
+      riskItems: [],
+      defaultTrainerNotes: 'No notes registered.',
+    };
+  }, [selectedBatchId, batches, filteredStudents, trainers]);
+
+  // Daily Report Builder & Preview States
+  const [dailyReportBuilderOpen, setDailyReportBuilderOpen] = useState(false);
+  const [dailyReportPreviewOpen, setDailyReportPreviewOpen] = useState(false);
+
+  const [dailyReportConfig, setDailyReportConfig] = useState<DailyReportConfig>(() => ({
+    selectedSections: [
+      'executive-summary',
+      'datewise-attendance',
+      'assessment-status',
+      'final-exam-eligibility',
+      'student-data',
+    ],
+    selectedAssessmentIds: [],
+    selectedStudentColumns: ['studentName', 'gender', 'hasComputer', 'learnedBefore', 'attendancePct', 'assessmentStatus', 'finalExamEligibility'],
+    trainerNotes: 'No notes registered.',
+  }));
+
+  useEffect(() => {
+    setDailyReportConfig((prev) => ({
+      ...prev,
+      trainerNotes: dailyReportFixture.defaultTrainerNotes,
+      selectedAssessmentIds: dailyReportFixture.assessments.map((a) => a.id),
+      selectedStudentColumns: [
+        'studentName',
+        'gender',
+        'hasComputer',
+        'learnedBefore',
+        'attendancePct',
+        ...dailyReportFixture.assessments.map((a) => a.id),
+        'assessmentStatus',
+        'finalExamEligibility',
+      ],
+    }));
+  }, [dailyReportFixture]);
 
   useEffect(() => {
     let active = true;
@@ -1679,6 +1748,10 @@ export function BatchManagement() {
               retestPaymentStatus: fields.retestPaymentStatus || 'Unpaid',
               retestCollectedAmount: fields.retestCollectedAmount ?? 0,
               retestVoucherId: fields.retestVoucherId || '',
+              gender: fields.gender || 'Female',
+              qualification: fields.qualification || s.academicQualification || '',
+              hasComputer: fields.hasComputer || 'Yes',
+              learnedBefore: fields.learnedBefore || 'No',
             };
           });
           setStudents(mapped);
@@ -1710,6 +1783,10 @@ export function BatchManagement() {
           course: student.course || '',
           examDate: student.examDate || '',
           photoUrl: student.photoUrl || '',
+          gender: (student as any).gender || 'Female',
+          qualification: (student as any).qualification || '',
+          hasComputer: (student as any).hasComputer || 'Yes',
+          learnedBefore: (student as any).learnedBefore || 'No',
           ass1: student.ass1,
           ass2: student.ass2,
           ass3: student.ass3,
