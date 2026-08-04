@@ -447,7 +447,6 @@ export function BatchManagement() {
     const payload = {
       first_name: firstName,
       last_name: lastName,
-      name: newFinalExamStudentForm.name,
       phone: newFinalExamStudentForm.phone || '+91 90000 00000',
       email: `${newFinalExamStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
       custom_fields: {
@@ -1868,7 +1867,6 @@ export function BatchManagement() {
       const payload = {
         first_name: firstName,
         last_name: lastName,
-        name: student.name,
         phone: normalizeStudentKey(student.phone || '9876500000'),
         email: student.email,
         photo_url: student.photoUrl || '',
