@@ -77,7 +77,7 @@ export function LoginPage() {
 
   const doLogin = async () => {
     if (!identifier.trim() || !password.trim()) {
-      setError('Please enter your username/email and password.');
+      setError('Please enter your email and password.');
       return;
     }
 
@@ -98,7 +98,7 @@ export function LoginPage() {
         navigate('/app');
       }
     } catch (e) {
-      setError(e instanceof AppError ? e.message : 'Invalid username/email or password.');
+      setError(e instanceof AppError ? e.message : 'Invalid email or password.');
     } finally {
       setBusy(false);
     }
@@ -138,7 +138,7 @@ export function LoginPage() {
 
   const doForgot = async () => {
     if (!identifier.trim()) {
-      setError('Please enter your email or username.');
+      setError('Please enter your email address.');
       return;
     }
     setBusy(true);
@@ -202,13 +202,14 @@ export function LoginPage() {
             {view === 'login' && (
               <>
                 <label style={fieldWrap}>
-                  <span style={lbl}>Username or Email</span>
+                  <span style={lbl}>Email</span>
                   <input
                     className="kvj-input"
-                    type="text"
+                    type="email"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Enter username or email"
+                    placeholder="you@kvjanalytics.com"
+                    autoComplete="email"
                     onKeyDown={(e) => e.key === 'Enter' && doLogin()}
                   />
                 </label>
@@ -341,8 +342,8 @@ export function LoginPage() {
             {view === 'forgot' && (
               <>
                 <label style={fieldWrap}>
-                  <span style={lbl}>Username or Email</span>
-                  <input className="kvj-input" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="you@kvjanalytics.com" />
+                  <span style={lbl}>Email</span>
+                  <input className="kvj-input" type="email" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="you@kvjanalytics.com" autoComplete="email" />
                 </label>
                 <Button onClick={doForgot} disabled={busy} style={{ width: '100%', justifyContent: 'center', height: 42, fontSize: 14 }}>
                   {busy ? 'Sending...' : 'Send reset link'}
