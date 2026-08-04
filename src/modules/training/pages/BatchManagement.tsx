@@ -3212,6 +3212,212 @@ export function BatchManagement() {
           initialConfig={dailyReportConfig}
         />
       )}
+
+      {/* UPLOAD EXCEL FILE MODAL */}
+      {uploadModalOpen && (
+        <Drawer open={true} onClose={() => setUploadModalOpen(false)} title="📤 Upload Students Data (Excel / CSV)">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+              Select an Excel file (<code>.xlsx</code> / <code>.csv</code>) to import multiple student records directly into the active batch registry.
+            </p>
+            <div style={{
+              border: '2px dashed var(--brand)',
+              borderRadius: 12,
+              padding: 30,
+              textAlign: 'center',
+              background: 'var(--bg-sunken)',
+            }}>
+              <span style={{ fontSize: 32 }}>📄</span>
+              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>Choose Excel / CSV File</div>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                style={{ marginTop: 12 }}
+              />
+            </div>
+          </div>
+        </Drawer>
+      )}
+
+      {/* ADD STUDENT DATA INDIVIDUAL MODAL */}
+      {addStudentModalOpen && (
+        <Drawer open={true} onClose={() => setAddStudentModalOpen(false)} title="➕ Add Student Record">
+          <form onSubmit={handleAddStudentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Student Full Name</label>
+              <input
+                type="text"
+                className="kvj-input"
+                required
+                value={newStudentForm.name}
+                onChange={(e) => setNewStudentForm({ ...newStudentForm, name: e.target.value })}
+                placeholder="e.g. Anoop Varghese"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Email Address</label>
+              <input
+                type="email"
+                className="kvj-input"
+                value={newStudentForm.email}
+                onChange={(e) => setNewStudentForm({ ...newStudentForm, email: e.target.value })}
+                placeholder="anoop.v@student.edu"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Phone Number</label>
+              <input
+                type="text"
+                className="kvj-input"
+                value={newStudentForm.phone}
+                onChange={(e) => setNewStudentForm({ ...newStudentForm, phone: e.target.value })}
+                placeholder="+91 98950 12345"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Initial Attendance %</label>
+              <input
+                type="number"
+                className="kvj-input"
+                value={newStudentForm.attendancePct}
+                onChange={(e) => setNewStudentForm({ ...newStudentForm, attendancePct: Number(e.target.value) })}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
+              <Button type="button" variant="secondary" onClick={() => setAddStudentModalOpen(false)}>Cancel</Button>
+              <Button type="submit">Add Student</Button>
+            </div>
+          </form>
+        </Drawer>
+      )}
+
+      {/* UPLOAD VOUCHER FILE MODAL */}
+      {uploadVoucherModalOpen && (
+        <Drawer open={true} onClose={() => setUploadVoucherModalOpen(false)} title="📤 Upload Voucher IDs File (3 Fields)">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+              Select the returned Voucher ID CSV file (containing columns <code>Phone Number</code>, <code>Name</code>, <code>Voucher ID</code>) to update student voucher assignments automatically.
+            </p>
+            <div style={{
+              border: '2px dashed var(--brand)',
+              borderRadius: 12,
+              padding: 30,
+              textAlign: 'center',
+              background: 'var(--bg-sunken)',
+            }}>
+              <span style={{ fontSize: 32 }}>📜</span>
+              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>Choose Voucher Template CSV File</div>
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleVoucherUpload}
+                style={{ marginTop: 12 }}
+              />
+            </div>
+          </div>
+        </Drawer>
+      )}
+
+      {/* ADD FINAL EXAM STUDENT MODAL */}
+      {addFinalExamModalOpen && (
+        <Drawer open={true} onClose={() => setAddFinalExamModalOpen(false)} title="🎓 Add Student for Final Exam">
+          <form onSubmit={handleAddFinalExamStudentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Student Full Name</label>
+              <input
+                type="text"
+                className="kvj-input"
+                required
+                placeholder="e.g. Rahul Sharma"
+                value={newFinalExamStudentForm.name}
+                onChange={(e) => setNewFinalExamStudentForm({ ...newFinalExamStudentForm, name: e.target.value })}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Phone Number</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  placeholder="+91 98765 00000"
+                  value={newFinalExamStudentForm.phone}
+                  onChange={(e) => setNewFinalExamStudentForm({ ...newFinalExamStudentForm, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>College Name</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  value={newFinalExamStudentForm.college}
+                  onChange={(e) => setNewFinalExamStudentForm({ ...newFinalExamStudentForm, college: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Course</label>
+                <select
+                  className="kvj-input"
+                  value={newFinalExamStudentForm.course}
+                  onChange={(e) => setNewFinalExamStudentForm({ ...newFinalExamStudentForm, course: e.target.value })}
+                >
+                  <option value="Data Analytics">Data Analytics</option>
+                  <option value="Power BI & Tableau">Power BI BI & Tableau</option>
+                  <option value="Fullstack Web Dev">Fullstack Web Dev</option>
+                  <option value="Cloud Architecture">Cloud Architecture</option>
+                  <option value="AI & Machine Learning">AI & Machine Learning</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Exam Date</label>
+                <input
+                  type="date"
+                  className="kvj-input"
+                  value={newFinalExamStudentForm.examDate}
+                  onChange={(e) => setNewFinalExamStudentForm({ ...newFinalExamStudentForm, examDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Exam Mark</label>
+                <input
+                  type="number"
+                  className="kvj-input"
+                  placeholder="e.g. 85"
+                  value={newFinalExamStudentForm.finalExam}
+                  onChange={(e) => setNewFinalExamStudentForm({ ...newFinalExamStudentForm, finalExam: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Voucher ID (Optional)</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  placeholder="VOUCH-CHRIST-108"
+                  value={newFinalExamStudentForm.voucherId}
+                  onChange={(e) => setNewFinalExamStudentForm({ ...newFinalExamStudentForm, voucherId: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
+              <Button type="button" variant="secondary" onClick={() => setAddFinalExamModalOpen(false)}>Cancel</Button>
+              <Button type="submit">➕ Save Student Record</Button>
+            </div>
+          </form>
+        </Drawer>
+      )}
       </AppShell>
     );
   }
