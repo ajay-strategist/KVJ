@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { TrainingBatchCarousel, type BatchAction } from '../components/TrainingBatchCarousel';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Card, SectionHeader, Badge, ProgressBar } from '../../../shared/ui/components';
@@ -1355,91 +1356,64 @@ export function BatchManagement() {
 
     try {
       const reader = new FileReader();
-      reader.onload = async () => {
-        const text = reader.result as string;
-        const parsed = parseCsv(text);
-        if (parsed.length <= 1) {
-          toast({ variant: 'error', title: 'Upload Failed', message: 'The CSV file is empty or invalid.' });
-          return;
-        }
+      reader.onload = async (event) => {
+        try {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const parsed: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        const headers = parsed[0].map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
-        const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('student'));
-        const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact'));
-        const emailIdx = headers.findIndex(h => h.includes('email'));
-        const collegeIdx = headers.findIndex(h => h.includes('college') || h.includes('university') || h.includes('school'));
-        const deptIdx = headers.findIndex(h => h.includes('dept') || h.includes('department') || h.includes('program') || h.includes('stream'));
-        const attnIdx = headers.findIndex(h => h.includes('att') || h.includes('attendance') || h.includes('pct'));
-        const ass1Idx = headers.findIndex(h => h.includes('ass1') || h.includes('assessment1'));
-        const ass2Idx = headers.findIndex(h => h.includes('ass2') || h.includes('assessment2'));
-        const ass3Idx = headers.findIndex(h => h.includes('ass3') || h.includes('assessment3'));
+          if (parsed.length <= 1) {
+            toast({ variant: 'error', title: 'Upload Failed', message: 'The spreadsheet is empty or invalid.' });
+            return;
+          }
 
-        if (nameIdx === -1) {
-          toast({
-            variant: 'error',
-            title: 'Invalid CSV Format',
-            message: 'CSV must contain a "Name" column to identify students.',
-          });
-          return;
-        }
+          const headerRow = parsed[0].map(h => String(h || '').toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
+          const nameIdx = headerRow.findIndex(h => h.includes('name') || h.includes('student'));
+          const phoneIdx = headerRow.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'));
+          const emailIdx = headerRow.findIndex(h => h.includes('email'));
+          const collegeIdx = headerRow.findIndex(h => h.includes('college') || h.includes('university') || h.includes('school'));
+          const deptIdx = headerRow.findIndex(h => h.includes('dept') || h.includes('department') || h.includes('program') || h.includes('stream'));
+          const attnIdx = headerRow.findIndex(h => h.includes('att') || h.includes('attendance') || h.includes('pct'));
+          const ass1Idx = headerRow.findIndex(h => h.includes('ass1') || h.includes('assessment1'));
+          const ass2Idx = headerRow.findIndex(h => h.includes('ass2') || h.includes('assessment2'));
+          const ass3Idx = headerRow.findIndex(h => h.includes('ass3') || h.includes('assessment3'));
 
-        let importedCount = 0;
-        const newStudentsList: StudentRecord[] = [];
+          if (nameIdx === -1) {
+            toast({
+              variant: 'error',
+              title: 'Invalid Spreadsheet Format',
+              message: 'Spreadsheet must contain a "Name" column to identify students.',
+            });
+            return;
+          }
 
-        for (let i = 1; i < parsed.length; i++) {
-          const row = parsed[i];
-          const name = row[nameIdx]?.trim() || '';
-          if (!name) continue;
+          let importedCount = 0;
+          const newStudentsList: StudentRecord[] = [];
 
-          const phone = phoneIdx !== -1 ? row[phoneIdx]?.trim() || '+91 90000 00000' : '+91 90000 00000';
-          const email = emailIdx !== -1 ? row[emailIdx]?.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu` : `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu`;
-          const college = collegeIdx !== -1 ? row[collegeIdx]?.trim() || activeBatch?.college || 'Christ College' : activeBatch?.college || 'Christ College';
-          const department = deptIdx !== -1 ? row[deptIdx]?.trim() || activeBatch?.program || 'BBA' : activeBatch?.program || 'BBA';
-          const attendancePct = attnIdx !== -1 ? Number(row[attnIdx]) || 100 : 100;
-          const ass1 = ass1Idx !== -1 ? Number(row[ass1Idx]) || 0 : 0;
-          const ass2 = ass2Idx !== -1 ? Number(row[ass2Idx]) || 0 : 0;
-          const ass3 = ass3Idx !== -1 ? Number(row[ass3Idx]) || 0 : 0;
+          for (let i = 1; i < parsed.length; i++) {
+            const row = parsed[i];
+            if (!row || row.length === 0) continue;
 
-          const names = name.split(' ');
-          const firstName = names[0] || 'Student';
-          const lastName = names.slice(1).join(' ') || '';
+            const name = String(row[nameIdx] || '').trim();
+            if (!name) continue;
 
-          const eligible = attendancePct >= 84;
-          const customFields = {
-            college,
-            department,
-            attendancePct,
-            attendanceStatus: eligible ? 'Regular' : 'Irregular',
-            ass1,
-            ass2,
-            ass3,
-            project: 0,
-            finalExam: 0,
-            overallScore: Math.round((ass1 + ass2 + ass3) / 3),
-            voucherId: eligible ? `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}` : '',
-            voucherStatus: eligible ? 'Assigned' : 'Unassigned',
-            certificateStatus: 'Pending',
-          };
+            const phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '+91 90000 00000';
+            const email = emailIdx !== -1 ? String(row[emailIdx] || '').trim() : `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu`;
+            const college = collegeIdx !== -1 ? String(row[collegeIdx] || '').trim() : activeBatch?.college || 'Christ College';
+            const department = deptIdx !== -1 ? String(row[deptIdx] || '').trim() : activeBatch?.program || 'BBA';
+            const attendancePct = attnIdx !== -1 ? Number(row[attnIdx]) || 100 : 100;
+            const ass1 = ass1Idx !== -1 ? Number(row[ass1Idx]) || 0 : 0;
+            const ass2 = ass2Idx !== -1 ? Number(row[ass2Idx]) || 0 : 0;
+            const ass3 = ass3Idx !== -1 ? Number(row[ass3Idx]) || 0 : 0;
 
-          const res = await registerStudent({
-            firstName,
-            lastName,
-            phone,
-            email,
-            customFields,
-          });
+            const names = name.split(' ');
+            const firstName = names[0] || 'Student';
+            const lastName = names.slice(1).join(' ') || '';
 
-          if (res.ok) {
-            if (selectedBatchId) {
-              await enrollStudent(res.value.id, selectedBatchId);
-            }
-
-            newStudentsList.push({
-              id: res.value.id,
-              name,
-              photo: '👨‍🎓',
-              phone: res.value.phone || '',
-              email: res.value.email || '',
+            const eligible = attendancePct >= 84;
+            const customFields = {
               college,
               department,
               attendancePct,
@@ -1450,24 +1424,61 @@ export function BatchManagement() {
               project: 0,
               finalExam: 0,
               overallScore: Math.round((ass1 + ass2 + ass3) / 3),
-              voucherId: customFields.voucherId,
-              voucherStatus: customFields.voucherStatus,
+              voucherId: eligible ? `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}` : '',
+              voucherStatus: eligible ? 'Assigned' : 'Unassigned',
               certificateStatus: 'Pending',
-            });
-            importedCount++;
-          }
-        }
+            };
 
-        setStudents((prev) => [...prev, ...newStudentsList]);
-        setUploadModalOpen(false);
-        refreshBatches();
-        toast({
-          variant: 'success',
-          title: 'Import Complete',
-          message: `Successfully imported ${importedCount} student records and enrolled them in this batch.`,
-        });
+            const res = await registerStudent({
+              firstName,
+              lastName,
+              phone,
+              email,
+              customFields,
+            });
+
+            if (res.ok) {
+              if (selectedBatchId) {
+                await enrollStudent(res.value.id, selectedBatchId);
+              }
+
+              newStudentsList.push({
+                id: res.value.id,
+                name,
+                photo: '👨‍🎓',
+                phone: res.value.phone || '',
+                email: res.value.email || '',
+                college,
+                department,
+                attendancePct,
+                attendanceStatus: eligible ? 'Regular' : 'Irregular',
+                ass1,
+                ass2,
+                ass3,
+                project: 0,
+                finalExam: 0,
+                overallScore: Math.round((ass1 + ass2 + ass3) / 3),
+                voucherId: customFields.voucherId,
+                voucherStatus: customFields.voucherStatus,
+                certificateStatus: 'Pending',
+              });
+              importedCount++;
+            }
+          }
+
+          setStudents((prev) => [...prev, ...newStudentsList]);
+          setUploadModalOpen(false);
+          refreshBatches();
+          toast({
+            variant: 'success',
+            title: 'Import Complete',
+            message: `Successfully imported ${importedCount} student records and enrolled them in this batch.`,
+          });
+        } catch (err: any) {
+          toast({ variant: 'error', title: 'Parsing Failed', message: err.message });
+        }
       };
-      reader.readAsText(file);
+      reader.readAsArrayBuffer(file);
     } catch (err: any) {
       toast({ variant: 'error', title: 'Import Failed', message: err.message });
     }
