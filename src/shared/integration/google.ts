@@ -72,7 +72,7 @@ export function getMonthlyFolderName(dateInput?: string): string {
   return `${now.getFullYear()}-${monthNames[now.getMonth()]}`;
 }
 
-const GOOGLE_APPS_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyWJaVIyqLvvBNKq-40SrKwdrvBf-poE4f7TvR5pJJTKT0gdi9I1g1ZMYhTlYbSAYS6/exec';
+const GOOGLE_APPS_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbw6uzg9izpqe0UYI9OqfNN-dhMKF4d0g63HvDRvSexUgIRssFb0VYeXiGffC3d9evY2/exec';
 
 async function uploadToGoogleDriveAppsScript(payload: {
   categoryFolder: 'Receipt' | 'Medical Certificates';
