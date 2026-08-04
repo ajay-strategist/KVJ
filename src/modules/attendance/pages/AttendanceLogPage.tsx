@@ -352,9 +352,9 @@ export function AttendanceLogPage() {
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
     const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
-      return foundBatch.college || 'KVJ Analytics';
+      return batchDisplayName(foundBatch);
     }
-    return isTraining ? 'Training Organization' : (workType === 'Office' ? 'KVJ Analytics' : '—');
+    return isTraining ? 'Training Batch' : (workType === 'Office' ? 'KVJ Analytics' : '—');
   }, [resolveBatchHelper]);
 
   const resolveLocationValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
@@ -367,12 +367,12 @@ export function AttendanceLogPage() {
 
   const resolveClassOrWorkValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string) => {
     const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
-    if (foundBatch) {
-      return { value: batchDisplayName(foundBatch), isTraining: true };
+    if (isTraining) {
+      return { value: 'Class', isTraining: true };
     }
     const wt = workType || 'Office';
     const cleanWt = wt.startsWith('Training:') ? wt.substring(9).trim() : wt;
-    return { value: cleanWt, isTraining };
+    return { value: cleanWt, isTraining: false };
   }, [resolveBatchHelper]);
 
   const calendarDays: CalendarDayDetail[] = useMemo(() => {
