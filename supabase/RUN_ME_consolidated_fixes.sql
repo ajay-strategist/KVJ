@@ -29,6 +29,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS flwdsk_employees_username_lower_key
   ON public.flwdsk_employees (lower(username))
   WHERE username IS NOT NULL AND deleted_at IS NULL;
 
+-- 1b) PROJECT supervisor column ------------------------------------------------
+ALTER TABLE public.flwdsk_projects ADD COLUMN IF NOT EXISTS supervisor_id UUID REFERENCES public.flwdsk_employees(id) ON DELETE SET NULL;
+
+
 
 -- 2) TASK APPROVAL WORKFLOW columns (submit → approve / rework) -----------------
 ALTER TABLE public.flwdsk_tasks ADD COLUMN IF NOT EXISTS approval_status TEXT;
