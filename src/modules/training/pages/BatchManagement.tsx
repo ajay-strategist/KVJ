@@ -819,7 +819,7 @@ export function BatchManagement() {
       setStudents((sList) =>
         sList.map((st) => {
           if (st.id === studentId) {
-            const updated = {
+            const updated: StudentRecord = {
               ...st,
               attendancePct: calcPct,
               attendanceStatus: calcPct >= 84 ? 'Regular' : 'Irregular',
@@ -1057,7 +1057,7 @@ export function BatchManagement() {
           const hasEmailChanged = reg.email && reg.email !== currentStudent.email;
 
           if (hasPhotoChanged || hasPhoneChanged || hasEmailChanged) {
-            const updatedStudent = {
+            const updatedStudent: StudentRecord = {
               ...currentStudent,
               photoUrl: reg.photoUrl || currentStudent.photoUrl,
               photo: reg.photoUrl ? '📷' : currentStudent.photo,
@@ -1079,7 +1079,7 @@ export function BatchManagement() {
         } else {
           // If student doesn't exist, check if they belong to active batch
           const regBatchNorm = reg.batch.toLowerCase().replace(/\s+/g, '');
-          const activeBatchName = (activeBatch?.batchName || '').toLowerCase().replace(/\s+/g, '');
+          const activeBatchName = (activeBatch?.trainingName || '').toLowerCase().replace(/\s+/g, '');
           const activeBatchNo = String(activeBatch?.batchNo || '').toLowerCase().replace(/\s+/g, '');
           const activeProgram = (activeBatch?.program || '').toLowerCase().replace(/\s+/g, '');
 
