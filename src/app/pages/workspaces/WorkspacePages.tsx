@@ -2286,10 +2286,10 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
         a.workDate,
         a.employeeId,
         a.status || 'present',
-        a.workType || 'office',
+        (a as any).workType || 'office',
         a.firstClockIn || '',
         a.lastClockOut || '',
-        a.totalHours != null ? Number(a.totalHours) : ''
+        (a as any).totalHours != null ? Number((a as any).totalHours) : ''
       ]);
 
       // 3. Leave Sheet
@@ -2303,22 +2303,37 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
         l.halfDay ? 'Yes' : 'No',
         l.status,
         l.reason,
-        l.medicalCertificateUrl || ''
+        l.medicalCertUrl || ''
       ]);
 
       // 4. Expenses Sheet
       const expHeaders = ['Claim ID', 'Employee ID', 'Person Name', 'Classification', 'Expense Type', 'Amount (INR)', 'Status', 'Notes', 'Receipt URL'];
-      const expRows = expList.map(ex => [
-        ex.id,
-        ex.employeeId,
-        ex.personName,
-        ex.isOfficeExpense ? 'Office Expense' : 'Training Expense',
-        ex.expenseType,
-        ex.amount != null ? Number(ex.amount) : 0,
-        ex.status,
-        ex.notes || '',
-        ex.receiptUrl || ''
-      ]);
+      const expRows = expList.map(ex => {
+        let person = 'Employee';
+        let type = 'Misc';
+        let userNotes = ex.notes || '';
+
+        if (ex.notes && ex.notes.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(ex.notes);
+            person = parsed.personName || person;
+            type = parsed.expenseType || type;
+            userNotes = parsed.userNotes || '';
+          } catch (e) {}
+        }
+
+        return [
+          ex.id,
+          ex.employeeId,
+          person,
+          ex.category || 'Office Expense',
+          type,
+          ex.amount != null ? Number(ex.amount) : 0,
+          ex.status,
+          userNotes,
+          ex.receiptUrl || ''
+        ];
+      });
 
       // 5. Tasks Sheet
       const taskHeaders = ['Task ID', 'Title', 'Project ID', 'Assignee ID', 'Supervisor ID', 'Status', 'Priority', 'Due Date', 'Approval Status'];
