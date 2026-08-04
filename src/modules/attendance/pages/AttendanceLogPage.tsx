@@ -17,6 +17,7 @@ import { toLocalISODate, todayISO } from '../../../shared/utils/date';
 import { useTraining } from '../../training/hooks/useTraining';
 import { cleanBatchCode } from '../../training/utils/batch-formatter';
 import { supabase } from '../../../shared/integration/supabase';
+import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 /**
  * Human-readable name of a training batch, e.g.
@@ -96,6 +97,7 @@ function ConditionalAttendanceFields() {
 export function AttendanceLogPage() {
   const { user } = useAuth();
   const { toast } = useNotifications();
+  const { confirm } = useDialog();
   const { batches } = useTraining();
 
   const userRole = user?.role || 'EMPLOYEE';
@@ -115,7 +117,7 @@ export function AttendanceLogPage() {
   const [receiptModalUrl, setReceiptModalUrl] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
-  const [expenseRows, setExpenseRows] = useState<Array<{ id: string; date: string; employee: string; category: string; batch: string; amount: number; status: string }>>([]);
+  const [expenseRows, setExpenseRows] = useState<Array<any>>([]);
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -254,36 +256,73 @@ export function AttendanceLogPage() {
     setSelectedExpenses((prev) => ({ ...prev, [id]: checked }));
   };
 
-  const handleBulkApprove = async () => {
+  const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
     const selectedIds = Object.keys(selectedExpenses).filter((id) => selectedExpenses[id]);
     if (selectedIds.length === 0) return;
 
+    const actionText = action === 'approve' ? 'approve' : action === 'reject' ? 'reject' : 'delete';
+    const confirmOk = await confirm({
+      title: `Bulk ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}?`,
+      message: `Are you sure you want to ${actionText} the ${selectedIds.length} selected expense claim(s)?`,
+    });
+    if (!confirmOk) return;
+
     try {
-      const expenseRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
-      const updatePromises = selectedIds.map(id =>
-        expenseRepo.update(
-          id,
-          { status: 'approved', approvedBy: user?.id, approvedAt: new Date().toISOString() },
-          { id: user?.id || 'emp-user', role: user?.role || 'Employee' }
-        )
-      );
-      await Promise.all(updatePromises);
-
-      toast({
-        variant: 'success',
-        title: 'Bulk Approval Complete',
-        message: `${selectedIds.length} expense claims approved successfully.`,
-      });
-
+      if (action === 'delete') {
+        const { error } = await supabase
+          .from('flwdsk_expense_claims')
+          .delete()
+          .in('id', selectedIds);
+        if (error) throw error;
+        toast({ variant: 'warning', title: 'Claims Deleted', message: `${selectedIds.length} claim(s) successfully deleted.` });
+      } else {
+        const updates: Record<string, any> = {
+          status: action === 'approve' ? 'approved' : 'rejected'
+        };
+        if (action === 'approve') {
+          updates.approved_by = user?.id;
+          updates.approved_at = new Date().toISOString();
+        }
+        const { error } = await supabase
+          .from('flwdsk_expense_claims')
+          .update(updates)
+          .in('id', selectedIds);
+        if (error) throw error;
+        toast({ variant: 'success', title: `Claims ${action === 'approve' ? 'Approved' : 'Rejected'}`, message: `${selectedIds.length} claim(s) successfully updated.` });
+      }
       setSelectedExpenses({});
       setRefetchTrigger(prev => prev + 1);
-    } catch (e) {
-      console.error('Error approving expenses:', e);
-      toast({
-        variant: 'error',
-        title: 'Approval Failed',
-        message: 'Could not approve selected expense claims.',
-      });
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Bulk Action Failed', message: e.message });
+    }
+  };
+
+  const handleIndividualAction = async (id: string, action: 'approve' | 'reject' | 'delete') => {
+    try {
+      if (action === 'delete') {
+        const confirmOk = await confirm({
+          title: 'Delete Expense Claim?',
+          message: 'Are you sure you want to delete this expense claim? This cannot be undone.',
+        });
+        if (!confirmOk) return;
+        const { error } = await supabase.from('flwdsk_expense_claims').delete().eq('id', id);
+        if (error) throw error;
+        toast({ variant: 'warning', title: 'Claim Deleted', message: 'Expense claim deleted successfully.' });
+      } else {
+        const updates: Record<string, any> = {
+          status: action === 'approve' ? 'approved' : 'rejected'
+        };
+        if (action === 'approve') {
+          updates.approved_by = user?.id;
+          updates.approved_at = new Date().toISOString();
+        }
+        const { error } = await supabase.from('flwdsk_expense_claims').update(updates).eq('id', id);
+        if (error) throw error;
+        toast({ variant: 'success', title: `Claim ${action === 'approve' ? 'Approved' : 'Rejected'}`, message: `Expense claim successfully updated.` });
+      }
+      setRefetchTrigger(prev => prev + 1);
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Action Failed', message: e.message });
     }
   };
 
@@ -578,14 +617,42 @@ export function AttendanceLogPage() {
     return expenseClaims.map((claim) => {
       const emp = employees.find((e) => e.id === claim.employeeId);
       const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'System Admin';
+
+      let person = empName;
+      let type = 'Misc';
+      let batch = (claim as any).projectName || (claim as any).batchName || 'Office Operations';
+      let route = undefined;
+      let vehicle = undefined;
+      let km = undefined;
+      let userNotes = claim.notes || '';
+
+      if (claim.notes && claim.notes.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(claim.notes);
+          person = parsed.personName || person;
+          type = parsed.expenseType || type;
+          batch = parsed.batchName || batch;
+          route = parsed.route || route;
+          vehicle = parsed.vehicle || undefined;
+          km = parsed.km || undefined;
+          userNotes = parsed.userNotes || '';
+        } catch (e) {}
+      }
+
       return {
         id: claim.id,
-        date: claim.createdAt.slice(0, 10),
-        employee: empName,
-        category: claim.category,
-        batch: (claim as any).projectName || (claim as any).batchName || 'Office Operations',
-        amount: claim.amount,
-        status: claim.status === 'approved' ? 'Approved' : 'Pending Approval',
+        date: new Date(claim.createdAt).toLocaleDateString('en-GB'),
+        employee: person,
+        category: claim.category || 'Office Expense',
+        type,
+        batch,
+        notes: userNotes,
+        route,
+        vehicle,
+        km,
+        amount: Number(claim.amount || 0),
+        receipt: claim.receiptUrl || '',
+        status: (claim.status || 'submitted').toLowerCase(),
       };
     });
   }, [expenseClaims, employees]);
@@ -834,13 +901,29 @@ export function AttendanceLogPage() {
                 </div>
               </div>
               {isManagement && (
-                <Button
-                  onClick={handleBulkApprove}
-                  disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
-                  style={{ background: 'var(--status-success)', color: 'white' }}
-                >
-                  ✓ Bulk Approve Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
-                </Button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Button
+                    onClick={() => handleBulkAction('approve')}
+                    disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
+                    style={{ background: 'var(--status-success)', color: 'white' }}
+                  >
+                    ✓ Bulk Approve Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  </Button>
+                  <Button
+                    onClick={() => handleBulkAction('reject')}
+                    disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
+                    style={{ background: 'var(--status-danger)', color: 'white' }}
+                  >
+                    ✕ Bulk Reject Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  </Button>
+                  <Button
+                    onClick={() => handleBulkAction('delete')}
+                    disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
+                    variant="danger"
+                  >
+                    🗑️ Bulk Delete Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  </Button>
+                </div>
               )}
             </div>
           </Card>
@@ -856,41 +939,103 @@ export function AttendanceLogPage() {
                         <input
                           type="checkbox"
                           onChange={(e) => handleSelectAllExpenses(e.target.checked)}
+                          checked={
+                            expenseRows.length > 0 &&
+                            expenseRows.every((exp) => selectedExpenses[exp.id])
+                          }
                         />
                       </th>
                     )}
                     <th style={{ padding: 10 }}>Date</th>
-                    <th style={{ padding: 10 }}>Employee Name</th>
-                    <th style={{ padding: 10 }}>Category</th>
-                    <th style={{ padding: 10 }}>Batch (or Office)</th>
-                    <th style={{ padding: 10 }}>Amount</th>
+                    <th style={{ padding: 10 }}>Employee</th>
+                    <th style={{ padding: 10 }}>Classification</th>
+                    <th style={{ padding: 10 }}>Expense Type</th>
+                    <th style={{ padding: 10 }}>Batch / Route</th>
+                    <th style={{ padding: 10 }}>Amount (₹)</th>
+                    <th style={{ padding: 10 }}>Receipt</th>
                     <th style={{ padding: 10 }}>Status</th>
+                    <th style={{ padding: 10 }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {expenseRows.map((exp) => (
-                    <tr key={exp.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      {isManagement && (
+                  {expenseRows.map((exp) => {
+                    const isLocked = exp.status === 'approved';
+                    return (
+                      <tr key={exp.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        {isManagement && (
+                          <td style={{ padding: 10 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedExpenses[exp.id]}
+                              onChange={(e) => handleSelectExpense(exp.id, e.target.checked)}
+                            />
+                          </td>
+                        )}
+                        <td style={{ padding: 10, fontWeight: 600 }}>{exp.date}</td>
+                        <td style={{ padding: 10 }}>{exp.employee}</td>
                         <td style={{ padding: 10 }}>
-                          <input
-                            type="checkbox"
-                            checked={!!selectedExpenses[exp.id]}
-                            onChange={(e) => handleSelectExpense(exp.id, e.target.checked)}
-                          />
+                          <Badge tone={exp.category.includes('Training') ? 'info' : 'neutral'}>
+                            {exp.category}
+                          </Badge>
                         </td>
-                      )}
-                      <td style={{ padding: 10, fontWeight: 600 }}>{exp.date}</td>
-                      <td style={{ padding: 10 }}>{exp.employee}</td>
-                      <td style={{ padding: 10 }}>{exp.category}</td>
-                      <td style={{ padding: 10, fontWeight: 500, color: 'var(--brand)' }}>{exp.batch}</td>
-                      <td style={{ padding: 10, fontWeight: 700 }}>₹ {exp.amount.toFixed(2)}</td>
-                      <td style={{ padding: 10 }}>
-                        <Badge tone={exp.status === 'Approved' ? 'success' : 'warning'}>
-                          {exp.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
+                        <td style={{ padding: 10 }}>
+                          <div style={{ fontWeight: 600 }}>{exp.type}</div>
+                          {exp.vehicle && (
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {exp.vehicle} · {exp.km} km
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: 10 }}>
+                          <div style={{ fontWeight: 500, color: 'var(--brand)' }}>{exp.batch || '—'}</div>
+                          {exp.route && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>🗺 {exp.route}</div>}
+                        </td>
+                        <td style={{ padding: 10, fontWeight: 800, color: 'var(--status-success)' }}>
+                          ₹ {exp.amount.toFixed(2)}
+                        </td>
+                        <td style={{ padding: 10 }}>
+                          {exp.receipt ? (
+                            <a href={exp.receipt} target="_blank" rel="noreferrer" style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                              📎 View Receipt
+                            </a>
+                          ) : exp.type === 'Self Travel' ? (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>KM Auto-Calc</span>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--status-danger)' }}>Missing</span>
+                          )}
+                        </td>
+                        <td style={{ padding: 10 }}>
+                          <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
+                            {isLocked ? '🔒 Approved' : exp.status}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: 10 }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            {!isLocked && exp.status === 'submitted' && isManagement && (
+                              <>
+                                <Button size="xs" variant="success" onClick={() => handleIndividualAction(exp.id, 'approve')}>Approve</Button>
+                                <Button size="xs" variant="danger" onClick={() => handleIndividualAction(exp.id, 'reject')}>Reject</Button>
+                              </>
+                            )}
+                            {!isLocked && (
+                              <Button
+                                size="xs"
+                                variant="danger"
+                                onClick={() => handleIndividualAction(exp.id, 'delete')}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                            {isLocked && (
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                🔒 Locked
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

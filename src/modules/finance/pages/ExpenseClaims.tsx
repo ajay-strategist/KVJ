@@ -279,6 +279,7 @@ export function ExpenseClaims() {
 
   const [customExpenseTypes, setCustomExpenseTypes] = useState<string[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
 
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
@@ -559,25 +560,58 @@ export function ExpenseClaims() {
     }
   };
 
-  const handleBulkApprove = async () => {
-    try {
-      const { error } = await supabase
-        .from('flwdsk_expense_claims')
-        .update({
-          status: 'approved',
-          approved_by: user?.id,
-          approved_at: new Date().toISOString(),
-        })
-        .eq('status', 'submitted');
+  const handleSelectExpense = (id: string, checked: boolean) => {
+    setSelectedExpenses((prev) => ({ ...prev, [id]: checked }));
+  };
 
-      if (error) {
-        toast({ variant: 'error', title: 'Bulk Approval Failed', message: error.message });
+  const handleSelectAllExpenses = (checked: boolean) => {
+    const next: Record<string, boolean> = {};
+    if (checked) {
+      filteredExpenses.forEach((exp) => {
+        next[exp.id] = true;
+      });
+    }
+    setSelectedExpenses(next);
+  };
+
+  const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
+    const selectedIds = Object.keys(selectedExpenses).filter((id) => selectedExpenses[id]);
+    if (selectedIds.length === 0) return;
+
+    const actionText = action === 'approve' ? 'approve' : action === 'reject' ? 'reject' : 'delete';
+    const confirmOk = await confirm({
+      title: `Bulk ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}?`,
+      message: `Are you sure you want to ${actionText} the ${selectedIds.length} selected expense claim(s)?`,
+    });
+    if (!confirmOk) return;
+
+    try {
+      if (action === 'delete') {
+        const { error } = await supabase
+          .from('flwdsk_expense_claims')
+          .delete()
+          .in('id', selectedIds);
+        if (error) throw error;
+        toast({ variant: 'warning', title: 'Claims Deleted', message: `${selectedIds.length} claim(s) successfully deleted.` });
       } else {
-        toast({ variant: 'success', title: 'Bulk Approved', message: 'All pending expense claims authorized.' });
-        loadClaims();
+        const updates: Record<string, any> = {
+          status: action === 'approve' ? 'approved' : 'rejected'
+        };
+        if (action === 'approve') {
+          updates.approved_by = user?.id;
+          updates.approved_at = new Date().toISOString();
+        }
+        const { error } = await supabase
+          .from('flwdsk_expense_claims')
+          .update(updates)
+          .in('id', selectedIds);
+        if (error) throw error;
+        toast({ variant: 'success', title: `Claims ${action === 'approve' ? 'Approved' : 'Rejected'}`, message: `${selectedIds.length} claim(s) successfully updated.` });
       }
+      setSelectedExpenses({});
+      loadClaims();
     } catch (e: any) {
-      toast({ variant: 'error', title: 'Bulk Approval Failed', message: e.message });
+      toast({ variant: 'error', title: 'Bulk Action Failed', message: e.message });
     }
   };
 
@@ -587,12 +621,34 @@ export function ExpenseClaims() {
         title="Expense Claims & Reimbursements"
         subtitle="Conditional expense filing, auto-calculated travel KM rates, and locked approval audit trails"
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {isManagement && (
               <Button variant="secondary" onClick={() => setRateModalOpen(true)}>⚙️ Travel Rates (KM)</Button>
             )}
             {isManagement && (
-              <Button variant="secondary" onClick={handleBulkApprove}>Bulk Approve Claims</Button>
+              <>
+                <Button
+                  style={{ background: 'var(--status-success)', color: 'white' }}
+                  onClick={() => handleBulkAction('approve')}
+                  disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
+                >
+                  ✓ Bulk Approve Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                </Button>
+                <Button
+                  style={{ background: 'var(--status-danger)', color: 'white' }}
+                  onClick={() => handleBulkAction('reject')}
+                  disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
+                >
+                  ✕ Bulk Reject Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => handleBulkAction('delete')}
+                  disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
+                >
+                  🗑️ Bulk Delete Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                </Button>
+              </>
             )}
             <Button onClick={() => setExpenseOpen(true)}>Submit Expense Claim</Button>
           </div>
@@ -642,6 +698,18 @@ export function ExpenseClaims() {
           <table className="kvj-table">
             <thead>
               <tr>
+                {isManagement && (
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      onChange={(e) => handleSelectAllExpenses(e.target.checked)}
+                      checked={
+                        filteredExpenses.length > 0 &&
+                        filteredExpenses.every((exp) => selectedExpenses[exp.id])
+                      }
+                    />
+                  </th>
+                )}
                 <th>Date</th>
                 <th>Employee</th>
                 <th>Classification</th>
@@ -658,6 +726,15 @@ export function ExpenseClaims() {
                 const isLocked = exp.status === 'approved';
                 return (
                   <tr key={exp.id}>
+                    {isManagement && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={!!selectedExpenses[exp.id]}
+                          onChange={(e) => handleSelectExpense(exp.id, e.target.checked)}
+                        />
+                      </td>
+                    )}
                     <td style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{exp.date}</td>
                     <td>{exp.person}</td>
                     <td>
