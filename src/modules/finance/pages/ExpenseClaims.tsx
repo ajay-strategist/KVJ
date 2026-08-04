@@ -58,10 +58,10 @@ function DynamicExpenseForm({
   onSubmit: (vals: any) => void;
   onCancel: () => void;
 }) {
-  const { values } = useForm();
+  const { values, setValue } = useForm();
   const [newTypeInput, setNewTypeInput] = useState('');
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [receiptPreview, setReceiptPreview] = useState<string>('');
+  const receiptFile = values.receiptFile as File | null;
+  const receiptPreview = values.receiptPreview as string || '';
 
   const category = values.categoryType || 'Office Expense';
   const isSelfTravel = values.expenseType === 'Self Travel';
@@ -118,22 +118,13 @@ function DynamicExpenseForm({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setReceiptFile(file);
+      setValue('receiptFile', file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setReceiptPreview(reader.result as string);
+        setValue('receiptPreview', reader.result as string);
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const handleSubmitForm = () => {
-    onSubmit({
-      ...values,
-      receiptFile,
-      receiptPreview,
-      expenseType: values.expenseType === '__NEW_TYPE__' ? newTypeInput : values.expenseType,
-    });
   };
 
   return (
@@ -231,13 +222,13 @@ function DynamicExpenseForm({
                       </div>
                     </div>
                   </div>
-                  <Button
+                   <Button
                     size="xs"
                     variant="secondary"
                     type="button"
                     onClick={() => {
-                      setReceiptFile(null);
-                      setReceiptPreview('');
+                      setValue('receiptFile', null);
+                      setValue('receiptPreview', '');
                     }}
                   >
                     ✕ Remove
@@ -269,7 +260,7 @@ function DynamicExpenseForm({
 
       <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <Button variant="secondary" type="button" onClick={onCancel}>Cancel</Button>
-        <Button type="button" onClick={handleSubmitForm}>Submit Expense Claim</Button>
+        <Button type="submit">Submit Expense Claim</Button>
       </div>
     </div>
   );
