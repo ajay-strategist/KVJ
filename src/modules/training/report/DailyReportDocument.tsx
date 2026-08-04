@@ -195,7 +195,7 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: 8,
             marginTop: 10,
             padding: '8px 12px',
@@ -217,14 +217,6 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
           <div>
             <span style={{ color: '#64748b', display: 'block', fontSize: 9, fontWeight: 600 }}>Academic Year</span>
             <strong style={{ color: '#0f172a' }}>{data.academicYear}</strong>
-          </div>
-          <div>
-            <span style={{ color: '#64748b', display: 'block', fontSize: 9, fontWeight: 600 }}>Lead Trainer</span>
-            <strong style={{ color: '#0f172a' }}>{data.trainerName}</strong>
-          </div>
-          <div>
-            <span style={{ color: '#64748b', display: 'block', fontSize: 9, fontWeight: 600 }}>Coordinator</span>
-            <strong style={{ color: '#0f172a' }}>{data.coordinatorName}</strong>
           </div>
         </div>
       </div>
