@@ -1752,52 +1752,44 @@ export function BatchManagement() {
   }, [dailyReportFixture]);
 
   useEffect(() => {
-    let active = true;
-    try {
-      const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
-      repo.findMany({ pageSize: 1000, page: 1 }).then((p: Page<any>) => {
-        if (!active) return;
-        if (p.data && p.data.length > 0) {
-          const mapped: StudentRecord[] = p.data.map((s: any) => {
-            const fields = s.customFields || {};
-            return {
-              id: s.id,
-              name: s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.fullName || s.name || 'Student',
-              photo: s.photoUrl || s.photo || '🎓',
-              photoUrl: s.photoUrl,
-              phone: s.phone || '',
-              email: s.email || '',
-              college: fields.college || 'Christ Irinjalakkuda',
-              department: fields.department || 'BBA',
-              attendancePct: fields.attendancePct ?? 100,
-              attendanceStatus: fields.attendanceStatus || 'Regular',
-              ass1: fields.ass1 ?? 0,
-              ass2: fields.ass2 ?? 0,
-              ass3: fields.ass3 ?? 0,
-              project: fields.project ?? 0,
-              finalExam: fields.finalExam ?? 0,
-              overallScore: fields.overallScore ?? 0,
-              voucherId: fields.voucherId || '',
-              voucherStatus: fields.voucherStatus || 'unassigned',
-              certificateStatus: fields.certificateStatus || 'unissued',
-              examAttemptCount: fields.examAttemptCount ?? 1,
-              retestScore: fields.retestScore ?? 0,
-              retestApproved: fields.retestApproved ?? false,
-              retestPaymentStatus: fields.retestPaymentStatus || 'Unpaid',
-              retestCollectedAmount: fields.retestCollectedAmount ?? 0,
-              retestVoucherId: fields.retestVoucherId || '',
-              gender: fields.gender || 'Female',
-              qualification: fields.qualification || s.academicQualification || '',
-              hasComputer: fields.hasComputer || 'Yes',
-              learnedBefore: fields.learnedBefore || 'No',
-            };
-          });
-          setStudents(mapped);
-        }
-      }).catch(() => {});
-    } catch {}
-    return () => { active = false; };
-  }, []);
+    if (dbStudents) {
+      const mapped: StudentRecord[] = dbStudents.map((s: any) => {
+        const fields = s.customFields || {};
+        return {
+          id: s.id,
+          name: s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : s.fullName || s.name || 'Student',
+          photo: s.photoUrl || s.photo || '🎓',
+          photoUrl: s.photoUrl,
+          phone: s.phone || '',
+          email: s.email || '',
+          college: fields.college || 'Christ Irinjalakkuda',
+          department: fields.department || 'BBA',
+          attendancePct: fields.attendancePct ?? 100,
+          attendanceStatus: fields.attendanceStatus || 'Regular',
+          ass1: fields.ass1 ?? 0,
+          ass2: fields.ass2 ?? 0,
+          ass3: fields.ass3 ?? 0,
+          project: fields.project ?? 0,
+          finalExam: fields.finalExam ?? 0,
+          overallScore: fields.overallScore ?? 0,
+          voucherId: fields.voucherId || '',
+          voucherStatus: fields.voucherStatus || 'unassigned',
+          certificateStatus: fields.certificateStatus || 'unissued',
+          examAttemptCount: fields.examAttemptCount ?? 1,
+          retestScore: fields.retestScore ?? 0,
+          retestApproved: fields.retestApproved ?? false,
+          retestPaymentStatus: fields.retestPaymentStatus || 'Unpaid',
+          retestCollectedAmount: fields.retestCollectedAmount ?? 0,
+          retestVoucherId: fields.retestVoucherId || '',
+          gender: fields.gender || 'Female',
+          qualification: fields.qualification || s.academicQualification || '',
+          hasComputer: fields.hasComputer || 'Yes',
+          learnedBefore: fields.learnedBefore || 'No',
+        };
+      });
+      setStudents(mapped);
+    }
+  }, [dbStudents]);
 
   useEffect(() => {
     if (!selectedBatchId || students.length === 0 || enrollments.length === 0) return;
