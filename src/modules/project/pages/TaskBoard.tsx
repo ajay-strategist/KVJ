@@ -284,8 +284,8 @@ export function TaskBoard({
     // If supervisor is not explicitly selected, assigning employee is automatically the supervisor
     const finalSupervisorId = supervisor ? supervisor.id : user?.id;
 
-    const isOtherAssignee = assignee && assignee.id !== user?.id;
-    const approvalStatus = (!isManagement && isOtherAssignee) ? 'pending_assignment_approval' : null;
+    const isSelfAssigned = assignee?.id === user?.id || (!assignee && !values.assignee);
+    const approvalStatus = (!isManagement && !isSelfAssigned) ? 'pending_assignment_approval' : null;
 
     const res = await createTask({
       projectId: proj?.id,
