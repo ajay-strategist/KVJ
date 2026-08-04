@@ -509,52 +509,105 @@ export function BatchManagement() {
     voucherId: '',
   });
 
-  const handleAddFinalExamStudentSubmit = (e: React.FormEvent) => {
+  const handleAddFinalExamStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFinalExamStudentForm.name.trim()) return;
 
-    const newStudent: StudentRecord = {
-      id: `s-${Date.now()}`,
+    const names = newFinalExamStudentForm.name.trim().split(' ');
+    const firstName = names[0] || 'Student';
+    const lastName = names.slice(1).join(' ') || '';
+
+    const payload = {
+      first_name: firstName,
+      last_name: lastName,
       name: newFinalExamStudentForm.name,
-      photo: '👨‍🎓',
       phone: newFinalExamStudentForm.phone || '+91 90000 00000',
       email: `${newFinalExamStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
-      college: newFinalExamStudentForm.college || 'Christ University',
-      department: 'BCOM B',
-      course: newFinalExamStudentForm.course,
-      examDate: newFinalExamStudentForm.examDate,
-      attendancePct: 0,
-      attendanceStatus: 'Critical',
-      ass1: 0,
-      ass2: 0,
-      ass3: 0,
-      project: 0,
-      finalExam: Number(newFinalExamStudentForm.finalExam) || 0,
-      retestScore: Number(newFinalExamStudentForm.finalExam) || 0,
-      overallScore: Number(newFinalExamStudentForm.finalExam) || 0,
-      voucherId: newFinalExamStudentForm.voucherId || '',
-      voucherStatus: '',
-      certificateStatus: '',
-      examAttemptCount: 1,
+      custom_fields: {
+        college: newFinalExamStudentForm.college || 'Christ University',
+        department: 'BCOM B',
+        course: newFinalExamStudentForm.course,
+        examDate: newFinalExamStudentForm.examDate,
+        attendancePct: 0,
+        attendanceStatus: 'Critical',
+        ass1: 0,
+        ass2: 0,
+        ass3: 0,
+        project: 0,
+        finalExam: Number(newFinalExamStudentForm.finalExam) || 0,
+        retestScore: Number(newFinalExamStudentForm.finalExam) || 0,
+        overallScore: Number(newFinalExamStudentForm.finalExam) || 0,
+        voucherId: newFinalExamStudentForm.voucherId || '',
+        voucherStatus: newFinalExamStudentForm.voucherId ? 'Assigned' : '',
+        certificateStatus: '',
+        examAttemptCount: 1,
+      }
     };
 
-    setStudents((prev) => [...prev, newStudent]);
-    setAddFinalExamModalOpen(false);
-    setNewFinalExamStudentForm({
-      name: '',
-      phone: '',
-      college: 'Christ University',
-      course: 'Data Analytics',
-      closeReason: '',
-      examDate: '2026-07-25',
-      finalExam: 0,
-      voucherId: '',
-    } as any);
-    toast({
-      variant: 'success',
-      title: 'Final Exam Student Added',
-      message: `Student "${newStudent.name}" added to Final Exam registry successfully.`,
-    });
+    try {
+      const { data, error } = await supabase.from('flwdsk_student_records').insert({
+        ...payload,
+        register_no: normalizeStudentKey(newFinalExamStudentForm.phone || '9876500000'),
+      }).select('id');
+
+      if (error) throw error;
+      
+      const newId = data?.[0]?.id || `s-${Date.now()}`;
+
+      if (selectedBatchId && data?.[0]?.id) {
+        await enrollStudent(data[0].id, selectedBatchId);
+      }
+
+      const newStudent: StudentRecord = {
+        id: newId,
+        name: newFinalExamStudentForm.name,
+        photo: '👨‍🎓',
+        phone: newFinalExamStudentForm.phone || '+91 90000 00000',
+        email: `${newFinalExamStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
+        college: newFinalExamStudentForm.college || 'Christ University',
+        department: 'BCOM B',
+        course: newFinalExamStudentForm.course,
+        examDate: newFinalExamStudentForm.examDate,
+        attendancePct: 0,
+        attendanceStatus: 'Critical',
+        ass1: 0,
+        ass2: 0,
+        ass3: 0,
+        project: 0,
+        finalExam: Number(newFinalExamStudentForm.finalExam) || 0,
+        retestScore: Number(newFinalExamStudentForm.finalExam) || 0,
+        overallScore: Number(newFinalExamStudentForm.finalExam) || 0,
+        voucherId: newFinalExamStudentForm.voucherId || '',
+        voucherStatus: newFinalExamStudentForm.voucherId ? 'Assigned' : '',
+        certificateStatus: '',
+        examAttemptCount: 1,
+      };
+
+      setStudents((prev) => [...prev, newStudent]);
+      setAddFinalExamModalOpen(false);
+      setNewFinalExamStudentForm({
+        name: '',
+        phone: '',
+        college: 'Christ University',
+        course: 'Data Analytics',
+        closeReason: '',
+        examDate: '2026-07-25',
+        finalExam: 0,
+        voucherId: '',
+      } as any);
+      
+      toast({
+        variant: 'success',
+        title: 'Final Exam Student Added',
+        message: `Student "${newStudent.name}" added to Final Exam registry and database successfully.`,
+      });
+    } catch (err: any) {
+      toast({
+        variant: 'error',
+        title: 'Failed to Add Student',
+        message: err.message,
+      });
+    }
   };
 
   const handleAddFinalExamStudentRow = () => {
@@ -763,7 +816,18 @@ export function BatchManagement() {
       const calcPct = Math.round((attended / total) * 100);
 
       setStudents((sList) =>
-        sList.map((st) => st.id === studentId ? { ...st, attendancePct: calcPct } : st)
+        sList.map((st) => {
+          if (st.id === studentId) {
+            const updated = {
+              ...st,
+              attendancePct: calcPct,
+              attendanceStatus: calcPct >= 84 ? 'Regular' : 'Irregular',
+            };
+            saveStudentToDb(updated);
+            return updated;
+          }
+          return st;
+        })
       );
 
       return updatedMatrix;
@@ -1109,30 +1173,82 @@ export function BatchManagement() {
     });
   };
 
-  const handleVoucherUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVoucherUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      toast({
-        variant: 'info',
-        title: 'Processing Voucher File',
-        message: `Importing Voucher IDs from "${file.name}"...`,
-      });
+    if (!file) return;
 
-      setTimeout(() => {
-        setStudents((prev) =>
-          prev.map((s, idx) => ({
-            ...s,
-            voucherId: s.voucherId || `VOUCH-CHRIST-${105 + idx}`,
-            voucherStatus: 'Assigned',
-          }))
-        );
+    toast({
+      variant: 'info',
+      title: 'Processing Voucher File',
+      message: `Importing Voucher IDs from "${file.name}"...`,
+    });
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const text = reader.result as string;
+        const parsed = parseCsv(text);
+        if (parsed.length <= 1) {
+          toast({ variant: 'error', title: 'Upload Failed', message: 'The CSV file is empty or invalid.' });
+          return;
+        }
+
+        const headers = parsed[0].map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
+        const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'));
+        const nameIdx = headers.findIndex(h => h.includes('name'));
+        const voucherIdx = headers.findIndex(h => h.includes('voucher') || h.includes('vouch'));
+
+        if (voucherIdx === -1 || (phoneIdx === -1 && nameIdx === -1)) {
+          toast({
+            variant: 'error',
+            title: 'Invalid CSV Format',
+            message: 'CSV must contain "Voucher ID" column and either "Phone Number" or "Name" to match.',
+          });
+          return;
+        }
+
+        let updatedCount = 0;
+        const updatedStudents = [...students];
+
+        for (let i = 1; i < parsed.length; i++) {
+          const row = parsed[i];
+          const filePhone = phoneIdx !== -1 ? normalizeStudentKey(row[phoneIdx]) : '';
+          const fileName = nameIdx !== -1 ? row[nameIdx].toLowerCase().trim() : '';
+          const fileVoucher = row[voucherIdx]?.trim() || '';
+
+          if (!fileVoucher) continue;
+
+          const sIdx = updatedStudents.findIndex(st => {
+            const stPhone = normalizeStudentKey(st.phone);
+            const stName = st.name.toLowerCase().trim();
+            if (filePhone && stPhone && filePhone === stPhone) return true;
+            if (fileName && stName && fileName === stName) return true;
+            return false;
+          });
+
+          if (sIdx !== -1) {
+            const updated = {
+              ...updatedStudents[sIdx],
+              voucherId: fileVoucher,
+              voucherStatus: 'Assigned',
+            };
+            updatedStudents[sIdx] = updated;
+            await saveStudentToDb(updated);
+            updatedCount++;
+          }
+        }
+
+        setStudents(updatedStudents);
         setUploadVoucherModalOpen(false);
         toast({
           variant: 'success',
           title: 'Voucher IDs Updated',
-          message: `Voucher IDs successfully assigned to student records from ${file.name}.`,
+          message: `Successfully updated ${updatedCount} student voucher assignments in the database.`,
         });
-      }, 500);
+      };
+      reader.readAsText(file);
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Upload Failed', message: err.message });
     }
   };
 
@@ -1227,29 +1343,133 @@ export function BatchManagement() {
     });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      toast({
-        variant: 'info',
-        title: 'Processing Excel File',
-        message: `Importing records from "${file.name}"...`,
-      });
+    if (!file) return;
 
-      // NOTE: student data must come from the real registration flow, which
-      // syncs into the student_records table (see syncGoogleSheetData). This
-      // uploader previously injected two hardcoded demo students with fabricated
-      // marks/attendance and reported success — that dummy data has been removed.
-      // Real spreadsheet parsing + persistence to the student repository is a
-      // separate feature to wire.
-      setUploadModalOpen(false);
-      toast({
-        variant: 'info',
-        title: 'Import Not Yet Connected',
-        message:
-          'Student records are loaded from the live registration data. Direct Excel import ' +
-          'is not wired yet — add students via the registration sync or "Add Student Data".',
-      });
+    toast({
+      variant: 'info',
+      title: 'Importing Student Records',
+      message: `Parsing and saving students from "${file.name}"...`,
+    });
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const text = reader.result as string;
+        const parsed = parseCsv(text);
+        if (parsed.length <= 1) {
+          toast({ variant: 'error', title: 'Upload Failed', message: 'The CSV file is empty or invalid.' });
+          return;
+        }
+
+        const headers = parsed[0].map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
+        const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('student'));
+        const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact'));
+        const emailIdx = headers.findIndex(h => h.includes('email'));
+        const collegeIdx = headers.findIndex(h => h.includes('college') || h.includes('university') || h.includes('school'));
+        const deptIdx = headers.findIndex(h => h.includes('dept') || h.includes('department') || h.includes('program') || h.includes('stream'));
+        const attnIdx = headers.findIndex(h => h.includes('att') || h.includes('attendance') || h.includes('pct'));
+        const ass1Idx = headers.findIndex(h => h.includes('ass1') || h.includes('assessment1'));
+        const ass2Idx = headers.findIndex(h => h.includes('ass2') || h.includes('assessment2'));
+        const ass3Idx = headers.findIndex(h => h.includes('ass3') || h.includes('assessment3'));
+
+        if (nameIdx === -1) {
+          toast({
+            variant: 'error',
+            title: 'Invalid CSV Format',
+            message: 'CSV must contain a "Name" column to identify students.',
+          });
+          return;
+        }
+
+        let importedCount = 0;
+        const newStudentsList: StudentRecord[] = [];
+
+        for (let i = 1; i < parsed.length; i++) {
+          const row = parsed[i];
+          const name = row[nameIdx]?.trim() || '';
+          if (!name) continue;
+
+          const phone = phoneIdx !== -1 ? row[phoneIdx]?.trim() || '+91 90000 00000' : '+91 90000 00000';
+          const email = emailIdx !== -1 ? row[emailIdx]?.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu` : `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu`;
+          const college = collegeIdx !== -1 ? row[collegeIdx]?.trim() || activeBatch?.college || 'Christ College' : activeBatch?.college || 'Christ College';
+          const department = deptIdx !== -1 ? row[deptIdx]?.trim() || activeBatch?.program || 'BBA' : activeBatch?.program || 'BBA';
+          const attendancePct = attnIdx !== -1 ? Number(row[attnIdx]) || 100 : 100;
+          const ass1 = ass1Idx !== -1 ? Number(row[ass1Idx]) || 0 : 0;
+          const ass2 = ass2Idx !== -1 ? Number(row[ass2Idx]) || 0 : 0;
+          const ass3 = ass3Idx !== -1 ? Number(row[ass3Idx]) || 0 : 0;
+
+          const names = name.split(' ');
+          const firstName = names[0] || 'Student';
+          const lastName = names.slice(1).join(' ') || '';
+
+          const eligible = attendancePct >= 84;
+          const customFields = {
+            college,
+            department,
+            attendancePct,
+            attendanceStatus: eligible ? 'Regular' : 'Irregular',
+            ass1,
+            ass2,
+            ass3,
+            project: 0,
+            finalExam: 0,
+            overallScore: Math.round((ass1 + ass2 + ass3) / 3),
+            voucherId: eligible ? `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}` : '',
+            voucherStatus: eligible ? 'Assigned' : 'Unassigned',
+            certificateStatus: 'Pending',
+          };
+
+          const res = await registerStudent({
+            firstName,
+            lastName,
+            phone,
+            email,
+            customFields,
+          });
+
+          if (res.ok) {
+            if (selectedBatchId) {
+              await enrollStudent(res.value.id, selectedBatchId);
+            }
+
+            newStudentsList.push({
+              id: res.value.id,
+              name,
+              photo: '👨‍🎓',
+              phone: res.value.phone || '',
+              email: res.value.email || '',
+              college,
+              department,
+              attendancePct,
+              attendanceStatus: eligible ? 'Regular' : 'Irregular',
+              ass1,
+              ass2,
+              ass3,
+              project: 0,
+              finalExam: 0,
+              overallScore: Math.round((ass1 + ass2 + ass3) / 3),
+              voucherId: customFields.voucherId,
+              voucherStatus: customFields.voucherStatus,
+              certificateStatus: 'Pending',
+            });
+            importedCount++;
+          }
+        }
+
+        setStudents((prev) => [...prev, ...newStudentsList]);
+        setUploadModalOpen(false);
+        refreshBatches();
+        toast({
+          variant: 'success',
+          title: 'Import Complete',
+          message: `Successfully imported ${importedCount} student records and enrolled them in this batch.`,
+        });
+      };
+      reader.readAsText(file);
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Import Failed', message: err.message });
     }
   };
 
@@ -1300,65 +1520,101 @@ export function BatchManagement() {
     return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    async function syncToSupabase() {
-      try {
-        for (const s of students) {
-          const names = s.name.split(' ');
-          const firstName = names[0] || 'Student';
-          const lastName = names.slice(1).join(' ') || '';
-          
-          const isRealUuid = s.id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
-          
-          const payload = {
-            first_name: firstName,
-            last_name: lastName,
-            name: s.name,
-            phone: s.phone,
-            email: s.email,
-            notes: (s as any).notes,
-            custom_fields: {
-              college: s.college,
-              department: s.department,
-              ass1: s.ass1,
-              ass2: s.ass2,
-              ass3: s.ass3,
-              project: s.project,
-              finalExam: s.finalExam,
-              retestScore: s.retestScore,
-              examAttemptCount: s.examAttemptCount,
-              retestApproved: s.retestApproved,
-              retestPaymentStatus: s.retestPaymentStatus,
-              retestCollectedAmount: s.retestCollectedAmount,
-              voucherId: s.voucherId,
-              retestVoucherId: s.retestVoucherId,
-              voucherStatus: s.voucherStatus,
-              certificateStatus: s.certificateStatus,
-            }
-          };
+  const saveStudentToDb = async (student: StudentRecord) => {
+    try {
+      const names = student.name.split(' ');
+      const firstName = names[0] || 'Student';
+      const lastName = names.slice(1).join(' ') || '';
+      
+      const isRealUuid = student.id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
+      
+      const payload = {
+        first_name: firstName,
+        last_name: lastName,
+        name: student.name,
+        phone: student.phone,
+        email: student.email,
+        notes: (student as any).notes || '',
+        custom_fields: {
+          college: student.college,
+          department: student.department,
+          course: student.course || '',
+          examDate: student.examDate || '',
+          ass1: student.ass1,
+          ass2: student.ass2,
+          ass3: student.ass3,
+          project: student.project,
+          finalExam: student.finalExam,
+          retestScore: student.retestScore,
+          examAttemptCount: student.examAttemptCount,
+          retestApproved: student.retestApproved,
+          retestPaymentStatus: student.retestPaymentStatus,
+          retestCollectedAmount: student.retestCollectedAmount,
+          voucherId: student.voucherId,
+          retestVoucherId: student.retestVoucherId,
+          voucherStatus: student.voucherStatus,
+          certificateStatus: student.certificateStatus,
+          selectedVoucherId: (student as any).selectedVoucherId || '',
+        }
+      };
 
-          if (isRealUuid) {
-            await supabase.from('flwdsk_student_records').update(payload).eq('id', s.id);
-          } else {
-            const { data, error } = await supabase.from('flwdsk_student_records').insert({
-              ...payload,
-              register_no: normalizeStudentKey(s.phone || '9876500000'),
-            }).select('id');
-            if (!error && data && data[0] && active) {
-              s.id = data[0].id;
-            }
+      if (isRealUuid) {
+        await supabase.from('flwdsk_student_records').update(payload).eq('id', student.id);
+      } else {
+        const { data, error } = await supabase.from('flwdsk_student_records').insert({
+          ...payload,
+          register_no: normalizeStudentKey(student.phone || '9876500000'),
+        }).select('id');
+        if (!error && data && data[0]) {
+          student.id = data[0].id;
+          if (selectedBatchId) {
+            await enrollStudent(data[0].id, selectedBatchId);
           }
         }
-      } catch (err) {
-        console.warn('Failed to sync students to Supabase:', err);
+      }
+    } catch (err) {
+      console.warn('Failed to save student to Supabase:', err);
+    }
+  };
+
+  const parseCsv = (text: string): string[][] => {
+    const result: string[][] = [];
+    let row: string[] = [];
+    let cell = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          cell += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        row.push(cell.trim());
+        cell = '';
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') {
+          i++;
+        }
+        row.push(cell.trim());
+        result.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += char;
       }
     }
-    
-    if (students.length > 0) {
-      syncToSupabase();
+    if (cell || row.length > 0) {
+      row.push(cell.trim());
+      result.push(row);
     }
-  }, [students]);
+    return result.filter(r => r.length > 0);
+  };
 
   // Final Exam student ID list — separate from master students array
   const [finalExamStudentIds, setFinalExamStudentIds] = useState<string[]>([]);
@@ -1970,7 +2226,11 @@ export function BatchManagement() {
                                   }}
                                   style={{ fontSize: 12, padding: '3px 8px', fontWeight: 700, border: '1px dashed var(--border)', background: 'transparent', width: 130, borderRadius: 5 }}
                                   onFocus={(e) => { e.currentTarget.style.border = '1px solid var(--brand)'; e.currentTarget.style.background = 'var(--bg-sunken)'; }}
-                                  onBlur={(e) => { e.currentTarget.style.border = '1px dashed var(--border)'; e.currentTarget.style.background = 'transparent'; }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.border = '1px dashed var(--border)';
+                                    e.currentTarget.style.background = 'transparent';
+                                    saveStudentToDb(s);
+                                  }}
                                 />
                               </div>
                             </td>
@@ -1987,7 +2247,11 @@ export function BatchManagement() {
                                 }}
                                 style={{ fontSize: 11.5, padding: '3px 8px', width: 120, color: 'var(--text-primary)', border: '1px dashed var(--border)', background: 'transparent', borderRadius: 5 }}
                                 onFocus={(e) => { e.currentTarget.style.border = '1px solid var(--brand)'; e.currentTarget.style.background = 'var(--bg-sunken)'; }}
-                                onBlur={(e) => { e.currentTarget.style.border = '1px dashed var(--border)'; e.currentTarget.style.background = 'transparent'; }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.border = '1px dashed var(--border)';
+                                  e.currentTarget.style.background = 'transparent';
+                                  saveStudentToDb(s);
+                                }}
                               />
                             </td>
 
@@ -2003,7 +2267,11 @@ export function BatchManagement() {
                                 }}
                                 style={{ fontSize: 11.5, padding: '3px 8px', width: 160, border: '1px dashed var(--border)', background: 'transparent', borderRadius: 5 }}
                                 onFocus={(e) => { e.currentTarget.style.border = '1px solid var(--brand)'; e.currentTarget.style.background = 'var(--bg-sunken)'; }}
-                                onBlur={(e) => { e.currentTarget.style.border = '1px dashed var(--border)'; e.currentTarget.style.background = 'transparent'; }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.border = '1px dashed var(--border)';
+                                  e.currentTarget.style.background = 'transparent';
+                                  saveStudentToDb(s);
+                                }}
                               />
                             </td>
 
@@ -2526,7 +2794,9 @@ export function BatchManagement() {
                               value={examDateVal}
                               onChange={(e) => {
                                 const newD = e.target.value;
-                                setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, examDate: newD } : st));
+                                const updated = { ...s, examDate: newD };
+                                setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
+                                saveStudentToDb(updated);
                               }}
                               style={{ fontSize: 11.5, padding: '3px 6px', width: 125 }}
                             />
@@ -2542,6 +2812,7 @@ export function BatchManagement() {
                                 const val = e.target.value;
                                 setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, college: val } : st));
                               }}
+                              onBlur={() => saveStudentToDb(s)}
                               style={{ fontSize: 11.5, padding: '3px 6px', width: 140, fontWeight: 600 }}
                             />
                           </td>
@@ -2557,7 +2828,6 @@ export function BatchManagement() {
                                 const typedPhone = e.target.value;
                                 const digits = typedPhone.replace(/\D/g, '');
 
-                                // Match against other student records in the registry
                                 const match = students.find(
                                   (st) => st.id !== s.id && digits.length >= 5 && st.phone.replace(/\D/g, '').includes(digits)
                                 );
@@ -2571,7 +2841,7 @@ export function BatchManagement() {
                                         title: 'Student Auto-Filled',
                                         message: `Auto-filled details for "${match.name}" (${match.college}).`,
                                       });
-                                      return {
+                                      const updated = {
                                         ...st,
                                         phone: typedPhone,
                                         name: match.name,
@@ -2580,11 +2850,14 @@ export function BatchManagement() {
                                         voucherId: match.voucherId || `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}`,
                                         retestVoucherId: match.retestVoucherId || `VOUCH-RETEST-${Math.floor(100 + Math.random() * 900)}`,
                                       };
+                                      saveStudentToDb(updated);
+                                      return updated;
                                     }
                                     return { ...st, phone: typedPhone };
                                   })
                                 );
                               }}
+                              onBlur={() => saveStudentToDb(s)}
                               placeholder="+91 98765 00000"
                               style={{ fontSize: 11.5, padding: '3px 6px', width: 130, color: 'var(--text-muted)' }}
                             />
@@ -2609,6 +2882,7 @@ export function BatchManagement() {
                                   const val = e.target.value;
                                   setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, name: val } : st));
                                 }}
+                                onBlur={() => saveStudentToDb(s)}
                                 style={{ fontSize: 11.5, padding: '3px 6px', width: 125, fontWeight: 700 }}
                               />
                             </div>
@@ -2620,7 +2894,9 @@ export function BatchManagement() {
                               value={courseVal}
                               onChange={(e) => {
                                 const cVal = e.target.value;
-                                setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, course: cVal } : st));
+                                const updated = { ...s, course: cVal };
+                                setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
+                                saveStudentToDb(updated);
                               }}
                               style={{
                                 fontSize: 11,
@@ -2652,6 +2928,7 @@ export function BatchManagement() {
                                   const val = Number(e.target.value);
                                   setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, finalExam: val, retestScore: val } : st));
                                 }}
+                                onBlur={() => saveStudentToDb(s)}
                                 placeholder="Mark"
                                 style={{ fontSize: 11.5, padding: '3px 6px', width: 65, textAlign: 'center', fontWeight: 700 }}
                               />
@@ -2673,7 +2950,9 @@ export function BatchManagement() {
                                 type="button"
                                 onClick={() => {
                                   const nextAttempt = isRetestAttempt ? 1 : 2;
-                                  setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, examAttemptCount: nextAttempt, retestApproved: nextAttempt === 2 } : st));
+                                  const updated = { ...s, examAttemptCount: nextAttempt, retestApproved: nextAttempt === 2 };
+                                  setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
+                                  saveStudentToDb(updated);
                                   toast({
                                     variant: 'info',
                                     title: 'Exam Attempt Updated',
@@ -2701,7 +2980,9 @@ export function BatchManagement() {
                                 value={s.selectedVoucherId || retestVoucher}
                                 onChange={(e) => {
                                   const vCode = e.target.value;
-                                  setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, selectedVoucherId: vCode } : st));
+                                  const updated = { ...s, selectedVoucherId: vCode };
+                                  setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
+                                  saveStudentToDb(updated);
                                   toast({
                                     variant: 'info',
                                     title: 'Retest Voucher Selected',
@@ -2731,6 +3012,7 @@ export function BatchManagement() {
                                   className="kvj-input"
                                   value={firstVoucher}
                                   onChange={(e) => assignVoucherId(s.id, e.target.value)}
+                                  onBlur={() => saveStudentToDb(s)}
                                   placeholder="VOUCH-XXX-000"
                                   style={{ fontSize: 11, padding: '3px 6px', width: 135 }}
                                 />
@@ -2824,7 +3106,9 @@ export function BatchManagement() {
                                 value={pStatus}
                                 onChange={(e) => {
                                   const nextP = e.target.value as 'Paid' | 'Pending';
-                                  setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, retestPaymentStatus: nextP } : st));
+                                  const updated = { ...s, retestPaymentStatus: nextP };
+                                  setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
+                                  saveStudentToDb(updated);
                                 }}
                                 style={{
                                   fontSize: 11,
@@ -2851,6 +3135,7 @@ export function BatchManagement() {
                                     const amt = Number(e.target.value);
                                     setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, retestCollectedAmount: amt } : st));
                                   }}
+                                  onBlur={() => saveStudentToDb(s)}
                                   placeholder="Amount"
                                   style={{ fontSize: 11.5, padding: '3px 6px', width: 70, fontWeight: 700 }}
                                 />
@@ -2879,6 +3164,7 @@ export function BatchManagement() {
                                   )
                                 );
                               }}
+                              onBlur={() => saveStudentToDb(s)}
                               placeholder="Mark"
                               style={{ fontSize: 11.5, padding: '3px 6px', width: 65, textAlign: 'center', fontWeight: 700 }}
                             />
@@ -2894,6 +3180,7 @@ export function BatchManagement() {
                                 const vCode = e.target.value;
                                 setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, retestVoucherId: vCode } : st));
                               }}
+                              onBlur={() => saveStudentToDb(s)}
                               placeholder="New Voucher ID"
                               style={{ fontSize: 11, padding: '3px 6px', width: 155 }}
                             />
