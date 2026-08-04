@@ -8,6 +8,10 @@ import { useGeolocation } from './useGeolocation';
 import { toLocalISODate } from '../../../shared/utils/date';
 import { hoursThisMonth as calcHoursThisMonth, attendancePercent } from '../../../shared/utils/metrics';
 
+/** Only a real Supabase Auth UUID is safe to write into uuid columns. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SESSION_ERR = 'Your session is not fully verified. Please log out and sign in again with your registered email and password.';
+
 export function useAttendance() {
   const service = useMemo(() => container.resolve(ATTENDANCE_SERVICE_TOKEN), []);
   const { user } = useAuth();
@@ -53,6 +57,7 @@ export function useAttendance() {
 
   const clockIn = useCallback(async (workType: WorkSessionType) => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
+    if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
     setLoading(true);
     let geo: GeoPoint | undefined;
     try {
@@ -71,6 +76,7 @@ export function useAttendance() {
 
   const clockOut = useCallback(async () => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
+    if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
     setLoading(true);
     let geo: GeoPoint | undefined;
     try {
@@ -89,6 +95,7 @@ export function useAttendance() {
 
   const startBreak = useCallback(async (reason?: string) => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
+    if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
     setLoading(true);
     const res = await service.startBreak(user.id, reason);
     setLoading(false);
@@ -101,6 +108,7 @@ export function useAttendance() {
 
   const endBreak = useCallback(async () => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
+    if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
     setLoading(true);
     const res = await service.endBreak(user.id);
     setLoading(false);
