@@ -127,17 +127,19 @@ export class ProjectService implements IProjectService {
       // Automatically set supervisor to assigning employee (actor.id) if not specified
       const supervisorId = data.supervisorId || actor.id;
 
-      // Auto-resolve projectId to avoid NULL constraint violations in PostgreSQL
+      // Auto-resolve projectId to avoid NULL constraint violations in PostgreSQL.
+      // Unspecified project tasks must go to "Office Task".
       let projectId = data.projectId;
       if (!projectId) {
-        const prjPage = await this.projectRepo.findMany({ pageSize: 1 });
-        if (prjPage.data && prjPage.data.length > 0) {
-          projectId = prjPage.data[0].id;
+        const prjPage = await this.projectRepo.findMany({ pageSize: 100 });
+        const existingOffice = prjPage.data?.find((p: any) => p.title === 'Office Task');
+        if (existingOffice) {
+          projectId = existingOffice.id;
         } else {
           const gen = await this.projectRepo.create(
             {
-              title: 'General Operations',
-              code: 'GEN-01',
+              title: 'Office Task',
+              code: 'OFF-TASK',
               category: 'Office',
               type: 'Internal',
               status: 'execution',

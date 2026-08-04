@@ -1664,12 +1664,34 @@ function ResizedQuickAction({ icon, label, onClick }: { icon: React.ReactNode; l
   );
 }
 
+function TaskProjectFields({ projectOptions }: { projectOptions: Array<{ value: string; label: string }> }) {
+  const { values } = useForm();
+  const isCreateNew = values.projectId === 'CREATE_NEW';
+
+  return (
+    <>
+      <SelectField
+        name="projectId"
+        label="Project / Department *"
+        options={projectOptions}
+      />
+      {isCreateNew && (
+        <TextField
+          name="newProjectName"
+          label="New Project Name *"
+          placeholder="e.g. KVJ Mobile App"
+        />
+      )}
+    </>
+  );
+}
+
 export function MyDayPage() {
   const { user } = useAuth();
   const { employees } = useEmployee();
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
-  const { tasks: projectTasks, projects, createTask, updateTask, submitTask } = useProject();
+  const { tasks: projectTasks, projects, createTask, createProject, updateTask, submitTask } = useProject();
   const { startSession, pauseSession, completeSession } = useTaskSessions();
 
   const [selectedEmpId, setSelectedEmpId] = useState('me');
@@ -1957,18 +1979,54 @@ export function MyDayPage() {
     handleActivityLog(`Submitted for Manager Review: ${taskTitle}`, 'success');
   };
 
+  const projectOptions = useMemo(() => {
+    const list = (projects || []).map((p) => ({
+      value: p.id,
+      label: p.title,
+    }));
+    return [
+      { value: 'OFFICE_TASK', label: 'None (Office Task)' },
+      ...list,
+      { value: 'CREATE_NEW', label: '➕ Create New Project...' },
+    ];
+  }, [projects]);
+
   const handleCreateTaskSubmit = async (values: Record<string, unknown>) => {
     const todayStr = toLocalISODate(new Date());
     const title = (values.name as string) || 'New Task';
-    const projName = (values.projectName as string) || '';
+    let targetProjectId = values.projectId as string | undefined;
+    let projName = 'Office Task';
 
-    // Link a project ONLY when one is explicitly selected. Without a project the
-    // task is an Office Task — do not force it into the first project.
-    const proj = projName || values.projectId
-      ? projects.find((p) => p.title === projName || p.id === values.projectId)
-      : undefined;
+    if (targetProjectId === 'CREATE_NEW') {
+      const newProjName = (values.newProjectName as string || '').trim();
+      if (!newProjName) {
+        toast({ variant: 'error', title: 'Invalid Project Name', message: 'Please enter a name for the new project.' });
+        return;
+      }
+      
+      const projRes = await createProject({
+        title: newProjName,
+        code: newProjName.slice(0, 3).toUpperCase() + '-' + Math.floor(Math.random() * 90 + 10),
+        status: 'execution',
+        priority: 'medium',
+      });
+      
+      if (!projRes.ok) {
+        toast({ variant: 'error', title: 'Project Creation Failed', message: projRes.error });
+        return;
+      }
+      
+      targetProjectId = projRes.value.id;
+      projName = newProjName;
+    } else if (targetProjectId && targetProjectId !== 'OFFICE_TASK') {
+      const projObj = projects.find((p) => p.id === targetProjectId);
+      projName = projObj?.title || 'Office Task';
+    } else {
+      targetProjectId = undefined;
+    }
+
     const res = await createTask({
-      projectId: proj?.id,
+      projectId: targetProjectId,
       title,
       supervisorId: user?.id,
       assignedByEmployeeId: user?.id,
@@ -1981,7 +2039,7 @@ export function MyDayPage() {
     const newTaskItem: TaskItem = {
       id: taskId,
       title,
-      project: projName || 'Office Task',
+      project: projName,
       due: todayStr,
       priority: 'Normal',
       active: false,
@@ -2087,9 +2145,9 @@ export function MyDayPage() {
 
       {/* Create Task Drawer */}
       <Drawer open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Create New Task">
-        <Form initial={{ category: 'Office Task' }} onSubmit={handleCreateTaskSubmit}>
+        <Form initial={{ projectId: 'OFFICE_TASK' }} onSubmit={handleCreateTaskSubmit}>
           <TextField name="name" label="Task Title *" placeholder="e.g. Cross check each features" />
-          <TextField name="projectName" label="Project Name / Department" placeholder="e.g. Flow Desk" />
+          <TaskProjectFields projectOptions={projectOptions} />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
             <Button type="submit">Create Task</Button>
