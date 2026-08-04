@@ -289,7 +289,7 @@ export function ApprovalsQueue() {
         }
         if (r.approvalStatus === 'pending_assignment_approval') {
           const creator = Object.values(employees).find(emp => emp.id === r.assignedByEmployeeId);
-          const creatorRole = (creator?.role || '').toUpperCase();
+          const creatorRole = ((creator as any)?.role || '').toUpperCase();
           const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
 
           if (needsCeoOnly) {

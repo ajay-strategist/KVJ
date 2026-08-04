@@ -808,7 +808,7 @@ export function TaskBoard({
 
                       // Check if creator is Admin or Manager
                       const creator = employees.find(e => e.id === t.assignedByEmployeeId);
-                      const creatorRole = (creator?.role || '').toUpperCase();
+                      const creatorRole = ((creator as any)?.role || '').toUpperCase();
                       const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
 
                       if (needsCeoOnly) {
