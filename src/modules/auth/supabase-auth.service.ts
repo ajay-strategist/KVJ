@@ -623,6 +623,17 @@ export class SupabaseAuthService implements IAuthService {
       console.warn('Application-level password update note:', e);
     }
 
+    try {
+      const stored = localStorage.getItem('kvj_app_session');
+      if (stored) {
+        const appSession = JSON.parse(stored);
+        if (appSession && appSession.user) {
+          appSession.user.mustChangePassword = false;
+          try { localStorage.setItem('kvj_app_session', JSON.stringify(appSession)); } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
     return { ok: true };
   }
 
