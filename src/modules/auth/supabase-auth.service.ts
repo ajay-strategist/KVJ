@@ -266,17 +266,80 @@ export class SupabaseAuthService implements IAuthService {
     };
   }
 
+  /**
+   * Silently attempts to establish a Supabase Auth session so that the Supabase
+   * JWT is available for RLS. Called as a background side-effect after a
+   * successful application-level login. Errors are intentionally swallowed.
+   */
+  private syncSupabaseAuth(email: string, password: string, fullName: string, role: string): void {
+    supabase.auth.signInWithPassword({ email, password }).then(async (res) => {
+      if (res.data?.session) return; // already synced
+      await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName, role } },
+      }).catch(() => {});
+    }).catch(() => {});
+  }
+
   async login(credentials: Credentials): Promise<Session> {
     const email = await this.resolveIdentifierToEmail(credentials.email);
     const pwd = credentials.password;
 
+    // =========================================================================
+    // PATH 1 — Application-level auth (primary)
+    // flwdsk_authenticate is a SECURITY DEFINER function: it bypasses RLS and
+    // works with the anon key, so it runs before a Supabase session exists.
+    // =========================================================================
+    try {
+      const { data: employeeId, error: authFnErr } = await supabase.rpc(
+        'flwdsk_authenticate',
+        { p_email: email, p_password: pwd },
+      );
+
+      if (!authFnErr && employeeId) {
+        // Credential confirmed — load the full employee profile via SECURITY DEFINER
+        const { data: rows } = await supabase.rpc('flwdsk_get_employee', { p_email: email });
+        const empRow = Array.isArray(rows) ? rows[0] : rows;
+
+        if (empRow?.id) {
+          const authUser = toAuthUser(empRow as unknown as EmployeeProfileRow, email);
+          const fullName = authUser.fullName;
+          const role = authUser.role;
+
+          // Background: try to establish a Supabase Auth session for RLS.
+          // Non-blocking — failures are silently ignored.
+          this.syncSupabaseAuth(email, pwd, fullName, role);
+
+          const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
+          const appSession: Session = {
+            user: authUser,
+            token: `app_${Date.now()}`,
+            issuedAt: Date.now(),
+            expiresAt: Date.now() + fallbackTtlMs,
+            rememberMe: !!credentials.rememberMe,
+          };
+          // Persist for getSession() on page reload
+          try {
+            localStorage.setItem('kvj_app_session', JSON.stringify(appSession));
+          } catch (_) {}
+          return appSession;
+        }
+      }
+    } catch (_) {
+      // flwdsk_authenticate function not yet deployed — fall through to Supabase Auth
+    }
+
+    // =========================================================================
+    // PATH 2 — Supabase Auth (fallback / backward-compat)
+    // Used when the app-level auth function is not deployed yet, or when the
+    // employee has a Supabase Auth account but hasn’t been migrated to the
+    // app-level credential store.
+    // =========================================================================
     const defaultPasswords = ['password', 'password123', 'Password123', '123456', 'kvj123', 'admin', 'admin123', 'password@123', '12345678'];
     const isDefaultPwd = defaultPasswords.includes(pwd);
 
-    let authRes: any = await supabase.auth.signInWithPassword({
-      email,
-      password: pwd,
-    });
+    let authRes: any = await supabase.auth.signInWithPassword({ email, password: pwd });
 
     if (authRes.error && isDefaultPwd) {
       for (const altPwd of defaultPasswords) {
@@ -289,134 +352,100 @@ export class SupabaseAuthService implements IAuthService {
       }
     }
 
-    if (authRes.error) {
-      const { data: empRow } = await supabase
-        .from('flwdsk_employees')
-        .select('id, email, first_name, last_name, role, must_change_password')
-        .ilike('email', email)
-        .maybeSingle();
+    if (!authRes.error && authRes.data?.session && authRes.data?.user) {
+      return await this.buildSession(
+        authRes.data.session.access_token,
+        authRes.data.session.expires_at,
+        authRes.data.user.id,
+        authRes.data.user.email ?? email,
+        !!credentials.rememberMe,
+      );
+    }
 
-      if (empRow) {
-        const fullName = `${empRow.first_name || ''} ${empRow.last_name || ''}`.trim() || 'Employee';
-        
-        // Attempt sign up if auth user doesn't exist yet
+    // Try sign-up for employees who haven’t been added to Supabase Auth yet
+    if (authRes.error && isDefaultPwd) {
+      // Use SECURITY DEFINER function to look up the employee pre-auth
+      const { data: rows } = await supabase.rpc('flwdsk_get_employee', { p_email: email });
+      const empRow = Array.isArray(rows) ? rows[0] : rows;
+
+      if (empRow?.id) {
+        const fullName = [empRow.first_name, empRow.last_name].filter(Boolean).join(' ').trim() || 'Employee';
+        const role = empRow.role || 'EMPLOYEE';
+
         const signUpRes = await supabase.auth.signUp({
           email: empRow.email || email,
           password: pwd,
-          options: { data: { full_name: fullName, role: empRow.role || 'EMPLOYEE' } }
+          options: { data: { full_name: fullName, role } },
         });
 
         if (signUpRes.data?.session && signUpRes.data?.user) {
-          authRes = signUpRes;
-        } else {
-          const loginAgain = await supabase.auth.signInWithPassword({ email: empRow.email || email, password: pwd });
-          if (loginAgain.data?.session && loginAgain.data?.user) {
-            authRes = loginAgain;
-          }
-        }
-      }
-    }
-
-    // 4. Fallback for initial employee provisioning when default password is used
-    if ((authRes.error || !authRes.data?.session) && (isDefaultPwd || pwd === 'password')) {
-      let fullName = 'Employee';
-      let role: RoleKey = 'EMPLOYEE';
-
-      const emailLower = email.toLowerCase();
-      if (emailLower.includes('ajay') || emailLower === 'mail@thestrategist.co.in') {
-        fullName = 'Ajay Thomas'; role = 'ADMIN';
-      } else if (emailLower.includes('jomon') || emailLower === 'info@thestrategist.co.in') {
-        fullName = 'Jomon Joseph'; role = 'CEO';
-      }
-
-      // Last-resort: try to create a Supabase auth account so RLS-dependent
-      // reads (auth.uid() IS NOT NULL) return data instead of empty rows.
-      const signUpAttempt = await supabase.auth.signUp({
-        email,
-        password: pwd,
-        options: { data: { full_name: fullName, role } },
-      });
-      if (signUpAttempt.data?.session && signUpAttempt.data?.user) {
-        return await this.buildSession(
-          signUpAttempt.data.session.access_token,
-          signUpAttempt.data.session.expires_at,
-          signUpAttempt.data.user.id,
-          signUpAttempt.data.user.email ?? email,
-          !!credentials.rememberMe,
-        );
-      }
-      if (signUpAttempt.data?.user && !signUpAttempt.data.session) {
-        const lastAttempt = await supabase.auth.signInWithPassword({ email, password: pwd });
-        if (lastAttempt.data?.session && lastAttempt.data?.user) {
           return await this.buildSession(
-            lastAttempt.data.session.access_token,
-            lastAttempt.data.session.expires_at,
-            lastAttempt.data.user.id,
-            lastAttempt.data.user.email ?? email,
+            signUpRes.data.session.access_token,
+            signUpRes.data.session.expires_at,
+            signUpRes.data.user.id,
+            signUpRes.data.user.email ?? email,
             !!credentials.rememberMe,
           );
         }
-      }
+        if (signUpRes.data?.user && !signUpRes.data.session) {
+          const lastAttempt = await supabase.auth.signInWithPassword({ email: empRow.email || email, password: pwd });
+          if (lastAttempt.data?.session && lastAttempt.data?.user) {
+            return await this.buildSession(
+              lastAttempt.data.session.access_token,
+              lastAttempt.data.session.expires_at,
+              lastAttempt.data.user.id,
+              lastAttempt.data.user.email ?? email,
+              !!credentials.rememberMe,
+            );
+          }
+        }
 
-      // Supabase Auth cannot issue a session (email confirmation pending, or
-      // account already exists with a different password set via dashboard).
-      // Last resort: look up the employee by email from the DB and use their
-      // real employees.id UUID for the session. This is safe:
-      //   - The record comes from server-side Postgres, not the client
-      //   - employees.id is a real UUID → all DB writes succeed
-      //   - This path only triggers when password matches a known default value
-      //     AND the employee exists in the database
-      let empRow: any = null;
-      try {
-        const { data } = await supabase
-          .from('flwdsk_employees')
-          .select('id, first_name, last_name, email, role, designation, must_change_password, username, avatar_url, phone, employee_id')
-          .ilike('email', email)
-          .is('deleted_at', null)
-          .maybeSingle();
-        empRow = data;
-      } catch (_) {}
-
-      if (empRow?.id) {
+        // Supabase Auth session unavailable but employee exists in DB.
+        // Return an app-level session using the real employees.id UUID.
         const authUser = toAuthUser(empRow as unknown as EmployeeProfileRow, email);
         const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
-        return {
+        const appSession: Session = {
           user: authUser,
-          token: `db_session_${Date.now()}`,
+          token: `app_${Date.now()}`,
           issuedAt: Date.now(),
           expiresAt: Date.now() + fallbackTtlMs,
           rememberMe: !!credentials.rememberMe,
         };
+        try { localStorage.setItem('kvj_app_session', JSON.stringify(appSession)); } catch (_) {}
+        return appSession;
       }
 
       // Employee not found in DB either — truly unprovisioned account.
       throw new AppError({
         code: 'UNAUTHENTICATED' as never,
-        message:
-          'Your account is not yet set up. Please ask your administrator to ' +
-          'add you as an employee in the system.',
+        message: 'Your account is not yet set up. Please ask your administrator to add you as an employee in the system.',
         severity: 'warning',
       });
     }
 
-    if (authRes.error || !authRes.data?.session || !authRes.data?.user) {
-      throw invalidCredentials();
-    }
-
-    return await this.buildSession(
-      authRes.data.session.access_token,
-      authRes.data.session.expires_at,
-      authRes.data.user.id,
-      authRes.data.user.email ?? email,
-      !!credentials.rememberMe,
-    );
+    throw invalidCredentials();
   }
 
   async logout(): Promise<void> {
+    try {
+      localStorage.removeItem('kvj_app_session');
+    } catch (_) {}
     await supabase.auth.signOut();
   }
 
   async getSession(): Promise<Session | null> {
+    try {
+      const stored = localStorage.getItem('kvj_app_session');
+      if (stored) {
+        const appSession = JSON.parse(stored) as Session;
+        if (appSession && appSession.expiresAt > Date.now()) {
+          return appSession;
+        } else {
+          localStorage.removeItem('kvj_app_session');
+        }
+      }
+    } catch (_) {}
+
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) return null;
 
@@ -438,6 +467,19 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async refresh(): Promise<Session | null> {
+    try {
+      const stored = localStorage.getItem('kvj_app_session');
+      if (stored) {
+        const appSession = JSON.parse(stored) as Session;
+        if (appSession) {
+          const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
+          appSession.expiresAt = Date.now() + fallbackTtlMs;
+          try { localStorage.setItem('kvj_app_session', JSON.stringify(appSession)); } catch (_) {}
+          return appSession;
+        }
+      }
+    } catch (_) {}
+
     const { data, error } = await supabase.auth.refreshSession();
     if (error || !data.session || !data.user) return null;
     return this.buildSession(
@@ -561,15 +603,24 @@ export class SupabaseAuthService implements IAuthService {
 
     try {
       const isUuid = typeof userId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
-      const updateData = { must_change_password: false, updated_at: new Date().toISOString() };
-      
-      if (isUuid) {
-        await supabase.from('flwdsk_employees').update(updateData).eq('id', userId);
-      } else {
-        await supabase.from('flwdsk_employees').update(updateData).ilike('email', userId);
+      let targetUuid: string | null = isUuid ? userId : null;
+
+      if (!targetUuid) {
+        const { data: rows } = await supabase.rpc('flwdsk_get_employee', { p_email: userId });
+        const empRow = Array.isArray(rows) ? rows[0] : rows;
+        if (empRow?.id) {
+          targetUuid = empRow.id;
+        }
+      }
+
+      if (targetUuid) {
+        await supabase.rpc('flwdsk_set_password', {
+          p_employee_id: targetUuid,
+          p_new_password: newPassword
+        });
       }
     } catch (e) {
-      console.warn('Supabase employees update note:', e);
+      console.warn('Application-level password update note:', e);
     }
 
     return { ok: true };
