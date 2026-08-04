@@ -321,20 +321,48 @@ export function ExpenseClaims() {
       
       const { data, error } = await query.order('created_at', { ascending: false });
       if (!error && data) {
-        const mapped: ExpenseRecord[] = data.map((r: any) => ({
-          id: r.id,
-          date: new Date(r.expense_date || r.created_at).toLocaleDateString('en-GB'),
-          person: r.person_name || 'Employee',
-          category: r.category || (r.is_office_expense ? 'Office Expense' : 'Training Expense'),
-          type: r.expense_type || 'Misc',
-          batch: r.batch_name,
-          notes: r.notes,
-          amount: Number(r.amount || 0),
-          receipt: r.receipt_url || r.receipt_file_name || '',
-          status: (r.status || 'submitted').toLowerCase() as any,
-          approvedBy: r.approved_by,
-          approvedAt: r.approved_at ? new Date(r.approved_at).toLocaleString() : undefined,
-        }));
+        const mapped: ExpenseRecord[] = data.map((r: any) => {
+          let person = 'Employee';
+          let type = 'Misc';
+          let batch = '';
+          let route = '';
+          let vehicle = undefined;
+          let km = undefined;
+          let userNotes = r.notes || '';
+
+          if (r.notes && r.notes.trim().startsWith('{')) {
+            try {
+              const parsed = JSON.parse(r.notes);
+              person = parsed.personName || person;
+              type = parsed.expenseType || type;
+              batch = parsed.batchName || batch;
+              route = parsed.route || route;
+              vehicle = parsed.vehicle || undefined;
+              km = parsed.km || undefined;
+              userNotes = parsed.userNotes || '';
+            } catch (e) {
+              // fallback if parsing fails
+            }
+          }
+
+          return {
+            id: r.id,
+            date: new Date(r.created_at).toLocaleDateString('en-GB'),
+            person,
+            category: r.category || 'Office Expense',
+            type,
+            batch,
+            notes: userNotes,
+            route,
+            vehicle,
+            km,
+            amount: Number(r.amount || 0),
+            receipt: r.receipt_url || '',
+            status: (r.status || 'submitted').toLowerCase() as any,
+            approvedBy: r.approved_by,
+            approvedAt: r.approved_at ? new Date(r.approved_at).toLocaleString() : undefined,
+          };
+        });
         setExpenses(mapped);
       }
     } catch (e) {
@@ -441,18 +469,23 @@ export function ExpenseClaims() {
     };
 
     try {
+      const notesJson = JSON.stringify({
+        personName: user?.fullName || 'Employee',
+        expenseType: expType,
+        batchName: values.batch as string || null,
+        route: values.route as string || null,
+        vehicle: isSelfTravel ? vehicle : null,
+        km: isSelfTravel ? km : null,
+        userNotes: (values.notes as string) || (values.route as string) || '',
+      });
+
       const { error } = await supabase.from('flwdsk_expense_claims').insert({
         employee_id: validEmpId,
-        person_name: user?.fullName || 'Employee',
         category: values.categoryType || 'Office Expense',
-        expense_type: expType,
         amount,
-        expense_date: new Date().toISOString().split('T')[0],
-        batch_name: values.batch as string,
-        is_office_expense: values.categoryType === 'Office Expense',
-        notes: (values.notes as string) || (values.route as string) || expType,
         receipt_url: receiptLink,
         status: 'submitted',
+        notes: notesJson,
       });
 
       if (error) {
