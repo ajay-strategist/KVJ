@@ -39,7 +39,26 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
         @media print {
           @page {
             size: A4 portrait;
-            margin: 6mm 6mm 6mm 6mm;
+            /* Clean, balanced A4 edges. The white card provides the inner frame. */
+            margin: 10mm 9mm 12mm 9mm;
+          }
+
+          /* Each major section begins on its own page for a partitioned,
+             executive-grade layout. */
+          .report-section-page {
+            page-break-before: always !important;
+            break-before: page !important;
+          }
+
+          /* Keep every heading attached to the content that follows it, and never
+             leave 1-2 orphan/widow lines dangling across a page break. */
+          h1, h2, h3, h4, h5 {
+            page-break-after: avoid !important;
+            break-after: avoid-page !important;
+          }
+          p, li, div {
+            orphans: 3;
+            widows: 3;
           }
 
           /* Light gray background canvas matching executive design */
@@ -214,13 +233,15 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
       <ExecutiveSummarySection data={data} config={config} />
 
       {/* Render Remaining Active Streamlined Sections */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div>
         {activeSections
           .filter((sec) => sec.id !== 'executive-summary')
           .map((sec) => {
             const SectionComponent = sec.component;
             return (
-              <div key={sec.id}>
+              // Each major section starts on a fresh A4 page in print (clean,
+              // partitioned executive report). On screen it just stacks with a gap.
+              <div key={sec.id} className="report-section-page" style={{ marginBottom: 18 }}>
                 <SectionComponent data={data} config={config} />
               </div>
             );

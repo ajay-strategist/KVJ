@@ -132,11 +132,11 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
   const groups = dataCols.length > 0 ? chunk(dataCols, MAX_DATA_COLS_PER_TABLE) : [[]];
   const multi = groups.length > 1;
 
-  const thStyle: React.CSSProperties = { padding: '8px 6px', fontSize: 10.5, fontWeight: 700, color: '#334155' };
+  const thStyle: React.CSSProperties = { padding: '9px 6px', fontSize: 10.5, fontWeight: 700, color: '#ffffff' };
 
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
-      <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4, paddingLeft: 10, borderLeft: '4px solid #1e40af' }}>
         👨‍🎓 Student Performance Register
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
@@ -159,7 +159,8 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
 
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, border: '1px solid #cbd5e1' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                {/* Deep-blue header repeats on every page the register spans. */}
+                <tr style={{ background: '#1e40af', borderBottom: '2px solid #1e3a8a' }}>
                   {cols.map((c) => (
                     <th key={c.id} style={{ ...thStyle, textAlign: c.align, width: c.id === 'photo' ? 52 : undefined }}>
                       {c.header}
