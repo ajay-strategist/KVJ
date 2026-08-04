@@ -36,7 +36,7 @@ CREATE OR REPLACE FUNCTION public.flwdsk_authenticate(
 ) RETURNS uuid
   LANGUAGE plpgsql
   SECURITY DEFINER
-  SET search_path = public
+  SET search_path = public, extensions
 AS $$
 DECLARE
   v_id            uuid;
@@ -122,7 +122,7 @@ CREATE OR REPLACE FUNCTION public.flwdsk_set_password(
 ) RETURNS boolean
   LANGUAGE plpgsql
   SECURITY DEFINER
-  SET search_path = public
+  SET search_path = public, extensions
 AS $$
 BEGIN
   IF length(trim(p_new_password)) < 6 THEN
