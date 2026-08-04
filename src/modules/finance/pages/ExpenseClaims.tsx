@@ -436,7 +436,7 @@ export function ExpenseClaims() {
       route: values.route as string,
       notes: (values.notes as string) || (values.route as string) || expType,
       amount,
-      receipt: values.receiptFile ? (values.receiptFile as File).name : receiptLink,
+      receipt: receiptLink,
       status: 'submitted',
     };
 
