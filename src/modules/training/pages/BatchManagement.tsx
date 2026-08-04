@@ -913,6 +913,7 @@ export function BatchManagement() {
   // Google Sheet Auto-Sync State (Registration & Student Photos)
   const [isSyncingSheet, setIsSyncingSheet] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; message: string } | null>(null);
 
   // Convert Google Drive open URL or view link to direct viewable image URL
   const convertDriveUrlToDirectImg = (url: string): string => {
@@ -958,6 +959,7 @@ export function BatchManagement() {
   };
 
   // Sync Google Sheet Registration Data & Student Photos
+  // Sync Google Sheet Registration Data & Student Photos
   const syncGoogleSheetData = async (showToastNotice = false) => {
     setIsSyncingSheet(true);
     try {
@@ -983,10 +985,6 @@ export function BatchManagement() {
         const email = (row[1] || row[6] || '').trim();
         const college = (row[2] || 'MIM Kuttikkanam').trim();
         const batch = (row[3] || 'Batch 1').trim();
-        // BUSINESS RULE (locked): register_no IS the phone number and is the
-        // unique student identifier. The sheet's own "Register No." column
-        // (row[4]) is deliberately NOT used — a college register number is not
-        // an identifier in this system.
         const phone = (row[5] || '').trim();
         const registerNo = normalizeStudentKey(phone);
         const name = (row[7] || '').trim();
@@ -1029,55 +1027,155 @@ export function BatchManagement() {
       const regStudents = Array.from(uniqueRegMap.values());
       setRegistrationRecords(regStudents);
 
-      // Enrich existing students (uploaded via Excel) with photos & contact info from Google Sheet.
-      // Do NOT auto-insert new students — Performance Matrix shows only Excel-uploaded data.
-      setStudents((prevStudents) => {
-        const updated = [...prevStudents];
+      // Now process students with database persistence and real-time progress!
+      setImportProgress({ current: 0, total: regStudents.length, message: 'Analyzing Google Sheet registrations...' });
 
-        regStudents.forEach((reg) => {
-          const regPhoneDigits = reg.phone.replace(/\D/g, '');
-          const normRegName = reg.name.toLowerCase().trim();
+      const updatedStudents = [...students];
+      let dbUpdated = 0;
+      let dbCreated = 0;
 
-          // Match primarily by Phone Number (last 10 digits as primary key)
-          const existingIdx = updated.findIndex((st) => {
-            const stPhoneDigits = st.phone.replace(/\D/g, '');
-            const stName = st.name.toLowerCase().trim();
-            if (regPhoneDigits && stPhoneDigits && regPhoneDigits.length >= 10 && stPhoneDigits.length >= 10) {
-              return regPhoneDigits.slice(-10) === stPhoneDigits.slice(-10);
-            }
-            return normRegName && stName && normRegName === stName;
-          });
+      for (let i = 0; i < regStudents.length; i++) {
+        const reg = regStudents[i];
+        const regPhoneDigits = reg.phone.replace(/\D/g, '');
+        const normRegName = reg.name.toLowerCase().trim();
 
-          // Only update existing students — never auto-insert from Google Sheet
-          if (existingIdx >= 0) {
-            updated[existingIdx] = {
-              ...updated[existingIdx],
-              photoUrl: reg.photoUrl || updated[existingIdx].photoUrl,
-              photo: reg.photoUrl ? '📷' : updated[existingIdx].photo,
-              phone: reg.phone || updated[existingIdx].phone,
-              email: reg.email || updated[existingIdx].email,
-              college: reg.college || updated[existingIdx].college,
-              department: reg.batch || updated[existingIdx].department,
-            };
+        // Match primarily by Phone Number (last 10 digits as primary key)
+        const existingIdx = updatedStudents.findIndex((st) => {
+          const stPhoneDigits = st.phone.replace(/\D/g, '');
+          const stName = st.name.toLowerCase().trim();
+          if (regPhoneDigits && stPhoneDigits && regPhoneDigits.length >= 10 && stPhoneDigits.length >= 10) {
+            return regPhoneDigits.slice(-10) === stPhoneDigits.slice(-10);
           }
-          // Registration-only students (no Excel match) are shown in the Registration tab only
+          return normRegName && stName && normRegName === stName;
         });
 
-        return updated;
-      });
+        if (existingIdx >= 0) {
+          // Update details in local state and database
+          const currentStudent = updatedStudents[existingIdx];
+          const hasPhotoChanged = reg.photoUrl && reg.photoUrl !== currentStudent.photoUrl;
+          const hasPhoneChanged = reg.phone && reg.phone !== currentStudent.phone;
+          const hasEmailChanged = reg.email && reg.email !== currentStudent.email;
 
+          if (hasPhotoChanged || hasPhoneChanged || hasEmailChanged) {
+            const updatedStudent = {
+              ...currentStudent,
+              photoUrl: reg.photoUrl || currentStudent.photoUrl,
+              photo: reg.photoUrl ? '📷' : currentStudent.photo,
+              phone: reg.phone || currentStudent.phone,
+              email: reg.email || currentStudent.email,
+              college: reg.college || currentStudent.college,
+              department: reg.batch || currentStudent.department,
+            };
+            updatedStudents[existingIdx] = updatedStudent;
+
+            setImportProgress({
+              current: i + 1,
+              total: regStudents.length,
+              message: `Updating database details for ${reg.name}...`,
+            });
+            await saveStudentToDb(updatedStudent);
+            dbUpdated++;
+          }
+        } else {
+          // If student doesn't exist, check if they belong to active batch
+          const regBatchNorm = reg.batch.toLowerCase().replace(/\s+/g, '');
+          const activeBatchName = (activeBatch?.batchName || '').toLowerCase().replace(/\s+/g, '');
+          const activeBatchNo = String(activeBatch?.batchNo || '').toLowerCase().replace(/\s+/g, '');
+          const activeProgram = (activeBatch?.program || '').toLowerCase().replace(/\s+/g, '');
+
+          const batchMatches = regBatchNorm.includes(activeBatchName) ||
+                               regBatchNorm.includes(activeBatchNo) ||
+                               activeBatchName.includes(regBatchNorm) ||
+                               activeBatchNo.includes(regBatchNorm) ||
+                               regBatchNorm.includes(activeProgram);
+
+          const collegeMatches = activeBatch?.college
+            ? reg.college.toLowerCase().trim() === activeBatch.college.toLowerCase().trim()
+            : false;
+
+          if (collegeMatches && batchMatches) {
+            setImportProgress({
+              current: i + 1,
+              total: regStudents.length,
+              message: `Auto-registering and enrolling ${reg.name} from Google Sheet...`,
+            });
+
+            const names = reg.name.split(' ');
+            const firstName = names[0] || 'Student';
+            const lastName = names.slice(1).join(' ') || '';
+
+            const customFields = {
+              college: reg.college,
+              department: reg.batch,
+              attendancePct: 100,
+              attendanceStatus: 'Regular',
+              ass1: 0,
+              ass2: 0,
+              ass3: 0,
+              project: 0,
+              finalExam: 0,
+              overallScore: 0,
+              voucherId: `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}`,
+              voucherStatus: 'Assigned',
+              certificateStatus: 'Pending',
+            };
+
+            const res = await registerStudent({
+              firstName,
+              lastName,
+              phone: reg.phone,
+              email: reg.email,
+              customFields,
+            });
+
+            if (res.ok) {
+              if (selectedBatchId) {
+                await enrollStudent(res.value.id, selectedBatchId);
+              }
+
+              const newStudent: StudentRecord = {
+                id: res.value.id,
+                name: reg.name,
+                photo: reg.photoUrl ? '📷' : '🎓',
+                photoUrl: reg.photoUrl,
+                phone: reg.phone,
+                email: reg.email,
+                college: reg.college,
+                department: reg.batch,
+                attendancePct: 100,
+                attendanceStatus: 'Regular',
+                ass1: 0,
+                ass2: 0,
+                ass3: 0,
+                project: 0,
+                finalExam: 0,
+                overallScore: 0,
+                voucherId: customFields.voucherId,
+                voucherStatus: 'Assigned',
+                certificateStatus: 'Pending',
+              };
+              updatedStudents.push(newStudent);
+              dbCreated++;
+            }
+          }
+        }
+      }
+
+      setStudents(updatedStudents);
       const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setLastSyncedTime(nowStr);
+      setImportProgress(null);
 
-      if (showToastNotice) {
+      if (showToastNotice || dbCreated > 0 || dbUpdated > 0) {
         toast({
           variant: 'success',
-          title: 'Google Sheet Synced',
-          message: `Synced ${regStudents.length} student registration records & photos from live Google Sheet.`,
+          title: 'Google Sheet Sync Complete',
+          message: `Successfully registered ${dbCreated} new batch students and updated ${dbUpdated} records in the database.`,
         });
       }
     } catch (err) {
       console.error('Failed to sync Google Sheet Registration data:', err);
+      setImportProgress(null);
     } finally {
       setIsSyncingSheet(false);
     }
@@ -1186,69 +1284,89 @@ export function BatchManagement() {
 
     try {
       const reader = new FileReader();
-      reader.onload = async () => {
-        const text = reader.result as string;
-        const parsed = parseCsv(text);
-        if (parsed.length <= 1) {
-          toast({ variant: 'error', title: 'Upload Failed', message: 'The CSV file is empty or invalid.' });
-          return;
-        }
+      reader.onload = async (event) => {
+        try {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const parsed: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        const headers = parsed[0].map(h => h.toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
-        const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'));
-        const nameIdx = headers.findIndex(h => h.includes('name'));
-        const voucherIdx = headers.findIndex(h => h.includes('voucher') || h.includes('vouch'));
-
-        if (voucherIdx === -1 || (phoneIdx === -1 && nameIdx === -1)) {
-          toast({
-            variant: 'error',
-            title: 'Invalid CSV Format',
-            message: 'CSV must contain "Voucher ID" column and either "Phone Number" or "Name" to match.',
-          });
-          return;
-        }
-
-        let updatedCount = 0;
-        const updatedStudents = [...students];
-
-        for (let i = 1; i < parsed.length; i++) {
-          const row = parsed[i];
-          const filePhone = phoneIdx !== -1 ? normalizeStudentKey(row[phoneIdx]) : '';
-          const fileName = nameIdx !== -1 ? row[nameIdx].toLowerCase().trim() : '';
-          const fileVoucher = row[voucherIdx]?.trim() || '';
-
-          if (!fileVoucher) continue;
-
-          const sIdx = updatedStudents.findIndex(st => {
-            const stPhone = normalizeStudentKey(st.phone);
-            const stName = st.name.toLowerCase().trim();
-            if (filePhone && stPhone && filePhone === stPhone) return true;
-            if (fileName && stName && fileName === stName) return true;
-            return false;
-          });
-
-          if (sIdx !== -1) {
-            const updated = {
-              ...updatedStudents[sIdx],
-              voucherId: fileVoucher,
-              voucherStatus: 'Assigned',
-            };
-            updatedStudents[sIdx] = updated;
-            await saveStudentToDb(updated);
-            updatedCount++;
+          if (parsed.length <= 1) {
+            toast({ variant: 'error', title: 'Upload Failed', message: 'The spreadsheet is empty or invalid.' });
+            return;
           }
-        }
 
-        setStudents(updatedStudents);
-        setUploadVoucherModalOpen(false);
-        toast({
-          variant: 'success',
-          title: 'Voucher IDs Updated',
-          message: `Successfully updated ${updatedCount} student voucher assignments in the database.`,
-        });
+          const headerRow = parsed[0].map(h => String(h || '').toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
+          const phoneIdx = headerRow.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'));
+          const nameIdx = headerRow.findIndex(h => h.includes('name'));
+          const voucherIdx = headerRow.findIndex(h => h.includes('voucher') || h.includes('vouch'));
+
+          if (voucherIdx === -1 || (phoneIdx === -1 && nameIdx === -1)) {
+            toast({
+              variant: 'error',
+              title: 'Invalid Spreadsheet Format',
+              message: 'Spreadsheet must contain "Voucher ID" column and either "Phone Number" or "Name" to match.',
+            });
+            return;
+          }
+
+          let updatedCount = 0;
+          const updatedStudents = [...students];
+          const totalRows = parsed.length - 1;
+
+          for (let i = 1; i < parsed.length; i++) {
+            const row = parsed[i];
+            if (!row || row.length === 0) continue;
+
+            const filePhone = phoneIdx !== -1 ? normalizeStudentKey(row[phoneIdx]) : '';
+            const fileName = nameIdx !== -1 ? String(row[nameIdx] || '').toLowerCase().trim() : '';
+            const fileVoucher = String(row[voucherIdx] || '').trim();
+
+            if (!fileVoucher) continue;
+
+            setImportProgress({
+              current: i,
+              total: totalRows,
+              message: `Updating voucher code for ${fileName || filePhone} (${i} of ${totalRows})...`,
+            });
+
+            const sIdx = updatedStudents.findIndex(st => {
+              const stPhone = normalizeStudentKey(st.phone);
+              const stName = st.name.toLowerCase().trim();
+              if (filePhone && stPhone && filePhone === stPhone) return true;
+              if (fileName && stName && fileName === stName) return true;
+              return false;
+            });
+
+            if (sIdx !== -1) {
+              const updated = {
+                ...updatedStudents[sIdx],
+                voucherId: fileVoucher,
+                voucherStatus: 'Assigned',
+              };
+              updatedStudents[sIdx] = updated;
+              await saveStudentToDb(updated);
+              updatedCount++;
+            }
+          }
+
+          setImportProgress(null);
+          setStudents(updatedStudents);
+          setUploadVoucherModalOpen(false);
+          toast({
+            variant: 'success',
+            title: 'Voucher IDs Updated',
+            message: `Successfully updated ${updatedCount} student voucher assignments in the database.`,
+          });
+        } catch (err: any) {
+          setImportProgress(null);
+          toast({ variant: 'error', title: 'Parsing Failed', message: err.message });
+        }
       };
-      reader.readAsText(file);
+      reader.readAsArrayBuffer(file);
     } catch (err: any) {
+      setImportProgress(null);
       toast({ variant: 'error', title: 'Upload Failed', message: err.message });
     }
   };
@@ -1391,6 +1509,7 @@ export function BatchManagement() {
 
           let importedCount = 0;
           const newStudentsList: StudentRecord[] = [];
+          const totalRows = parsed.length - 1;
 
           for (let i = 1; i < parsed.length; i++) {
             const row = parsed[i];
@@ -1398,6 +1517,12 @@ export function BatchManagement() {
 
             const name = String(row[nameIdx] || '').trim();
             if (!name) continue;
+
+            setImportProgress({
+              current: i,
+              total: totalRows,
+              message: `Importing ${name} (${i} of ${totalRows})...`,
+            });
 
             const phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '+91 90000 00000';
             const email = emailIdx !== -1 ? String(row[emailIdx] || '').trim() : `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu`;
@@ -1466,6 +1591,7 @@ export function BatchManagement() {
             }
           }
 
+          setImportProgress(null);
           setStudents((prev) => [...prev, ...newStudentsList]);
           setUploadModalOpen(false);
           refreshBatches();
@@ -1475,11 +1601,13 @@ export function BatchManagement() {
             message: `Successfully imported ${importedCount} student records and enrolled them in this batch.`,
           });
         } catch (err: any) {
+          setImportProgress(null);
           toast({ variant: 'error', title: 'Parsing Failed', message: err.message });
         }
       };
       reader.readAsArrayBuffer(file);
     } catch (err: any) {
+      setImportProgress(null);
       toast({ variant: 'error', title: 'Import Failed', message: err.message });
     }
   };
@@ -4486,6 +4614,44 @@ export function BatchManagement() {
             </div>
           </form>
         </Drawer>
+      )}
+
+      {importProgress && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+        }}>
+          <Card style={{ padding: 30, width: '100%', maxWidth: 450, textAlign: 'center', boxShadow: 'var(--shadow-xl)', border: '1px solid var(--border)' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              ⏳ Processing & Syncing Data
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+              {importProgress.message}
+            </p>
+            <div style={{ height: 8, background: 'var(--bg-sunken)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{
+                height: '100%',
+                width: `${(importProgress.current / importProgress.total) * 100}%`,
+                background: 'var(--brand)',
+                borderRadius: 99,
+                transition: 'width 200ms ease',
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
+              <span>{Math.round((importProgress.current / importProgress.total) * 100)}% Complete</span>
+              <span>{importProgress.current} / {importProgress.total} records</span>
+            </div>
+          </Card>
+        </div>
       )}
 
     </AppShell>
