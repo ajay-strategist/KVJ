@@ -34,7 +34,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
       render: (st) => {
         const initials = st.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
         return (
-          <div style={{ width: 26, height: 26, borderRadius: '50%', overflow: 'hidden', border: '1.5px solid #cbd5e1', background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 10, color: '#1e293b', margin: '0 auto' }}>
+          <div style={{ width: 38, height: 38, borderRadius: '50%', overflow: 'hidden', border: '1.5px solid #cbd5e1', background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12.5, color: '#1e293b', margin: '0 auto' }}>
             {st.avatarUrl ? <img src={st.avatarUrl} alt={st.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
           </div>
         );
@@ -161,7 +161,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
                   {cols.map((c) => (
-                    <th key={c.id} style={{ ...thStyle, textAlign: c.align, width: c.id === 'photo' ? 40 : undefined }}>
+                    <th key={c.id} style={{ ...thStyle, textAlign: c.align, width: c.id === 'photo' ? 52 : undefined }}>
                       {c.header}
                     </th>
                   ))}

@@ -253,6 +253,7 @@ export function BatchManagement() {
       sessions: [],
       students: batchStudents.map((s) => ({
         id: s.id,
+        avatarUrl: s.photoUrl || s.customFields?.photoUrl || '',
         registerNo: s.registerNo || '',
         phone: s.phone || '',
         name: `${s.firstName} ${s.lastName}`,
@@ -1673,12 +1674,14 @@ export function BatchManagement() {
         name: student.name,
         phone: student.phone,
         email: student.email,
+        photo_url: student.photoUrl || '',
         notes: (student as any).notes || '',
         custom_fields: {
           college: student.college,
           department: student.department,
           course: student.course || '',
           examDate: student.examDate || '',
+          photoUrl: student.photoUrl || '',
           ass1: student.ass1,
           ass2: student.ass2,
           ass3: student.ass3,
