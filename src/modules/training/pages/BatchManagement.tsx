@@ -474,7 +474,7 @@ export function BatchManagement() {
     try {
       const { data, error } = await supabase.from('flwdsk_student_records').insert({
         ...payload,
-        register_no: normalizeStudentKey(newFinalExamStudentForm.phone || '9876500000'),
+        phone: normalizeStudentKey(newFinalExamStudentForm.phone || '9876500000'),
       }).select('id');
 
       if (error) throw error;
@@ -1774,7 +1774,7 @@ export function BatchManagement() {
         first_name: firstName,
         last_name: lastName,
         name: student.name,
-        phone: student.phone,
+        phone: normalizeStudentKey(student.phone || '9876500000'),
         email: student.email,
         photo_url: student.photoUrl || '',
         notes: (student as any).notes || '',
@@ -1811,7 +1811,7 @@ export function BatchManagement() {
       } else {
         const { data, error } = await supabase.from('flwdsk_student_records').insert({
           ...payload,
-          register_no: normalizeStudentKey(student.phone || '9876500000'),
+          phone: normalizeStudentKey(student.phone || '9876500000'),
         }).select('id');
         if (!error && data && data[0]) {
           student.id = data[0].id;

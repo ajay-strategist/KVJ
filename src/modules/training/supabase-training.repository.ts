@@ -47,7 +47,7 @@ export class SupabaseStudentRepository extends SupabaseRepository<Student> imple
         'identifier (register_no) and cannot be empty.',
       );
     }
-    return { ...data, registerNo: key };
+    return { ...data, registerNo: key, phone: key };
   }
 
   async create(data: Partial<Student>, actor: Parameters<SupabaseRepository<Student>['create']>[1]) {
@@ -65,7 +65,7 @@ export class SupabaseStudentRepository extends SupabaseRepository<Student> imple
     const { data, error } = await supabase
       .from('flwdsk_student_records')
       .select('*')
-      .eq('register_no', key)
+      .eq('phone', key)
       .is('deleted_at', null)
       .maybeSingle();
     if (error) throw error;
