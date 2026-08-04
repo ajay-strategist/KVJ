@@ -11,6 +11,7 @@ import { Button } from '../../../shared/ui/components';
 import { AppError } from '../../../core/result';
 import { InitialAdminBootstrapScreen } from './InitialAdminBootstrapScreen';
 import { appConfig } from '../../../config/app-config';
+import heroBg from '../../../assets/hero.png';
 
 type View = 'login' | 'forgot' | 'first_time_reset';
 
@@ -147,8 +148,25 @@ export function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', placeItems: 'center', padding: 24 }}>
+    <div style={{ position: 'relative', minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr', color: 'var(--text-primary)', overflow: 'hidden' }}>
+      {/* Premium mesh-gradient canvas as the base (theme-aware). */}
+      <div aria-hidden style={{
+        position: 'fixed', inset: 0, zIndex: 0,
+        background: 'var(--app-canvas, var(--bg-app))',
+      }} />
+      {/* The repo's hero illustration as a soft, oversized decorative accent —
+          adds brand character without washing out the page or the text. */}
+      <div aria-hidden style={{
+        position: 'fixed', top: '-6%', right: '-4%', width: 'min(720px, 60vw)', aspectRatio: '1', zIndex: 0,
+        backgroundImage: `url(${heroBg})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'top right',
+        opacity: 0.14, filter: 'blur(1px) saturate(1.2)', pointerEvents: 'none',
+      }} />
+      <div aria-hidden style={{
+        position: 'fixed', bottom: '-8%', left: '-5%', width: 'min(560px, 48vw)', aspectRatio: '1', zIndex: 0,
+        backgroundImage: `url(${heroBg})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'bottom left',
+        opacity: 0.10, filter: 'blur(1px)', transform: 'scaleX(-1)', pointerEvents: 'none',
+      }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', placeItems: 'center', padding: 24, minHeight: '100vh' }}>
         <div style={{ width: 'min(420px, 100%)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

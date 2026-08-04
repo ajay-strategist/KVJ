@@ -234,17 +234,18 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   useEffect(() => {
     if (currentStatus === 'present' || currentStatus === 'on_break') {
-      const timer = setInterval(() => { setNow(Date.now()); }, 1000);
+      // Refresh the elapsed-time display once a minute (not every second) so the
+      // whole page isn't redrawn 60× a minute. Minute precision is enough here.
+      const timer = setInterval(() => { setNow(Date.now()); }, 60000);
       return () => clearInterval(timer);
     }
   }, [currentStatus]);
 
   const formatDuration = (ms: number) => {
-    if (ms <= 0 || isNaN(ms)) return '00h 00m 00s';
-    const sec = Math.floor(ms / 1000) % 60;
+    if (ms <= 0 || isNaN(ms)) return '00h 00m';
     const min = Math.floor(ms / 60000) % 60;
     const hr = Math.floor(ms / 3600000);
-    return `${String(hr).padStart(2, '0')}h ${String(min).padStart(2, '0')}m ${String(sec).padStart(2, '0')}s`;
+    return `${String(hr).padStart(2, '0')}h ${String(min).padStart(2, '0')}m`;
   };
 
   const currentWorkType = record?.sessions && record.sessions.length > 0
@@ -258,7 +259,8 @@ export const AttendancePanel = memo(function AttendancePanel({
   const [nowMs, setNowMs] = useState(Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    // Once a minute instead of every second — see note above.
+    const timer = setInterval(() => setNowMs(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -873,6 +875,9 @@ export const TaskWidget = memo(function TaskWidget({
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
 
   useEffect(() => {
+    // The running-task clock advances once a MINUTE (adds 60s), not every second,
+    // so My Day is not redrawn 60× a minute. The exact worked time is still
+    // recomputed from the start timestamp on refresh, so accuracy is preserved.
     const timer = setInterval(() => {
       let syncTaskId: string | null = null;
       let syncSec = 0;
@@ -883,12 +888,10 @@ export const TaskWidget = memo(function TaskWidget({
         const next = prev.map((t) => {
           if (t.active) {
             changed = true;
-            const nextSec = t.secondsToday + 1;
-            if (nextSec % 5 === 0) {
-              syncTaskId = t.id;
-              syncSec = nextSec;
-              syncUnderReview = !!t.underReview;
-            }
+            const nextSec = t.secondsToday + 60;
+            syncTaskId = t.id;
+            syncSec = nextSec;
+            syncUnderReview = !!t.underReview;
             return { ...t, secondsToday: nextSec };
           }
           return t;
@@ -914,15 +917,14 @@ export const TaskWidget = memo(function TaskWidget({
       if (syncTaskId && onSyncTask) {
         onSyncTask(syncTaskId, syncSec, true, syncUnderReview);
       }
-    }, 1000);
+    }, 60000);
     return () => clearInterval(timer);
   }, [setTasks, onSyncTask]);
 
   const formatSec = (sec: number) => {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-    return `${h}h ${m}m ${s}s`;
+    return `${h}h ${m}m`;
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {

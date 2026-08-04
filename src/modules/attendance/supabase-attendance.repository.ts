@@ -141,13 +141,16 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
   }
 
   override async create(data: Partial<AttendanceRecord>, actor: Actor): Promise<AttendanceRecord> {
-    const created = await super.create(data, actor);
-    const sessions = data.sessions || created.sessions;
+    // `sessions` and `breaks` are NOT columns on flwdsk_attendance_records — they
+    // live in flwdsk_work_sessions / flwdsk_break_records and are written below.
+    // Strip them before the base insert so the insert doesn't error on unknown
+    // columns (which caused clock-in to fail).
+    const { sessions, breaks, ...base } = data;
+    const created = await super.create(base, actor);
     if (sessions && sessions.length > 0) {
       await this.syncWorkSessions(created.id, sessions);
       created.sessions = sessions;
     }
-    const breaks = data.breaks || created.breaks;
     if (breaks && breaks.length > 0) {
       await this.syncBreaks(created.id, breaks);
       created.breaks = breaks;
@@ -156,14 +159,15 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
   }
 
   override async update(id: UUID, patch: Partial<AttendanceRecord>, actor: Actor): Promise<AttendanceRecord> {
-    const updated = await super.update(id, patch, actor);
-    if (patch.sessions && patch.sessions.length > 0) {
-      await this.syncWorkSessions(id, patch.sessions);
-      updated.sessions = patch.sessions;
+    const { sessions, breaks, ...base } = patch;
+    const updated = await super.update(id, base, actor);
+    if (sessions && sessions.length > 0) {
+      await this.syncWorkSessions(id, sessions);
+      updated.sessions = sessions;
     }
-    if (patch.breaks && patch.breaks.length > 0) {
-      await this.syncBreaks(id, patch.breaks);
-      updated.breaks = patch.breaks;
+    if (breaks && breaks.length > 0) {
+      await this.syncBreaks(id, breaks);
+      updated.breaks = breaks;
     }
     return updated;
   }

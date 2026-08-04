@@ -48,7 +48,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(record);
     } catch (e) {
       console.error('Failed to get today attendance record:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -58,7 +58,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(records);
     } catch (e) {
       console.error('Failed to get attendance history:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -125,7 +125,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(saved);
     } catch (e) {
       console.error('Failed to clock in:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -179,7 +179,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(saved);
     } catch (e) {
       console.error('Failed to clock out:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -222,7 +222,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(saved);
     } catch (e) {
       console.error('Failed to start break:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -274,7 +274,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(saved);
     } catch (e) {
       console.error('Failed to end break:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -294,8 +294,8 @@ export class AttendanceService implements IAttendanceService {
 
       const rows = (data ?? []).map((row) => toCamelCaseObject(row));
       return Ok(rows);
-    } catch {
-      return Err(AppError.internal());
+    } catch (e) {
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -343,8 +343,8 @@ export class AttendanceService implements IAttendanceService {
         });
       }
       return Ok(undefined);
-    } catch {
-      return Err(AppError.internal());
+    } catch (e) {
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -536,7 +536,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(undefined);
     } catch (e) {
       console.error('Failed to approve attendance correction:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 
@@ -556,7 +556,7 @@ export class AttendanceService implements IAttendanceService {
       return Ok(undefined);
     } catch (e) {
       console.error('Failed to reject attendance correction:', e);
-      return Err(AppError.internal());
+      return Err(AppError.internal((e as any)?.message));
     }
   }
 }

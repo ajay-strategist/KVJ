@@ -180,16 +180,25 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               padding: collapsed && !isMobile ? '14px 8px' : '14px 16px',
               borderBottom: '1px solid var(--border)', flexShrink: 0, gap: 10, overflow: 'hidden'
             }}>
-              <img
-                src="/logo.png"
-                alt={`${appConfig.app.company} Logo`}
-                style={{
-                  height: collapsed && !isMobile ? 28 : 34,
-                  maxWidth: '100%',
-                  objectFit: 'contain',
-                  flexShrink: 0
-                }}
-              />
+              {/* Light chip keeps the (dark-ink) logo readable on any theme,
+                  including the dark sidebar — fixes "logo disappears in dark mode". */}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                background: '#FFFFFF', borderRadius: 10,
+                padding: collapsed && !isMobile ? '4px 6px' : '5px 8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.12)', flexShrink: 0,
+              }}>
+                <img
+                  src="/logo.png"
+                  alt={`${appConfig.app.company} Logo`}
+                  style={{
+                    height: collapsed && !isMobile ? 22 : 26,
+                    maxWidth: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
+                />
+              </span>
               {(!collapsed || isMobile) && (
                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   {/* Product wordmark shows only once a product name is set. */}

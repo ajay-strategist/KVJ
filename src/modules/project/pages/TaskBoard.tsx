@@ -115,7 +115,9 @@ export function TaskBoard({
 
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    // Refresh running-task durations once a minute, not every second, so the
+    // whole Task Board doesn't redraw 60× a minute. Minute precision is enough.
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -129,8 +131,7 @@ export function TaskBoard({
     const totalSecs = Math.floor(totalMs / 1000);
     const hrs = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
     const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
-    const secs = (totalSecs % 60).toString().padStart(2, '0');
-    return `${hrs}:${mins}:${secs}`;
+    return `${hrs}h ${mins}m`;
   };
 
   const getTaskDurationHours = (taskId: string) => {
