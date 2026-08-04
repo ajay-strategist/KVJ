@@ -24,6 +24,8 @@ import { container } from '../../../core/registry';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attendance.repository';
 import { ATTENDANCE_SERVICE_TOKEN } from '../../../modules/attendance/attendance.service';
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
+import { LEAVE_REPOSITORY_TOKEN } from '../../../modules/leave/leave.repository';
+import { TASK_REPOSITORY_TOKEN } from '../../../modules/project/project.repository';
 import { toLocalISODate } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
@@ -2201,13 +2203,168 @@ export function MyDayPage() {
   );
 }
 
+function escapeXml(val: any): string {
+  if (val === undefined || val === null) return '';
+  return String(val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 /** Supervisor / Manager / CEO workspaces. */
 export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'employee'> }) {
+  const { toast } = useNotifications();
   const { projects, clients, timesheets } = useProject();
   const { employees } = useEmployee();
 
   const [presentCount, setPresentCount] = useState(0);
   const [pendingExpenses, setPendingExpenses] = useState(0);
+
+  const handleExportAllData = async () => {
+    try {
+      toast({ variant: 'info', title: 'Exporting Data', message: 'Fetching all data tables, please wait...' });
+      
+      const attRepo = container.resolve(ATTENDANCE_REPOSITORY_TOKEN);
+      const expRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
+      const leaveRepo = container.resolve(LEAVE_REPOSITORY_TOKEN);
+      const taskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
+
+      const [attRes, expRes, leaveRes, taskRes] = await Promise.all([
+        attRepo.findMany({ pageSize: 2000 }),
+        expRepo.findMany({ pageSize: 2000 }),
+        leaveRepo.findMany({ pageSize: 2000 }),
+        taskRepo.findMany({ pageSize: 2000 }),
+      ]);
+
+      const attList = attRes?.data || [];
+      const expList = expRes?.data || [];
+      const leaveList = leaveRes?.data || [];
+      const taskList = taskRes?.data || [];
+      const empList = employees || [];
+
+      // Helper to build a table sheet
+      const buildSheet = (sheetName: string, headers: string[], rows: any[][]) => {
+        let sheetXml = `  <Worksheet ss:Name="${sheetName}">\n    <Table>\n      <Row>\n`;
+        headers.forEach(h => {
+          sheetXml += `        <Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>\n`;
+        });
+        sheetXml += `      </Row>\n`;
+        
+        rows.forEach(r => {
+          sheetXml += `      <Row>\n`;
+          r.forEach(v => {
+            const valStr = escapeXml(v);
+            const isNum = typeof v === 'number' && !isNaN(v);
+            const typeAttr = isNum ? 'Number' : 'String';
+            sheetXml += `        <Cell><Data ss:Type="${typeAttr}">${valStr}</Data></Cell>\n`;
+          });
+          sheetXml += `      </Row>\n`;
+        });
+        
+        sheetXml += `    </Table>\n  </Worksheet>\n`;
+        return sheetXml;
+      };
+
+      // 1. Employees Sheet
+      const empHeaders = ['ID', 'Employee ID', 'First Name', 'Last Name', 'Email', 'Designation', 'Joining Date'];
+      const empRows = empList.map(e => [
+        e.id,
+        e.employeeId,
+        e.firstName,
+        e.lastName,
+        e.email,
+        e.designation,
+        e.dateOfJoining
+      ]);
+
+      // 2. Attendance Sheet
+      const attHeaders = ['Record ID', 'Date', 'Employee ID', 'Status', 'Work Type', 'First Clock In', 'Last Clock Out', 'Total Hours'];
+      const attRows = attList.map(a => [
+        a.id,
+        a.workDate,
+        a.employeeId,
+        a.status || 'present',
+        a.workType || 'office',
+        a.firstClockIn || '',
+        a.lastClockOut || '',
+        a.totalHours != null ? Number(a.totalHours) : ''
+      ]);
+
+      // 3. Leave Sheet
+      const leaveHeaders = ['Record ID', 'Employee ID', 'Leave Type', 'Start Date', 'End Date', 'Half Day', 'Status', 'Reason', 'Med Certificate'];
+      const leaveRows = leaveList.map(l => [
+        l.id,
+        l.employeeId,
+        l.leaveType,
+        l.startDate,
+        l.endDate,
+        l.halfDay ? 'Yes' : 'No',
+        l.status,
+        l.reason,
+        l.medicalCertificateUrl || ''
+      ]);
+
+      // 4. Expenses Sheet
+      const expHeaders = ['Claim ID', 'Employee ID', 'Person Name', 'Classification', 'Expense Type', 'Amount (INR)', 'Status', 'Notes', 'Receipt URL'];
+      const expRows = expList.map(ex => [
+        ex.id,
+        ex.employeeId,
+        ex.personName,
+        ex.isOfficeExpense ? 'Office Expense' : 'Training Expense',
+        ex.expenseType,
+        ex.amount != null ? Number(ex.amount) : 0,
+        ex.status,
+        ex.notes || '',
+        ex.receiptUrl || ''
+      ]);
+
+      // 5. Tasks Sheet
+      const taskHeaders = ['Task ID', 'Title', 'Project ID', 'Assignee ID', 'Supervisor ID', 'Status', 'Priority', 'Due Date', 'Approval Status'];
+      const taskRows = taskList.map(t => [
+        t.id,
+        t.title,
+        t.projectId || 'Office Task',
+        t.assigneeId || '',
+        t.supervisorId || '',
+        t.status,
+        t.priority,
+        t.dueDate,
+        t.approvalStatus || 'approved'
+      ]);
+
+      let xml = `<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n`;
+      xml += `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n`;
+      xml += ` xmlns:o="urn:schemas-microsoft-com:office:office"\n`;
+      xml += ` xmlns:x="urn:schemas-microsoft-com:office:excel"\n`;
+      xml += ` xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"\n`;
+      xml += ` xmlns:html="http://www.w3.org/TR/REC-html40">\n`;
+
+      xml += buildSheet('Employees', empHeaders, empRows);
+      xml += buildSheet('Attendance', attHeaders, attRows);
+      xml += buildSheet('Leaves', leaveHeaders, leaveRows);
+      xml += buildSheet('Expenses', expHeaders, expRows);
+      xml += buildSheet('Tasks', taskHeaders, taskRows);
+
+      xml += `</Workbook>\n`;
+
+      const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `KVJ_Analytics_CEO_Report_${new Date().toISOString().split('T')[0]}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ variant: 'success', title: 'Export Complete', message: 'Excel workbook downloaded successfully.' });
+    } catch (err: any) {
+      console.error('Export error:', err);
+      toast({ variant: 'error', title: 'Export Failed', message: err.message || 'Unknown error occurred during export.' });
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -2271,7 +2428,18 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
   return (
     <AppShell>
       <WorkspaceShell role={role} regions={{
-        greeting: <PageHeader title={title} />,
+        greeting: (
+          <PageHeader
+            title={title}
+            actions={
+              role === 'ceo' ? (
+                <Button onClick={handleExportAllData} variant="success">
+                  📥 Export All Data (Excel)
+                </Button>
+              ) : undefined
+            }
+          />
+        ),
         stats: <>
           <StatCard label="Team present" value={teamPresent} tone="success" icon="●" />
           <StatCard label="Utilization" value="" icon="◔" />
