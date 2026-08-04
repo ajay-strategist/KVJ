@@ -67,6 +67,7 @@ export class SupabaseStudentRepository extends SupabaseRepository<Student> imple
       .select('*')
       .eq('phone', key)
       .is('deleted_at', null)
+      .limit(1)
       .maybeSingle();
     if (error) throw error;
     return data ? (toCamelCaseObject(data) as Student) : null;
