@@ -60,6 +60,7 @@ export interface AttendanceLogRow {
   note: string;
   break: string;
   tasks: string[];
+  isTraining?: boolean;
 }
 
 function ConditionalAttendanceFields() {
@@ -286,38 +287,51 @@ export function AttendanceLogPage() {
     }
   };
 
-  const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+  const resolveBatchHelper = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string) => {
     const wt = workType || 'Office';
     const safeBatches = Array.isArray(batches) ? batches : [];
+    const isTraining = wt.startsWith('Training:') || wt === 'Training' || (sessionNotes || '').toLowerCase().includes('training') || (recordNotes || '').toLowerCase().includes('training');
+
+    let foundBatch: any = null;
 
     // 1. Direct recordBatchId lookup
     if (recordBatchId) {
-      const found = safeBatches.find((b) => b && (b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId));
-      if (found) return batchDisplayName(found);
+      foundBatch = safeBatches.find((b) => b && (b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId));
     }
 
-    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+    // 2. Extract batch code from "Training: Code" prefix
+    if (!foundBatch && wt.startsWith('Training:')) {
+      const codePart = wt.substring(9).trim();
+      foundBatch = safeBatches.find((b) =>
+        b && (
+          b.code === codePart ||
+          b.id === codePart ||
+          b.trainingName === codePart ||
+          batchDisplayName(b) === codePart
+        )
+      );
+    }
 
-    // 2. Parse Location: ... in notes
+    // 3. Parse Location from notes
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
     const locMatch = rawNotes.match(/Location:\s*([^\n,]+)/i);
-    if (locMatch && locMatch[1].trim()) {
-      let locStr = locMatch[1].trim().replace(/\.$/, '').trim();
+    if (!foundBatch && locMatch && locMatch[1].trim()) {
+      const locStr = locMatch[1].trim().replace(/\.$/, '').trim();
       if (locStr.toLowerCase() !== 'office work' && locStr.toLowerCase() !== 'office') {
-        const found = safeBatches.find((b) =>
+        foundBatch = safeBatches.find((b) =>
           b && (
             (b.code && b.code.toLowerCase() === locStr.toLowerCase()) ||
             (b.batchNo && b.batchNo.toLowerCase() === locStr.toLowerCase()) ||
             (b.college && locStr.toLowerCase().includes(b.college.toLowerCase()))
           )
         );
-        return found ? batchDisplayName(found) : locStr;
       }
     }
 
-    // 3. Search notes for any batch code/name/college matching batches array
+    // 4. Search notes for batch details
     const lower = rawNotes.toLowerCase();
-    if (lower.trim()) {
-      const found = safeBatches.find((b) =>
+    if (!foundBatch && lower.trim()) {
+      foundBatch = safeBatches.find((b) =>
         b && (
           (b.batchNo && lower.includes(b.batchNo.toLowerCase())) ||
           (b.code && lower.includes(b.code.toLowerCase())) ||
@@ -325,20 +339,41 @@ export function AttendanceLogPage() {
           (b.trainingName && lower.includes(b.trainingName.toLowerCase()))
         )
       );
-      if (found) return batchDisplayName(found);
     }
 
-    // 4. If workType is Training or notes mention training/batch
-    const isTraining = wt === 'Training' || wt.toLowerCase().includes('training') || lower.includes('training') || lower.includes('batch');
-    if (isTraining) {
-      if (safeBatches.length > 0) {
-        return batchDisplayName(safeBatches[0]);
-      }
-      return 'Training Batch';
+    // 5. Fallback if training but no batch matched
+    if (!foundBatch && isTraining && safeBatches.length > 0) {
+      foundBatch = safeBatches[0];
     }
 
-    return wt;
+    return { foundBatch, isTraining };
   }, [batches]);
+
+  const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+    const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    if (foundBatch) {
+      return foundBatch.college || 'KVJ Analytics';
+    }
+    return isTraining ? 'Training Organization' : (workType === 'Office' ? 'KVJ Analytics' : '—');
+  }, [resolveBatchHelper]);
+
+  const resolveLocationValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+    const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    if (foundBatch) {
+      return foundBatch.venue || foundBatch.college || 'Offline';
+    }
+    return isTraining ? 'Offline' : (workType === 'Office' ? 'Office' : workType || '—');
+  }, [resolveBatchHelper]);
+
+  const resolveClassOrWorkValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string) => {
+    const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    if (foundBatch) {
+      return { value: batchDisplayName(foundBatch), isTraining: true };
+    }
+    const wt = workType || 'Office';
+    const cleanWt = wt.startsWith('Training:') ? wt.substring(9).trim() : wt;
+    return { value: cleanWt, isTraining };
+  }, [resolveBatchHelper]);
 
   const calendarDays: CalendarDayDetail[] = useMemo(() => {
     const start = new Date(startDate);
@@ -483,6 +518,8 @@ export function AttendanceLogPage() {
           const workType = s.workType || 'Office';
           const batchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
           const orgVal = resolveOrgValue(workType, s.notes, (record as any).notes, batchId) || 'Office';
+          const locVal = resolveLocationValue(workType, s.notes, (record as any).notes, batchId) || 'Office';
+          const classOrWorkInfo = resolveClassOrWorkValue(workType, s.notes, (record as any).notes, batchId);
 
           const isReapproved = (s as any).isReapproved ||
             (s as any).status === 'Approved' ||
@@ -498,8 +535,9 @@ export function AttendanceLogPage() {
             name: resolvedEmpName,
             holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
             org: orgVal,
-            location: orgVal,
-            type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : (workType as string),
+            location: locVal,
+            type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
+            isTraining: classOrWorkInfo.isTraining,
             mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : isReapproved ? 'Re-Approved' : (hasMultipleSessions ? `Session ${sIdx + 1}` : 'Offline'),
             start: startT,
             end: endT,
@@ -534,7 +572,7 @@ export function AttendanceLogPage() {
       }
     }
     return rows;
-  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, leaveRecords, resolveOrgValue]);
+  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, leaveRecords, resolveOrgValue, resolveLocationValue, resolveClassOrWorkValue]);
 
   const mappedExpenseRows = useMemo(() => {
     return expenseClaims.map((claim) => {
@@ -732,7 +770,7 @@ export function AttendanceLogPage() {
                           ) : isLeave ? (
                             <Badge tone="warning">On Leave</Badge>
                           ) : r.type && r.type !== '—' ? (
-                            <Badge tone={r.type === 'Training' ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : 'neutral'}>
+                            <Badge tone={r.isTraining ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : 'neutral'}>
                               {r.type}
                             </Badge>
                           ) : (
