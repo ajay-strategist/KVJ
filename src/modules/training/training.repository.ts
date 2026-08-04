@@ -162,7 +162,9 @@ export interface College extends Entity {
   isActive?: boolean;
 }
 
-export interface IStudentRepository extends IRepository<Student> {}
+export interface IStudentRepository extends IRepository<Student> {
+  findByRegisterNo(phone: string): Promise<Student | null>;
+}
 export interface ICourseRepository extends IRepository<Course> {}
 export interface IBatchRepository extends IRepository<Batch> {}
 export interface ICollegeRepository extends IRepository<College> {}

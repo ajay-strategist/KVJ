@@ -1400,25 +1400,47 @@ export function BatchManagement() {
       certificateStatus: 'Pending',
     };
 
-    const res = await registerStudent({
-      firstName,
-      lastName,
-      phone: newStudentForm.phone || '+91 90000 00000',
-      email: newStudentForm.email || `${newStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
-      customFields,
-    });
+    const phone = newStudentForm.phone || '+91 90000 00000';
+    const email = newStudentForm.email || `${newStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`;
 
-    if (res.ok) {
-      if (selectedBatchId) {
-        await enrollStudent(res.value.id, selectedBatchId);
+    const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
+    const existing = await repo.findByRegisterNo(phone);
+    let studentId = '';
+
+    if (existing) {
+      studentId = existing.id;
+    } else {
+      const res = await registerStudent({
+        firstName,
+        lastName,
+        phone,
+        email,
+        customFields,
+      });
+      if (res.ok) {
+        studentId = res.value.id;
+      } else {
+        toast({
+          variant: 'error',
+          title: 'Student Creation Failed',
+          message: res.error,
+        });
+        return;
+      }
+    }
+
+    if (studentId) {
+      const alreadyEnrolled = enrollments.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
+      if (!alreadyEnrolled && selectedBatchId) {
+        await enrollStudent(studentId, selectedBatchId);
       }
 
       const newStudent: StudentRecord = {
-        id: res.value.id,
+        id: studentId,
         name: newStudentForm.name,
         photo: '👨‍🎓',
-        phone: res.value.phone || '',
-        email: res.value.email || '',
+        phone: phone,
+        email: email,
         college: finalCollege,
         department: finalDept,
         attendancePct: Number(newStudentForm.attendancePct),
@@ -1440,12 +1462,6 @@ export function BatchManagement() {
         variant: 'success',
         title: 'Student Record Added',
         message: `Student "${newStudent.name}" registered and enrolled successfully.`,
-      });
-    } else {
-      toast({
-        variant: 'error',
-        title: 'Student Creation Failed',
-        message: res.error,
       });
     }
 
@@ -1555,25 +1571,37 @@ export function BatchManagement() {
               certificateStatus: 'Pending',
             };
 
-            const res = await registerStudent({
-              firstName,
-              lastName,
-              phone,
-              email,
-              customFields,
-            });
+            const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
+            const existing = await repo.findByRegisterNo(phone);
+            let studentId = '';
 
-            if (res.ok) {
-              if (selectedBatchId) {
-                await enrollStudent(res.value.id, selectedBatchId);
+            if (existing) {
+              studentId = existing.id;
+            } else {
+              const res = await registerStudent({
+                firstName,
+                lastName,
+                phone,
+                email,
+                customFields,
+              });
+              if (res.ok) {
+                studentId = res.value.id;
+              }
+            }
+
+            if (studentId) {
+              const alreadyEnrolled = enrollments.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
+              if (!alreadyEnrolled && selectedBatchId) {
+                await enrollStudent(studentId, selectedBatchId);
               }
 
               newStudentsList.push({
-                id: res.value.id,
+                id: studentId,
                 name,
                 photo: '👨‍🎓',
-                phone: res.value.phone || '',
-                email: res.value.email || '',
+                phone: phone,
+                email: email,
                 college,
                 department,
                 attendancePct,
