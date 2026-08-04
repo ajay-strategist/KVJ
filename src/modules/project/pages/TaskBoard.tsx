@@ -192,7 +192,7 @@ export function TaskBoard({
         name: t.title || 'Untitled Task',
         // A task with no linked project is an Office Task; otherwise a Project Task.
         category: (t.projectId && project ? 'Project Task' : 'Office Task') as 'Office Task' | 'Project Task',
-        projectName: project ? project.title : 'Office',
+        projectName: project ? project.title : 'Office Task',
         supervisor: supervisorName,
         supervisorId,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned',
@@ -305,7 +305,7 @@ export function TaskBoard({
         id: res.value.id,
         name: res.value.title,
         category: proj ? 'Project Task' : 'Office Task',
-        projectName: proj ? proj.title : 'Office',
+        projectName: proj ? proj.title : 'Office Task',
         supervisor: supervisor ? `${supervisor.firstName} ${supervisor.lastName}` : (user?.fullName || ''),
         supervisorId: finalSupervisorId,
         assignee: assignee ? `${assignee.firstName} ${assignee.lastName}` : (values.assignee as string) || user?.fullName || 'Unassigned',

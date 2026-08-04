@@ -1785,7 +1785,7 @@ export function MyDayPage() {
         return {
           id: t.id,
           title: t.title,
-          project: proj ? proj.title : 'Office',
+          project: proj ? proj.title : 'Office Task',
           due: (t.dueDate || '').slice(0, 10) || todayStr,
           priority: t.priority === 'high' ? 'High' : 'Normal',
           active,
@@ -1981,7 +1981,7 @@ export function MyDayPage() {
     const newTaskItem: TaskItem = {
       id: taskId,
       title,
-      project: projName,
+      project: projName || 'Office Task',
       due: todayStr,
       priority: 'Normal',
       active: false,
