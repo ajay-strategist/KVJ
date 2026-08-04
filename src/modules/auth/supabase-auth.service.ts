@@ -319,74 +319,24 @@ export class SupabaseAuthService implements IAuthService {
 
     // 4. Fallback for initial employee provisioning when default password is used
     if ((authRes.error || !authRes.data?.session) && (isDefaultPwd || pwd === 'password')) {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(email);
-      const tempId = isUuid ? email : `emp-${Date.now()}`;
-      
       let fullName = 'Employee';
       let role: RoleKey = 'EMPLOYEE';
-      let designation = 'Employee';
 
       const emailLower = email.toLowerCase();
-      if (emailLower.includes('ajay') || emailLower === 'mail@thestrategist.co.in' || emailLower === 'ajaythomas') {
-        fullName = 'Ajay Thomas';
-        role = 'ADMIN';
-        designation = 'System Administrator';
+      if (emailLower.includes('ajay') || emailLower === 'mail@thestrategist.co.in') {
+        fullName = 'Ajay Thomas'; role = 'ADMIN';
       } else if (emailLower.includes('jomon') || emailLower === 'info@thestrategist.co.in') {
-        fullName = 'Jomon Joseph';
-        role = 'CEO';
-        designation = 'Chief Executive Officer';
-      } else if (emailLower.includes('linto')) {
-        fullName = 'Linto George';
-        role = 'EMPLOYEE';
-        designation = 'Employee';
-      } else if (emailLower.includes('anoop')) {
-        fullName = 'Anoop Baiju';
-        role = 'EMPLOYEE';
-        designation = 'Employee';
-      }
-
-      // Check if employee row exists in database
-      let empCheck: any = null;
-      try {
-        const { data } = await supabase
-          .from('flwdsk_employees')
-          .select('id, first_name, last_name, role, designation')
-          .ilike('email', email)
-          .maybeSingle();
-        empCheck = data;
-      } catch (e) {}
-
-      if (empCheck) {
-        fullName = `${empCheck.first_name || ''} ${empCheck.last_name || ''}`.trim() || fullName;
-        designation = empCheck.designation || designation;
-        const desigUpper = designation.toUpperCase();
-        if (empCheck.role) {
-          role = empCheck.role as RoleKey;
-        } else if (desigUpper.includes('CEO') || desigUpper.includes('CHIEF EXECUTIVE')) {
-          role = 'CEO';
-        } else if (desigUpper.includes('ADMIN')) {
-          role = 'ADMIN';
-        } else if (desigUpper.includes('MANAGER')) {
-          role = 'MANAGER';
-        }
-      } else if (email.toLowerCase() !== 'info@thestrategist.co.in') {
-        const namePart = email.split('@')[0].replace(/[._]/g, ' ');
-        fullName = namePart ? namePart.charAt(0).toUpperCase() + namePart.slice(1) : 'Employee';
-        role = 'EMPLOYEE';
-        designation = 'Employee';
+        fullName = 'Jomon Joseph'; role = 'CEO';
       }
 
       // Last-resort: try to create a Supabase auth account so RLS-dependent
       // reads (auth.uid() IS NOT NULL) return data instead of empty rows.
-      // signUp returns a session immediately on projects with email confirmation
-      // disabled (the default for internal/corporate apps).
       const signUpAttempt = await supabase.auth.signUp({
         email,
         password: pwd,
         options: { data: { full_name: fullName, role } },
       });
       if (signUpAttempt.data?.session && signUpAttempt.data?.user) {
-        // A real Supabase session was established — use it fully.
         return await this.buildSession(
           signUpAttempt.data.session.access_token,
           signUpAttempt.data.session.expires_at,
@@ -395,8 +345,6 @@ export class SupabaseAuthService implements IAuthService {
           !!credentials.rememberMe,
         );
       }
-      // If signUp returned a user but no session (email confirmation required),
-      // try signing in one more time — the account now exists.
       if (signUpAttempt.data?.user && !signUpAttempt.data.session) {
         const lastAttempt = await supabase.auth.signInWithPassword({ email, password: pwd });
         if (lastAttempt.data?.session && lastAttempt.data?.user) {
@@ -410,23 +358,16 @@ export class SupabaseAuthService implements IAuthService {
         }
       }
 
-      const fallbackUser: AuthUser = {
-        id: tempId,
-        fullName,
-        email,
-        role,
-        designation,
-        mustChangePassword: empCheck ? (empCheck as any).must_change_password === true : (email.toLowerCase() === 'info@thestrategist.co.in' ? false : true),
-      };
-
-      const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
-      return {
-        user: fallbackUser,
-        token: `session_token_${Date.now()}`,
-        issuedAt: Date.now(),
-        expiresAt: Date.now() + fallbackTtlMs,
-        rememberMe: !!credentials.rememberMe,
-      };
+      // Supabase Auth cannot issue a real session for this email.
+      // A fake session with id=emp-* would crash every DB write with
+      // "invalid input syntax for type uuid" — surface a real error instead.
+      throw new AppError({
+        code: 'UNAUTHENTICATED' as never,
+        message:
+          'Your account is not yet activated in the system. ' +
+          'Please ask your administrator to set up your login, or contact support.',
+        severity: 'warning',
+      });
     }
 
     if (authRes.error || !authRes.data?.session || !authRes.data?.user) {
