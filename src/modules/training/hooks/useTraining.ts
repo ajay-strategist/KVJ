@@ -38,7 +38,7 @@ export function useTraining() {
       const enrollmentRepo = container.resolve(ENROLLMENT_REPOSITORY_TOKEN);
 
       // Use a large pageSize to ensure all records are fetched (not just the default 20)
-      const BIG = { pageSize: 1000, page: 1 };
+      const BIG = { pageSize: 10000, page: 1 };
 
       const [sPage, cPage, bPage, ePage] = await Promise.all([
         studentRepo.findMany(BIG),
