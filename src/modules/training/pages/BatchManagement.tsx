@@ -1655,7 +1655,7 @@ export function BatchManagement() {
         return {
           id: s.id,
           name: s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : s.fullName || s.name || 'Student',
-          photo: s.photoUrl || s.photo || '🎓',
+          photo: s.photo && !s.photo.startsWith('http') ? s.photo : '🎓',
           photoUrl: s.photoUrl,
           phone: s.phone || '',
           email: s.email || '',
@@ -1722,7 +1722,7 @@ export function BatchManagement() {
           return {
             id: s.id,
             name: firstName || lastName ? `${firstName} ${lastName}`.trim() : fullName || 'Student',
-            photo: photoUrl || s.photo || '🎓',
+            photo: s.photo && !s.photo.startsWith('http') ? s.photo : '🎓',
             photoUrl: photoUrl,
             phone: phone,
             email: email,
