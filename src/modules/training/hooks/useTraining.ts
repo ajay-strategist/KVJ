@@ -37,20 +37,37 @@ export function useTraining() {
       const batchRepo = container.resolve(BATCH_REPOSITORY_TOKEN);
       const enrollmentRepo = container.resolve(ENROLLMENT_REPOSITORY_TOKEN);
 
-      // Use a large pageSize to ensure all records are fetched (not just the default 20)
-      const BIG = { pageSize: 10000, page: 1 };
+      // Helper to retrieve all records across all pages
+      const fetchAllPages = async (repo: any, sort?: any[]) => {
+        let allData: any[] = [];
+        let page = 1;
+        const pageSize = 1000;
+        while (true) {
+          const res = await repo.findMany({ pageSize, page, sort });
+          if (res && Array.isArray(res.data)) {
+            allData = allData.concat(res.data);
+            if (res.data.length < pageSize) {
+              break;
+            }
+            page++;
+          } else {
+            break;
+          }
+        }
+        return allData;
+      };
 
-      const [sPage, cPage, bPage, ePage] = await Promise.all([
-        studentRepo.findMany(BIG),
-        courseRepo.findMany(BIG),
-        batchRepo.findMany({ ...BIG, sort: [{ field: 'createdAt', dir: 'desc' }] }),
-        enrollmentRepo.findMany(BIG),
+      const [sData, cData, bData, eData] = await Promise.all([
+        fetchAllPages(studentRepo),
+        fetchAllPages(courseRepo),
+        fetchAllPages(batchRepo, [{ field: 'createdAt', dir: 'desc' }]),
+        fetchAllPages(enrollmentRepo),
       ]);
 
-      setStudents(Array.isArray(sPage?.data) ? sPage.data : []);
-      setCourses(Array.isArray(cPage?.data) ? cPage.data : []);
-      setBatches(Array.isArray(bPage?.data) ? bPage.data : []);
-      setEnrollments(Array.isArray(ePage?.data) ? ePage.data : []);
+      setStudents(sData);
+      setCourses(cData);
+      setBatches(bData);
+      setEnrollments(eData);
       setError(null);
     } catch (e: any) {
       setError(e.message);
