@@ -1688,6 +1688,80 @@ export function BatchManagement() {
     }
   }, [dbStudents]);
 
+  // Load and merge student records enrolled in the active batch to bypass the 1000-student fetch limit.
+  useEffect(() => {
+    if (!selectedBatchId) return;
+
+    let active = true;
+
+    const fetchBatchStudents = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('flwdsk_enrollments')
+          .select('student_id, student:flwdsk_student_records(*)')
+          .eq('batch_id', selectedBatchId)
+          .is('deleted_at', null);
+
+        if (error) throw error;
+        if (!data || !active) return;
+
+        const batchStudents = data
+          .map((d: any) => d.student)
+          .filter(Boolean);
+
+        const mappedBatchStudents: StudentRecord[] = batchStudents.map((s: any) => {
+          const fields = s.customFields || {};
+          return {
+            id: s.id,
+            name: s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : s.fullName || s.name || 'Student',
+            photo: s.photoUrl || s.photo || '🎓',
+            photoUrl: s.photoUrl,
+            phone: s.phone || '',
+            email: s.email || '',
+            college: fields.college || 'Christ Irinjalakkuda',
+            department: fields.department || 'BBA',
+            attendancePct: fields.attendancePct ?? 100,
+            attendanceStatus: fields.attendanceStatus || 'Regular',
+            ass1: fields.ass1 ?? 0,
+            ass2: fields.ass2 ?? 0,
+            ass3: fields.ass3 ?? 0,
+            project: fields.project ?? 0,
+            finalExam: fields.finalExam ?? 0,
+            overallScore: fields.overallScore ?? 0,
+            voucherId: fields.voucherId || '',
+            voucherStatus: fields.voucherStatus || 'unassigned',
+            certificateStatus: fields.certificateStatus || 'unissued',
+            examAttemptCount: fields.examAttemptCount ?? 1,
+            retestScore: fields.retestScore ?? 0,
+            retestApproved: fields.retestApproved ?? false,
+            retestPaymentStatus: fields.retestPaymentStatus || 'Unpaid',
+            retestCollectedAmount: fields.retestCollectedAmount ?? 0,
+            retestVoucherId: fields.retestVoucherId || '',
+            gender: fields.gender || 'Female',
+            qualification: fields.qualification || s.academicQualification || '',
+            hasComputer: fields.hasComputer || 'Yes',
+            learnedBefore: fields.learnedBefore || 'No',
+          };
+        });
+
+        setStudents((prev) => {
+          const existingMap = new Map(prev.map((s) => [s.id, s]));
+          for (const s of mappedBatchStudents) {
+            existingMap.set(s.id, s);
+          }
+          return Array.from(existingMap.values());
+        });
+      } catch (err: any) {
+        console.error('Error fetching batch students:', err.message);
+      }
+    };
+
+    fetchBatchStudents();
+    return () => {
+      active = false;
+    };
+  }, [selectedBatchId, dbStudents, enrollments]);
+
   /**
    * Remove duplicate students from the ACTIVE batch by normalized phone number.
    * Keeps the FIRST enrolled student (oldest createdAt) and un-enrolls the rest.
