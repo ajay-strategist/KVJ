@@ -121,7 +121,7 @@ export function TrainingCalendar() {
             trainerId: r.trainer_id || user?.id || (trainers[0]?.id ?? ''),
             date: r.date,
             name: r.session_title || matchedBatch?.trainingName || matchedCourse?.title || 'Training Session',
-            batchCode: matchedBatch?.code || 'KVJ Batch',
+            batchCode: matchedBatch?.code || r.session_title || 'Training Batch',
             college: matchedBatch?.college || 'College',
             course: matchedCourse?.title || 'Training',
             academicYear: matchedBatch?.academicYear || '2026-27',
@@ -173,6 +173,7 @@ export function TrainingCalendar() {
     trainerId: string;
     name: string;
     batchCode: string;
+    batchId: string;
     college: string;
     course: string;
     academicYear: string;
@@ -187,6 +188,7 @@ export function TrainingCalendar() {
     trainerId: '',
     name: '',
     batchCode: '',
+    batchId: '',
     college: '',
     course: '',
     academicYear: '',
@@ -468,6 +470,7 @@ export function TrainingCalendar() {
       trainerId: trainerId || (trainers[0]?.id ?? ''),
       name: firstPreset?.name || 'Power BI',
       batchCode: firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI',
+      batchId: firstPreset?.id || '',
       college: firstPreset?.college || 'Christ Irinjalakkuda',
       course: firstPreset?.course || 'Power BI',
       academicYear: '2026-2027',
@@ -483,11 +486,14 @@ export function TrainingCalendar() {
 
   const handleEditSchedule = (s: ScheduleSession) => {
     setEditingSessionId(s.id);
+    const matched = batches.find((b) => b.code === s.batchCode || cleanBatchCode(b.code, b.batchNo) === s.batchCode);
+    const bId = matched?.id || '';
     setAssignForm({
       date: s.date,
       trainerId: s.trainerId,
       name: s.name,
       batchCode: s.batchCode,
+      batchId: bId,
       college: s.college,
       course: s.course,
       academicYear: s.academicYear,
@@ -512,7 +518,13 @@ export function TrainingCalendar() {
     const finalBatchCode = assignForm.batchCode.trim() || firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI';
     const finalName = assignForm.name.trim() || firstPreset?.name || 'Power BI';
 
-    const assocBatch = batches.find((b) => b.code === finalBatchCode || b.batchNo === finalBatchCode || b.id === finalBatchCode);
+    const assocBatch = batches.find((b) => 
+      b.id === assignForm.batchId ||
+      b.code === finalBatchCode || 
+      b.batchNo === finalBatchCode || 
+      b.id === finalBatchCode ||
+      cleanBatchCode(b.code, b.batchNo) === finalBatchCode
+    );
 
     const isEdit = Boolean(editingSessionId && UUID_RE.test(editingSessionId));
     const sessId = isEdit && editingSessionId ? editingSessionId : crypto.randomUUID();
@@ -1089,6 +1101,7 @@ export function TrainingCalendar() {
                     setAssignForm((f) => ({
                       ...f,
                       batchCode: preset.batchCode,
+                      batchId: preset.id,
                       name: preset.name,
                       college: preset.college,
                       course: preset.course,
@@ -1098,7 +1111,7 @@ export function TrainingCalendar() {
                       studentCount: preset.studentCount,
                     }));
                   } else {
-                    setAssignForm((f) => ({ ...f, batchCode: bCode }));
+                    setAssignForm((f) => ({ ...f, batchCode: bCode, batchId: '' }));
                   }
                 }}
                 style={{ width: '100%', padding: '9px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
