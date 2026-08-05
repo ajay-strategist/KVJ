@@ -166,7 +166,7 @@ export function ChatChannels() {
         senderName,
         senderAvatar: sender?.avatarUrl,
         senderRole: sender?.designation || 'System Bot',
-        senderDepartment: sender?.departmentId || 'Operations',
+        senderDepartment: sender?.departmentId || '—',
         text: m.text,
         createdAt: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
         reactions: reactionsGrouped,
@@ -1133,7 +1133,7 @@ export function ChatChannels() {
                       {activeChannel.dmParticipant.designation}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2 }}>
-                      {activeChannel.dmParticipant.departmentId || 'Operations'} Department
+                      {activeChannel.dmParticipant.departmentId || '—'}
                     </div>
                   </div>
                   <Badge tone={activeChannel.dmParticipant.status === 'active' ? 'success' : 'neutral'}>
@@ -1142,7 +1142,7 @@ export function ChatChannels() {
 
                   <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, textAlign: 'left' }}>
                     <div>📧 <strong>Email:</strong> {activeChannel.dmParticipant.email}</div>
-                    <div>📞 <strong>Phone:</strong> {activeChannel.dmParticipant.phone || '+91 9988776655'}</div>
+                    <div>📞 <strong>Phone:</strong> {activeChannel.dmParticipant.phone || '—'}</div>
                     <div>📅 <strong>Joined:</strong> {activeChannel.dmParticipant.dateOfJoining}</div>
                   </div>
                 </div>
@@ -1267,7 +1267,7 @@ export function ChatChannels() {
                 <Avatar name={`${emp.firstName} ${emp.lastName}`} src={emp.avatarUrl} size={36} />
                 <div>
                   <strong style={{ display: 'block', fontSize: 13 }}>{emp.firstName} {emp.lastName}</strong>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{emp.designation} · {emp.departmentId || 'Operations'}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{emp.designation} · {emp.departmentId || '—'}</span>
                 </div>
               </button>
             ))
