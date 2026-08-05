@@ -970,7 +970,7 @@ export function TrainingCalendar() {
         <div style={{ height: rowVirt.getTotalSize(), width: bodyW, position: 'relative' }}>
           {vRows.map((vr) => {
             const r = rows[vr.index];
-            const tint = r.holiday ? '#fff1f2' : r.isToday ? 'rgba(59, 130, 246, 0.12)' : 'transparent';
+            const tint = r.holiday ? 'var(--bg-holiday-solid)' : r.isToday ? 'var(--bg-today-solid)' : 'transparent';
             const isOpen = !!expanded[r.date];
             return (
               <div
@@ -992,10 +992,10 @@ export function TrainingCalendar() {
                     aria-label={isOpen ? 'Collapse day' : 'Expand day'}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginRight: 4 }}
                   >{isOpen ? '▾' : '▸'}</button>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: r.isToday ? 800 : 500, color: r.isToday ? '#1d4ed8' : 'inherit' }}>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: r.isToday ? 800 : 500, color: r.isToday ? 'var(--text-today)' : 'inherit' }}>
                     {r.date}
                     {r.isToday && (
-                      <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, background: '#2563eb', color: '#ffffff', padding: '1px 5px', borderRadius: 4, letterSpacing: '0.04em' }}>
+                      <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, background: 'var(--brand)', color: 'var(--brand-contrast, #ffffff)', padding: '1px 5px', borderRadius: 4, letterSpacing: '0.04em' }}>
                         TODAY
                       </span>
                     )}
@@ -1004,7 +1004,7 @@ export function TrainingCalendar() {
                 <FrozenCell w={FROZEN.day} left={FROZEN.date} bg={tint}>{r.dayName}</FrozenCell>
                 <FrozenCell w={FROZEN.holiday} left={FROZEN.date + FROZEN.day} bg={tint}>
                   {r.holiday
-                    ? <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 700 }}>{r.holiday.name}</span>
+                    ? <span style={{ fontSize: 11, color: 'var(--text-holiday)', fontWeight: 700 }}>{r.holiday.name}</span>
                     : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>}
                 </FrozenCell>
 
@@ -1264,7 +1264,11 @@ function HeadCell({ w, left, children }: { w: number; left: number; children: Re
 }
 
 function FrozenCell({ w, left, bg, children }: { w: number; left: number; bg: string; children: React.ReactNode }) {
-  const solidBg = bg === '#fff1f2' ? '#fff1f2' : bg && bg !== 'transparent' ? '#eff6ff' : 'var(--bg-surface)';
+  const solidBg = bg === 'var(--bg-holiday-solid)'
+    ? 'var(--bg-holiday-solid)'
+    : bg === 'var(--bg-today-solid)'
+      ? 'var(--bg-today-solid)'
+      : 'var(--bg-surface)';
 
   return (
     <div style={{

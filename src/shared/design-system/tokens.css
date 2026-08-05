@@ -62,6 +62,12 @@
   --status-neutral: #64748B;  --status-neutral-bg: rgba(100, 116, 139, 0.08); --status-neutral-border: rgba(100, 116, 139, 0.20);
   --status-purple: #8B5CF6;   --status-purple-bg: rgba(139, 92, 246, 0.10);   --status-purple-border: rgba(139, 92, 246, 0.25);
 
+  /* ── Training Calendar Highlights ── */
+  --bg-holiday-solid: #FFF1F2;
+  --bg-today-solid: #EFF6FF;
+  --text-holiday: #DC2626;
+  --text-today: #1D4ED8;
+
   /* ── Focus ── */
   --focus-ring: rgba(59, 130, 246, 0.40);
 
@@ -126,6 +132,12 @@
   --status-progress:#3B82F6;  --status-progress-bg:rgba(59, 130, 246, 0.14); --status-progress-border:rgba(59, 130, 246, 0.30);
   --status-neutral: #94A3B8;  --status-neutral-bg: rgba(148, 163, 184, 0.12); --status-neutral-border: rgba(148, 163, 184, 0.25);
   --status-purple: #A78BFA;   --status-purple-bg: rgba(167, 139, 250, 0.14);  --status-purple-border: rgba(167, 139, 250, 0.30);
+
+  /* ── Training Calendar Highlights ── */
+  --bg-holiday-solid: #211319;
+  --bg-today-solid: #0A1B30;
+  --text-holiday: #FDA4AF;
+  --text-today: #60A5FA;
 
   --focus-ring: rgba(59, 130, 246, 0.55);
 
