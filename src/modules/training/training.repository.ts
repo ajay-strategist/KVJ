@@ -174,6 +174,7 @@ export interface ISessionAttendanceRepository extends IRepository<SessionAttenda
 }
 export interface IAssessmentRepository extends IRepository<AssessmentRecord> {
   findByEnrollment(enrollmentId: UUID): Promise<AssessmentRecord[]>;
+  findByBatch(enrollmentIds: UUID[]): Promise<AssessmentRecord[]>;
 }
 export interface IExamVoucherRepository extends IRepository<ExamVoucher> {}
 export interface ICertificateRepository extends IRepository<CertificateRecord> {}

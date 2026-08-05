@@ -8,7 +8,7 @@ import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
-import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN, type Batch } from '../training.repository';
+import { STUDENT_REPOSITORY_TOKEN, ASSESSMENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN, type Batch } from '../training.repository';
 import { normalizeStudentKey } from '../supabase-training.repository';
 import type { Page, UUID } from '../../../core/types';
 import { supabase } from '../../../shared/integration/supabase';
@@ -1045,110 +1045,8 @@ export function BatchManagement() {
             dbUpdated++;
           }
         } else {
-          // If student doesn't exist, check if they belong to active batch
-          const regBatchNorm = reg.batch.toLowerCase().replace(/\s+/g, '');
-          const activeBatchName = (activeBatchRef.current?.trainingName || '').toLowerCase().replace(/\s+/g, '');
-          const activeBatchNo = String(activeBatchRef.current?.batchNo || '').toLowerCase().replace(/\s+/g, '');
-          const activeProgram = (activeBatchRef.current?.program || '').toLowerCase().replace(/\s+/g, '');
-
-          const batchMatches = regBatchNorm.includes(activeBatchName) ||
-                               regBatchNorm.includes(activeBatchNo) ||
-                               activeBatchName.includes(regBatchNorm) ||
-                               activeBatchNo.includes(regBatchNorm) ||
-                               regBatchNorm.includes(activeProgram);
-
-          const regCollegeNorm = reg.college.toLowerCase().trim();
-          const activeCollegeNorm = (activeBatchRef.current?.college || '').toLowerCase().trim();
-          const collegeMatches = activeCollegeNorm
-            ? regCollegeNorm.includes(activeCollegeNorm) || activeCollegeNorm.includes(regCollegeNorm)
-            : false;
-
-          if (collegeMatches && batchMatches) {
-            setImportProgress({
-              current: i + 1,
-              total: regStudents.length,
-              message: `Auto-registering and enrolling ${reg.name} from Google Sheet...`,
-            });
-
-            const names = reg.name.split(' ');
-            const firstName = names[0] || 'Student';
-            const lastName = names.slice(1).join(' ') || '';
-
-            const customFields = {
-              college: reg.college,
-              department: reg.batch,
-              attendancePct: 100,
-              attendanceStatus: 'Regular' as const,
-              ass1: 0,
-              ass2: 0,
-              ass3: 0,
-              project: 0,
-              finalExam: 0,
-              overallScore: 0,
-              voucherId: `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}`,
-              voucherStatus: 'Assigned',
-              certificateStatus: 'Pending',
-              gender: reg.gender || 'Female',
-              qualification: reg.qualification || '',
-              hasComputer: reg.hasComputer || 'Yes',
-              learnedBefore: reg.learnedBefore || 'No',
-            };
-
-            const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
-            const existing = await repo.findByRegisterNo(reg.phone);
-            let studentId = '';
-
-            if (existing) {
-              studentId = existing.id;
-            } else {
-              const res = await registerStudent({
-                firstName,
-                lastName,
-                phone: reg.phone,
-                email: reg.email,
-                photoUrl: reg.photoUrl,
-                customFields,
-              });
-              if (res.ok) {
-                studentId = res.value.id;
-              }
-            }
-
-            if (studentId) {
-              const alreadyEnrolled = enrollmentsRef.current.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
-              if (!alreadyEnrolled && selectedBatchId) {
-                await enrollStudent(studentId, selectedBatchId);
-              }
-
-              const newStudent: StudentRecord = {
-                id: studentId,
-                name: reg.name,
-                photo: reg.photoUrl ? '📷' : '🎓',
-                photoUrl: reg.photoUrl,
-                phone: reg.phone,
-                email: reg.email,
-                college: reg.college,
-                department: reg.batch,
-                attendancePct: 100,
-                attendanceStatus: 'Regular',
-                ass1: 0,
-                ass2: 0,
-                ass3: 0,
-                project: 0,
-                finalExam: 0,
-                overallScore: 0,
-                voucherId: customFields.voucherId,
-                voucherStatus: 'Assigned',
-                certificateStatus: 'Pending',
-                gender: (reg.gender || 'Female') as 'Male' | 'Female',
-                qualification: reg.qualification || '',
-                hasComputer: (reg.hasComputer || 'Yes') as 'Yes' | 'No',
-                learnedBefore: (reg.learnedBefore || 'No') as 'Yes' | 'No',
-              };
-              updatedStudents.push(newStudent);
-              dbCreated++;
-            }
-          }
+          // Google Sheet is enrichment-only — new students must be added via Excel upload.
+          // Skip any sheet row that doesn't match an existing enrolled student.
         }
       }
 
@@ -1157,11 +1055,11 @@ export function BatchManagement() {
       setLastSyncedTime(nowStr);
       setImportProgress(null);
 
-      if (showToastNotice || dbCreated > 0 || dbUpdated > 0) {
+      if (showToastNotice || dbUpdated > 0) {
         toast({
           variant: 'success',
           title: 'Google Sheet Sync Complete',
-          message: `Successfully registered ${dbCreated} new batch students and updated ${dbUpdated} records in the database.`,
+          message: `Enriched ${dbUpdated} student profile(s) with photo, email, and basic details from Google Sheet.`,
         });
       }
     } catch (err) {
@@ -1184,6 +1082,94 @@ export function BatchManagement() {
 
     return () => clearInterval(interval);
   }, [selectedBatchId]);
+
+  /**
+   * Load assessment scores from the flwdsk_assessments DB table.
+   * Maps assessment records back to StudentRecord fields:
+   *   Assignment / ModuleTest (by order) → ass1, ass2, ass3
+   *   MockTest                           → project
+   *   FinalExam                          → finalExam
+   */
+  const loadAssessmentsFromDb = async () => {
+    if (!selectedBatchId || enrollmentsRef.current.length === 0) return;
+
+    const batchEnrollments = enrollmentsRef.current.filter(
+      (e) => e.batchId === selectedBatchId
+    );
+    if (batchEnrollments.length === 0) return;
+
+    try {
+      const assessmentRepo = container.resolve(ASSESSMENT_REPOSITORY_TOKEN);
+      const enrollmentIds = batchEnrollments.map((e) => e.id);
+      const allAssessments = await assessmentRepo.findByBatch(enrollmentIds);
+
+      if (allAssessments.length === 0) return;
+
+      // Group assessments by enrollmentId
+      const byEnrollment = new Map<string, typeof allAssessments>();
+      for (const a of allAssessments) {
+        const arr = byEnrollment.get(a.enrollmentId) ?? [];
+        arr.push(a);
+        byEnrollment.set(a.enrollmentId, arr);
+      }
+
+      // Build enrollmentId → studentId lookup
+      const enrollmentToStudent = new Map(
+        batchEnrollments.map((e) => [e.id, e.studentId])
+      );
+
+      setStudents((prev) =>
+        prev.map((student) => {
+          // Find this student's enrollment in the active batch
+          const enrollment = batchEnrollments.find(
+            (e) => e.studentId === student.id
+          );
+          if (!enrollment) return student;
+
+          const recs = byEnrollment.get(enrollment.id);
+          if (!recs || recs.length === 0) return student;
+
+          // Sort by createdAt so we assign ass1/ass2/ass3 in chronological order
+          const sorted = [...recs].sort((a, b) =>
+            (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
+          );
+
+          let ass1 = student.ass1;
+          let ass2 = student.ass2;
+          let ass3 = student.ass3;
+          let project = student.project;
+          let finalExam = student.finalExam;
+
+          const assignments = sorted.filter(
+            (r) => r.type === 'Assignment' || r.type === 'ModuleTest'
+          );
+          if (assignments[0]) ass1 = assignments[0].marksObtained ?? ass1;
+          if (assignments[1]) ass2 = assignments[1].marksObtained ?? ass2;
+          if (assignments[2]) ass3 = assignments[2].marksObtained ?? ass3;
+
+          const mockTests = sorted.filter((r) => r.type === 'MockTest');
+          if (mockTests[0]) project = mockTests[0].marksObtained ?? project;
+
+          const finalExams = sorted.filter((r) => r.type === 'FinalExam');
+          if (finalExams[0]) finalExam = finalExams[0].marksObtained ?? finalExam;
+
+          const overallScore = Math.round(
+            (ass1 + ass2 + ass3 + project + finalExam) / 5
+          );
+
+          return { ...student, ass1, ass2, ass3, project, finalExam, overallScore };
+        })
+      );
+    } catch (err) {
+      console.warn('Failed to load assessments from DB:', err);
+    }
+  };
+
+  // Load assessment scores from DB whenever the active batch or enrollments change
+  useEffect(() => {
+    if (!selectedBatchId) return;
+    loadAssessmentsFromDb();
+  }, [selectedBatchId, enrollments]);
 
   // Active student ID for displaying course completion checklist popover
   const [activeChecklistStudentId, setActiveChecklistStudentId] = useState<string | null>(null);
@@ -1489,8 +1475,8 @@ export function BatchManagement() {
 
     toast({
       variant: 'info',
-      title: 'Importing Student Records',
-      message: `Parsing and saving students from "${file.name}"...`,
+      title: 'Importing Student Roster',
+      message: `Reading Name & Phone from "${file.name}"...`,
     });
 
     try {
@@ -1504,30 +1490,19 @@ export function BatchManagement() {
           const parsed: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
           if (parsed.length <= 1) {
-            toast({ variant: 'error', title: 'Upload Failed', message: 'The spreadsheet is empty or invalid.' });
+            toast({ variant: 'error', title: 'Upload Failed', message: 'The spreadsheet is empty or has only a header row.' });
             return;
           }
 
-          const headerRow = parsed[0].map(h => String(h || '').toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
-          const nameIdx = headerRow.findIndex(h => h.includes('name') || h.includes('student'));
-          const phoneIdx = headerRow.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'));
-          const emailIdx = headerRow.findIndex(h => h.includes('email'));
-          const collegeIdx = headerRow.findIndex(h => h.includes('college') || h.includes('university') || h.includes('school'));
-          const deptIdx = headerRow.findIndex(h => h.includes('dept') || h.includes('department') || h.includes('program') || h.includes('stream'));
-          const attnIdx = headerRow.findIndex(h => h.includes('att') || h.includes('attendance') || h.includes('pct'));
-          const ass1Idx = headerRow.findIndex(h => h.includes('ass1') || h.includes('assessment1'));
-          const ass2Idx = headerRow.findIndex(h => h.includes('ass2') || h.includes('assessment2'));
-          const ass3Idx = headerRow.findIndex(h => h.includes('ass3') || h.includes('assessment3'));
-          const genderIdx = headerRow.findIndex(h => h.includes('gender') || h.includes('sex'));
-          const qualIdx = headerRow.findIndex(h => h.includes('qualification') || h.includes('degree'));
-          const compIdx = headerRow.findIndex(h => h.includes('computer') || h.includes('laptop') || h.includes('hasacomputer'));
-          const prevIdx = headerRow.findIndex(h => h.includes('learned') || h.includes('prior') || h.includes('experienced'));
+          const headerRow = parsed[0].map((h: any) => String(h || '').toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
+          const nameIdx  = headerRow.findIndex((h: string) => h.includes('name') || h.includes('student'));
+          const phoneIdx = headerRow.findIndex((h: string) => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'));
 
           if (nameIdx === -1) {
             toast({
               variant: 'error',
-              title: 'Invalid Spreadsheet Format',
-              message: 'Spreadsheet must contain a "Name" column to identify students.',
+              title: 'Missing "Name" Column',
+              message: 'Your Excel must have a "Name" column. Phone is strongly recommended as the student key.',
             });
             return;
           }
@@ -1544,64 +1519,38 @@ export function BatchManagement() {
             const name = String(row[nameIdx] || '').trim();
             if (!name) continue;
 
-            const phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '+91 90000 00000';
+            // Use phone as primary key; generate a unique placeholder if absent
+            const rawPhone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '';
+            const phone = rawPhone || `0000000${String(i).padStart(3, '0')}`;
             const normalizedPhone = normalizeStudentKey(phone);
 
-            if (processedPhones.has(normalizedPhone)) {
-              continue;
-            }
+            if (processedPhones.has(normalizedPhone)) continue;
             processedPhones.add(normalizedPhone);
 
-            const alreadyInBatch = students.some(
+            // Skip if already enrolled in this batch
+            const alreadyInBatch = studentsRef.current.some(
               (s) => normalizeStudentKey(s.phone) === normalizedPhone && batchStudentIds.has(s.id)
             );
-            if (alreadyInBatch) {
-              continue;
-            }
+            if (alreadyInBatch) continue;
 
             setImportProgress({
               current: i,
               total: totalRows,
-              message: `Importing ${name} (${i} of ${totalRows})...`,
+              message: `Registering ${name} (${i} of ${totalRows})...`,
             });
-            const email = emailIdx !== -1 ? String(row[emailIdx] || '').trim() : `${name.toLowerCase().replace(/\s+/g, '.')}@student.edu`;
-            const college = collegeIdx !== -1 ? String(row[collegeIdx] || '').trim() : activeBatch?.college || 'Christ College';
-            const department = deptIdx !== -1 ? String(row[deptIdx] || '').trim() : activeBatch?.program || 'BBA';
-            const attendancePct = attnIdx !== -1 ? Number(row[attnIdx]) || 100 : 100;
-            const ass1 = ass1Idx !== -1 ? Number(row[ass1Idx]) || 0 : 0;
-            const ass2 = ass2Idx !== -1 ? Number(row[ass2Idx]) || 0 : 0;
-            const ass3 = ass3Idx !== -1 ? Number(row[ass3Idx]) || 0 : 0;
-            const rawGender = genderIdx !== -1 ? String(row[genderIdx] || '').trim() : 'Female';
-            const gender = (rawGender.toLowerCase().startsWith('m') ? 'Male' : 'Female') as 'Male' | 'Female';
-            const qualification = qualIdx !== -1 ? String(row[qualIdx] || '').trim() : '';
-            const rawComp = compIdx !== -1 ? String(row[compIdx] || '').trim() : 'Yes';
-            const hasComputer = (rawComp.toLowerCase().includes('no') || rawComp.toLowerCase() === 'lab') ? 'No' : 'Yes';
-            const rawPrev = prevIdx !== -1 ? String(row[prevIdx] || '').trim() : 'No';
-            const learnedBefore = (rawPrev.toLowerCase().includes('yes') || rawPrev.toLowerCase() === 'experienced') ? 'Yes' : 'No';
 
             const names = name.split(' ');
             const firstName = names[0] || 'Student';
             const lastName = names.slice(1).join(' ') || '';
 
-            const eligible = attendancePct >= 84;
+            // Minimal customFields — scores & details will be loaded from DB/Sheet later
             const customFields = {
-              college,
-              department,
-              attendancePct,
-              attendanceStatus: eligible ? 'Regular' : 'Irregular',
-              ass1,
-              ass2,
-              ass3,
-              project: 0,
-              finalExam: 0,
-              overallScore: Math.round((ass1 + ass2 + ass3) / 3),
-              voucherId: eligible ? `VOUCH-CHRIST-${Math.floor(100 + Math.random() * 900)}` : '',
-              voucherStatus: eligible ? 'Assigned' : 'Unassigned',
-              certificateStatus: 'Pending',
-              gender,
-              qualification,
-              hasComputer,
-              learnedBefore,
+              college: activeBatchRef.current?.college || '',
+              department: activeBatchRef.current?.program || '',
+              attendancePct: 100,
+              attendanceStatus: 'Regular',
+              ass1: 0, ass2: 0, ass3: 0, project: 0, finalExam: 0, overallScore: 0,
+              voucherId: '', voucherStatus: 'Unassigned', certificateStatus: 'Pending',
             };
 
             const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
@@ -1615,16 +1564,16 @@ export function BatchManagement() {
                 firstName,
                 lastName,
                 phone,
-                email,
+                email: `${firstName.toLowerCase()}.${lastName.toLowerCase() || 'student'}@student.edu`,
                 customFields,
               });
-              if (res.ok) {
-                studentId = res.value.id;
-              }
+              if (res.ok) studentId = res.value.id;
             }
 
             if (studentId) {
-              const alreadyEnrolled = enrollments.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
+              const alreadyEnrolled = enrollmentsRef.current.some(
+                (e) => e.batchId === selectedBatchId && e.studentId === studentId
+              );
               if (!alreadyEnrolled && selectedBatchId) {
                 await enrollStudent(studentId, selectedBatchId);
               }
@@ -1633,25 +1582,16 @@ export function BatchManagement() {
                 id: studentId,
                 name,
                 photo: '👨‍🎓',
-                phone: phone,
-                email: email,
-                college,
-                department,
-                attendancePct,
-                attendanceStatus: eligible ? 'Regular' : 'Irregular',
-                ass1,
-                ass2,
-                ass3,
-                project: 0,
-                finalExam: 0,
-                overallScore: Math.round((ass1 + ass2 + ass3) / 3),
-                voucherId: customFields.voucherId,
-                voucherStatus: customFields.voucherStatus,
-                certificateStatus: 'Pending',
-                gender,
-                qualification,
-                hasComputer: hasComputer as 'Yes' | 'No',
-                learnedBefore: learnedBefore as 'Yes' | 'No',
+                photoUrl: undefined,
+                phone,
+                email: '',
+                college: activeBatchRef.current?.college || '',
+                department: activeBatchRef.current?.program || '',
+                attendancePct: 100,
+                attendanceStatus: 'Regular',
+                ass1: 0, ass2: 0, ass3: 0,
+                project: 0, finalExam: 0, overallScore: 0,
+                voucherId: '', voucherStatus: 'Unassigned', certificateStatus: 'Pending',
               });
               importedCount++;
             }
@@ -1664,8 +1604,8 @@ export function BatchManagement() {
           refreshBatches();
           toast({
             variant: 'success',
-            title: 'Import Complete',
-            message: `Successfully imported ${importedCount} student records and enrolled them in this batch.`,
+            title: 'Roster Import Complete',
+            message: `${importedCount} student(s) added to batch. Sync Google Sheet to fill in basic details.`,
           });
         } catch (err: any) {
           setImportProgress(null);
@@ -3888,12 +3828,13 @@ export function BatchManagement() {
             setSelectedUploadFile(null);
             setImportProgress(null);
           }}
-          title="📤 Upload Students Data (Excel / CSV)"
+          title="📤 Upload Student Roster (Excel / CSV)"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-              Select an Excel file (<code>.xlsx</code> / <code>.csv</code>) to import multiple student records directly into the active batch registry.
-            </p>
+            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 10, padding: '12px 14px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px', color: 'var(--text-primary)' }}>📋 Required columns: <code>Name</code> &amp; <code>Phone</code></p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Students are stored in the database and enrolled into this batch. Basic details (photo, email, gender) will be auto-enriched by syncing with Google Sheet.</p>
+            </div>
 
             {!importProgress ? (
               <>
@@ -4496,12 +4437,13 @@ export function BatchManagement() {
             setSelectedUploadFile(null);
             setImportProgress(null);
           }}
-          title="📤 Upload Students Data (Excel / CSV)"
+          title="📤 Upload Student Roster (Excel / CSV)"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-              Select an Excel file (<code>.xlsx</code> / <code>.csv</code>) to import multiple student records directly into the active batch registry.
-            </p>
+            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 10, padding: '12px 14px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px', color: 'var(--text-primary)' }}>📋 Required columns: <code>Name</code> &amp; <code>Phone</code></p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Students are stored in the database and enrolled into this batch. Basic details (photo, email, gender) will be auto-enriched by syncing with Google Sheet.</p>
+            </div>
 
             {!importProgress ? (
               <>

@@ -125,6 +125,22 @@ export class SupabaseAssessmentRepository extends SupabaseRepository<AssessmentR
     }
     return (data ?? []).map((row) => toCamelCaseObject(row) as AssessmentRecord);
   }
+
+  /** Fetch all assessment records for an entire batch in one round-trip. */
+  async findByBatch(enrollmentIds: UUID[]): Promise<AssessmentRecord[]> {
+    if (!enrollmentIds.length) return [];
+    const { data, error } = await supabase
+      .from(this.tableName)
+      .select('*')
+      .in('enrollment_id', enrollmentIds)
+      .is('deleted_at', null);
+
+    if (error) {
+      console.warn(`Supabase findByBatch warning on ${this.tableName}:`, error.message);
+      return [];
+    }
+    return (data ?? []).map((row) => toCamelCaseObject(row) as AssessmentRecord);
+  }
 }
 
 export class SupabaseExamVoucherRepository extends SupabaseRepository<ExamVoucher> implements IExamVoucherRepository {
