@@ -1521,7 +1521,11 @@ export function BatchManagement() {
 
           setImportProgress(null);
           setSelectedUploadFile(null);
-          setStudents((prev) => [...prev, ...newStudentsList]);
+          setStudents((prev) => {
+            const existingIds = new Set(prev.map((s) => s.id));
+            const uniqueNew = newStudentsList.filter((s) => !existingIds.has(s.id));
+            return [...prev, ...uniqueNew];
+          });
           setUploadModalOpen(false);
           refreshBatches();
           toast({
@@ -1693,9 +1697,19 @@ export function BatchManagement() {
     if (!selectedBatchId) return 0;
     const enrolled = students.filter((s) => batchStudentIds.has(s.id));
 
-    // 1) Group enrolled students by normalized phone (last 10 digits).
-    const groups: Record<string, StudentRecord[]> = {};
+    // 1) Get unique enrolled students by ID first to prevent React array duplicates from triggering DB deletes
+    const uniqueEnrolled: StudentRecord[] = [];
+    const seenIds = new Set<string>();
     for (const student of enrolled) {
+      if (!seenIds.has(student.id)) {
+        seenIds.add(student.id);
+        uniqueEnrolled.push(student);
+      }
+    }
+
+    // 2) Group enrolled students by normalized phone (last 10 digits).
+    const groups: Record<string, StudentRecord[]> = {};
+    for (const student of uniqueEnrolled) {
       const key = normalizeStudentKey(student.phone);
       if (!key) continue;
       (groups[key] ||= []).push(student);
