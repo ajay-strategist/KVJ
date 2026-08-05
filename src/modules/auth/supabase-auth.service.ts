@@ -560,7 +560,7 @@ export class SupabaseAuthService implements IAuthService {
    */
   async updateUser(
     userId: string,
-    data: Partial<NewUserInput & { password?: string }>,
+    data: Partial<NewUserInput & { password?: string, avatarUrl?: string }>,
   ): Promise<AuthUser> {
     if (data.password) throw serverSideOnly("Setting another user's password");
 
@@ -570,6 +570,7 @@ export class SupabaseAuthService implements IAuthService {
     if (data.role) patch.role = data.role;
     if (data.designation) patch.designation = data.designation;
     if (data.phone) patch.phone = data.phone;
+    if (data.avatarUrl !== undefined) patch.avatar_url = data.avatarUrl;
     if (data.fullName) {
       const [first, ...rest] = data.fullName.trim().split(/\s+/);
       patch.first_name = first;

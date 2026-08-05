@@ -6,12 +6,13 @@
 
 import { useState, useEffect } from 'react';
 import { AppShell } from '../../shared/layout/AppShell';
-import { PageHeader, Card, SectionHeader, Button } from '../../shared/ui/components';
+import { PageHeader, Card, SectionHeader, Button, Avatar } from '../../shared/ui/components';
 import { useTheme, type ThemeMode } from '../../shared/theme/ThemeProvider';
 import { useConfig } from '../../shared/config/ConfigProvider';
 import { useAuth } from '../../modules/auth/AuthProvider';
 import { useWorkspace, WORKSPACE_PRESETS, WALLPAPER_GALLERY } from '../../shared/theme/WorkspaceProvider';
 import { useNotifications } from '../../shared/notifications/NotificationProvider';
+import { convertDriveUrlToDirectImg } from '../../shared/utils/drive';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -25,7 +26,38 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function SettingsPage() {
   const { mode, setMode } = useTheme();
   const { config, features } = useConfig();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
+  const { toast } = useNotifications();
+  const [photoUrlInput, setPhotoUrlInput] = useState(user?.avatarUrl || '');
+  const [updatingPhoto, setUpdatingPhoto] = useState(false);
+
+  useEffect(() => {
+    if (user?.avatarUrl) {
+      setPhotoUrlInput(user.avatarUrl);
+    }
+  }, [user?.avatarUrl]);
+
+  const handleUpdatePhoto = async () => {
+    if (!user) return;
+    setUpdatingPhoto(true);
+    try {
+      const convertedUrl = convertDriveUrlToDirectImg(photoUrlInput);
+      await updateUser(user.id, { avatarUrl: convertedUrl });
+      toast({
+        variant: 'success',
+        title: 'Photo Updated',
+        message: 'Your profile photo has been updated successfully.',
+      });
+    } catch (err: any) {
+      toast({
+        variant: 'error',
+        title: 'Update Failed',
+        message: err.message || 'Failed to update profile photo.',
+      });
+    } finally {
+      setUpdatingPhoto(false);
+    }
+  };
 
   const {
     wallpaper,
@@ -323,9 +355,47 @@ export function SettingsPage() {
 
           <Card>
             <SectionHeader title="Signed-in Profile" />
-            <Row label="Name">{user?.fullName ?? '—'}</Row>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <Avatar name={user?.fullName ?? ''} src={user?.avatarUrl} size={60} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
+                  {user?.fullName ?? '—'}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+                  {user?.designation ?? '—'} · {user?.role ?? '—'}
+                </div>
+              </div>
+            </div>
+
             <Row label="Email">{user?.email ?? '—'}</Row>
-            <Row label="Role">{user?.role ?? '—'}</Row>
+            <Row label="Phone">{user?.phone ?? '—'}</Row>
+
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                Profile Photo (Google Drive Link or Image URL)
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  placeholder="Paste Google Drive share link (Anyone can view)..."
+                  value={photoUrlInput}
+                  onChange={(e) => setPhotoUrlInput(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <Button 
+                  size="sm" 
+                  onClick={handleUpdatePhoto} 
+                  loading={updatingPhoto}
+                  disabled={updatingPhoto || photoUrlInput === (user?.avatarUrl || '')}
+                >
+                  Save Photo
+                </Button>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: '1.4' }}>
+                Supports any public Google Drive view link. We will automatically convert it to a viewable direct image link.
+              </p>
+            </div>
           </Card>
 
           {/* Email Setup Panel (SMTP Configuration for sending emails) */}

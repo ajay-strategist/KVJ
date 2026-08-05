@@ -20,7 +20,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ sent: boolean }>;
   createUser: (input: import('./auth.service').NewUserInput) => Promise<import('./auth.service').AuthUser>;
-  updateUser: (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string }>) => Promise<import('./auth.service').AuthUser>;
+  updateUser: (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string, avatarUrl?: string }>) => Promise<import('./auth.service').AuthUser>;
   deleteUser: (userId: string) => Promise<{ ok: boolean }>;
   updateUserPassword: (userId: string, newPassword: string) => Promise<{ ok: boolean }>;
   resetToDefaultPassword: (userIdOrEmail: string, fullName?: string) => Promise<{ ok: boolean }>;
@@ -120,9 +120,13 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     return authService.createUser(input);
   }, [authService]);
 
-  const updateUser = useCallback(async (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string }>) => {
-    return authService.updateUser(userId, data);
-  }, [authService]);
+  const updateUser = useCallback(async (userId: string, data: Partial<import('./auth.service').NewUserInput & { password?: string, avatarUrl?: string }>) => {
+    const updated = await authService.updateUser(userId, data);
+    if (session && session.user.id === userId) {
+      setSession((prev) => prev ? { ...prev, user: updated } : null);
+    }
+    return updated;
+  }, [authService, session]);
 
   const deleteUser = useCallback(async (userId: string) => {
     return authService.deleteUser(userId);

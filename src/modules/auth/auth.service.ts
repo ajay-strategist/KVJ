@@ -56,6 +56,7 @@ export interface NewUserInput {
   designation?: string;
   department?: string;
   role: RoleKey;
+  avatarUrl?: string;
 }
 
 export interface BootstrapAdminInput {
@@ -75,7 +76,7 @@ export interface IAuthService {
   requestPasswordReset(email: string): Promise<{ sent: boolean }>;
   resetPassword(token: string, newPassword: string): Promise<{ ok: boolean }>;
   createUser(input: NewUserInput): Promise<AuthUser>;
-  updateUser(userId: string, data: Partial<NewUserInput & { password?: string }>): Promise<AuthUser>;
+  updateUser(userId: string, data: Partial<NewUserInput & { password?: string, avatarUrl?: string }>): Promise<AuthUser>;
   deleteUser(userId: string): Promise<{ ok: boolean }>;
   updateUserPassword(userId: string, newPassword: string): Promise<{ ok: boolean }>;
   resetToDefaultPassword(userIdOrEmail: string, fullName?: string): Promise<{ ok: boolean }>;
