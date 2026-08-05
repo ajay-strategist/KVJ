@@ -2658,7 +2658,42 @@ export function BatchManagement() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }} className="kvj-table">
                   <thead>
                     <tr style={{ background: 'var(--bg-sunken)' }}>
-                      {isExecutive && <th style={{ padding: 12, textAlign: 'center', width: 40 }}><input type="checkbox" title="Select all" checked={selectedMatrixIds.size > 0} onChange={(e) => { /* handled per-row */ }} style={{ cursor: 'pointer', width: 15, height: 15 }} onClick={(e) => { e.stopPropagation(); /* select/deselect all visible rows handled below */ }} /></th>}
+                      {isExecutive && (
+                        <th style={{ padding: 12, textAlign: 'center', width: 40 }}>
+                          <input
+                            type="checkbox"
+                            title="Select all"
+                            checked={(() => {
+                              const filtered = students.filter((s) => {
+                                if (selectedBatchId && !batchStudentIds.has(s.id)) return false;
+                                if (matrixEligFilter === 'all') return true;
+                                const elig = isStudentEligible(s);
+                                return matrixEligFilter === 'eligible' ? elig : !elig;
+                              });
+                              return filtered.length > 0 && filtered.every((s) => selectedMatrixIds.has(s.id));
+                            })()}
+                            onChange={() => {
+                              const filtered = students.filter((s) => {
+                                if (selectedBatchId && !batchStudentIds.has(s.id)) return false;
+                                if (matrixEligFilter === 'all') return true;
+                                const elig = isStudentEligible(s);
+                                return matrixEligFilter === 'eligible' ? elig : !elig;
+                              });
+                              const isAllSelected = filtered.length > 0 && filtered.every((s) => selectedMatrixIds.has(s.id));
+                              setSelectedMatrixIds((prev) => {
+                                const next = new Set(prev);
+                                if (isAllSelected) {
+                                  filtered.forEach((s) => next.delete(s.id));
+                                } else {
+                                  filtered.forEach((s) => next.add(s.id));
+                                }
+                                return next;
+                              });
+                            }}
+                            style={{ cursor: 'pointer', width: 15, height: 15 }}
+                          />
+                        </th>
+                      )}
                       <th style={{ padding: 12, textAlign: 'center', minWidth: 65 }}>Photo</th>
                       <th style={{ padding: 12, position: 'sticky', left: 0, background: 'var(--bg-sunken)', zIndex: 10, minWidth: 160, textAlign: 'left' }}>Student Name</th>
                       <th style={{ padding: 12, textAlign: 'left', minWidth: 120 }}>Phone</th>
