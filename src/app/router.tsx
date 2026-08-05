@@ -36,6 +36,7 @@ const StudentLifecycle = lazy(() => import('../modules/training/pages/StudentLif
 const StudentAttendance = lazy(() => import('../modules/training/pages/StudentAttendance').then((m) => ({ default: m.StudentAttendance })));
 const AssessmentBoard = lazy(() => import('../modules/training/pages/AssessmentBoard').then((m) => ({ default: m.AssessmentBoard })));
 const FinalExamModule = lazy(() => import('../modules/training/pages/FinalExamModule').then((m) => ({ default: m.FinalExamModule })));
+const ExamSubmissionPage = lazy(() => import('../modules/training/pages/ExamSubmissionPage').then((m) => ({ default: m.ExamSubmissionPage })));
 
 // Project & Resource Management
 const ClientDirectory = lazy(() => import('../modules/project/pages/ClientDirectory').then((m) => ({ default: m.ClientDirectory })));
@@ -74,6 +75,7 @@ export function AppRouter() {
           <Route path="/session-expired" element={<SessionExpired />} />
           <Route path="/locked" element={<LockedAccount />} />
           <Route path="/403" element={<Forbidden />} />
+          <Route path="/submit-exam" element={<ExamSubmissionPage />} />
 
           {/* Protected app */}
           <Route path="/app" element={<ProtectedRoute><MyDayPage /></ProtectedRoute>} />

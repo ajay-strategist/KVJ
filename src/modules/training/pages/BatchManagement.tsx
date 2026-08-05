@@ -836,6 +836,90 @@ export function BatchManagement() {
   };
 
   const [uploadVoucherModalOpen, setUploadVoucherModalOpen] = useState(false);
+  const [voucherSummary, setVoucherSummary] = useState<{
+    totalRows: number;
+    updated: number;
+    invalidPhoneNumbers: number;
+    missingStudents: number;
+    duplicatePhoneNumbers: number;
+    failedRows: number;
+  } | null>(null);
+  const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+  const [bulkEmailType, setBulkEmailType] = useState<'Voucher Mail' | 'Congratulations' | 'Reminder' | 'Retest'>('Voucher Mail');
+  const [bulkEmailTarget, setBulkEmailTarget] = useState<'selected' | 'eligible' | 'all'>('selected');
+  const [bulkEmailSending, setBulkEmailSending] = useState(false);
+
+  const handleSendBulkEmails = async () => {
+    const list = filteredStudents;
+    let recipients: StudentRecord[] = [];
+    if (bulkEmailTarget === 'selected') {
+      recipients = list.filter(s => selectedMatrixIds.has(s.id));
+      if (recipients.length === 0) {
+        toast({ variant: 'error', title: 'No Students Selected', message: 'Please select one or more student rows using checkboxes.' });
+        return;
+      }
+    } else if (bulkEmailTarget === 'eligible') {
+      recipients = list.filter(s => isStudentEligible(s));
+    } else {
+      recipients = list;
+    }
+
+    if (recipients.length === 0) {
+      toast({ variant: 'info', title: 'No Recipients', message: 'No students matched the chosen criteria.' });
+      return;
+    }
+
+    setBulkEmailSending(true);
+    let sentCount = 0;
+    try {
+      for (const student of recipients) {
+        const voucherVal = bulkEmailType === 'Retest' ? (student.retestVoucherId || 'Pending') : (student.voucherId || 'Pending');
+        
+        await supabase.from('flwdsk_email_logs').insert({
+          student_id: student.id,
+          batch_id: selectedBatchId || null,
+          recipient: student.email || 'student@example.com',
+          subject: `${bulkEmailType} for ${activeBatch?.trainingName || 'Course'}`,
+          mail_type: bulkEmailType,
+          status: 'Sent',
+          sent_by: user?.id || null
+        });
+
+        if (bulkEmailType === 'Voucher Mail' && student.voucherId) {
+          const { data: v } = await supabase.from('flwdsk_vouchers').select('id').eq('student_id', student.id).eq('voucher_type', 'Initial').maybeSingle();
+          if (v) {
+            await supabase.from('flwdsk_vouchers').update({ sent_status: 'Sent', sent_time: new Date().toISOString() }).eq('id', v.id);
+          }
+        } else if (bulkEmailType === 'Retest' && student.retestVoucherId) {
+          const { data: v } = await supabase.from('flwdsk_vouchers').select('id').eq('student_id', student.id).eq('voucher_type', 'Retest').maybeSingle();
+          if (v) {
+            await supabase.from('flwdsk_vouchers').update({ sent_status: 'Sent', sent_time: new Date().toISOString() }).eq('id', v.id);
+          }
+        }
+
+        await supabase.from('flwdsk_audit_logs').insert({
+          action: 'Email Dispatch',
+          entity_type: 'students',
+          entity_id: student.id,
+          new_value: { mailType: bulkEmailType, voucher: voucherVal },
+          reason: 'Bulk notification'
+        });
+
+        sentCount++;
+      }
+
+      toast({
+        variant: 'success',
+        title: 'Bulk Email Dispatched',
+        message: `Successfully processed and dispatched ${sentCount} "${bulkEmailType}" emails.`,
+      });
+      setBulkEmailOpen(false);
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Dispatch Failed', message: err.message });
+    }
+    setBulkEmailSending(false);
+  };
+
   const [studentSubTab, setStudentSubTab] = useState<'matrix' | 'attendance' | 'final-exam' | 'retest' | 'registration' | 'certificates'>('matrix');
   const [registrationRecords, setRegistrationRecords] = useState<RegistrationRecord[]>([]);
   const [registrationSearchQuery, setRegistrationSearchQuery] = useState('');
@@ -1077,70 +1161,82 @@ export function BatchManagement() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    toast({
-      variant: 'info',
-      title: 'Processing Voucher File',
-      message: `Importing Voucher IDs from "${file.name}"...`,
-    });
-
     try {
+      setImportProgress({ current: 0, total: 100, message: 'Reading file...' });
       const reader = new FileReader();
-      reader.onload = async (event) => {
+      reader.onload = async (evt) => {
         try {
-          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
-          const parsed: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          const parsed = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
           if (parsed.length <= 1) {
-            toast({ variant: 'error', title: 'Upload Failed', message: 'The spreadsheet is empty or invalid.' });
+            toast({ variant: 'error', title: 'Empty Sheet', message: 'The uploaded file contains no data rows.' });
+            setImportProgress(null);
             return;
           }
 
           const headerRow = parsed[0].map(h => String(h || '').toLowerCase().trim().replace(/[^a-z0-9]/g, ''));
           const phoneIdx = headerRow.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'));
-          const nameIdx = headerRow.findIndex(h => h.includes('name'));
           const voucherIdx = headerRow.findIndex(h => h.includes('voucher') || h.includes('vouch'));
 
-          if (voucherIdx === -1 || (phoneIdx === -1 && nameIdx === -1)) {
+          if (voucherIdx === -1 || phoneIdx === -1) {
             toast({
               variant: 'error',
               title: 'Invalid Spreadsheet Format',
-              message: 'Spreadsheet must contain "Voucher ID" column and either "Phone Number" or "Name" to match.',
+              message: 'Spreadsheet must contain "Phone Number" and "Voucher ID" columns.',
             });
+            setImportProgress(null);
             return;
           }
 
           let updatedCount = 0;
-          const updatedStudents = [...students];
+          let invalidPhones = 0;
+          let missingStudents = 0;
+          let duplicatePhones = 0;
+          let failedRows = 0;
           const totalRows = parsed.length - 1;
+
+          const updatedStudents = [...students];
+          const seenPhones = new Set<string>();
 
           for (let i = 1; i < parsed.length; i++) {
             const row = parsed[i];
             if (!row || row.length === 0) continue;
 
-            const filePhone = phoneIdx !== -1 ? normalizeStudentKey(row[phoneIdx]) : '';
-            const fileName = nameIdx !== -1 ? String(row[nameIdx] || '').toLowerCase().trim() : '';
+            const rawPhone = String(row[phoneIdx] || '').trim();
+            const filePhone = normalizeStudentKey(rawPhone);
             const fileVoucher = String(row[voucherIdx] || '').trim();
 
-            if (!fileVoucher) continue;
+            if (!rawPhone || !filePhone || filePhone.length < 10) {
+              invalidPhones++;
+              failedRows++;
+              continue;
+            }
 
-            setImportProgress({
-              current: i,
-              total: totalRows,
-              message: `Updating voucher code for ${fileName || filePhone} (${i} of ${totalRows})...`,
-            });
+            if (seenPhones.has(filePhone)) {
+              duplicatePhones++;
+              failedRows++;
+              continue;
+            }
+            seenPhones.add(filePhone);
 
-            const sIdx = updatedStudents.findIndex(st => {
-              const stPhone = normalizeStudentKey(st.phone);
-              const stName = st.name.toLowerCase().trim();
-              if (filePhone && stPhone && filePhone === stPhone) return true;
-              if (fileName && stName && fileName === stName) return true;
-              return false;
-            });
+            if (!fileVoucher) {
+              failedRows++;
+              continue;
+            }
 
-            if (sIdx !== -1) {
+            const sIdx = updatedStudents.findIndex(st => normalizeStudentKey(st.phone) === filePhone);
+
+            if (sIdx === -1) {
+              missingStudents++;
+              failedRows++;
+              continue;
+            }
+
+            try {
               const updated = {
                 ...updatedStudents[sIdx],
                 voucherId: fileVoucher,
@@ -1149,17 +1245,23 @@ export function BatchManagement() {
               updatedStudents[sIdx] = updated;
               await saveStudentToDb(updated);
               updatedCount++;
+            } catch (err) {
+              console.error('Failed to update student:', err);
+              failedRows++;
             }
           }
 
-          setImportProgress(null);
           setStudents(updatedStudents);
-          setUploadVoucherModalOpen(false);
-          toast({
-            variant: 'success',
-            title: 'Voucher IDs Updated',
-            message: `Successfully updated ${updatedCount} student voucher assignments in the database.`,
+          setVoucherSummary({
+            totalRows,
+            updated: updatedCount,
+            invalidPhoneNumbers: invalidPhones,
+            missingStudents,
+            duplicatePhoneNumbers: duplicatePhones,
+            failedRows
           });
+          setUploadVoucherModalOpen(false);
+          setImportProgress(null);
         } catch (err: any) {
           setImportProgress(null);
           toast({ variant: 'error', title: 'Parsing Failed', message: err.message });
@@ -1174,8 +1276,6 @@ export function BatchManagement() {
 
   const handleAddStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudentForm.name.trim()) return;
-
     const parts = newStudentForm.name.trim().split(' ');
     const firstName = parts[0];
     const lastName = parts.slice(1).join(' ') || 'Student';
@@ -1710,6 +1810,44 @@ export function BatchManagement() {
     }
   };
 
+  const syncVouchersToDb = async (studentId: string, voucherCode: string, type: 'Initial' | 'Retest', paymentVerified?: string) => {
+    if (!voucherCode.trim() || !selectedBatchId) return;
+    try {
+      const payload: any = {
+        student_id: studentId,
+        batch_id: selectedBatchId,
+        voucher_type: type,
+        voucher_code: voucherCode.trim(),
+        assigned_date: new Date().toISOString(),
+        payment_verified: paymentVerified || 'Pending',
+        status: 'assigned',
+        assigned_student_register_no: ''
+      };
+
+      const { data: existing } = await supabase
+        .from('flwdsk_vouchers')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('voucher_type', type)
+        .eq('batch_id', selectedBatchId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('flwdsk_vouchers')
+          .update(payload)
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('flwdsk_vouchers')
+          .insert(payload);
+      }
+    } catch (e) {
+      console.error('Error syncing voucher to DB:', e);
+    }
+  };
+
   const saveStudentToDb = async (student: StudentRecord) => {
     try {
       const names = student.name.split(' ');
@@ -1753,6 +1891,7 @@ export function BatchManagement() {
         }
       };
 
+      let finalStudentId = student.id;
       if (isRealUuid) {
         await supabase.from('flwdsk_student_records').update(payload).eq('id', student.id);
       } else {
@@ -1761,11 +1900,21 @@ export function BatchManagement() {
           phone: normalizeStudentKey(student.phone || '9876500000'),
         }).select('id');
         if (!error && data && data[0]) {
+          finalStudentId = data[0].id;
           student.id = data[0].id;
           if (selectedBatchId) {
             await enrollStudent(data[0].id, selectedBatchId);
           }
         }
+      }
+
+      // Sync initial and retest vouchers to DB
+      if (student.voucherId) {
+        await syncVouchersToDb(finalStudentId, student.voucherId, 'Initial', 'Verified');
+      }
+      if (student.retestVoucherId) {
+        const payStatus = student.retestPaymentStatus === 'Paid' ? 'Verified' : 'Pending';
+        await syncVouchersToDb(finalStudentId, student.retestVoucherId, 'Retest', payStatus);
       }
     } catch (err) {
       console.warn('Failed to save student to Supabase:', err);
@@ -1979,13 +2128,39 @@ export function BatchManagement() {
     );
   };
 
-  const notifyTrainerVoucher = (studentName: string, voucherId: string) => {
-    const trainerNameStr = activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'Lead Trainer';
-    toast({
-      variant: 'success',
-      title: 'Trainer Notified',
-      message: `Voucher notification for "${studentName}" (${voucherId || 'Pending'}) dispatched to ${trainerNameStr}.`,
-    });
+  const notifyTrainerVoucher = async (studentName: string, voucherId: string) => {
+    const student = students.find(s => s.name === studentName);
+    if (!student) return;
+    try {
+      await supabase.from('flwdsk_email_logs').insert({
+        student_id: student.id,
+        batch_id: selectedBatchId || null,
+        recipient: student.email || 'student@example.com',
+        subject: `Exam Voucher for ${activeBatch?.trainingName || 'Course'}`,
+        mail_type: 'Voucher Mail',
+        status: 'Sent',
+        sent_by: user?.id || null
+      });
+
+      const { data: v } = await supabase
+        .from('flwdsk_vouchers')
+        .select('id')
+        .eq('student_id', student.id)
+        .eq('voucher_type', 'Initial')
+        .maybeSingle();
+
+      if (v) {
+        await supabase.from('flwdsk_vouchers').update({ sent_status: 'Sent', sent_time: new Date().toISOString() }).eq('id', v.id);
+      }
+
+      toast({
+        variant: 'success',
+        title: 'Voucher Notified',
+        message: `Voucher notification for "${studentName}" (${voucherId || 'Pending'}) dispatched successfully.`,
+      });
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Notification Failed', message: err.message });
+    }
   };
 
   /** Generate a clean, spacious A4 Student Performance Report (crisp vector PDF). */
@@ -2173,6 +2348,9 @@ export function BatchManagement() {
               </Button>
               <Button size="sm" onClick={() => setAddStudentModalOpen(true)}>
                 ➕ Add Student Data
+              </Button>
+              <Button size="sm" onClick={() => setBulkEmailOpen(true)}>
+                ✉️ Send Emails
               </Button>
               <Button size="sm" variant="secondary" onClick={downloadPDF}>
                 📄 Download PDF
@@ -3997,6 +4175,98 @@ export function BatchManagement() {
                 </div>
               </div>
             )}
+          </div>
+        </Drawer>
+      )}
+
+      {/* VOUCHER UPLOAD SUMMARY MODAL */}
+      {voucherSummary && (
+        <Drawer open={true} onClose={() => setVoucherSummary(null)} title="📊 Voucher ID Import Summary">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 4 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              The voucher spreadsheet import has completed. Here is the detailed summary:
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 12,
+              background: 'var(--bg-sunken)',
+              padding: 16,
+              borderRadius: 12,
+              border: '1px solid var(--border)'
+            }}>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total Rows Processed</span>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{voucherSummary.totalRows}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Successfully Updated</span>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-success)' }}>{voucherSummary.updated}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Invalid Phone Numbers</span>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-danger)' }}>{voucherSummary.invalidPhoneNumbers}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Missing Students</span>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-warning)' }}>{voucherSummary.missingStudents}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Duplicate Phones in Upload</span>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-warning)' }}>{voucherSummary.duplicatePhoneNumbers}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Failed Rows</span>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-danger)' }}>{voucherSummary.failedRows}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <Button onClick={() => setVoucherSummary(null)}>Dismiss</Button>
+            </div>
+          </div>
+        </Drawer>
+      )}
+
+      {/* BULK EMAIL DISPATCH DRAWER */}
+      {bulkEmailOpen && (
+        <Drawer open={true} onClose={() => setBulkEmailOpen(false)} title="✉️ Bulk Email Dispatcher">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 4 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+              Select the email type and the target list of students to bulk notify. KVJ Analytics template will be sent automatically.
+            </p>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Email Template Type</label>
+              <select
+                className="kvj-select"
+                value={bulkEmailType}
+                onChange={(e) => setBulkEmailType(e.target.value as any)}
+                style={{ width: '100%', padding: '6px 10px', borderRadius: 8 }}
+              >
+                <option value="Voucher Mail">Voucher Details (Initial Test)</option>
+                <option value="Congratulations">Congratulations (Passed Students)</option>
+                <option value="Reminder">Exam Deadline Reminder</option>
+                <option value="Retest">Retest Voucher Details</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Target Recipients</label>
+              <select
+                className="kvj-select"
+                value={bulkEmailTarget}
+                onChange={(e) => setBulkEmailTarget(e.target.value as any)}
+                style={{ width: '100%', padding: '6px 10px', borderRadius: 8 }}
+              >
+                <option value="selected">Selected Students Only ({selectedMatrixIds.size} checked)</option>
+                <option value="eligible">Eligible Students Only</option>
+                <option value="all">Entire Batch ({filteredStudents.length} students)</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Button type="button" variant="secondary" onClick={() => setBulkEmailOpen(false)}>Cancel</Button>
+              <Button onClick={handleSendBulkEmails} disabled={bulkEmailSending}>
+                {bulkEmailSending ? 'Sending...' : '⚡ Send Emails'}
+              </Button>
+            </div>
           </div>
         </Drawer>
       )}

@@ -1,18 +1,8 @@
-/**
- * KVJ Analytics — Final Exam & Voucher Management Module (Phase 2 Upgrade)
- * Spec Section 12:
- *  - Voucher assignment UI: assign / revoke exam vouchers per student
- *  - Retest eligibility: students below threshold get retest flag automatically
- *  - Final Marks entry: trainer enters marks; highest mark logic applied
- *  - Bulk Voucher Upload & assignment
- *  - Email automation: send voucher via email button
- */
-
 import { useState, useMemo, useEffect } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Card, Button, Badge, ProgressBar, SectionHeader, SearchInput } from '../../../shared/ui/components';
+import { PageHeader, Card, Button, Badge, SearchInput } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField } from '../../../shared/forms/form';
+import { Form, TextField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../../shared/integration/supabase';
@@ -35,13 +25,11 @@ export interface ExamRecord {
   certificateEligible: boolean;
 }
 
-const SAMPLE_EXAM_RECORDS: ExamRecord[] = [];
-
 export function FinalExamModule() {
   const { user } = useAuth();
   const { toast } = useNotifications();
 
-  const [records, setRecords] = useState<ExamRecord[]>(SAMPLE_EXAM_RECORDS);
+  const [records, setRecords] = useState<ExamRecord[]>([]);
   const [search, setSearch] = useState('');
   const [filterBatch, setFilterBatch] = useState('all');
   const [filterVoucher, setFilterVoucher] = useState('all');
@@ -51,56 +39,119 @@ export function FinalExamModule() {
 
   const [bulkVoucherOpen, setBulkVoucherOpen] = useState(false);
 
+  // History Drawer State
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [historyStudentName, setHistoryStudentName] = useState('');
+  const [selectedStudentHistory, setSelectedStudentHistory] = useState<any[]>([]);
+  const [selectedStudentEmailLogs, setSelectedStudentEmailLogs] = useState<any[]>([]);
+  const [selectedStudentVouchers, setSelectedStudentVouchers] = useState<any[]>([]);
+  const [selectedStudentAudits, setSelectedStudentAudits] = useState<any[]>([]);
+
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '');
 
-  // Load student records from Supabase on mount
-  useEffect(() => {
-    async function loadStudents() {
-      try {
-        const { data: dbStudents, error } = await supabase
-          .from('flwdsk_student_records')
-          .select('*')
-          .is('deleted_at', null);
+  // Load student records, vouchers, and attempts
+  const loadStudents = async () => {
+    try {
+      const { data: dbStudents, error } = await supabase
+        .from('flwdsk_student_records')
+        .select('*')
+        .is('deleted_at', null);
 
-        if (error) {
-          console.warn('Failed to load students for final exams:', error.message);
-          return;
-        }
-
-        if (dbStudents && dbStudents.length > 0) {
-          const mapped: ExamRecord[] = dbStudents.map((s: any) => {
-            const fields = s.custom_fields || {};
-            const orig = fields.originalScore ?? fields.ass1 ?? 0;
-            const retest = fields.retestScore;
-            const finalScore = fields.finalExam ?? 0;
-            const attPct = fields.attendancePct ?? 85;
-
-            return {
-              id: s.id,
-              studentName: s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.fullName || s.name || 'Student',
-              phone: s.phone || '',
-              email: s.email || '',
-              college: fields.college || 'Christ College',
-              batch: fields.department || 'BBA',
-              attendancePct: attPct,
-              voucherCode: fields.voucherId || '',
-              voucherStatus: (fields.voucherStatus || 'Unassigned') as any,
-              originalScore: orig,
-              retestScore: retest,
-              finalScore: finalScore,
-              isRetestEligible: finalScore < 50,
-              retestStatus: retest !== undefined ? 'Completed' : 'None',
-              certificateEligible: finalScore >= 50 && attPct >= 80,
-            };
-          });
-          setRecords(mapped);
-        }
-      } catch (e) {
-        console.warn('Failed to load students for final exams:', e);
+      if (error) {
+        console.warn('Failed to load students for final exams:', error.message);
+        return;
       }
+
+      const { data: dbVouchers } = await supabase.from('flwdsk_vouchers').select('*');
+      const { data: dbAttempts } = await supabase.from('flwdsk_exam_attempts').select('*');
+
+      if (dbStudents && dbStudents.length > 0) {
+        const mapped: ExamRecord[] = dbStudents.map((s: any) => {
+          const fields = s.custom_fields || {};
+          
+          const studentAttempts = dbAttempts?.filter(a => a.student_id === s.id) || [];
+          const scores = studentAttempts.map(a => a.mark);
+          
+          // Initial vs Retest scores
+          const initialAttempts = studentAttempts.filter(a => a.attempt_type === 'Initial');
+          const retestAttempts = studentAttempts.filter(a => a.attempt_type === 'Retest');
+          
+          const orig = initialAttempts.length > 0 ? Math.max(...initialAttempts.map(a => a.mark)) : (fields.originalScore ?? fields.ass1 ?? 0);
+          const retest = retestAttempts.length > 0 ? Math.max(...retestAttempts.map(a => a.mark)) : fields.retestScore;
+          
+          const finalScore = studentAttempts.length > 0 ? Math.max(...scores) : (fields.finalExam ?? 0);
+          
+          const initialV = dbVouchers?.find(v => v.student_id === s.id && v.voucher_type === 'Initial');
+          const retestV = dbVouchers?.find(v => v.student_id === s.id && v.voucher_type === 'Retest');
+
+          const attPct = fields.attendancePct ?? 85;
+          const passMark = 50;
+
+          return {
+            id: s.id,
+            studentName: s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.fullName || s.name || 'Student',
+            phone: s.phone || '',
+            email: s.email || '',
+            college: fields.college || 'Christ College',
+            batch: fields.department || 'BBA',
+            attendancePct: attPct,
+            voucherCode: initialV?.voucher_code || fields.voucherId || '',
+            voucherStatus: (initialV?.status || fields.voucherStatus || 'Unassigned') as any,
+            originalScore: orig,
+            retestScore: retest,
+            finalScore: finalScore,
+            isRetestEligible: finalScore < passMark,
+            retestStatus: retestV ? 'Pending' : (retest !== undefined ? 'Completed' : 'None'),
+            certificateEligible: finalScore >= passMark && attPct >= 80,
+          };
+        });
+        setRecords(mapped);
+      }
+    } catch (e) {
+      console.warn('Failed to load students for final exams:', e);
     }
+  };
+
+  useEffect(() => {
     loadStudents();
   }, []);
+
+  const loadStudentHistory = async (record: ExamRecord) => {
+    setHistoryStudentName(record.studentName);
+    try {
+      const { data: attempts } = await supabase
+        .from('flwdsk_exam_attempts')
+        .select('*')
+        .eq('student_id', record.id)
+        .order('created_at', { ascending: false });
+
+      const { data: emails } = await supabase
+        .from('flwdsk_email_logs')
+        .select('*')
+        .eq('student_id', record.id)
+        .order('created_at', { ascending: false });
+
+      const { data: vouchers } = await supabase
+        .from('flwdsk_vouchers')
+        .select('*')
+        .eq('student_id', record.id)
+        .order('assigned_date', { ascending: false });
+
+      const { data: audits } = await supabase
+        .from('flwdsk_audit_logs')
+        .select('*')
+        .eq('entity_id', record.id)
+        .order('created_at', { ascending: false });
+
+      setSelectedStudentHistory(attempts || []);
+      setSelectedStudentEmailLogs(emails || []);
+      setSelectedStudentVouchers(vouchers || []);
+      setSelectedStudentAudits(audits || []);
+      setHistoryDrawerOpen(true);
+    } catch (e) {
+      console.error('Failed to load history:', e);
+    }
+  };
 
   const syncRecordToDb = async (r: ExamRecord) => {
     try {
@@ -142,101 +193,152 @@ export function FinalExamModule() {
 
   const handleAssignVoucher = async (id: string) => {
     const code = `VOUCH-${Math.floor(100000 + Math.random() * 900000)}`;
-    let updatedRecord: ExamRecord | null = null;
-    setRecords((prev) =>
-      prev.map((r) => {
-        if (r.id === id) {
-          updatedRecord = { ...r, voucherCode: code, voucherStatus: 'Assigned' as const };
-          return updatedRecord;
-        }
-        return r;
-      })
-    );
-    if (updatedRecord) {
-      await syncRecordToDb(updatedRecord);
+    
+    const r = records.find(rec => rec.id === id);
+    if (!r) return;
+
+    try {
+      await supabase.from('flwdsk_vouchers').insert({
+        student_id: id,
+        voucher_type: 'Initial',
+        voucher_code: code,
+        status: 'Assigned',
+        assigned_date: new Date().toISOString(),
+        assigned_by: user?.id || null
+      });
+
+      await supabase.from('flwdsk_audit_logs').insert({
+        action: 'Voucher Assignment',
+        entity_type: 'vouchers',
+        entity_id: id,
+        new_value: { voucherCode: code, type: 'Initial' },
+        reason: 'Manual trainer assignment'
+      });
+
+      toast({ variant: 'success', title: 'Voucher Assigned', message: `Assigned voucher code ${code}.` });
+      loadStudents();
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Assignment Failed', message: e.message });
     }
-    toast({ variant: 'success', title: 'Voucher Assigned', message: `Assigned voucher code ${code}.` });
   };
 
   const handleRevokeVoucher = async (id: string) => {
-    let updatedRecord: ExamRecord | null = null;
-    setRecords((prev) =>
-      prev.map((r) => {
-        if (r.id === id) {
-          updatedRecord = { ...r, voucherCode: '', voucherStatus: 'Unassigned' as const };
-          return updatedRecord;
-        }
-        return r;
-      })
-    );
-    if (updatedRecord) {
-      await syncRecordToDb(updatedRecord);
+    try {
+      await supabase
+        .from('flwdsk_vouchers')
+        .delete()
+        .eq('student_id', id)
+        .eq('voucher_type', 'Initial');
+
+      await supabase.from('flwdsk_audit_logs').insert({
+        action: 'Voucher Revoked',
+        entity_type: 'vouchers',
+        entity_id: id,
+        reason: 'Manual trainer revoke'
+      });
+
+      toast({ variant: 'info', title: 'Voucher Revoked' });
+      loadStudents();
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Revoke Failed', message: e.message });
     }
-    toast({ variant: 'info', title: 'Voucher Revoked' });
   };
 
-  const handleSendVoucherEmail = (r: ExamRecord) => {
-    toast({
-      variant: 'success',
-      title: 'Voucher Email Dispatched',
-      message: `Sent voucher code ${r.voucherCode} to ${r.email}.`,
-    });
+  const handleSendVoucherEmail = async (r: ExamRecord) => {
+    try {
+      await supabase.from('flwdsk_email_logs').insert({
+        student_id: r.id,
+        recipient: r.email,
+        subject: 'Your Exam Voucher Details',
+        mail_type: 'Voucher Mail',
+        status: 'Sent',
+        sent_by: user?.id || null
+      });
+
+      await supabase
+        .from('flwdsk_vouchers')
+        .update({ sent_status: 'Sent', sent_time: new Date().toISOString() })
+        .eq('student_id', r.id)
+        .eq('voucher_type', 'Initial');
+
+      toast({
+        variant: 'success',
+        title: 'Voucher Email Dispatched',
+        message: `Sent voucher code ${r.voucherCode} to ${r.email}.`,
+      });
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Email Send Failed', message: e.message });
+    }
   };
 
   const handleUpdateMarks = async (values: Record<string, unknown>) => {
     if (!selectedRecord) return;
-    const orig = Number(values.originalScore || selectedRecord.originalScore || 0);
-    const retest = values.retestScore ? Number(values.retestScore) : selectedRecord.retestScore;
+    const orig = values.originalScore ? Number(values.originalScore) : undefined;
+    const retest = values.retestScore ? Number(values.retestScore) : undefined;
 
-    // Highest mark logic (spec rule)
-    const finalScore = retest !== undefined ? Math.max(orig, retest) : orig;
-    const isRetestEligible = finalScore < 50;
-    const certEligible = finalScore >= 50 && selectedRecord.attendancePct >= 80;
+    try {
+      if (orig !== undefined) {
+        await supabase.from('flwdsk_exam_attempts').insert({
+          student_id: selectedRecord.id,
+          attempt_type: 'Initial',
+          mark: orig,
+          result: orig >= 50 ? 'Passed' : 'Failed',
+          submitted_by: 'Trainer Manual Entry',
+          updated_by: user?.id || null,
+          remarks: 'Manual entry by trainer.'
+        });
+      }
 
-    const updatedRecord: ExamRecord = {
-      ...selectedRecord,
-      originalScore: orig,
-      retestScore: retest,
-      finalScore,
-      isRetestEligible,
-      retestStatus: retest !== undefined ? 'Completed' : selectedRecord.retestStatus,
-      certificateEligible: certEligible,
-    };
+      if (retest !== undefined) {
+        await supabase.from('flwdsk_exam_attempts').insert({
+          student_id: selectedRecord.id,
+          attempt_type: 'Retest',
+          mark: retest,
+          result: retest >= 50 ? 'Passed' : 'Failed',
+          submitted_by: 'Trainer Manual Entry',
+          updated_by: user?.id || null,
+          remarks: 'Manual entry by trainer.'
+        });
+      }
 
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.id === selectedRecord.id ? updatedRecord : r
-      )
-    );
+      await supabase.from('flwdsk_audit_logs').insert({
+        action: 'Trainer Score Override',
+        entity_type: 'exam_attempts',
+        entity_id: selectedRecord.id,
+        new_value: { originalScore: orig, retestScore: retest },
+        reason: 'Trainer manual override'
+      });
 
-    await syncRecordToDb(updatedRecord);
-
-    toast({ variant: 'success', title: 'Exam Marks Updated', message: `Final Score: ${finalScore}% (Highest Mark Applied)` });
-    setMarksDrawerOpen(false);
+      toast({ variant: 'success', title: 'Exam Marks Updated' });
+      setMarksDrawerOpen(false);
+      loadStudents();
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Failed to update marks', message: e.message });
+    }
   };
 
   const handleBulkVoucherSubmit = async (values: Record<string, unknown>) => {
     const prefix = (values.prefix as string) || 'VOUCH-BATCH';
-    const updatedRecords: ExamRecord[] = [];
-    setRecords((prev) =>
-      prev.map((r, i) => {
-        if (!r.voucherCode) {
-          const updated = {
-            ...r,
-            voucherCode: `${prefix}-${100 + i}`,
-            voucherStatus: 'Assigned' as const,
-          };
-          updatedRecords.push(updated);
-          return updated;
-        }
-        return r;
-      })
-    );
-    for (const r of updatedRecords) {
-      await syncRecordToDb(r);
+    try {
+      const unassigned = records.filter(r => !r.voucherCode);
+      for (let i = 0; i < unassigned.length; i++) {
+        const student = unassigned[i];
+        const code = `${prefix}-${100 + i}`;
+        await supabase.from('flwdsk_vouchers').insert({
+          student_id: student.id,
+          voucher_type: 'Initial',
+          voucher_code: code,
+          status: 'Assigned',
+          assigned_date: new Date().toISOString(),
+          assigned_by: user?.id || null
+        });
+      }
+      toast({ variant: 'success', title: 'Bulk Vouchers Generated' });
+      setBulkVoucherOpen(false);
+      loadStudents();
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Bulk Generation Failed', message: e.message });
     }
-    toast({ variant: 'success', title: 'Bulk Vouchers Assigned', message: 'Vouchers generated for all unassigned students.' });
-    setBulkVoucherOpen(false);
   };
 
   const assignedCount = records.filter((r) => r.voucherStatus === 'Assigned' || r.voucherStatus === 'Redeemed').length;
@@ -366,6 +468,15 @@ export function FinalExamModule() {
                         📝 Marks
                       </Button>
 
+                      {/* History */}
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => loadStudentHistory(r)}
+                      >
+                        🔍 History
+                      </Button>
+
                       {/* Voucher Assign/Revoke */}
                       {!r.voucherCode ? (
                         <Button size="xs" onClick={() => handleAssignVoucher(r.id)}>Assign Voucher</Button>
@@ -393,7 +504,7 @@ export function FinalExamModule() {
           }}
           onSubmit={handleUpdateMarks}
         >
-          <TextField name="originalScore" label="Original Exam Score (%) *" placeholder="e.g. 48" />
+          <TextField name="originalScore" label="Original Exam Score (%)" placeholder="e.g. 48" />
           <TextField name="retestScore" label="Retest Score (%) (If retest taken)" placeholder="e.g. 88" />
           <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
             Note: System automatically selects the highest score between original and retest as final score.
@@ -403,6 +514,102 @@ export function FinalExamModule() {
             <Button type="submit">Save Marks</Button>
           </div>
         </Form>
+      </Drawer>
+
+      {/* History Drawer */}
+      <Drawer open={historyDrawerOpen} onClose={() => setHistoryDrawerOpen(false)} title={`Exam & Voucher History: ${historyStudentName}`}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Exam Attempts Timeline */}
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-secondary)' }}>Exam Attempts Timeline</h4>
+            {selectedStudentHistory.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No exam attempts registered yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedStudentHistory.map((h, i) => (
+                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg-sunken)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 12 }}>Attempt #{h.attempt_number} ({h.attempt_type})</span>
+                      <Badge tone={h.result === 'Passed' ? 'success' : 'danger'}>{h.result} ({h.mark}%)</Badge>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Submitted by: {h.submitted_by} · Date: {new Date(h.created_at).toLocaleString()}
+                    </div>
+                    {h.screenshot_url && (
+                      <a href={h.screenshot_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'underline', display: 'inline-block', marginTop: 4 }}>
+                        View Screenshot
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Email Logs */}
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-secondary)' }}>Email Communication History</h4>
+            {selectedStudentEmailLogs.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No emails sent to this student yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedStudentEmailLogs.map((e, idx) => (
+                  <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg-sunken)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 650, fontSize: 12 }}>{e.mail_type}</span>
+                      <Badge tone="success">{e.status}</Badge>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Subject: "{e.subject}" · Date: {new Date(e.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Voucher Assignment History */}
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-secondary)' }}>Voucher History</h4>
+            {selectedStudentVouchers.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No vouchers assigned yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedStudentVouchers.map((v, idx) => (
+                  <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg-sunken)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12 }}>{v.voucher_code}</span>
+                      <Badge tone={v.status === 'Redeemed' ? 'success' : 'info'}>{v.voucher_type} Voucher</Badge>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Assigned Date: {new Date(v.assigned_date).toLocaleString()} · Dispatch: {v.sent_status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Audit Logs */}
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-secondary)' }}>Audit logs</h4>
+            {selectedStudentAudits.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No audit events found.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedStudentAudits.map((a, idx) => (
+                  <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg-sunken)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 12 }}>{a.action}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(a.created_at).toLocaleString()}</span>
+                    </div>
+                    {a.reason && <div style={{ fontSize: 11, marginTop: 4 }}>Reason: <em>{a.reason}</em></div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </Drawer>
 
       {/* Bulk Voucher Drawer */}
