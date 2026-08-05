@@ -837,9 +837,6 @@ export function BatchManagement() {
   const [courseMaxMarks, setCourseMaxMarks] = useState<number>(100);
   const [coursePassPct, setCoursePassPct] = useState<number>(70);
 
-  // Google Sheet Auto-Sync State (Registration & Student Photos)
-  const [isSyncingSheet, setIsSyncingSheet] = useState(false);
-  const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; message: string } | null>(null);
 
   // Convert Google Drive open URL or view link to direct viewable image URL
@@ -885,201 +882,7 @@ export function BatchManagement() {
     return result;
   };
 
-  // Sync Google Sheet Registration Data & Student Photos
-  // Sync Google Sheet Registration Data & Student Photos
-  const syncGoogleSheetData = async (showToastNotice = false) => {
-    setIsSyncingSheet(true);
-    try {
-      // Fetch public Registration sheet CSV
-      const regRes = await fetch(
-        'https://docs.google.com/spreadsheets/d/1XCQGySwzEqpOV-MpGtc2lvhgcW3byTqKjLpOPcOYEvg/gviz/tq?tqx=out:csv&sheet=Registration'
-      );
-      const regText = await regRes.text();
-      const regRows = parseCSV(regText);
-
-      if (regRows.length < 2) {
-        setIsSyncingSheet(false);
-        return;
-      }
-
-      // Headers: ["Timestamp","Email address","College","Batch","Register No.","Phone No.","Mail ID","Full Name","Gender","Previous Qualification","Do you have a computer","Learned before","Certiport User","Certiport Pass","Photo","Image","Rounded Image"]
-      const uniqueRegMap = new Map<string, RegistrationRecord>();
-
-      for (let i = 1; i < regRows.length; i++) {
-        const row = regRows[i];
-        if (row.length < 6) continue;
-        const timestamp = (row[0] || '').trim();
-        const email = (row[1] || row[6] || '').trim();
-        const college = (row[2] || 'MIM Kuttikkanam').trim();
-        const batch = (row[3] || 'Batch 1').trim();
-        const phone = (row[5] || '').trim();
-        const registerNo = normalizeStudentKey(phone);
-        const name = (row[7] || '').trim();
-        const gender = (row[8] || '').trim();
-        const qualification = (row[9] || '').trim();
-        const hasComputer = (row[10] || '').trim();
-        const learnedBefore = (row[11] || '').trim();
-        const certiportUser = (row[12] || '').trim();
-        const rawPhoto = (row[15] || row[16] || row[14] || '').trim();
-        const photoUrl = convertDriveUrlToDirectImg(rawPhoto);
-
-        if (name || phone) {
-          const record: RegistrationRecord = {
-            timestamp,
-            email,
-            college,
-            batch,
-            registerNo,
-            phone,
-            name,
-            gender,
-            qualification,
-            hasComputer,
-            learnedBefore,
-            certiportUser,
-            photoUrl,
-          };
-
-          // Primary key: 10-digit phone number (or normalized name as fallback)
-          const phoneDigits = phone.replace(/\D/g, '').slice(-10);
-          const key = phoneDigits && phoneDigits.length >= 10 ? phoneDigits : name.toLowerCase().trim();
-
-          if (key) {
-            // Overwrite earlier rows to keep only the latest registration submission
-            uniqueRegMap.set(key, record);
-          }
-        }
-      }
-
-      const regStudents = Array.from(uniqueRegMap.values());
-      setRegistrationRecords(regStudents);
-
-      // The Google Sheet enrichment sync runs SILENTLY in the background — it must
-      // NOT show the full-screen "Processing & Syncing Data" progress modal on the
-      // Batch Management front page. That modal is only for explicit student-data
-      // imports (Excel upload). So we do not touch importProgress here.
-      const updatedStudents = [...studentsRef.current];
-      let dbUpdated = 0;
-      let dbCreated = 0;
-
-      for (let i = 0; i < regStudents.length; i++) {
-        const reg = regStudents[i];
-        const regPhoneDigits = reg.phone.replace(/\D/g, '');
-        const normRegName = reg.name.toLowerCase().trim();
-
-        // Match primarily by Phone Number (last 10 digits as primary key)
-        const existingIdx = updatedStudents.findIndex((st) => {
-          const stPhoneDigits = st.phone.replace(/\D/g, '');
-          const stName = st.name.toLowerCase().trim();
-          if (regPhoneDigits && stPhoneDigits && regPhoneDigits.length >= 10 && stPhoneDigits.length >= 10) {
-            return regPhoneDigits.slice(-10) === stPhoneDigits.slice(-10);
-          }
-          return normRegName && stName && normRegName === stName;
-        });
-
-        if (existingIdx >= 0) {
-          // Update details in local state and database
-          const currentStudent = updatedStudents[existingIdx];
-
-          // Ensure student is enrolled in active batch if they belong to it according to Google Sheet
-          const regBatchNorm = reg.batch.toLowerCase().replace(/\s+/g, '');
-          const activeBatchName = (activeBatchRef.current?.trainingName || '').toLowerCase().replace(/\s+/g, '');
-          const activeBatchNo = String(activeBatchRef.current?.batchNo || '').toLowerCase().replace(/\s+/g, '');
-          const activeProgram = (activeBatchRef.current?.program || '').toLowerCase().replace(/\s+/g, '');
-
-          const batchMatches = regBatchNorm.includes(activeBatchName) ||
-                               regBatchNorm.includes(activeBatchNo) ||
-                               activeBatchName.includes(regBatchNorm) ||
-                               activeBatchNo.includes(regBatchNorm) ||
-                               regBatchNorm.includes(activeProgram);
-
-          const regCollegeNorm = reg.college.toLowerCase().trim();
-          const activeCollegeNorm = (activeBatchRef.current?.college || '').toLowerCase().trim();
-          const collegeMatches = activeCollegeNorm
-            ? regCollegeNorm.includes(activeCollegeNorm) || activeCollegeNorm.includes(regCollegeNorm)
-            : false;
-
-          if (collegeMatches && batchMatches) {
-            const alreadyEnrolled = enrollmentsRef.current.some(e => e.batchId === selectedBatchId && e.studentId === currentStudent.id);
-            if (!alreadyEnrolled && selectedBatchId) {
-              await enrollStudent(currentStudent.id, selectedBatchId);
-            }
-          }
-
-          const hasPhotoChanged = reg.photoUrl && reg.photoUrl !== currentStudent.photoUrl;
-          const hasPhoneChanged = reg.phone && reg.phone !== currentStudent.phone;
-          const hasEmailChanged = reg.email && reg.email !== currentStudent.email;
-          const hasGenderChanged = reg.gender && reg.gender !== currentStudent.gender;
-          const hasQualChanged = reg.qualification && reg.qualification !== currentStudent.qualification;
-          const hasCompChanged = reg.hasComputer && reg.hasComputer !== currentStudent.hasComputer;
-          const hasLearnedChanged = reg.learnedBefore && reg.learnedBefore !== currentStudent.learnedBefore;
-
-          if (
-            hasPhotoChanged ||
-            hasPhoneChanged ||
-            hasEmailChanged ||
-            hasGenderChanged ||
-            hasQualChanged ||
-            hasCompChanged ||
-            hasLearnedChanged ||
-            !currentStudent.gender
-          ) {
-            const updatedStudent: StudentRecord = {
-              ...currentStudent,
-              photoUrl: reg.photoUrl || currentStudent.photoUrl,
-              photo: reg.photoUrl ? '📷' : currentStudent.photo,
-              phone: reg.phone || currentStudent.phone,
-              email: reg.email || currentStudent.email,
-              college: reg.college || currentStudent.college,
-              department: reg.batch || currentStudent.department,
-              gender: (reg.gender || currentStudent.gender || 'Female') as 'Male' | 'Female',
-              qualification: reg.qualification || currentStudent.qualification || '',
-              hasComputer: (reg.hasComputer || currentStudent.hasComputer || 'Yes') as 'Yes' | 'No',
-              learnedBefore: (reg.learnedBefore || currentStudent.learnedBefore || 'No') as 'Yes' | 'No',
-            };
-            updatedStudents[existingIdx] = updatedStudent;
-
-            // Silent background enrichment — no progress modal (see note above).
-            await saveStudentToDb(updatedStudent);
-            dbUpdated++;
-          }
-        } else {
-          // Google Sheet is enrichment-only — new students must be added via Excel upload.
-          // Skip any sheet row that doesn't match an existing enrolled student.
-        }
-      }
-
-      setStudents(updatedStudents);
-      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setLastSyncedTime(nowStr);
-
-      if (showToastNotice || dbUpdated > 0) {
-        toast({
-          variant: 'success',
-          title: 'Google Sheet Sync Complete',
-          message: `Enriched ${dbUpdated} student profile(s) with photo, email, and basic details from Google Sheet.`,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to sync Google Sheet Registration data:', err);
-      setImportProgress(null);
-    } finally {
-      setIsSyncingSheet(false);
-    }
-  };
-
-  // Hourly Auto-Sync Effect (1 hour = 3,600,000 milliseconds)
-  useEffect(() => {
-    if (!selectedBatchId) return;
-
-    syncGoogleSheetData();
-
-    const interval = setInterval(() => {
-      syncGoogleSheetData();
-    }, 3600000);
-
-    return () => clearInterval(interval);
-  }, [selectedBatchId]);
+  // Google Sheet sync removed — data is managed manually.
 
   /**
    * Load assessment scores from the flwdsk_assessments DB table.
@@ -2393,28 +2196,8 @@ export function BatchManagement() {
                     )}
                   </div>
 
-                  {/* Right: Action Buttons (Sync Google Sheet + Eligibility + Sort) */}
+                  {/* Right: Action Buttons (Eligibility + Sort) */}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => syncGoogleSheetData(true)}
-                      disabled={isSyncingSheet}
-                      title="Fetch live Registration photos and student data from Google Sheet (Auto-synced every 1 hour)"
-                      style={{
-                        fontSize: 11.5, padding: '5px 12px', borderRadius: 6, fontWeight: 700, cursor: isSyncingSheet ? 'not-allowed' : 'pointer',
-                        border: '1px solid var(--brand)', background: 'var(--bg-sunken)', color: 'var(--brand)',
-                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 150ms',
-                      }}
-                    >
-                      <span style={{ display: 'inline-block', transform: isSyncingSheet ? 'rotate(180deg)' : 'none', transition: 'transform 300ms' }}>🔄</span>
-                      {isSyncingSheet ? 'Syncing...' : 'Sync Google Sheet'}
-                    </button>
-
-                    {lastSyncedTime && (
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        🟢 Auto-synced 1h • {lastSyncedTime}
-                      </span>
-                    )}
 
                     <button
                       type="button"
@@ -3781,14 +3564,7 @@ export function BatchManagement() {
                           placeholder="🔍 Search Name, Phone, Email, Reg No..."
                           style={{ fontSize: 11.5, padding: '5px 10px', width: 220, borderRadius: 6 }}
                         />
-                        <Button
-                          size="sm"
-                          onClick={() => syncGoogleSheetData(true)}
-                          disabled={isSyncingSheet}
-                          style={{ fontSize: 11.5 }}
-                        >
-                          🔄 {isSyncingSheet ? 'Syncing...' : 'Sync Google Sheet'}
-                        </Button>
+
                         <Badge tone="success">
                           ✅ {matchedRegistrations.length} Matched / {registrationRecords.length} Total
                         </Badge>

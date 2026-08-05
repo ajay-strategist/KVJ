@@ -11,6 +11,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import type { Employee } from '../employee.repository';
 import { useProject } from '../../project/hooks/useProject';
 import { supabase } from '../../../shared/integration/supabase';
+import { Authorize } from '../../../shared/permissions/react';
 
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   const { tasks } = useProject();
   const { toast } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -290,6 +293,50 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     }
   };
 
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0) return;
+    const names = employees
+      .filter((e) => selectedIds.includes(e.id))
+      .map((e) => `${e.firstName} ${e.lastName}`)
+      .join(', ');
+    if (!window.confirm(`Permanently delete ${selectedIds.length} employee(s)?\n\n${names}\n\nThis action cannot be undone.`)) return;
+
+    setBatchDeleting(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const id of selectedIds) {
+      const emp = employees.find((e) => e.id === id);
+      const res = await deleteEmployee(id);
+      if (res.ok) {
+        successCount++;
+        if (emp) {
+          try {
+            const u = getEmployeeUser(emp.email);
+            if (u) await deleteUser(u.id);
+          } catch (err) {
+            console.warn('Auth user deletion note (batch):', err);
+          }
+        }
+      } else {
+        failCount++;
+      }
+    }
+
+    setBatchDeleting(false);
+    setSelectedIds([]);
+
+    if (successCount > 0) {
+      toast({
+        variant: 'success',
+        title: 'Batch Delete Complete',
+        message: `${successCount} employee(s) deleted successfully.${failCount > 0 ? ` ${failCount} failed.` : ''}`,
+      });
+    } else {
+      toast({ variant: 'error', title: 'Batch Delete Failed', message: 'Could not delete any of the selected employees.' });
+    }
+  };
+
   const filtered = employees.filter((e) =>
     `${e.firstName} ${e.lastName} ${e.employeeId} ${e.designation}`
       .toLowerCase()
@@ -436,6 +483,21 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         subtitle="Manage and view all employee files and profiles"
         actions={
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {/* Batch Delete — visible only to Admin / CEO / Manager, and only when rows are selected */}
+            <Authorize roles={['ADMIN', 'CEO', 'MANAGER']}>
+              {selectedIds.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={handleBatchDelete}
+                  disabled={batchDeleting}
+                >
+                  {batchDeleting
+                    ? `⏳ Deleting ${selectedIds.length}…`
+                    : `🗑️ Delete Selected (${selectedIds.length})`}
+                </Button>
+              )}
+            </Authorize>
             <Button size="sm" onClick={() => setAddModalOpen(true)}>
               ➕ Add New Employee
             </Button>
@@ -457,6 +519,8 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
             rows={filtered}
             rowKey={(r) => r.id}
             loading={loading}
+            selectable
+            onSelectionChange={setSelectedIds}
             onRowClick={(r) => navigate(`/app/employees/${r.id}`)}
           />
         </div>
