@@ -98,16 +98,16 @@ export function TrainingCalendar() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
 
-  // Load schedule sessions from Supabase schedule_sessions table
+  // Load schedule sessions from Supabase flwdsk_calendar_sessions table
   const loadDbSessions = useCallback(async () => {
     try {
       const { data: rows, error } = await supabase
-        .from('flwdsk_schedule_sessions')
+        .from('flwdsk_calendar_sessions')
         .select('*')
         .is('deleted_at', null);
 
       if (error) {
-        console.warn('Could not load DB schedule_sessions:', error.message);
+        console.warn('Could not load calendar sessions:', error.message);
         return;
       }
 
@@ -141,7 +141,7 @@ export function TrainingCalendar() {
         setCustomSessions([]);
       }
     } catch (e) {
-      console.warn('Could not load DB schedule_sessions:', e);
+      console.warn('Could not load calendar sessions:', e);
     }
   }, [batches, courses, user, trainers]);
 
@@ -539,7 +539,7 @@ export function TrainingCalendar() {
       color: '#3b82f6',
     };
 
-    // Persist to Supabase schedule_sessions DB table
+    // Persist to Supabase flwdsk_calendar_sessions table
     const payload: Record<string, any> = {
       id: sessId,
       date: sessionObj.date,
@@ -555,21 +555,16 @@ export function TrainingCalendar() {
       color: sessionObj.color || '#3b82f6',
     };
 
-    let { error } = await supabase.from('flwdsk_schedule_sessions').upsert(payload);
+    const { error: saveError } = await supabase.from('flwdsk_calendar_sessions').upsert(payload);
 
-    if (error) {
-      console.warn('Supabase schedule_sessions upsert error, trying minimal payload:', error.message);
-      const minimalPayload = {
-        id: sessId,
-        date: sessionObj.date,
-        session_title: sessionObj.name,
-        trainer_id: validTrainerId,
-        batch_id: validBatchId,
-      };
-      const minRes = await supabase.from('flwdsk_schedule_sessions').upsert(minimalPayload);
-      if (minRes.error) {
-        console.error('Minimal schedule_sessions upsert error:', minRes.error.message);
-      }
+    if (saveError) {
+      console.error('Calendar session save error:', saveError.message);
+      toast({
+        variant: 'error',
+        title: 'Save Failed',
+        message: saveError.message || 'Could not save session to database.',
+      });
+      return;
     }
 
     await loadDbSessions();
@@ -601,7 +596,7 @@ export function TrainingCalendar() {
     const deletedId = editingSessionId;
 
     if (UUID_RE.test(deletedId)) {
-      const { error } = await supabase.from('flwdsk_schedule_sessions').delete().eq('id', deletedId);
+      const { error } = await supabase.from('flwdsk_calendar_sessions').delete().eq('id', deletedId);
       if (error) {
         console.error('Supabase schedule_sessions delete error:', error.message);
         toast({
