@@ -1361,12 +1361,14 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
       )}
       {sessions.map((s) => {
         let rawCode = s.batchCode || s.name || s.course || '';
-        let batchDisplay = cleanBatchCode(rawCode);
+        let batchDisplay = (s.batchCode && s.batchCode !== 'Training Batch' && s.batchCode !== 'Training Session')
+          ? s.batchCode
+          : cleanBatchCode(rawCode);
 
         if (!batchDisplay || batchDisplay === 'Training Batch' || batchDisplay === 'Custom') {
           batchDisplay = s.name && s.name !== 'Training Batch' && s.name !== 'Custom'
-            ? cleanBatchCode(s.name)
-            : (s.course && s.course !== '—' ? cleanBatchCode(s.course) : 'Training Session');
+            ? s.name
+            : (s.course && s.course !== '—' ? s.course : 'Training Session');
         }
 
         const timeDisplay = `${s.startTime}–${s.endTime}`;
