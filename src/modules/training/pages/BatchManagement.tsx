@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { TrainingBatchCarousel, type BatchAction } from '../components/TrainingBatchCarousel';
 import { AppShell } from '../../../shared/layout/AppShell';
@@ -955,7 +955,7 @@ export function BatchManagement() {
       // Now process students with database persistence and real-time progress!
       setImportProgress({ current: 0, total: regStudents.length, message: 'Analyzing Google Sheet registrations...' });
 
-      const updatedStudents = [...students];
+      const updatedStudents = [...studentsRef.current];
       let dbUpdated = 0;
       let dbCreated = 0;
 
@@ -977,6 +977,32 @@ export function BatchManagement() {
         if (existingIdx >= 0) {
           // Update details in local state and database
           const currentStudent = updatedStudents[existingIdx];
+
+          // Ensure student is enrolled in active batch if they belong to it according to Google Sheet
+          const regBatchNorm = reg.batch.toLowerCase().replace(/\s+/g, '');
+          const activeBatchName = (activeBatchRef.current?.trainingName || '').toLowerCase().replace(/\s+/g, '');
+          const activeBatchNo = String(activeBatchRef.current?.batchNo || '').toLowerCase().replace(/\s+/g, '');
+          const activeProgram = (activeBatchRef.current?.program || '').toLowerCase().replace(/\s+/g, '');
+
+          const batchMatches = regBatchNorm.includes(activeBatchName) ||
+                               regBatchNorm.includes(activeBatchNo) ||
+                               activeBatchName.includes(regBatchNorm) ||
+                               activeBatchNo.includes(regBatchNorm) ||
+                               regBatchNorm.includes(activeProgram);
+
+          const regCollegeNorm = reg.college.toLowerCase().trim();
+          const activeCollegeNorm = (activeBatchRef.current?.college || '').toLowerCase().trim();
+          const collegeMatches = activeCollegeNorm
+            ? regCollegeNorm.includes(activeCollegeNorm) || activeCollegeNorm.includes(regCollegeNorm)
+            : false;
+
+          if (collegeMatches && batchMatches) {
+            const alreadyEnrolled = enrollmentsRef.current.some(e => e.batchId === selectedBatchId && e.studentId === currentStudent.id);
+            if (!alreadyEnrolled && selectedBatchId) {
+              await enrollStudent(currentStudent.id, selectedBatchId);
+            }
+          }
+
           const hasPhotoChanged = reg.photoUrl && reg.photoUrl !== currentStudent.photoUrl;
           const hasPhoneChanged = reg.phone && reg.phone !== currentStudent.phone;
           const hasEmailChanged = reg.email && reg.email !== currentStudent.email;
@@ -1021,9 +1047,9 @@ export function BatchManagement() {
         } else {
           // If student doesn't exist, check if they belong to active batch
           const regBatchNorm = reg.batch.toLowerCase().replace(/\s+/g, '');
-          const activeBatchName = (activeBatch?.trainingName || '').toLowerCase().replace(/\s+/g, '');
-          const activeBatchNo = String(activeBatch?.batchNo || '').toLowerCase().replace(/\s+/g, '');
-          const activeProgram = (activeBatch?.program || '').toLowerCase().replace(/\s+/g, '');
+          const activeBatchName = (activeBatchRef.current?.trainingName || '').toLowerCase().replace(/\s+/g, '');
+          const activeBatchNo = String(activeBatchRef.current?.batchNo || '').toLowerCase().replace(/\s+/g, '');
+          const activeProgram = (activeBatchRef.current?.program || '').toLowerCase().replace(/\s+/g, '');
 
           const batchMatches = regBatchNorm.includes(activeBatchName) ||
                                regBatchNorm.includes(activeBatchNo) ||
@@ -1031,8 +1057,10 @@ export function BatchManagement() {
                                activeBatchNo.includes(regBatchNorm) ||
                                regBatchNorm.includes(activeProgram);
 
-          const collegeMatches = activeBatch?.college
-            ? reg.college.toLowerCase().trim() === activeBatch.college.toLowerCase().trim()
+          const regCollegeNorm = reg.college.toLowerCase().trim();
+          const activeCollegeNorm = (activeBatchRef.current?.college || '').toLowerCase().trim();
+          const collegeMatches = activeCollegeNorm
+            ? regCollegeNorm.includes(activeCollegeNorm) || activeCollegeNorm.includes(regCollegeNorm)
             : false;
 
           if (collegeMatches && batchMatches) {
@@ -1087,7 +1115,7 @@ export function BatchManagement() {
             }
 
             if (studentId) {
-              const alreadyEnrolled = enrollments.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
+              const alreadyEnrolled = enrollmentsRef.current.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
               if (!alreadyEnrolled && selectedBatchId) {
                 await enrollStudent(studentId, selectedBatchId);
               }
@@ -1146,6 +1174,8 @@ export function BatchManagement() {
 
   // Hourly Auto-Sync Effect (1 hour = 3,600,000 milliseconds)
   useEffect(() => {
+    if (!selectedBatchId) return;
+
     syncGoogleSheetData();
 
     const interval = setInterval(() => {
@@ -1153,7 +1183,7 @@ export function BatchManagement() {
     }, 3600000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedBatchId]);
 
   // Active student ID for displaying course completion checklist popover
   const [activeChecklistStudentId, setActiveChecklistStudentId] = useState<string | null>(null);
@@ -2035,6 +2065,14 @@ export function BatchManagement() {
   const activeBatch = safeBatches.find((b) => b && b.id === selectedBatchId);
   const activeCourse = activeBatch ? safeCourses.find((c) => c && c.id === activeBatch.courseId) : null;
   const activeTrainer = activeBatch ? safeTrainers.find((t) => t && t.id === activeBatch.trainerId) : null;
+
+  const studentsRef = useRef(students);
+  const enrollmentsRef = useRef(enrollments);
+  const activeBatchRef = useRef(activeBatch);
+
+  useEffect(() => { studentsRef.current = students; }, [students]);
+  useEffect(() => { enrollmentsRef.current = enrollments; }, [enrollments]);
+  useEffect(() => { activeBatchRef.current = activeBatch; }, [activeBatch]);
 
   const handleToggleCheck = (stage: string, itemId: string) => {
     const list = checklist[stage].map((item) =>
