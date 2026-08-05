@@ -1634,6 +1634,9 @@ export function BatchManagement() {
 
   // Which student row is showing the inline "remove from batch?" confirm.
   const [confirmRemoveStudentId, setConfirmRemoveStudentId] = useState<string | null>(null);
+  // Batch-select state for the Performance Matrix
+  const [selectedMatrixIds, setSelectedMatrixIds] = useState<Set<string>>(new Set());
+  const [batchRemovingMatrix, setBatchRemovingMatrix] = useState(false);
 
   /** Un-enrol a single student from the active batch (keeps the student record). */
   const handleRemoveStudentFromBatch = useCallback(async (student: StudentRecord) => {
@@ -1652,6 +1655,39 @@ export function BatchManagement() {
       toast({ variant: 'error', title: 'Remove Failed', message: err?.message || 'Could not remove the student.' });
     }
   }, [selectedBatchId, toast]);
+
+  /** Batch-remove all selectedMatrixIds from the active batch. */
+  const handleBatchRemoveStudents = async () => {
+    if (!selectedBatchId || selectedMatrixIds.size === 0) return;
+    const ids = Array.from(selectedMatrixIds);
+    const names = students
+      .filter((s) => ids.includes(s.id))
+      .map((s) => s.name)
+      .join(', ');
+    if (!window.confirm(`Remove ${ids.length} student(s) from this batch?\n\n${names}\n\nThis only removes them from the batch, not from the system.`)) return;
+
+    setBatchRemovingMatrix(true);
+    let ok = 0; let fail = 0;
+    for (const id of ids) {
+      try {
+        const { error } = await supabase
+          .from('flwdsk_enrollments')
+          .delete()
+          .eq('batch_id', selectedBatchId)
+          .eq('student_id', id);
+        if (error) throw error;
+        ok++;
+      } catch { fail++; }
+    }
+    setStudents((prev) => prev.filter((s) => !selectedMatrixIds.has(s.id)));
+    setSelectedMatrixIds(new Set());
+    setBatchRemovingMatrix(false);
+    if (ok > 0) {
+      toast({ variant: 'success', title: 'Batch Remove Complete', message: `${ok} student(s) removed from batch.${fail > 0 ? ` ${fail} failed.` : ''}` });
+    } else {
+      toast({ variant: 'error', title: 'Batch Remove Failed', message: 'Could not remove selected students.' });
+    }
+  };
 
   const saveStudentToDb = async (student: StudentRecord) => {
     try {
@@ -2194,6 +2230,26 @@ export function BatchManagement() {
                         🧹 Remove Duplicates
                       </button>
                     )}
+                    {isExecutive && selectedMatrixIds.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleBatchRemoveStudents}
+                        disabled={batchRemovingMatrix}
+                        title="Remove all selected students from this batch"
+                        style={{
+                          fontSize: 11.5, padding: '5px 14px', borderRadius: 6, fontWeight: 700,
+                          cursor: batchRemovingMatrix ? 'not-allowed' : 'pointer',
+                          background: 'var(--status-danger)', color: '#fff',
+                          border: '1px solid var(--status-danger)',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          opacity: batchRemovingMatrix ? 0.7 : 1,
+                        }}
+                      >
+                        {batchRemovingMatrix
+                          ? `⏳ Removing ${selectedMatrixIds.size}…`
+                          : `🗑️ Delete Selected (${selectedMatrixIds.size})`}
+                      </button>
+                    )}
                   </div>
 
                   {/* Right: Action Buttons (Eligibility + Sort) */}
@@ -2403,6 +2459,7 @@ export function BatchManagement() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }} className="kvj-table">
                   <thead>
                     <tr style={{ background: 'var(--bg-sunken)' }}>
+                      {isExecutive && <th style={{ padding: 12, textAlign: 'center', width: 40 }}><input type="checkbox" title="Select all" checked={selectedMatrixIds.size > 0} onChange={(e) => { /* handled per-row */ }} style={{ cursor: 'pointer', width: 15, height: 15 }} onClick={(e) => { e.stopPropagation(); /* select/deselect all visible rows handled below */ }} /></th>}
                       <th style={{ padding: 12, textAlign: 'center', minWidth: 65 }}>Photo</th>
                       <th style={{ padding: 12, position: 'sticky', left: 0, background: 'var(--bg-sunken)', zIndex: 10, minWidth: 160, textAlign: 'left' }}>Student Name</th>
                       <th style={{ padding: 12, textAlign: 'left', minWidth: 120 }}>Phone</th>
@@ -2442,7 +2499,23 @@ export function BatchManagement() {
                       return filtered.map((s) => {
                         const eligible = isStudentEligible(s);
                         return (
-                          <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <tr key={s.id} style={{ borderBottom: '1px solid var(--border)', background: selectedMatrixIds.has(s.id) ? 'color-mix(in srgb, var(--brand) 8%, transparent)' : undefined }}>
+                            {isExecutive && (
+                              <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedMatrixIds.has(s.id)}
+                                  onChange={() => {
+                                    setSelectedMatrixIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(s.id)) next.delete(s.id); else next.add(s.id);
+                                      return next;
+                                    });
+                                  }}
+                                  style={{ cursor: 'pointer', width: 15, height: 15 }}
+                                />
+                              </td>
+                            )}
                             {/* Photo Thumbnail Column */}
                             <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                               {s.photoUrl ? (
