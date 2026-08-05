@@ -282,7 +282,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                     <div style={{
                       position: 'fixed',
                       bottom: isMobile ? 64 : 110,
-                      left: isMobile ? 16 : (collapsed ? 74 : 16),
+                      left: isMobile ? 16 : (collapsed ? 74 : 262),
                       width: isMobile ? 'calc(100vw - 32px)' : 340,
                       maxWidth: 'calc(100vw - 32px)',
                       maxHeight: 'min(460px, calc(100dvh - 130px))',
