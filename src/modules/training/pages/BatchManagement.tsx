@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { TrainingBatchCarousel, type BatchAction } from '../components/TrainingBatchCarousel';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Card, SectionHeader, Badge, ProgressBar } from '../../../shared/ui/components';
@@ -1607,6 +1609,8 @@ export function BatchManagement() {
             title: 'Roster Import Complete',
             message: `${importedCount} student(s) added to batch. Sync Google Sheet to fill in basic details.`,
           });
+          // Remove any accidental duplicates the import may have introduced.
+          setTimeout(() => { dedupeBatchStudents({ silent: true }); }, 600);
         } catch (err: any) {
           setImportProgress(null);
           toast({ variant: 'error', title: 'Parsing Failed', message: err.message });
@@ -1760,71 +1764,95 @@ export function BatchManagement() {
     }
   }, [dbStudents]);
 
+  /**
+   * Remove duplicate students from the ACTIVE batch by normalized phone number.
+   * Keeps the FIRST enrolled student (oldest createdAt) and un-enrolls the rest.
+   * Only the enrollment is deleted (the student record itself is preserved).
+   */
+  const dedupeBatchStudents = useCallback(async (opts?: { silent?: boolean }): Promise<number> => {
+    if (!selectedBatchId) return 0;
+    const enrolled = students.filter((s) => batchStudentIds.has(s.id));
+
+    // 1) Group enrolled students by normalized phone (last 10 digits).
+    const groups: Record<string, StudentRecord[]> = {};
+    for (const student of enrolled) {
+      const key = normalizeStudentKey(student.phone);
+      if (!key) continue;
+      (groups[key] ||= []).push(student);
+    }
+
+    // 2) In each group, keep the oldest (first enrolled) and mark the rest.
+    const duplicateIds: string[] = [];
+    for (const list of Object.values(groups)) {
+      if (list.length <= 1) continue;
+      const sorted = [...list].sort((a, b) => {
+        const ta = new Date((a as any).createdAt || 0).getTime();
+        const tb = new Date((b as any).createdAt || 0).getTime();
+        return ta - tb; // oldest first → kept
+      });
+      duplicateIds.push(...sorted.slice(1).map((s) => s.id));
+    }
+
+    if (duplicateIds.length === 0) {
+      if (!opts?.silent) {
+        toast({ variant: 'info', title: 'No Duplicates', message: 'No duplicate students were found in this batch.' });
+      }
+      return 0;
+    }
+
+    try {
+      // 3) Delete the duplicate ENROLLMENTS for this batch (not the students).
+      const { error } = await supabase
+        .from('flwdsk_enrollments')
+        .delete()
+        .eq('batch_id', selectedBatchId)
+        .in('student_id', duplicateIds);
+      if (error) throw error;
+
+      // 4) Remove them from local state.
+      setStudents((prev) => prev.filter((s) => !duplicateIds.includes(s.id)));
+      refreshBatches();
+      toast({
+        variant: opts?.silent ? 'info' : 'success',
+        title: 'Duplicates Removed',
+        message: `Removed ${duplicateIds.length} duplicate student${duplicateIds.length > 1 ? 's' : ''} from this batch.`,
+      });
+      return duplicateIds.length;
+    } catch (err: any) {
+      if (!opts?.silent) {
+        toast({ variant: 'error', title: 'Cleanup Failed', message: err?.message || 'Could not remove duplicates.' });
+      }
+      console.error('Error removing duplicate enrollments:', err?.message);
+      return 0;
+    }
+  }, [selectedBatchId, students, batchStudentIds, refreshBatches, toast]);
+
+  // Auto-clean duplicates whenever the batch/students/enrollments change.
   useEffect(() => {
     if (!selectedBatchId || students.length === 0 || enrollments.length === 0) return;
+    dedupeBatchStudents({ silent: true });
+  }, [selectedBatchId, students, enrollments, batchStudentIds, dedupeBatchStudents]);
 
-    const cleanDuplicates = async () => {
-      const enrolled = students.filter((s) => batchStudentIds.has(s.id));
-      const groups: Record<string, StudentRecord[]> = {};
-      
-      for (const student of enrolled) {
-        const key = normalizeStudentKey(student.phone);
-        if (!groups[key]) {
-          groups[key] = [];
-        }
-        groups[key].push(student);
-      }
+  // Which student row is showing the inline "remove from batch?" confirm.
+  const [confirmRemoveStudentId, setConfirmRemoveStudentId] = useState<string | null>(null);
 
-      const enrollmentsToDelete: string[] = [];
-      const studentsToDelete: string[] = [];
-
-      for (const [phone, list] of Object.entries(groups)) {
-        if (list.length > 1) {
-          const duplicates = list.slice(1);
-          for (const dupe of duplicates) {
-            enrollmentsToDelete.push(dupe.id);
-            studentsToDelete.push(dupe.id);
-          }
-        }
-      }
-
-      if (enrollmentsToDelete.length > 0) {
-        try {
-          const { error: enrollError } = await supabase
-            .from('flwdsk_enrollments')
-            .delete()
-            .eq('batch_id', selectedBatchId)
-            .in('student_id', enrollmentsToDelete);
-
-          if (enrollError) {
-            console.error('Error deleting duplicate enrollments:', enrollError.message);
-          } else {
-            const { error: studentError } = await supabase
-              .from('flwdsk_student_records')
-              .delete()
-              .in('id', studentsToDelete);
-
-            if (studentError) {
-              console.error('Error deleting duplicate student records:', studentError.message);
-            }
-
-            refreshBatches();
-            setStudents((prev) => prev.filter((s) => !studentsToDelete.includes(s.id)));
-            
-            toast({
-              variant: 'info',
-              title: 'Duplicates Cleaned',
-              message: `Automatically removed ${enrollmentsToDelete.length} duplicate student records from this batch.`,
-            });
-          }
-        } catch (err: any) {
-          console.error('Error cleaning duplicate student records:', err.message);
-        }
-      }
-    };
-
-    cleanDuplicates();
-  }, [selectedBatchId, students, enrollments, batchStudentIds, refreshBatches]);
+  /** Un-enrol a single student from the active batch (keeps the student record). */
+  const handleRemoveStudentFromBatch = useCallback(async (student: StudentRecord) => {
+    if (!selectedBatchId) return;
+    try {
+      const { error } = await supabase
+        .from('flwdsk_enrollments')
+        .delete()
+        .eq('batch_id', selectedBatchId)
+        .eq('student_id', student.id);
+      if (error) throw error;
+      setStudents((prev) => prev.filter((s) => s.id !== student.id));
+      setConfirmRemoveStudentId(null);
+      toast({ variant: 'success', title: 'Student Removed', message: 'Student removed from batch.' });
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Remove Failed', message: err?.message || 'Could not remove the student.' });
+    }
+  }, [selectedBatchId, toast]);
 
   const saveStudentToDb = async (student: StudentRecord) => {
     try {
@@ -2104,12 +2132,144 @@ export function BatchManagement() {
     });
   };
 
-  const exportPDFReport = (reportType: string) => {
-    toast({
-      variant: 'success',
-      title: 'Report Downloaded',
-      message: `${reportType} downloaded as PDF successfully with official seal.`,
+  /** Generate a clean, spacious A4 Student Performance Report (crisp vector PDF). */
+  const downloadPDF = () => {
+    const list = filteredStudents;
+    const b = activeBatch;
+    const trainerName = activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'N/A';
+
+    const batchName = b?.trainingName || b?.batchNo || b?.code || 'Training Batch';
+    const batchCode = b?.code || b?.batchNo || 'BATCH';
+    const college = b?.college || '—';
+    const program = b?.program || '—';
+    const academicYear = b?.academicYear || '—';
+    const startDate = String(b?.startDate || '—');
+    const endDate = String(b?.endDate || '—');
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();   // 210
+    const pageH = doc.internal.pageSize.getHeight();  // 297
+    const M = 20;                                     // 20mm margins
+    const contentW = pageW - M * 2;
+    let y = M;
+
+    // ── HEADER ──
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(0, 0, 0);
+    doc.text('Student Performance Report', pageW / 2, y, { align: 'center' });
+    y += 7;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(85, 85, 85);
+    doc.text(`${batchName}  ·  ${college}`, pageW / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(10); doc.setTextColor(119, 119, 119);
+    doc.text(`Academic Year: ${academicYear}    ·    Program: ${program}`, pageW / 2, y, { align: 'center' });
+    y += 8;
+    doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3);
+    doc.line(M, y, pageW - M, y);
+    y += 8;
+
+    // ── BATCH INFO BOX ──
+    const boxH = 26;
+    doc.setFillColor(245, 245, 245);
+    doc.rect(M, y, contentW, boxH, 'F');
+    const colLx = M + 8;
+    const colRx = M + contentW / 2 + 8;
+    const infoRow = (x: number, yy: number, label: string, value: string) => {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(51, 51, 51);
+      doc.text(label, x, yy);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, x + 28, yy);
+    };
+    let by = y + 8;
+    infoRow(colLx, by, 'Trainer:', trainerName); infoRow(colRx, by, 'College:', college); by += 6;
+    infoRow(colLx, by, 'Start Date:', startDate); infoRow(colRx, by, 'Program:', program); by += 6;
+    infoRow(colLx, by, 'End Date:', endDate); infoRow(colRx, by, 'Total Students:', String(list.length));
+    y += boxH + 6;
+
+    // ── SUMMARY STATS ──
+    const total = list.length;
+    const eligible = list.filter((s) => s.attendancePct >= 84).length;
+    const avgAtt = total ? Math.round(list.reduce((a, s) => a + (s.attendancePct || 0), 0) / total) : 0;
+    const avgOverall = total ? Math.round(list.reduce((a, s) => a + (s.overallScore || 0), 0) / total) : 0;
+    const stats = [
+      { n: String(total), l: 'Total Students' },
+      { n: String(eligible), l: 'Eligible for Voucher' },
+      { n: `${avgAtt}%`, l: 'Avg Attendance' },
+      { n: String(avgOverall), l: 'Avg Overall Score' },
+    ];
+    const gap = 4;
+    const sw = (contentW - gap * 3) / 4;
+    const sh = 18;
+    stats.forEach((st, i) => {
+      const sx = M + i * (sw + gap);
+      doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.3);
+      doc.rect(sx, y, sw, sh);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(30, 41, 59);
+      doc.text(st.n, sx + sw / 2, y + 8, { align: 'center' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+      doc.text(st.l, sx + sw / 2, y + 14, { align: 'center' });
     });
+    y += sh + 8;
+
+    // ── STUDENT TABLE ──
+    const body = list.map((s, i) => [
+      String(i + 1), s.name, s.phone, `${s.attendancePct}%`,
+      String(s.ass1 ?? 0), String(s.ass2 ?? 0), String(s.ass3 ?? 0),
+      String(s.overallScore ?? 0), s.voucherStatus || 'Unassigned',
+    ]);
+
+    autoTable(doc, {
+      startY: y,
+      head: [['#', 'Name', 'Phone', 'Attendance %', 'Ass 1', 'Ass 2', 'Ass 3', 'Overall', 'Voucher Status']],
+      body,
+      margin: { left: M, right: M, bottom: M },
+      styles: { font: 'helvetica', fontSize: 8, cellPadding: 2.6, textColor: [26, 26, 26], minCellHeight: 9, valign: 'middle', lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, minCellHeight: 9, halign: 'center' },
+      alternateRowStyles: { fillColor: [248, 249, 250] },
+      columnStyles: {
+        0: { cellWidth: 8, halign: 'center' },
+        1: { cellWidth: 48 },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 22, halign: 'center' },
+        4: { cellWidth: 14, halign: 'center' },
+        5: { cellWidth: 14, halign: 'center' },
+        6: { cellWidth: 14, halign: 'center' },
+        7: { cellWidth: 18, halign: 'center' },
+        8: { cellWidth: 24, halign: 'center' },
+      },
+      didParseCell: (d: any) => {
+        if (d.section !== 'body') return;
+        const s = list[d.row.index];
+        if (!s) return;
+        if (d.column.index === 3) {
+          d.cell.styles.textColor = s.attendancePct >= 84 ? [22, 163, 74] : [220, 38, 38];
+          d.cell.styles.fontStyle = 'bold';
+        }
+        if (d.column.index === 8) {
+          const v = (s.voucherStatus || '').toLowerCase();
+          d.cell.styles.textColor = v === 'assigned' ? [22, 163, 74] : v.includes('pend') ? [217, 119, 6] : [120, 120, 120];
+        }
+      },
+    });
+
+    // ── FOOTER on every page (with accurate "Page X of Y") ──
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      const fy = pageH - 12;
+      doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.3);
+      doc.line(M, fy - 3, pageW - M, fy - 3);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(153, 153, 153);
+      doc.text('KVJ Platform | Confidential', M, fy);
+      doc.text(batchCode, pageW / 2, fy, { align: 'center' });
+      doc.text(`Page ${p} of ${totalPages}`, pageW - M, fy, { align: 'right' });
+    }
+
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const fileName = `${batchCode}_Student_Report_${dd}${mm}${now.getFullYear()}.pdf`;
+    doc.save(fileName);
+    toast({ variant: 'success', title: 'PDF Downloaded', message: `Student report for ${batchName} generated.` });
   };
 
   // Calculating overall metrics
@@ -2158,8 +2318,8 @@ export function BatchManagement() {
               <Button size="sm" onClick={() => setAddStudentModalOpen(true)}>
                 ➕ Add Student Data
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => exportPDFReport('Full Registry List')}>
-                📄 Export Spreadsheet
+              <Button size="sm" variant="secondary" onClick={downloadPDF}>
+                📄 Download PDF
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setShowFullStudentReport(false)}>
                 Close Workspace
@@ -2221,6 +2381,20 @@ export function BatchManagement() {
                         <option value="not-eligible">❌ Not Eligible Only</option>
                       </select>
                     </div>
+                    {isExecutive && (
+                      <button
+                        type="button"
+                        onClick={() => dedupeBatchStudents()}
+                        title="Find and remove students enrolled more than once (by phone number)"
+                        style={{
+                          fontSize: 11.5, padding: '5px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer',
+                          background: 'transparent', color: 'var(--status-danger)',
+                          border: '1px solid var(--status-danger)',
+                        }}
+                      >
+                        🧹 Remove Duplicates
+                      </button>
+                    )}
                   </div>
 
                   {/* Right: Action Buttons (Sync Google Sheet + Eligibility + Sort) */}
@@ -2462,6 +2636,7 @@ export function BatchManagement() {
                       <th style={{ padding: 12, textAlign: 'center', minWidth: 80 }}>Final Exam</th>
                       <th style={{ padding: 12, textAlign: 'center', minWidth: 155 }}>Final Result</th>
                       <th style={{ padding: 12, minWidth: 240, textAlign: 'left' }}>Voucher ID Management</th>
+                      {isExecutive && <th style={{ padding: 12, textAlign: 'center', minWidth: 70 }}>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -2722,6 +2897,28 @@ export function BatchManagement() {
                                 </Button>
                               </div>
                             </td>
+                            {isExecutive && (
+                              <td style={{ padding: 12, textAlign: 'center' }}>
+                                {confirmRemoveStudentId === s.id ? (
+                                  <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'stretch', minWidth: 150, background: 'var(--bg-panel)', border: '1px solid var(--status-danger-border)', borderRadius: 8, padding: 8, boxShadow: 'var(--e2)' }}>
+                                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Remove <strong>{s.name}</strong> from batch?</span>
+                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                      <button type="button" onClick={() => setConfirmRemoveStudentId(null)} style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Cancel</button>
+                                      <button type="button" onClick={() => handleRemoveStudentFromBatch(s)} style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 5, border: 'none', background: 'var(--status-danger)', color: '#fff', cursor: 'pointer' }}>Remove</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    title="Remove student from this batch"
+                                    onClick={() => setConfirmRemoveStudentId(s.id)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}
+                                  >
+                                    🗑️
+                                  </button>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         );
                       });
