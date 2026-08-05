@@ -1710,37 +1710,45 @@ export function BatchManagement() {
           .filter(Boolean);
 
         const mappedBatchStudents: StudentRecord[] = batchStudents.map((s: any) => {
-          const fields = s.customFields || {};
+          const firstName = s.first_name || s.firstName || '';
+          const lastName = s.last_name || s.lastName || '';
+          const fullName = s.full_name || s.fullName || s.name || '';
+          const photoUrl = s.photo_url || s.photoUrl;
+          const phone = s.phone || '';
+          const email = s.email || '';
+          
+          const customFields = s.custom_fields || s.customFields || {};
+          
           return {
             id: s.id,
-            name: s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : s.fullName || s.name || 'Student',
-            photo: s.photoUrl || s.photo || '🎓',
-            photoUrl: s.photoUrl,
-            phone: s.phone || '',
-            email: s.email || '',
-            college: fields.college || 'Christ Irinjalakkuda',
-            department: fields.department || 'BBA',
-            attendancePct: fields.attendancePct ?? 100,
-            attendanceStatus: fields.attendanceStatus || 'Regular',
-            ass1: fields.ass1 ?? 0,
-            ass2: fields.ass2 ?? 0,
-            ass3: fields.ass3 ?? 0,
-            project: fields.project ?? 0,
-            finalExam: fields.finalExam ?? 0,
-            overallScore: fields.overallScore ?? 0,
-            voucherId: fields.voucherId || '',
-            voucherStatus: fields.voucherStatus || 'unassigned',
-            certificateStatus: fields.certificateStatus || 'unissued',
-            examAttemptCount: fields.examAttemptCount ?? 1,
-            retestScore: fields.retestScore ?? 0,
-            retestApproved: fields.retestApproved ?? false,
-            retestPaymentStatus: fields.retestPaymentStatus || 'Unpaid',
-            retestCollectedAmount: fields.retestCollectedAmount ?? 0,
-            retestVoucherId: fields.retestVoucherId || '',
-            gender: fields.gender || 'Female',
-            qualification: fields.qualification || s.academicQualification || '',
-            hasComputer: fields.hasComputer || 'Yes',
-            learnedBefore: fields.learnedBefore || 'No',
+            name: firstName || lastName ? `${firstName} ${lastName}`.trim() : fullName || 'Student',
+            photo: photoUrl || s.photo || '🎓',
+            photoUrl: photoUrl,
+            phone: phone,
+            email: email,
+            college: customFields.college || 'Christ Irinjalakkuda',
+            department: customFields.department || 'BBA',
+            attendancePct: customFields.attendance_pct ?? customFields.attendancePct ?? 100,
+            attendanceStatus: customFields.attendance_status || customFields.attendanceStatus || 'Regular',
+            ass1: customFields.ass1 ?? 0,
+            ass2: customFields.ass2 ?? 0,
+            ass3: customFields.ass3 ?? 0,
+            project: customFields.project ?? 0,
+            finalExam: customFields.final_exam ?? customFields.finalExam ?? 0,
+            overallScore: customFields.overall_score ?? customFields.overallScore ?? 0,
+            voucherId: customFields.voucher_id || customFields.voucherId || '',
+            voucherStatus: customFields.voucher_status || customFields.voucherStatus || 'unassigned',
+            certificateStatus: customFields.certificate_status || customFields.certificateStatus || 'unissued',
+            examAttemptCount: customFields.exam_attempt_count ?? customFields.examAttemptCount ?? 1,
+            retestScore: customFields.retest_score ?? customFields.retestScore ?? 0,
+            retestApproved: customFields.retest_approved ?? customFields.retestApproved ?? false,
+            retestPaymentStatus: customFields.retest_payment_status || customFields.retestPaymentStatus || 'Unpaid',
+            retestCollectedAmount: customFields.retest_collected_amount ?? customFields.retestCollectedAmount ?? 0,
+            retestVoucherId: customFields.retest_voucher_id || customFields.retestVoucherId || '',
+            gender: customFields.gender || 'Female',
+            qualification: customFields.qualification || s.academic_qualification || s.academicQualification || '',
+            hasComputer: customFields.has_computer || customFields.hasComputer || 'Yes',
+            learnedBefore: customFields.learned_before || customFields.learnedBefore || 'No',
           };
         });
 
