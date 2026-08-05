@@ -372,7 +372,28 @@ export function BatchManagement() {
       });
     }
   };
-  
+
+  /** Permanently delete a batch (Admin only). Removes from flwdsk_batches + all enrollments. */
+  const handleDeleteBatch = async (batchId: string) => {
+    const target = batches.find((b) => b.id === batchId);
+    if (!target) return;
+    const label = target.trainingName || target.code || batchId;
+    if (!window.confirm(`Permanently delete batch "${label}"?\n\nThis will also remove ALL student enrollments for this batch. This cannot be undone.`)) return;
+    try {
+      // Remove enrollments first
+      await supabase.from('flwdsk_enrollments').delete().eq('batch_id', batchId);
+      // Remove the batch
+      const { error } = await supabase.from('flwdsk_batches').delete().eq('id', batchId);
+      if (error) throw error;
+      // If deleted batch was selected, clear selection
+      if (selectedBatchId === batchId) setSelectedBatchId(safeBatches.find((b) => b.id !== batchId)?.id ?? '');
+      refreshBatches();
+      toast({ variant: 'success', title: 'Batch Deleted', message: `"${label}" has been permanently deleted.` });
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Delete Failed', message: err?.message || 'Could not delete the batch.' });
+    }
+  };
+
   // Tab control
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('students');
 
@@ -4216,6 +4237,7 @@ export function BatchManagement() {
         onAction={handleCarouselAction}
         onEdit={handleOpenEditBatch}
         onCopy={handleCopyBatch}
+        onDelete={userRole === 'ADMIN' ? handleDeleteBatch : undefined}
       />
 
       {/* EMAIL COMPOSER MODAL */}

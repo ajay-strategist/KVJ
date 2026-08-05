@@ -135,7 +135,7 @@ function saveChecklistDoneState(batchId: string, state: Record<string, boolean>)
 // ── Individual Batch Card Component (Side-by-Side with Right Checklist Panel) ──
 const BatchCard = memo(function BatchCard({
   vm, active, pinned, favourite,
-  onSelect, onTogglePin, onToggleFav, onAction, onEdit, onCopy,
+  onSelect, onTogglePin, onToggleFav, onAction, onEdit, onCopy, onDelete,
 }: {
   vm: BatchCardVM;
   active: boolean;
@@ -147,6 +147,7 @@ const BatchCard = memo(function BatchCard({
   onAction: (id: string, action: BatchAction) => void;
   onEdit?: (id: string) => void;
   onCopy?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   const [showAllChecklist, setShowAllChecklist] = useState(true);
   const [checklist, setChecklist] = useState(() => {
@@ -350,27 +351,57 @@ const BatchCard = memo(function BatchCard({
         </div>
 
         {/* ── Quick Action Buttons Row ── */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
-          {ACTIONS.map((a) => (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {ACTIONS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                title={a.label}
+                onClick={(e) => { e.stopPropagation(); onAction(vm.id, a); }}
+                style={{
+                  fontSize: 11.5, fontWeight: 600,
+                  padding: '6px 12px', borderRadius: 'var(--radius-sm, 8px)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-sunken)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                <span>{a.icon}</span> {a.label}
+              </button>
+            ))}
+          </div>
+          {onDelete && (
             <button
-              key={a.id}
               type="button"
-              title={a.label}
-              onClick={(e) => { e.stopPropagation(); onAction(vm.id, a); }}
+              title="Delete this batch permanently"
+              onClick={(e) => { e.stopPropagation(); onDelete(vm.id); }}
               style={{
-                fontSize: 11.5, fontWeight: 600,
-                padding: '6px 12px', borderRadius: 'var(--radius-sm, 8px)',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-sunken)',
-                color: 'var(--text-secondary)',
+                fontSize: 11.5, fontWeight: 700,
+                padding: '6px 14px', borderRadius: 'var(--radius-sm, 8px)',
+                border: '1px solid var(--status-danger, #ef4444)',
+                background: 'transparent',
+                color: 'var(--status-danger, #ef4444)',
                 cursor: 'pointer', whiteSpace: 'nowrap',
                 display: 'flex', alignItems: 'center', gap: 5,
                 fontFamily: 'var(--font-ui)',
+                transition: 'background 150ms, color 150ms',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--status-danger, #ef4444)';
+                (e.currentTarget as HTMLButtonElement).style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--status-danger, #ef4444)';
               }}
             >
-              <span>{a.icon}</span> {a.label}
+              🗑️ Delete Batch
             </button>
-          ))}
+          )}
         </div>
       </article>
 
@@ -483,7 +514,7 @@ function InfoField({ label, value, mono }: { label: string; value: string; mono?
 const PREFS_KEY_STORE = 'kvj.batchCards.prefs.v3';
 
 export function TrainingBatchCarousel({
-  batches, courses, trainers, activeId, onSelect, onAction, onEdit, onCopy,
+  batches, courses, trainers, activeId, onSelect, onAction, onEdit, onCopy, onDelete,
 }: {
   batches: Batch[];
   courses: Course[];
@@ -493,6 +524,7 @@ export function TrainingBatchCarousel({
   onAction: (batchId: string, action: BatchAction) => void;
   onEdit?: (batchId: string) => void;
   onCopy?: (batchId: string) => void;
+  onDelete?: (batchId: string) => void;
 }) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [query, setQuery] = useState('');
@@ -620,6 +652,7 @@ export function TrainingBatchCarousel({
               onAction={onAction}
               onEdit={onEdit}
               onCopy={onCopy}
+              onDelete={onDelete}
             />
           ))}
         </div>
