@@ -954,9 +954,10 @@ export function BatchManagement() {
       const regStudents = Array.from(uniqueRegMap.values());
       setRegistrationRecords(regStudents);
 
-      // Now process students with database persistence and real-time progress!
-      setImportProgress({ current: 0, total: regStudents.length, message: 'Analyzing Google Sheet registrations...' });
-
+      // The Google Sheet enrichment sync runs SILENTLY in the background — it must
+      // NOT show the full-screen "Processing & Syncing Data" progress modal on the
+      // Batch Management front page. That modal is only for explicit student-data
+      // imports (Excel upload). So we do not touch importProgress here.
       const updatedStudents = [...studentsRef.current];
       let dbUpdated = 0;
       let dbCreated = 0;
@@ -1038,11 +1039,7 @@ export function BatchManagement() {
             };
             updatedStudents[existingIdx] = updatedStudent;
 
-            setImportProgress({
-              current: i + 1,
-              total: regStudents.length,
-              message: `Updating database details for ${reg.name}...`,
-            });
+            // Silent background enrichment — no progress modal (see note above).
             await saveStudentToDb(updatedStudent);
             dbUpdated++;
           }
@@ -1055,7 +1052,6 @@ export function BatchManagement() {
       setStudents(updatedStudents);
       const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setLastSyncedTime(nowStr);
-      setImportProgress(null);
 
       if (showToastNotice || dbUpdated > 0) {
         toast({
