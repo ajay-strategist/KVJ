@@ -114,7 +114,7 @@ DECLARE
     'assets', 'salary_structures', 'travel_requests', 'chat_channels',
     'chat_messages', 'email_logs', 'notification_preferences',
     'kpi_definitions', 'saved_reports', 'vouchers', 'student_records',
-    'schedule_sessions'
+    'schedule_sessions', 'system_settings', 'flwdsk_system_settings'
   ];
 BEGIN
   FOREACH t IN ARRAY tables LOOP

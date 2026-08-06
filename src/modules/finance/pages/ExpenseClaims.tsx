@@ -32,6 +32,7 @@ export interface ExpenseRecord {
   batch?: string;
   vehicle?: 'Bike' | 'Car';
   km?: number;
+  rate?: number;
   route?: string;
   notes?: string;
   amount: number;
@@ -280,6 +281,41 @@ export function ExpenseClaims() {
   const [customExpenseTypes, setCustomExpenseTypes] = useState<string[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
+  const [editingRates, setEditingRates] = useState<Record<string, string>>({});
+
+  // Load central travel rates from system settings on mount
+  useEffect(() => {
+    async function loadRates() {
+      // 1. Try loading from database
+      try {
+        const { data, error } = await supabase
+          .from('flwdsk_system_settings')
+          .select('key, value')
+          .in('key', ['bike_rate_per_km', 'car_rate_per_km']);
+        
+        if (!error && data && data.length > 0) {
+          const bikeRow = data.find((d: any) => d.key === 'bike_rate_per_km');
+          const carRow = data.find((d: any) => d.key === 'car_rate_per_km');
+          if (bikeRow) setBikeRate(Number(bikeRow.value));
+          if (carRow) setCarRate(Number(carRow.value));
+          return; // successfully loaded from DB
+        }
+      } catch (e) {
+        console.warn('Could not load travel rates from database settings:', e);
+      }
+
+      // 2. Fallback to localStorage
+      try {
+        const storedBike = localStorage.getItem('kvj_bike_rate');
+        const storedCar = localStorage.getItem('kvj_car_rate');
+        if (storedBike) setBikeRate(Number(storedBike));
+        if (storedCar) setCarRate(Number(storedCar));
+      } catch (e) {
+        console.warn('Could not load travel rates from localStorage:', e);
+      }
+    }
+    loadRates();
+  }, []);
 
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
@@ -320,6 +356,7 @@ export function ExpenseClaims() {
           let route = '';
           let vehicle = undefined;
           let km = undefined;
+          let rate = undefined;
           let userNotes = r.notes || '';
 
           if (r.notes && r.notes.trim().startsWith('{')) {
@@ -331,6 +368,7 @@ export function ExpenseClaims() {
               route = parsed.route || route;
               vehicle = parsed.vehicle || undefined;
               km = parsed.km || undefined;
+              rate = parsed.rate || undefined;
               userNotes = parsed.userNotes || '';
             } catch (e) {
               // fallback if parsing fails
@@ -348,6 +386,7 @@ export function ExpenseClaims() {
             route,
             vehicle,
             km,
+            rate,
             amount: Number(r.amount || 0),
             receipt: r.receipt_url || '',
             status: (r.status || 'submitted').toLowerCase() as any,
@@ -453,6 +492,7 @@ export function ExpenseClaims() {
       batch: values.batch as string,
       vehicle: isSelfTravel ? vehicle : undefined,
       km: isSelfTravel ? km : undefined,
+      rate: isSelfTravel ? rate : undefined,
       route: values.route as string,
       notes: (values.notes as string) || (values.route as string) || expType,
       amount,
@@ -468,6 +508,7 @@ export function ExpenseClaims() {
         route: values.route as string || null,
         vehicle: isSelfTravel ? vehicle : null,
         km: isSelfTravel ? km : null,
+        rate: isSelfTravel ? rate : null,
         userNotes: (values.notes as string) || (values.route as string) || '',
       });
 
@@ -498,6 +539,50 @@ export function ExpenseClaims() {
         : `Submitted ₹${amount.toFixed(2)} expense claim for review.`,
     });
     setExpenseOpen(false);
+  };
+
+  const handleUpdateRate = async (exp: ExpenseRecord, newRate: number) => {
+    if (isNaN(newRate) || newRate < 0) {
+      toast({ variant: 'error', title: 'Invalid Rate', message: 'Rate must be a non-negative number.' });
+      return;
+    }
+    const km = exp.km || 0;
+    const newAmount = km * newRate;
+
+    // reconstruct notes JSON
+    const notesJson = JSON.stringify({
+      personName: exp.person,
+      expenseType: exp.type,
+      batchName: exp.batch || null,
+      route: exp.route || null,
+      vehicle: exp.vehicle || null,
+      km: exp.km || null,
+      rate: newRate,
+      userNotes: exp.notes || '',
+    });
+
+    try {
+      const { error } = await supabase
+        .from('flwdsk_expense_claims')
+        .update({
+          amount: newAmount,
+          notes: notesJson,
+        })
+        .eq('id', exp.id);
+
+      if (error) {
+        toast({ variant: 'error', title: 'Update Failed', message: error.message });
+      } else {
+        toast({
+          variant: 'success',
+          title: 'Rate Updated',
+          message: `Rate updated to ₹${newRate}/km (Amount recalculated to ₹${newAmount.toFixed(2)})`
+        });
+        loadClaims();
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Update Failed', message: e.message });
+    }
   };
 
   const handleApprove = async (id: string) => {
@@ -745,8 +830,53 @@ export function ExpenseClaims() {
                     <td>
                       <div style={{ fontWeight: 600 }}>{exp.type}</div>
                       {exp.vehicle && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {exp.vehicle} · {exp.km} km @ ₹{exp.vehicle === 'Car' ? carRate : bikeRate}/km
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                          <span>{exp.vehicle} · {exp.km} km @ ₹</span>
+                          {exp.status === 'submitted' && isManagement ? (
+                            <input
+                              type="number"
+                              value={editingRates[exp.id] !== undefined ? editingRates[exp.id] : (exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate))}
+                              onChange={(e) => setEditingRates(prev => ({ ...prev, [exp.id]: e.target.value }))}
+                              onBlur={(e) => {
+                                const val = Number(e.target.value);
+                                if (!isNaN(val) && val >= 0) {
+                                  handleUpdateRate(exp, val);
+                                }
+                                setEditingRates(prev => {
+                                  const next = { ...prev };
+                                  delete next[exp.id];
+                                  return next;
+                                });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = Number((e.target as HTMLInputElement).value);
+                                  if (!isNaN(val) && val >= 0) {
+                                    handleUpdateRate(exp, val);
+                                  }
+                                  setEditingRates(prev => {
+                                    const next = { ...prev };
+                                    delete next[exp.id];
+                                    return next;
+                                  });
+                                }
+                              }}
+                              style={{
+                                width: '55px',
+                                padding: '1px 3px',
+                                fontSize: '11px',
+                                border: '1px solid var(--border)',
+                                borderRadius: '4px',
+                                textAlign: 'center',
+                                background: 'var(--bg-sunken)',
+                                color: 'var(--text-primary)',
+                                fontWeight: 'bold'
+                              }}
+                            />
+                          ) : (
+                            <span>{exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate)}</span>
+                          )}
+                          <span>/km</span>
                         </div>
                       )}
                     </td>
@@ -846,9 +976,39 @@ export function ExpenseClaims() {
           </div>
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" onClick={() => setRateModalOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
-              toast({ variant: 'success', title: 'Rates Saved', message: 'Updated central travel KM reimbursement rates.' });
-              setRateModalOpen(false);
+            <Button onClick={async () => {
+              try {
+                // Save to localStorage as a robust immediate fallback
+                localStorage.setItem('kvj_bike_rate', String(bikeRate));
+                localStorage.setItem('kvj_car_rate', String(carRate));
+
+                // Save to Supabase
+                const { error: errBike } = await supabase
+                  .from('flwdsk_system_settings')
+                  .upsert({ key: 'bike_rate_per_km', value: bikeRate });
+                  
+                const { error: errCar } = await supabase
+                  .from('flwdsk_system_settings')
+                  .upsert({ key: 'car_rate_per_km', value: carRate });
+
+                if (errBike || errCar) {
+                  console.warn('Supabase travel rates upsert warning:', errBike || errCar);
+                  toast({
+                    variant: 'success',
+                    title: 'Rates Saved (Local Only)',
+                    message: 'Rates saved to local browser storage. Note: Database sync failed.'
+                  });
+                } else {
+                  toast({
+                    variant: 'success',
+                    title: 'Rates Saved',
+                    message: 'Updated central travel KM reimbursement rates in DB and local storage.'
+                  });
+                }
+                setRateModalOpen(false);
+              } catch (e: any) {
+                toast({ variant: 'error', title: 'Save Failed', message: e.message });
+              }
             }}>
               Save Travel Rates
             </Button>
