@@ -28,7 +28,10 @@ export function selectExecutiveKPIs(data: DailyReportData) {
   // Overall Attendance %
   const totalSessionPresent = data.sessions.reduce((acc, s) => acc + s.presentCount, 0);
   const totalSessionPossible = data.sessions.reduce((acc, s) => acc + s.totalStudents, 0);
-  const overallAttendancePct = totalSessionPossible > 0 ? Math.round((totalSessionPresent / totalSessionPossible) * 100) : 0;
+  let overallAttendancePct = totalSessionPossible > 0 ? Math.round((totalSessionPresent / totalSessionPossible) * 100) : 0;
+  if (totalSessionPossible === 0 && data.students.length > 0) {
+    overallAttendancePct = Math.round(data.students.reduce((acc, st) => acc + (st.attendancePct || 0), 0) / data.students.length);
+  }
 
   // Final Exam Eligibility
   const eligibleCount = data.students.filter((st) => st.finalExamEligibility === 'Eligible').length;
@@ -61,7 +64,10 @@ export function selectCoverHeroKPIs(data: DailyReportData) {
   // Overall Attendance %
   const totalSessionPresent = data.sessions.reduce((acc, s) => acc + s.presentCount, 0);
   const totalSessionPossible = data.sessions.reduce((acc, s) => acc + s.totalStudents, 0);
-  const overallAttendancePct = totalSessionPossible > 0 ? Math.round((totalSessionPresent / totalSessionPossible) * 100) : 0;
+  let overallAttendancePct = totalSessionPossible > 0 ? Math.round((totalSessionPresent / totalSessionPossible) * 100) : 0;
+  if (totalSessionPossible === 0 && data.students.length > 0) {
+    overallAttendancePct = Math.round(data.students.reduce((acc, st) => acc + (st.attendancePct || 0), 0) / data.students.length);
+  }
 
   // Present & Absent (Latest session)
   const latestSession = data.sessions[data.sessions.length - 1];
@@ -137,7 +143,10 @@ export function selectAttendanceKPIs(data: DailyReportData) {
   
   const totalPresentSum = data.sessions.reduce((acc, s) => acc + s.presentCount, 0);
   const totalStudentsSum = data.sessions.reduce((acc, s) => acc + s.totalStudents, 0);
-  const attendancePct = totalStudentsSum > 0 ? Math.round((totalPresentSum / totalStudentsSum) * 100) : 0;
+  let attendancePct = totalStudentsSum > 0 ? Math.round((totalPresentSum / totalStudentsSum) * 100) : 0;
+  if (totalStudentsSum === 0 && data.students.length > 0) {
+    attendancePct = Math.round(data.students.reduce((acc, st) => acc + (st.attendancePct || 0), 0) / data.students.length);
+  }
 
   const lateEntries = data.sessions.reduce((acc, s) => acc + s.lateCount, 0);
   const earlyCheckouts = 0; // standard default

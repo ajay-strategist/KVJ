@@ -8,8 +8,9 @@ import {
   LaptopAvailabilityDonutChart,
 } from '../charts/DemographicsDonutCharts';
 
-export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
+export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data, config }) => {
   const kpis = selectExecutiveKPIs(data);
+  const showAttendance = config?.selectedStudentColumns?.includes('attendancePct') || config?.selectedSections?.includes('datewise-attendance');
 
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
@@ -17,11 +18,11 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
         📊 Executive Summary &amp; Batch Intelligence Overview
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>
-        Core batch profile, enrolled strength metrics, attendance gauge, and student demographics.
+        Core batch profile, enrolled strength metrics, {showAttendance ? 'attendance gauge, ' : ''}and student demographics.
       </div>
 
-      {/* Top Row: Total Students KPI Card + Overall Attendance Gauge Chart */}
-      <div className="card-avoid-break" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+      {/* Top Row: Total Students KPI Card + Overall Attendance Gauge Chart (conditional) */}
+      <div className="card-avoid-break" style={{ display: 'grid', gridTemplateColumns: showAttendance ? '1fr 1fr' : '1fr', gap: 14, marginBottom: 14, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         
         {/* Total Students KPI Card */}
         <div
@@ -48,14 +49,16 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
           </div>
         </div>
 
-        {/* Gauge Chart for Overall Batch Attendance % */}
-        <div>
-          <AttendanceGaugeChart
-            percentage={kpis.overallAttendancePct}
-            title="Overall Batch Attendance %"
-            caption="Cumulative rate across all logged sessions"
-          />
-        </div>
+        {/* Gauge Chart for Overall Batch Attendance % (conditional) */}
+        {showAttendance && (
+          <div>
+            <AttendanceGaugeChart
+              percentage={kpis.overallAttendancePct}
+              title="Overall Batch Attendance %"
+              caption="Cumulative rate across all logged sessions"
+            />
+          </div>
+        )}
       </div>
 
       {/* Middle Row: Donut Charts Grid (Gender, Prior Course Knowledge, Laptop Availability) */}
@@ -93,7 +96,7 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data }) => {
           <span>💡</span> Executive Training Intelligence Insights
         </div>
         <div style={{ fontSize: 11, color: '#1e3a8a', lineHeight: 1.5 }}>
-          Enrolled batch strength is <strong>{kpis.totalStudents} students</strong> with a cumulative overall attendance rate of <strong>{kpis.overallAttendancePct}%</strong>.
+          Enrolled batch strength is <strong>{kpis.totalStudents} students</strong>{showAttendance ? <> with a cumulative overall attendance rate of <strong>{kpis.overallAttendancePct}%</strong></> : null}.
           Demographics reflect <strong>{kpis.femaleCount} Female / {kpis.maleCount} Male</strong> students. Technical readiness indicates <strong>{kpis.hasLaptopCount} students ({Math.round((kpis.hasLaptopCount / Math.max(kpis.totalStudents, 1)) * 100)}%)</strong> possess personal laptops for practical lab assignments.
         </div>
       </div>
