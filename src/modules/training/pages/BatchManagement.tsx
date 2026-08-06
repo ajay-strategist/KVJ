@@ -1392,6 +1392,73 @@ export function BatchManagement() {
     });
   };
 
+  // ── Update Final Exam marks from an Excel/CSV file (matched by phone) ──
+  const examMarkFileRef = useRef<HTMLInputElement>(null);
+  const handleExamMarkUpload = async (file: File) => {
+    if (!file) return;
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const wb = XLSX.read(e.target?.result, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          if (rows.length < 2) {
+            toast({ variant: 'error', title: 'Empty File', message: 'The file has no data rows.' });
+            return;
+          }
+          const header = (rows[0] || []).map((h) => String(h ?? '').toLowerCase().trim());
+          const phoneIdx = header.findIndex((h) => h.includes('phone') || h.includes('register') || h.includes('mobile') || h.includes('number'));
+          const markIdx = header.findIndex((h) => h.includes('mark') || h.includes('score') || h.includes('final') || h.includes('result'));
+          if (phoneIdx === -1 || markIdx === -1) {
+            toast({ variant: 'error', title: 'Columns Not Found', message: 'The file needs a "Phone" column and a "Mark" (final exam mark) column.' });
+            return;
+          }
+
+          // Build phone → mark map from the sheet.
+          const markMap = new Map<string, number>();
+          for (let i = 1; i < rows.length; i++) {
+            const r = rows[i] || [];
+            const key = normalizeStudentKey(r[phoneIdx]);
+            const mark = Number(r[markIdx]);
+            if (key && !isNaN(mark)) markMap.set(key, mark);
+          }
+          if (markMap.size === 0) {
+            toast({ variant: 'error', title: 'No Valid Rows', message: 'No rows had a valid phone number and numeric mark.' });
+            return;
+          }
+
+          // Apply to this batch's students, matched by normalized phone.
+          const toSave: StudentRecord[] = [];
+          const updatedStudents = students.map((st) => {
+            if (!batchStudentIds.has(st.id)) return st;
+            const key = normalizeStudentKey(st.phone);
+            if (!markMap.has(key)) return st;
+            const mark = markMap.get(key)!;
+            const next = { ...st, finalExam: mark, retestScore: mark };
+            toSave.push(next);
+            return next;
+          });
+          setStudents(updatedStudents);
+
+          for (const st of toSave) {
+            await saveStudentToDb(st);
+          }
+          toast({
+            variant: 'success',
+            title: 'Exam Marks Updated',
+            message: `Updated the final exam mark for ${toSave.length} student${toSave.length !== 1 ? 's' : ''}.`,
+          });
+        } catch (err: any) {
+          toast({ variant: 'error', title: 'Parsing Failed', message: err?.message || 'Could not read the file.' });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Upload Failed', message: err?.message || 'Could not read the file.' });
+    }
+  };
+
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
@@ -3450,9 +3517,25 @@ export function BatchManagement() {
                     Track exam dates, scores, course details, attempt status (Initial Test vs Retest), and voucher codes.
                   </div>
                 </div>
-                <Button size="sm" onClick={handleAddFinalExamStudentRow} style={{ fontSize: 11.5 }}>
-                  ➕ Add Student
-                </Button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    ref={examMarkFileRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleExamMarkUpload(f);
+                      e.target.value = '';
+                    }}
+                  />
+                  <Button size="sm" variant="secondary" onClick={() => examMarkFileRef.current?.click()} title="Upload an Excel/CSV with Phone and Mark columns to set final exam marks" style={{ fontSize: 11.5 }}>
+                    📤 Upload Exam Marks
+                  </Button>
+                  <Button size="sm" onClick={handleAddFinalExamStudentRow} style={{ fontSize: 11.5 }}>
+                    ➕ Add Student
+                  </Button>
+                </div>
               </div>
 
               <div style={{ overflowX: 'auto' }}>
@@ -3476,7 +3559,9 @@ export function BatchManagement() {
                     {students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id)).map((s) => {
                       const examDateVal = s.examDate || '2026-07-25';
                       const collegeVal = s.college || 'Christ University';
-                      const courseVal = s.course || 'Data Analytics';
+                      // The course is the BATCH's course (from the batch card), the same for
+                      // every student in the batch — not a per-student editable value.
+                      const courseVal = activeCourse?.title || activeBatch?.trainingName || s.course || 'Course';
                       const isRetestAttempt = (s.examAttemptCount && s.examAttemptCount > 1) || (s.retestScore && s.retestScore > 0) || s.retestApproved || (s.finalExam > 0 && s.finalExam < 60);
                       const hasPassed = s.finalExam >= 60;
                       const firstVoucher = s.voucherId || `VOUCH-CHRIST-${s.id.replace('s-', '10')}`;
@@ -3586,33 +3671,14 @@ export function BatchManagement() {
                             </div>
                           </td>
 
-                          {/* 5. Course */}
+                          {/* 5. Course — comes from the batch (read-only; same for the whole batch) */}
                           <td style={{ padding: 12 }}>
-                            <select
-                              value={courseVal}
-                              onChange={(e) => {
-                                const cVal = e.target.value;
-                                const updated = { ...s, course: cVal };
-                                setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
-                                saveStudentToDb(updated);
-                              }}
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                padding: '3px 6px',
-                                borderRadius: 6,
-                                border: '1px solid var(--border)',
-                                background: 'var(--bg-surface)',
-                                color: 'var(--brand)',
-                                cursor: 'pointer',
-                              }}
+                            <span
+                              title="Course is set on the batch"
+                              style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--brand)' }}
                             >
-                              <option value="Data Analytics">Data Analytics</option>
-                              <option value="Power BI & Tableau">Power BI & Tableau</option>
-                              <option value="Fullstack Web Dev">Fullstack Web Dev</option>
-                              <option value="Cloud Architecture">Cloud Architecture</option>
-                              <option value="AI & Machine Learning">AI & Machine Learning</option>
-                            </select>
+                              {courseVal}
+                            </span>
                           </td>
 
                           {/* 6. Exam Mark (Updates Final Exam + Retest Mark in Sync!) */}
