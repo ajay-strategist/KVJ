@@ -122,7 +122,12 @@ export interface GoogleIntegrationService {
 
 class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
   formatExpenseReceiptName(params: Omit<ReceiptUploadParams, 'fileContent'>): string {
-    const sanitize = (str: string) => str.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '');
+    const sanitize = (str: string) =>
+      str.trim()
+        .replace(/\s+/g, '-')           // spaces → single hyphen
+        .replace(/[^a-zA-Z0-9_-]/g, '') // strip special chars
+        .replace(/-{2,}/g, '-')         // collapse multiple hyphens → one
+        .replace(/^-+|-+$/g, '');       // trim leading/trailing hyphens
 
     const dateStr = params.date || new Date().toISOString().split('T')[0];
     const person = sanitize(params.personName || 'Employee');
@@ -183,7 +188,12 @@ class GoogleIntegrationServiceImpl implements GoogleIntegrationService {
     const monthFolder = getMonthlyFolderName(dateStr);
     const folderPath = `Office/Flow Desk/Medical Certificates/${monthFolder}`;
 
-    const sanitize = (str: string) => str.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '');
+    const sanitize = (str: string) =>
+      str.trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .replace(/-{2,}/g, '-')
+        .replace(/^-+|-+$/g, '');
     const emp = sanitize(params.employeeName || 'Employee');
     const extMatch = params.originalFileName.match(/\.([a-zA-Z0-9]+)$/);
     const ext = extMatch ? extMatch[1].toLowerCase() : 'pdf';
