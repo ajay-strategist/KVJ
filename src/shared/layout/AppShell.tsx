@@ -622,7 +622,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
         )}
 
         {/* ── Main content ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, height: '100vh' }}>
           {isMobile && !mobileOpen && (
             <button
               type="button"
@@ -650,6 +650,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             margin: 0,
             boxSizing: 'border-box',
             overflowY: 'auto',
+            minHeight: 0,
           }}>
             {children}
             <footer style={{

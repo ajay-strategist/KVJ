@@ -888,15 +888,34 @@ export function ExpenseClaims() {
                       ₹ {exp.amount.toFixed(2)}
                     </td>
                     <td>
-                      {exp.receipt ? (
-                        <a href={exp.receipt} target="_blank" rel="noreferrer" style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
-                          📎 View Receipt
-                        </a>
-                      ) : exp.type === 'Self Travel' ? (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>KM Auto-Calc</span>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--status-danger)' }}>Missing</span>
-                      )}
+                      {(() => {
+                        const r = exp.receipt || '';
+                        const isRealUrl = r.startsWith('http://') || r.startsWith('https://') || r.startsWith('data:');
+                        if (isRealUrl) {
+                          return (
+                            <a
+                              href={r}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            >
+                              📎 View Receipt
+                            </a>
+                          );
+                        } else if (r && r !== 'Uploaded Proof') {
+                          return (
+                            <span title={`File: ${r}`} style={{ fontSize: 11, color: 'var(--text-muted)', cursor: 'default' }}>
+                              📎 {r}
+                            </span>
+                          );
+                        } else if (exp.vehicle) {
+                          return <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>KM Auto-Calc</span>;
+                        } else if (r === 'Uploaded Proof') {
+                          return <span title="Receipt was uploaded but the direct link is not available" style={{ fontSize: 11, color: 'var(--text-muted)', cursor: 'default' }}>📎 Uploaded</span>;
+                        } else {
+                          return <span style={{ fontSize: 11, color: 'var(--status-danger)' }}>Missing</span>;
+                        }
+                      })()}
                     </td>
                     <td>
                       <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
