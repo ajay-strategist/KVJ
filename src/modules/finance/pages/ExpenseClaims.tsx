@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
@@ -700,6 +701,38 @@ export function ExpenseClaims() {
     }
   };
 
+  const handleExportExcel = useCallback(() => {
+    const rows = filteredExpenses.map((exp) => ({
+      Date: exp.date,
+      Employee: exp.person,
+      Classification: exp.category,
+      'Expense Type': exp.type,
+      'Batch / Route': exp.batch || exp.route || '—',
+      'Vehicle': exp.vehicle || '—',
+      'KM': exp.km ?? '—',
+      'Rate (₹/km)': exp.rate ?? '—',
+      'Amount (₹)': exp.amount.toFixed(2),
+      'Receipt': exp.receipt && (exp.receipt.startsWith('http') || exp.receipt.startsWith('data:')) ? exp.receipt : (exp.receipt || 'N/A'),
+      Status: exp.status,
+      'Approved By': exp.approvedBy || '—',
+      'Approved At': exp.approvedAt || '—',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Auto column widths
+    const colWidths = Object.keys(rows[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...rows.map((r) => String((r as any)[key] ?? '').length)) + 2,
+    }));
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Expense Claims');
+    const today = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `KVJ_Expense_Claims_${today}.xlsx`);
+
+    toast({ variant: 'success', title: 'Exported', message: `Downloaded ${rows.length} expense record(s) as Excel.` });
+  }, [filteredExpenses, toast]);
+
   return (
     <AppShell>
       <PageHeader
@@ -752,8 +785,19 @@ export function ExpenseClaims() {
       {/* Expense Claims Table */}
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-            📋 Expense Claims ({filteredExpenses.length})
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+              📋 Expense Claims ({filteredExpenses.length})
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleExportExcel}
+              disabled={filteredExpenses.length === 0}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700 }}
+            >
+              📥 Export to Excel
+            </Button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Filter Employee:</span>
@@ -779,7 +823,7 @@ export function ExpenseClaims() {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '60vh', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)', minHeight: 200, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
           <table className="kvj-table" style={{ marginBottom: 0 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }}>
               <tr>
