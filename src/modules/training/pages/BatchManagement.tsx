@@ -3660,19 +3660,25 @@ export function BatchManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id)).map((s) => {
-                      const examDateVal = s.examDate || '2026-07-25';
-                      const collegeVal = s.college || 'Christ University';
-                      // The course is the BATCH's course (from the batch card), the same for
-                      // every student in the batch — not a per-student editable value.
-                      const courseVal = activeCourse?.title || activeBatch?.trainingName || s.course || 'Course';
-                      const isRetestAttempt = (s.examAttemptCount && s.examAttemptCount > 1) || (s.retestScore && s.retestScore > 0) || s.retestApproved || (s.finalExam > 0 && s.finalExam < 60);
-                      const hasPassed = s.finalExam >= 60;
-                      const firstVoucher = s.voucherId || `VOUCH-CHRIST-${s.id.replace('s-', '10')}`;
-                      const retestVoucher = s.retestVoucherId || `VOUCH-RETEST-${s.id.replace('s-', '10')}`;
+                    {(() => {
+                      const batchFiltered = students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id));
+                      // Only show students who have actually attended (have a recorded exam score)
+                      const attended = batchFiltered.filter((s) => (s.finalExam || 0) > 0);
+                      const initialGroup = attended.filter((s) => !((s.examAttemptCount && s.examAttemptCount > 1) || s.retestApproved));
+                      const retestGroup  = attended.filter((s) =>  (s.examAttemptCount && s.examAttemptCount > 1) || s.retestApproved);
 
-                      return (
-                        <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      const renderRow = (s: typeof students[0]) => {
+                        const examDateVal = s.examDate || '2026-07-25';
+                        const collegeVal = s.college || 'Christ University';
+                        // The course is the BATCH's course (from the batch card), the same for
+                        // every student in the batch — not a per-student editable value.
+                        const courseVal = activeCourse?.title || activeBatch?.trainingName || s.course || 'Course';
+                        const isRetestAttempt = (s.examAttemptCount && s.examAttemptCount > 1) || (s.retestScore && s.retestScore > 0) || s.retestApproved || (s.finalExam > 0 && s.finalExam < 60);
+                        const hasPassed = s.finalExam >= 60;
+                        const firstVoucher = s.voucherId || `VOUCH-CHRIST-${s.id.replace('s-', '10')}`;
+                        const retestVoucher = s.retestVoucherId || `VOUCH-RETEST-${s.id.replace('s-', '10')}`;
+                        return (
+                          <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
                           {/* 1. Date */}
                           <td style={{ padding: 12 }}>
                             <input
@@ -3914,9 +3920,38 @@ export function BatchManagement() {
                               🗑️
                             </button>
                           </td>
-                        </tr>
+                          </tr>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {initialGroup.map((s) => renderRow(s))}
+                          {retestGroup.length > 0 && (
+                            <tr key="retest-divider">
+                              <td colSpan={9} style={{
+                                padding: '10px 16px',
+                                background: 'linear-gradient(90deg, rgba(245,158,11,0.10) 0%, transparent 100%)',
+                                borderTop: '2px dashed var(--border)',
+                                borderBottom: '2px dashed var(--border)',
+                              }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: '#d97706', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  🔄 Attended Again (Retest) — {retestGroup.length} student{retestGroup.length !== 1 ? 's' : ''}
+                                </span>
+                              </td>
+                            </tr>
+                          )}
+                          {retestGroup.map((s) => renderRow(s))}
+                          {attended.length === 0 && (
+                            <tr key="empty">
+                              <td colSpan={9} style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                                No students have attended the exam yet.
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </tbody>
                 </table>
               </div>
