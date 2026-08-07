@@ -779,9 +779,9 @@ export function ExpenseClaims() {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="kvj-table">
-            <thead>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '60vh', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+          <table className="kvj-table" style={{ marginBottom: 0 }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }}>
               <tr>
                 {isManagement && (
                   <th style={{ width: 36 }}>
