@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { PageHeader, Button, Card, SectionHeader, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import Drawer from '../../../shared/ui/Drawer';
@@ -822,7 +823,7 @@ export function ProjectList({
       )}
 
       {/* Detailed Project Report — Premium Full-Screen Modal */}
-      {selectedProject && reportOpen && (
+      {selectedProject && reportOpen && createPortal(
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 1250,
@@ -1205,7 +1206,8 @@ export function ProjectList({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
 

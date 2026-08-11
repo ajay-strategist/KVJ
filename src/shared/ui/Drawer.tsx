@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useDevice } from '../hooks/responsive';
 
 export interface DrawerProps {
@@ -39,7 +40,7 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
     xl: 'min(860px, 100vw)',
   };
 
-  return (
+  return createPortal(
     <div
       className="kvj-drawer-overlay"
       onClick={onClose}
@@ -98,15 +99,17 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
               border: '1px solid var(--border)',
               color: 'var(--text-primary)',
               fontSize: 18,
+              fontWeight: 'normal',
+              width: 32,
+              height: 32,
+              borderRadius: 8,
               cursor: 'pointer',
-              lineHeight: 1,
-              padding: '6px',
-              minWidth: 44,
-              minHeight: 44,
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 'var(--radius-sm)',
+              lineHeight: 1,
+              padding: 0,
+              transition: 'all var(--dur-fast)',
             }}
           >
             ×
@@ -143,7 +146,8 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
           to { transform: translateX(0); }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 export default Drawer;
