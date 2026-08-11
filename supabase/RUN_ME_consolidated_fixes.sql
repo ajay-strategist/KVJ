@@ -97,25 +97,48 @@ ALTER TABLE public.flwdsk_task_work_sessions ENABLE ROW LEVEL SECURITY;
 
 
 -- 8) RLS policies for any listed table missing one, + login resolver -----------
+--
+-- ⚠️  SECURITY (Phase 6.42 / audit finding F1): this block installs a *blanket*
+--     "authenticated can do anything" policy. PostgreSQL OR-combines permissive
+--     policies, so applying it to a table that has hardened, relationship-scoped
+--     RLS (Phase 6.30 training tables, 6.40 expense tables, 6.42 employees) would
+--     SILENTLY REOPEN it to every authenticated user — including employee→ADMIN
+--     role escalation on flwdsk_employees.
+--
+--     Therefore the protected tables have been REMOVED from this list, and a hard
+--     guard below refuses to touch any of them even if re-added by mistake.
+--     Never add a table with dedicated RLS to `tables`.
 DO $$
 DECLARE
   t text;
+  -- Utility tables the app expects every authenticated user to read/write.
+  -- Hardened tables (training / expense / employees / logs) are intentionally
+  -- ABSENT and must never be added here.
   tables text[] := ARRAY[
     'flwdsk_task_work_sessions',
-    'flwdsk_enrollments', 'flwdsk_assessments', 'flwdsk_certificates',
     'flwdsk_referrals', 'flwdsk_alumni_profiles', 'flwdsk_clients', 'flwdsk_milestones',
     'flwdsk_resource_allocations', 'flwdsk_timesheets', 'flwdsk_client_meetings',
     'flwdsk_budgets', 'flwdsk_vendors', 'flwdsk_purchase_orders', 'flwdsk_assets',
     'flwdsk_salary_structures', 'flwdsk_travel_requests', 'flwdsk_chat_channels',
-    'flwdsk_chat_messages', 'flwdsk_announcements', 'flwdsk_email_logs',
+    'flwdsk_chat_messages', 'flwdsk_announcements',
     'flwdsk_notification_preferences', 'flwdsk_kpi_definitions', 'flwdsk_saved_reports',
-    'flwdsk_declared_holidays', 'flwdsk_tasks', 'flwdsk_projects', 'flwdsk_employees',
-    'flwdsk_colleges', 'flwdsk_courses', 'flwdsk_batches', 'flwdsk_student_records',
-    'flwdsk_expense_claims', 'flwdsk_expense_types', 'flwdsk_schedule_sessions',
+    'flwdsk_declared_holidays', 'flwdsk_tasks', 'flwdsk_projects',
     'flwdsk_attendance_records', 'flwdsk_leave_records'
+  ];
+  -- Belt-and-suspenders: these must never receive a blanket policy.
+  protected text[] := ARRAY[
+    'flwdsk_enrollments', 'flwdsk_assessments', 'flwdsk_certificates', 'flwdsk_email_logs',
+    'flwdsk_audit_logs', 'flwdsk_employees', 'flwdsk_colleges', 'flwdsk_courses',
+    'flwdsk_batches', 'flwdsk_student_records', 'flwdsk_expense_claims',
+    'flwdsk_expense_types', 'flwdsk_schedule_sessions', 'flwdsk_calendar_sessions',
+    'flwdsk_exam_attempts', 'flwdsk_vouchers', 'flwdsk_retest_payment_verifications',
+    'flwdsk_batch_eligibility_rules', 'flwdsk_final_exam_results'
   ];
 BEGIN
   FOREACH t IN ARRAY tables LOOP
+    IF t = ANY(protected) THEN
+      RAISE EXCEPTION 'Refusing to apply blanket RLS to protected table %', t;
+    END IF;
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=t) THEN
       EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
       IF NOT EXISTS (

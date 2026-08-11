@@ -81,6 +81,33 @@ export function ApprovalsQueue() {
     return emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
   };
 
+  const [selectedLeaveIds, setSelectedLeaveIds] = useState<string[]>([]);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+
+  const handleBatchApproveLeave = async () => {
+    if (selectedLeaveIds.length === 0) return;
+    const ok = await confirm({
+      title: 'Batch Approve Leave Requests?',
+      message: `Are you sure you want to approve ${selectedLeaveIds.length} selected leave requests?`,
+    });
+    if (!ok) return;
+
+    setBatchProcessing(true);
+    let successCount = 0;
+    for (const id of selectedLeaveIds) {
+      const res = await approveLeave(id, 'Batch approved');
+      if (res.ok) successCount++;
+    }
+    setBatchProcessing(false);
+    setSelectedLeaveIds([]);
+    toast({
+      variant: 'success',
+      title: 'Batch Approval Complete',
+      message: `${successCount} leave request(s) approved successfully.`,
+    });
+    refreshPending();
+  };
+
   const handleApproveLeave = async () => {
     if (!selectedLeave) return;
     const ok = await confirm({ title: 'Approve Request?', message: 'Are you sure you want to approve this leave?' });
@@ -285,7 +312,7 @@ export function ApprovalsQueue() {
       header: 'Action',
       render: (r) => {
         if (!canApprove) {
-          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required (Admin/CEO/Manager)</span>;
+          return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required (Admin/CEO/Manager)</span>;
         }
         if (r.approvalStatus === 'pending_assignment_approval') {
           const creator = Object.values(employees).find(emp => emp.id === r.assignedByEmployeeId);
@@ -300,7 +327,7 @@ export function ApprovalsQueue() {
                 </div>
               );
             } else {
-              return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>CEO Approval Required</span>;
+              return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>CEO Approval Required</span>;
             }
           }
 
@@ -346,7 +373,7 @@ export function ApprovalsQueue() {
       header: 'Action',
       render: (r) => {
         if (!canApprove) {
-          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>;
+          return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>;
         }
         return (
           <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
@@ -394,7 +421,7 @@ export function ApprovalsQueue() {
       header: 'Action',
       render: (r) => {
         if (!canApprove) {
-          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>;
+          return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>;
         }
         return (
           <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
@@ -437,12 +464,26 @@ export function ApprovalsQueue() {
       id: 'leaves',
       label: `Leave Applications (${pendingApprovals.length})`,
       content: (
-        <DataTable
-          columns={leaveColumns}
-          rows={pendingApprovals}
-          rowKey={(r) => r.id}
-          onRowClick={(r) => setSelectedLeave(r)}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {selectedLeaveIds.length > 0 && canApprove && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', background: 'var(--brand-muted)', borderRadius: 'var(--radius-md)', border: '1px solid var(--brand)' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
+                {selectedLeaveIds.length} leave request(s) selected
+              </span>
+              <Button size="sm" onClick={handleBatchApproveLeave} disabled={batchProcessing}>
+                {batchProcessing ? '⏳ Approving...' : `✓ Batch Approve Selected (${selectedLeaveIds.length})`}
+              </Button>
+            </div>
+          )}
+          <DataTable
+            columns={leaveColumns}
+            rows={pendingApprovals}
+            rowKey={(r) => r.id}
+            selectable={canApprove}
+            onSelectionChange={setSelectedLeaveIds}
+            onRowClick={(r) => setSelectedLeave(r)}
+          />
+        </div>
       ),
     },
     {

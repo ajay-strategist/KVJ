@@ -10,11 +10,30 @@ interface ScoreHistogramChartProps {
 export const ScoreHistogramChart: React.FC<ScoreHistogramChartProps> = ({
   buckets,
   passMarkPercent,
-  title = 'V5. Score Distribution Histogram',
+  title = 'Score Distribution Histogram',
   caption = `Vertical line shows pass mark threshold (${passMarkPercent}%).`,
 }) => {
-  if (!buckets || buckets.length === 0) {
-    return <div style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>No score data for this assessment</div>;
+  const totalCount = (buckets || []).reduce((sum, b) => sum + (b.count || 0), 0);
+  // No attempts yet means every bar is zero. Drawing an empty axis looks like a
+  // rendering fault in the PDF, so state the reason instead.
+  if (!buckets || buckets.length === 0 || totalCount === 0) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          border: '1px dashed #cbd5e1',
+          borderRadius: 8,
+          padding: '18px 12px',
+          background: '#f8fafc',
+          textAlign: 'center',
+          color: '#64748b',
+          fontSize: 11,
+        }}
+      >
+        <div style={{ fontWeight: 700, color: '#475569', marginBottom: 2 }}>Score Distribution</div>
+        No marks have been recorded for this assessment yet.
+      </div>
+    );
   }
 
   const maxCount = Math.max(...buckets.map((b) => b.count), 5);

@@ -9,7 +9,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import type { Enrollment } from '../training.repository';
 
 export function AssessmentBoard() {
-  const { enrollments, students, evaluateAssessment, claimVoucher, issueCertificate, loading } = useTraining();
+  const { enrollments, students, evaluateAssessment, claimVoucher, issueCertificate, loading } = useTraining({ fetchCourses: false, fetchBatches: false });
   const { toast } = useNotifications();
 
   const [activeEnrolId, setActiveEnrolId] = useState<string | null>(null);
@@ -18,11 +18,29 @@ export function AssessmentBoard() {
   const handleEvaluateSubmit = async (values: Record<string, unknown>) => {
     if (!activeEnrolId) return;
 
+    const maxMarks = Number(values.maxMarks);
+    const marksObtained = Number(values.marksObtained);
+
+    // Guard the marks so a report can never show more than 100% or a negative
+    // score. Maximum must be a positive number; obtained must be within 0..max.
+    if (!Number.isFinite(maxMarks) || maxMarks <= 0) {
+      toast({ variant: 'error', title: 'Invalid Maximum Marks', message: 'Maximum marks must be a positive number.' });
+      return;
+    }
+    if (!Number.isFinite(marksObtained) || marksObtained < 0) {
+      toast({ variant: 'error', title: 'Invalid Marks', message: 'Marks obtained cannot be negative.' });
+      return;
+    }
+    if (marksObtained > maxMarks) {
+      toast({ variant: 'error', title: 'Invalid Marks', message: `Marks obtained (${marksObtained}) cannot exceed the maximum (${maxMarks}).` });
+      return;
+    }
+
     const res = await evaluateAssessment(activeEnrolId, {
       title: values.title as string,
       type: values.type as any,
-      maxMarks: Number(values.maxMarks),
-      marksObtained: Number(values.marksObtained),
+      maxMarks,
+      marksObtained,
       grade: values.grade as string || undefined,
       feedback: values.feedback as string || undefined,
     });

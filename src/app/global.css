@@ -44,6 +44,35 @@ button { font-family: inherit; }
    every inline style referencing them — and (b) handle the two structural
    things tokens can't: wide tables and horizontal page overflow.
    ============================================================================= */
+/* =============================================================================
+   TABLET (641px–1024px) — intermediate layer
+   Between phone and desktop the full sidebar + desktop density is too tight.
+   The shell auto-collapses the sidebar to an icon rail at this range (JS), and
+   here we relax spacing and table density so content breathes without a
+   dedicated per-page redesign.
+   ============================================================================= */
+@media (min-width: 641px) and (max-width: 1024px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+
+  :root,
+  [data-theme='light'],
+  [data-theme='dark'] {
+    --font-size-3xl: 28px;
+    --font-size-2xl: 24px;
+    --space-12: 72px;
+    --space-10: 64px;
+    --space-8: 52px;
+  }
+
+  /* Wide data tables scroll within their own box rather than widening the page. */
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 @media (max-width: 640px) {
   /* Never let the page scroll sideways. */
   html, body { max-width: 100%; overflow-x: hidden; }

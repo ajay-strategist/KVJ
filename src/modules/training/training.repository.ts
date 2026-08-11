@@ -134,6 +134,10 @@ export interface CertificateRecord extends Entity {
   issuedAt: string;
   reissuedAt?: string;
   reissueReason?: string;
+  deliveryDate?: string;
+  collectedBy?: string;
+  certificateCount?: number;
+  certificateReceiptPath?: string;
 }
 
 export interface ReferralRecord extends Entity {

@@ -36,7 +36,7 @@ export function Tabs({ items, defaultTabId, onChange, className = '' }: TabsProp
           marginBottom: 20,
           overflowX: 'auto',
           scrollbarWidth: 'none',
-          backdropFilter: 'blur(16px)',
+          backdropFilter: 'blur(var(--glass-blur, 12px))',
           boxShadow: 'var(--e1)',
         }}
       >

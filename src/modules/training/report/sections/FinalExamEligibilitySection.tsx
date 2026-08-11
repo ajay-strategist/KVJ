@@ -46,7 +46,7 @@ export const FinalExamEligibilitySection: React.FC<SectionProps> = ({ data, conf
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
       <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-        📋 Final Exam Eligibility Intelligence &amp; Outcomes
+         Final Exam Eligibility Intelligence &amp; Outcomes
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>
         Official eligibility determination for the Final Certification Exam, prerequisite clearance rates, and remedial action tracking.
@@ -121,7 +121,7 @@ export const FinalExamEligibilitySection: React.FC<SectionProps> = ({ data, conf
         <div>
           <EligibilityByAssessmentBarChart
             assessments={assessmentClearanceData}
-            title="📊 Cleared Students per Assessment"
+            title=" Cleared Students per Assessment"
             caption="Number of students who cleared each prerequisite assessment"
           />
         </div>
@@ -144,7 +144,7 @@ export const FinalExamEligibilitySection: React.FC<SectionProps> = ({ data, conf
       {kpis.notEligibleCount > 0 && (
         <div className="card-avoid-break" style={{ marginTop: 12, marginBottom: 14, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           <h3 style={{ fontSize: 13, fontWeight: 800, color: '#9f1239', marginBottom: 8 }}>
-            ⚠️ Ineligible Students Directory &amp; Remedial Action
+             Ineligible Students Directory &amp; Remedial Action
           </h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, border: '1.5px solid #fca5a5' }}>
             <thead>
@@ -184,7 +184,7 @@ export const FinalExamEligibilitySection: React.FC<SectionProps> = ({ data, conf
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#166534', marginBottom: 4 }}>
-          <span>🎯</span> Final Certification Eligibility Intelligence
+          Final Certification Eligibility Intelligence
         </div>
         <div style={{ fontSize: 11, color: '#14532d', lineHeight: 1.5 }}>
           <strong>{kpis.eligibleCount} out of {data.students.length} students ({kpis.eligibilityPct}%)</strong> have successfully cleared all required prerequisite assessments and are qualified for the Final Certification Exam.

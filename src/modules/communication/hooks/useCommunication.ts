@@ -236,6 +236,10 @@ export function useCommunication(activeChannelId?: UUID) {
 
   const postAnnouncement = useCallback(async (data: Partial<Announcement>): Promise<CallbackResult<Announcement>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
+    const userRole = (user.role || 'EMPLOYEE').toUpperCase();
+    if (!['ADMIN', 'CEO', 'MANAGER'].includes(userRole)) {
+      return { ok: false, error: 'Permission Denied: Only Admin, CEO, or Manager can post announcements.' };
+    }
     const res = await service.postAnnouncement(data, { id: user.id, role: user.role });
     if (res.ok) {
       setAnnouncements((prev) => [res.value, ...prev]);

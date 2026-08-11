@@ -7,6 +7,10 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useGeolocation } from './useGeolocation';
 import { toLocalISODate } from '../../../shared/utils/date';
 import { hoursThisMonth as calcHoursThisMonth, attendancePercent } from '../../../shared/utils/metrics';
+import { TASK_WORK_SESSION_REPOSITORY_TOKEN, type TaskWorkSession } from '../../project/project.repository';
+
+/** localStorage key holding the tasks auto-paused by the current break, per user. */
+const breakPausedKey = (userId: string) => `kvj_break_paused_tasks_${userId}`;
 
 /** Only a real Supabase Auth UUID is safe to write into uuid columns. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -93,6 +97,58 @@ export function useAttendance() {
     return { ok: false, error: res.error.message };
   }, [service, user, getPosition]);
 
+  /**
+   * Break ⇄ task-session coupling: starting a break pauses whatever task the
+   * user is actively working on, and ending the break resumes exactly those
+   * task(s). Best-effort — any task-session error is swallowed so it can never
+   * block the break itself. Nothing is deleted; a paused session is just closed
+   * with status 'paused', and resuming opens a fresh 'running' session.
+   */
+  const pauseRunningTasksForBreak = useCallback(async () => {
+    if (!user) return;
+    try {
+      const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
+      const actor = { id: user.id, role: user.role };
+      const page = await taskRepo.findMany({ pageSize: 500 });
+      const running = (page.data || []).filter(
+        (s: TaskWorkSession) => s.employeeId === user.id && (s as any).status === 'running' && !(s as any).deletedAt,
+      );
+      const resumeList: Partial<TaskWorkSession>[] = [];
+      for (const s of running) {
+        const endTime = new Date();
+        const durationMinutes = Math.max(0, Math.round((endTime.getTime() - new Date(s.startTime).getTime()) / 60000));
+        await taskRepo.update(s.id, { endTime: endTime.toISOString(), durationMinutes, status: 'paused' } as Partial<TaskWorkSession>, actor);
+        resumeList.push({
+          taskId: s.taskId, projectId: s.projectId, workTitle: s.workTitle, workCode: s.workCode,
+          supervisorId: s.supervisorId, supervisorName: s.supervisorName,
+        });
+      }
+      localStorage.setItem(breakPausedKey(user.id), JSON.stringify(resumeList));
+    } catch (e) {
+      console.warn('Auto-pause task on break failed:', e);
+    }
+  }, [user]);
+
+  const resumeTasksAfterBreak = useCallback(async () => {
+    if (!user) return;
+    try {
+      const raw = localStorage.getItem(breakPausedKey(user.id));
+      if (!raw) return;
+      const list: Partial<TaskWorkSession>[] = JSON.parse(raw) || [];
+      const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
+      const actor = { id: user.id, role: user.role };
+      for (const t of list) {
+        await taskRepo.create(
+          { ...t, employeeId: user.id, startTime: new Date().toISOString(), status: 'running' } as Partial<TaskWorkSession>,
+          actor,
+        );
+      }
+      localStorage.removeItem(breakPausedKey(user.id));
+    } catch (e) {
+      console.warn('Auto-resume task after break failed:', e);
+    }
+  }, [user]);
+
   const startBreak = useCallback(async (reason?: string) => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
@@ -101,10 +157,11 @@ export function useAttendance() {
     setLoading(false);
     if (res.ok) {
       setRecord(res.value);
+      await pauseRunningTasksForBreak();
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };
-  }, [service, user]);
+  }, [service, user, pauseRunningTasksForBreak]);
 
   const endBreak = useCallback(async () => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
@@ -114,10 +171,11 @@ export function useAttendance() {
     setLoading(false);
     if (res.ok) {
       setRecord(res.value);
+      await resumeTasksAfterBreak();
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };
-  }, [service, user]);
+  }, [service, user, resumeTasksAfterBreak]);
 
   useEffect(() => {
     fetchTodayRecord();

@@ -16,7 +16,7 @@ interface DailyProgressTimelineChartProps {
 
 export const DailyProgressTimelineChart: React.FC<DailyProgressTimelineChartProps> = ({
   milestones,
-  title = 'V12. Daily Curriculum Progress Milestone Strip',
+  title = 'Daily Curriculum Progress Milestone Strip',
   caption = 'Session-by-Session Curriculum Coverage',
 }) => {
   if (!milestones || milestones.length === 0) {
@@ -58,7 +58,7 @@ export const DailyProgressTimelineChart: React.FC<DailyProgressTimelineChartProp
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, fontSize: 9.5, fontWeight: 700 }}>
                 <span style={{ color: m.practicalDone ? '#059669' : '#64748b' }}>
-                  {m.practicalDone ? '⚡ Practical Done' : '📖 Theory'}
+                  {m.practicalDone ? 'Practical Done' : 'Theory'}
                 </span>
                 <span style={{ color: textColor }}>{m.status}</span>
               </div>

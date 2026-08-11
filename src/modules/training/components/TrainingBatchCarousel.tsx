@@ -14,6 +14,7 @@ import type { Batch, Course, TrainingPhase } from '../training.repository';
 import { TRAINING_PHASES } from '../training.repository';
 import type { Employee } from '../../employee/employee.repository';
 import { Button, Badge, FilterChip, ProgressBar, SearchInput } from '../../../shared/ui/components';
+import { cleanBatchCode } from '../utils/batch-formatter';
 
 export interface BatchAction {
   id: 'daily' | 'student' | 'final' | 'attendance' | 'assessments' | 'documents';
@@ -75,7 +76,9 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
   // Format: College-Program-Academic Year-Batch-Course
   // Example: MIM Kuttikkanam-2 MBA-2026-2027-Batch 1-Excel Expert 365
   const parts = [college, program, academicYear, batchNo, courseTitle].filter((p) => p && p !== '—');
-  const batchCode = parts.length > 0 ? parts.join('-') : (b.code || b.trainingName || 'Batch');
+  // Canonical batch label used everywhere: the generated code with its batch
+  // number synced to the current Batch-No field (fixes a stale code after edits).
+  const batchCode = cleanBatchCode(b.code, b.batchNo) || (parts.length > 0 ? parts.join('-') : (b.trainingName || 'Batch'));
 
   return {
     id:            b.id,
@@ -203,8 +206,8 @@ const BatchCard = memo(function BatchCard({
           background: 'var(--bg-surface)',
           border: `1.5px solid ${borderColor}`,
           borderRadius: 'var(--radius-xl, 20px)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          backdropFilter: 'blur(var(--glass-blur, 12px))',
+          WebkitBackdropFilter: 'blur(var(--glass-blur, 12px))',
           boxShadow: active
             ? '0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent), var(--e3)'
             : pinned
@@ -246,7 +249,7 @@ const BatchCard = memo(function BatchCard({
                 <span style={{
                   background: tone.bg, color: tone.fg,
                   border: `1px solid ${tone.border}`,
-                  fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+                  fontSize: 12, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
                   whiteSpace: 'nowrap', flexShrink: 0,
                 }}>
                   {vm.phase}
@@ -267,7 +270,7 @@ const BatchCard = memo(function BatchCard({
                   title="Edit Training Details"
                   style={{
                     background: 'var(--bg-sunken)', border: '1px solid var(--border)',
-                    cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                    cursor: 'pointer', fontSize: 12, fontWeight: 600,
                     padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
                     display: 'flex', alignItems: 'center', gap: 4,
                   }}
@@ -282,7 +285,7 @@ const BatchCard = memo(function BatchCard({
                   title="Make a Copy of Training Details Card"
                   style={{
                     background: 'var(--bg-sunken)', border: '1px solid var(--border)',
-                    cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                    cursor: 'pointer', fontSize: 12, fontWeight: 600,
                     padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
                     display: 'flex', alignItems: 'center', gap: 4,
                   }}
@@ -339,7 +342,7 @@ const BatchCard = memo(function BatchCard({
           {/* ── Workflow Completion Row ── */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 WORKFLOW COMPLETION
               </span>
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -360,7 +363,7 @@ const BatchCard = memo(function BatchCard({
                 title={a.label}
                 onClick={(e) => { e.stopPropagation(); onAction(vm.id, a); }}
                 style={{
-                  fontSize: 11.5, fontWeight: 600,
+                  fontSize: 12, fontWeight: 600,
                   padding: '6px 12px', borderRadius: 'var(--radius-sm, 8px)',
                   border: '1px solid var(--border)',
                   background: 'var(--bg-sunken)',
@@ -380,23 +383,23 @@ const BatchCard = memo(function BatchCard({
               title="Delete this batch permanently"
               onClick={(e) => { e.stopPropagation(); onDelete(vm.id); }}
               style={{
-                fontSize: 11.5, fontWeight: 700,
+                fontSize: 12, fontWeight: 700,
                 padding: '6px 14px', borderRadius: 'var(--radius-sm, 8px)',
-                border: '1px solid var(--status-danger, #ef4444)',
+                border: '1px solid var(--status-danger, var(--status-danger))',
                 background: 'transparent',
-                color: 'var(--status-danger, #ef4444)',
+                color: 'var(--status-danger, var(--status-danger))',
                 cursor: 'pointer', whiteSpace: 'nowrap',
                 display: 'flex', alignItems: 'center', gap: 5,
                 fontFamily: 'var(--font-ui)',
                 transition: 'background 150ms, color 150ms',
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'var(--status-danger, #ef4444)';
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--status-danger, var(--status-danger))';
                 (e.currentTarget as HTMLButtonElement).style.color = '#fff';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                (e.currentTarget as HTMLButtonElement).style.color = 'var(--status-danger, #ef4444)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--status-danger, var(--status-danger))';
               }}
             >
               🗑️ Delete Batch
@@ -431,7 +434,7 @@ const BatchCard = memo(function BatchCard({
                 type="button"
                 onClick={() => setShowAllChecklist((s) => !s)}
                 style={{
-                  fontSize: 11.5, fontWeight: 700,
+                  fontSize: 12, fontWeight: 700,
                   background: 'var(--bg-surface)', border: '1px solid var(--brand)',
                   borderRadius: 999, color: 'var(--brand)',
                   padding: '2px 10px', cursor: 'pointer',
@@ -466,13 +469,13 @@ const BatchCard = memo(function BatchCard({
                       width: 20, height: 20, flexShrink: 0,
                       borderRadius: 5,
                       border: task.done ? 'none' : '1.5px solid var(--border)',
-                      background: task.done ? 'var(--status-success, #10b981)' : 'var(--bg-surface)',
+                      background: task.done ? 'var(--status-success, var(--status-success))' : 'var(--bg-surface)',
                       cursor: 'pointer',
                       display: 'grid', placeItems: 'center',
                       padding: 0,
                     }}
                   >
-                    {task.done && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                    {task.done && <span style={{ color: '#fff', fontSize: 12, fontWeight: 900 }}>✓</span>}
                   </button>
                   <span style={{
                     fontSize: 12,
@@ -496,7 +499,7 @@ const BatchCard = memo(function BatchCard({
 function InfoField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 2 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 2 }}>
         {label}
       </div>
       <div style={{

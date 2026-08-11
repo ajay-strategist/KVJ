@@ -10,7 +10,7 @@ interface DatewiseAssessmentProgressLineChartProps {
 
 export const DatewiseAssessmentProgressLineChart: React.FC<DatewiseAssessmentProgressLineChartProps> = ({
   rows,
-  title = '📈 Date-Wise Pass Rate Progress Trend',
+  title = 'Date-Wise Pass Rate Progress Trend',
   caption = 'Tracks cumulative overall pass % progress across exam dates.',
   targetPassPct = 84,
 }) => {

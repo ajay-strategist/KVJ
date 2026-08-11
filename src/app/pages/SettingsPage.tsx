@@ -12,6 +12,7 @@ import { useConfig } from '../../shared/config/ConfigProvider';
 import { useAuth } from '../../modules/auth/AuthProvider';
 import { useWorkspace, WORKSPACE_PRESETS, WALLPAPER_GALLERY } from '../../shared/theme/WorkspaceProvider';
 import { useNotifications } from '../../shared/notifications/NotificationProvider';
+import { useDialog } from '../../shared/feedback/DialogProvider';
 import { convertDriveUrlToDirectImg } from '../../shared/utils/drive';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -301,7 +302,7 @@ export function SettingsPage() {
                   >
                     <span
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 12,
                         fontWeight: 700,
                         color: '#fff',
                         background: 'rgba(0,0,0,0.5)',
@@ -392,7 +393,7 @@ export function SettingsPage() {
                   Save Photo
                 </Button>
               </div>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: '1.4' }}>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: '1.4' }}>
                 Supports any public Google Drive view link. We will automatically convert it to a viewable direct image link.
               </p>
             </div>
@@ -504,6 +505,8 @@ function UserPasswordResetCard() {
 
 function AdminUserManagementCard() {
   const { createUser, updateUser, deleteUser, getUsers, resetToDefaultPassword } = useAuth();
+  const { confirm } = useDialog();
+  const { toast } = useNotifications();
   const [usersList, setUsersList] = useState<import('../../modules/auth/auth.service').AuthUser[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<import('../../modules/auth/auth.service').AuthUser | null>(null);
@@ -524,14 +527,18 @@ function AdminUserManagementCard() {
   }, []);
 
   const handleResetToDefault = async (u: import('../../modules/auth/auth.service').AuthUser) => {
-    if (confirm(`Reset password for "${u.fullName}" to default password ("password")? They will be required to change password on next login.`)) {
-      try {
-        await resetToDefaultPassword(u.id);
-        alert(`Password for ${u.fullName} reset to "password". User must change password on next login.`);
-        reloadUsers();
-      } catch (e: any) {
-        alert(e?.message || 'Failed to reset password.');
-      }
+    const ok = await confirm({
+      title: 'Reset password?',
+      message: `Reset password for "${u.fullName}" to the default password ("password")? They will be required to change it on next login.`,
+      variant: 'delete',
+    });
+    if (!ok) return;
+    try {
+      await resetToDefaultPassword(u.id);
+      toast({ variant: 'success', title: 'Password reset', message: `${u.fullName} must change password on next login.` });
+      reloadUsers();
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Reset failed', message: e?.message || 'Failed to reset password.' });
     }
   };
 
@@ -589,13 +596,22 @@ function AdminUserManagementCard() {
 
   const handleDelete = async (u: import('../../modules/auth/auth.service').AuthUser) => {
     if (u.username === 'Admin' || u.id === 'u-admin') {
-      alert('Cannot delete root System Admin user.');
+      toast({ variant: 'error', title: 'Not allowed', message: 'Cannot delete the root System Admin user.' });
       return;
     }
-    if (confirm(`Are you sure you want to delete user "${u.fullName}" (${u.username || u.email})?`)) {
+    const ok = await confirm({
+      title: 'Delete user?',
+      message: `Delete user "${u.fullName}" (${u.username || u.email})? This cannot be undone.`,
+      variant: 'delete',
+    });
+    if (!ok) return;
+    try {
       await deleteUser(u.id);
+      toast({ variant: 'success', title: 'User deleted', message: `${u.fullName} removed.` });
       reloadUsers();
       setModalOpen(false);
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Delete failed', message: e?.message || 'Could not delete user.' });
     }
   };
 
@@ -618,22 +634,22 @@ function AdminUserManagementCard() {
           <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
             <div>
               <strong style={{ fontSize: 13 }}>{u.fullName} ({u.username || u.email})</strong>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.email} · Role: <strong>{u.role}</strong></div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email} · Role: <strong>{u.role}</strong></div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {u.mustChangePassword ? (
-                <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 12, background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
                   ⚠️ Password Reset Pending
                 </span>
               ) : (
-                <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 12, background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>
+                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>
                   ✓ Active
                 </span>
               )}
-              <Button size="sm" variant="secondary" onClick={() => handleResetToDefault(u)} style={{ padding: '4px 10px', fontSize: 11 }}>
+              <Button size="sm" variant="secondary" onClick={() => handleResetToDefault(u)} style={{ padding: '4px 10px', fontSize: 12 }}>
                 🔑 Reset Password
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => openEditModal(u)} style={{ padding: '4px 10px', fontSize: 11 }}>
+              <Button size="sm" variant="secondary" onClick={() => openEditModal(u)} style={{ padding: '4px 10px', fontSize: 12 }}>
                 ✏️ Edit
               </Button>
             </div>
@@ -681,7 +697,7 @@ function AdminUserManagementCard() {
               )}
 
               {!editingUser && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-sunken)', padding: 8, borderRadius: 6, marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-sunken)', padding: 8, borderRadius: 6, marginTop: 4 }}>
                   ℹ️ Default password will be set to <strong>password</strong>. User must change password upon first login.
                 </div>
               )}

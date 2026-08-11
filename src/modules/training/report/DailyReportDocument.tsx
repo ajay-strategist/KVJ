@@ -2,69 +2,254 @@ import React from 'react';
 import type { DailyReportData, DailyReportConfig } from './daily-report.types';
 import { SECTIONS } from './daily-report.registry';
 import { ExecutiveSummarySection } from './sections/ExecutiveSummarySection';
+import { ReportPaginator, A4, type ReportBlock } from './ReportPaginator';
 
 interface DailyReportDocumentProps {
   data: DailyReportData;
   config: DailyReportConfig;
 }
 
+/** Neutral, print-safe palette. No decorative icons anywhere in the chrome. */
+const INK = '#0f172a';
+const MUTED = '#64748b';
+const RULE = '#cbd5e1';
+const ACCENT = '#1e40af';
+
 export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, config }) => {
   const activeSections = SECTIONS.filter((s) => config.selectedSections.includes(s.id));
-  const isFinalReport = config.reportMode === 'final' || config.selectedSections.includes('final-exam-results');
+  const isFinalReport =
+    config.reportMode === 'final' || config.selectedSections.includes('final-exam-results');
+
+  const documentTitle = isFinalReport
+    ? 'Final Course & Certification Report'
+    : 'Daily Training & Intelligence Report';
+
+  const safe = (v: unknown, fallback = '—') => {
+    const s = typeof v === 'string' ? v.trim() : v == null ? '' : String(v);
+    return s.length > 0 ? s : fallback;
+  };
+
+  // ── Blocks: the executive summary first, then each selected section. ────────
+  const blocks: ReportBlock[] = [
+    {
+      key: 'executive-summary',
+      node: <ExecutiveSummarySection data={data} config={config} />,
+    },
+    ...activeSections
+      .filter((sec) => sec.id !== 'executive-summary')
+      .map((sec) => {
+        const SectionComponent = sec.component;
+        return {
+          key: sec.id,
+          // Major sections open on a fresh sheet, but the paginator only honours
+          // this when the page already has content — so no blank pages.
+          breakBefore: true,
+          node: <SectionComponent data={data} config={config} />,
+        } as ReportBlock;
+      }),
+  ];
+
+  // ── Masthead (page 1 only) ─────────────────────────────────────────────────
+  const cover = (
+    <div style={{ marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          paddingBottom: 12,
+          borderBottom: `2px solid ${ACCENT}`,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/logo.png" alt="" style={{ height: 40, width: 'auto', display: 'block' }} />
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: INK, letterSpacing: '-0.01em', lineHeight: 1.15 }}>
+              KVJ Analytics
+            </div>
+            <div style={{ fontSize: 9, fontWeight: 600, color: MUTED, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Enterprise Operations Platform
+            </div>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'right', maxWidth: '58%' }}>
+          <div
+            style={{
+              display: 'inline-block',
+              border: `1px solid ${RULE}`,
+              color: MUTED,
+              fontSize: 8,
+              fontWeight: 700,
+              padding: '2px 7px',
+              borderRadius: 3,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: 5,
+            }}
+          >
+            {isFinalReport ? 'Final Certification Report' : 'Daily Training Report'}
+          </div>
+          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: INK, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+            {documentTitle}
+          </h1>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: MUTED, marginTop: 3, wordBreak: 'break-word' }}>
+            {safe(data.collegeName)} — {safe(data.courseName)}
+          </div>
+        </div>
+      </div>
+
+      {/* Identity strip: plain label/value pairs, no coloured chrome. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 10,
+          marginTop: 12,
+          paddingBottom: 12,
+          borderBottom: `1px solid ${RULE}`,
+        }}
+      >
+        {[
+          ['Report Date', safe(data.reportDate)],
+          ['Batch', safe(data.batchCode || data.batchName)],
+          ['Academic Year', safe(data.academicYear)],
+          ['Total Students', String(data.totalStudents ?? 0)],
+        ].map(([label, value]) => (
+          <div key={label} style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 7.5,
+                fontWeight: 700,
+                color: MUTED,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginBottom: 2,
+              }}
+            >
+              {label}
+            </div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: INK, wordBreak: 'break-word', lineHeight: 1.3 }}>
+              {value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ── Running header (every page after the first shows the identity band) ────
+  const renderHeader = (pageNumber: number) => {
+    if (pageNumber === 1) return null;
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          paddingBottom: 6,
+          marginBottom: 12,
+          borderBottom: `1px solid ${RULE}`,
+          fontSize: 8.5,
+          color: MUTED,
+        }}
+      >
+        <span style={{ fontWeight: 800, color: ACCENT, letterSpacing: '0.02em' }}>KVJ Analytics</span>
+        <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '55%' }}>
+          {documentTitle}
+        </span>
+        <span style={{ fontWeight: 600 }}>{safe(data.batchCode || data.batchName)}</span>
+      </div>
+    );
+  };
+
+  // ── Numbered footer on every page ──────────────────────────────────────────
+  const renderFooter = (pageNumber: number, totalPages: number) => (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 6,
+        borderTop: `1px solid ${RULE}`,
+        fontSize: 8,
+        color: MUTED,
+      }}
+    >
+      <span>
+        <strong style={{ color: ACCENT, fontWeight: 800 }}>KVJ Analytics</strong>
+        <span style={{ margin: '0 5px' }}>·</span>
+        Connect. Manage. Transform.
+      </span>
+      <span style={{ fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Confidential</span>
+      <span style={{ fontWeight: 700, color: INK, fontVariantNumeric: 'tabular-nums' }}>
+        Page {pageNumber} of {totalPages}
+      </span>
+    </div>
+  );
 
   return (
     <div
       className="daily-report-document"
       style={{
-        width: '100%',
-        maxWidth: '850px',
+        width: `${A4.widthMm}mm`,
         margin: '0 auto',
-        background: '#ffffff',
-        color: '#0f172a',
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-        padding: '28px 36px',
+        color: INK,
+        fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
         boxSizing: 'border-box',
-        boxShadow: '0 8px 30px rgba(15, 23, 42, 0.08)',
-        borderRadius: 12,
-        border: '1px solid #cbd5e1',
       }}
     >
-      {/* Global Executive Print Style Overrides */}
       <style>{`
-        /* Screen view for portal: hidden on screen, displayed only during print when body has kvj-printing-active */
+        /* Screen: the print copy is parked off-screen rather than display:none.
+           It must stay in layout, because the paginator measures real element
+           heights to decide where each page ends — inside display:none every
+           height is 0 and the whole report would collapse onto one page. */
         .kvj-print-portal {
-          display: none;
+          position: absolute;
+          left: -100000px;
+          top: 0;
+          width: ${A4.widthMm}mm;
+          pointer-events: none;
         }
+
+        /* Every page sheet on screen looks like paper. */
+        .kvj-page {
+          box-shadow: 0 4px 18px rgba(15, 23, 42, 0.10);
+          border: 1px solid ${RULE};
+          border-radius: 6px;
+        }
+
+        /* Never split a visual unit across a page boundary. */
+        .kvj-block,
+        .card-avoid-break,
+        .chart-avoid-break,
+        .section-card {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .kvj-block { margin-bottom: 12px; }
+        .kvj-block:last-child { margin-bottom: 0; }
+
+        /* Tabular figures keep numeric columns aligned. */
+        .daily-report-document table td,
+        .daily-report-document table th { font-variant-numeric: tabular-nums; }
+
+        /* Long names/emails wrap instead of pushing a table off the page. */
+        .daily-report-document table { table-layout: auto; width: 100%; }
+        .daily-report-document td,
+        .daily-report-document th { overflow-wrap: anywhere; word-break: break-word; }
 
         @media print {
           @page {
             size: A4 portrait;
-            /* Clean, balanced A4 edges. The white card provides the inner frame. */
-            margin: 10mm 9mm 12mm 9mm;
+            /* The page components carry their own padding, so the sheet margin
+               is zero — this is what keeps the header/footer exactly where the
+               paginator placed them. */
+            margin: 0;
           }
 
-          /* Each major section begins on its own page for a partitioned,
-             executive-grade layout. */
-          .report-section-page {
-            page-break-before: always !important;
-            break-before: page !important;
-          }
-
-          /* Keep every heading attached to the content that follows it, and never
-             leave 1-2 orphan/widow lines dangling across a page break. */
-          h1, h2, h3, h4, h5 {
-            page-break-after: avoid !important;
-            break-after: avoid-page !important;
-          }
-          p, li, div {
-            orphans: 3;
-            widows: 3;
-          }
-
-          /* Light gray background canvas matching executive design */
           html, body {
-            background: #f8fafc !important;
-            color: #0f172a !important;
+            background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
@@ -74,18 +259,13 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
             print-color-adjust: exact !important;
           }
 
-          /* Hide EVERYTHING under body when in kvj-printing-active EXCEPT .kvj-print-portal */
-          body.kvj-printing-active > *:not(.kvj-print-portal) {
-            display: none !important;
-          }
-
-          /* Force hide explicit UI elements */
+          /* Only the report portal prints. */
+          body.kvj-printing-active > *:not(.kvj-print-portal) { display: none !important; }
           .daily-report-no-print,
           aside, nav, [class*="sidebar"], [class*="AppShell"], [class*="drawer"] {
             display: none !important;
           }
 
-          /* Outer canvas wrapper on print: light gray background with padding around card */
           body.kvj-printing-active .kvj-print-portal {
             display: block !important;
             position: absolute !important;
@@ -93,182 +273,61 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
             top: 0 !important;
             width: 100% !important;
             margin: 0 !important;
-            padding: 6mm !important;
-            background: #f8fafc !important;
-            box-sizing: border-box !important;
-          }
-
-          /* EXECUTIVE WHITE CARD DESIGN: Preserved in PDF print output */
-          .daily-report-document {
-            display: block !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 auto !important;
-            padding: 24px 32px !important;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.06) !important;
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 12px !important;
+            padding: 0 !important;
             background: #ffffff !important;
-            box-sizing: border-box !important;
           }
 
-          /* Prevent orphaned headings at the bottom of pages */
-          h1, h2, h3, h4 {
-            page-break-after: avoid !important;
-            break-after: avoid !important;
+          .daily-report-document {
+            width: 100% !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
           }
 
-          /* Element-level break avoidance: avoid breaking inside cards, SVGs, and visual units */
-          .card-avoid-break,
-          .chart-avoid-break,
-          .section-card {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            margin-bottom: 10px !important;
+          /* One sheet per page: no shadows, no rounding, hard page break. */
+          .kvj-page {
+            width: 100% !important;
+            min-height: ${A4.heightMm}mm !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            break-after: page;
+            page-break-after: always;
+            break-inside: auto;
+          }
+          .kvj-page:last-child {
+            break-after: auto;
+            page-break-after: auto;
           }
 
-          svg, canvas, figure {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
+          /* Headings never end a page alone. */
+          h1, h2, h3, h4, h5 {
+            break-after: avoid;
+            page-break-after: avoid;
+          }
+          p, li { orphans: 3; widows: 3; }
+
+          svg, canvas, figure, img {
+            break-inside: avoid;
+            page-break-inside: avoid;
             max-width: 100% !important;
           }
 
-          /* Table print formatting */
-          table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            page-break-inside: auto !important;
-            break-inside: auto !important;
-          }
-
-          thead {
-            display: table-header-group !important;
-          }
-
-          tbody {
-            display: table-row-group !important;
-          }
-
-          tr {
-            display: table-row !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-
-          td, th {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
+          /* A long table repeats its header on each continuation page. */
+          table { width: 100% !important; border-collapse: collapse !important; }
+          thead { display: table-header-group !important; }
+          tbody { display: table-row-group !important; }
+          tr { break-inside: avoid; page-break-inside: avoid; }
         }
       `}</style>
 
-      {/* EXECUTIVE DOCUMENT HEADER */}
-      <div style={{ borderBottom: '2px solid #1e40af', paddingBottom: 12, marginBottom: 20, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-        
-        {/* Top Header Row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo.png" alt="KVJ Analytics Logo" style={{ height: 44, width: 'auto', display: 'block' }} />
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                KVJ Analytics <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>by KVJ</span>
-              </div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', marginTop: 1 }}>
-                Enterprise Operations Platform
-              </div>
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ display: 'inline-block', background: isFinalReport ? '#f0fdf4' : '#eff6ff', border: `1px solid ${isFinalReport ? '#86efac' : '#bfdbfe'}`, color: isFinalReport ? '#166534' : '#1e40af', fontSize: 9.5, fontWeight: 800, padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-              {isFinalReport ? 'FINAL CERTIFICATION REPORT · V2.4 EXECUTIVE EDITION' : 'DAILY TRAINING INTELLIGENCE REPORT · V2.4 EXECUTIVE EDITION'}
-            </div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-              {isFinalReport ? 'Final Course & Certification Report' : 'Daily Training & Intelligence Report'}
-            </h1>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', marginTop: 2, whiteSpace: 'nowrap' }}>
-              {data.collegeName} — {data.courseName}
-            </div>
-          </div>
-        </div>
-
-        {/* Sub-header Metadata Bar */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 8,
-            marginTop: 10,
-            padding: '8px 12px',
-            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            border: '1px solid #cbd5e1',
-            borderRadius: 6,
-            fontSize: 10,
-            color: '#334155',
-          }}
-        >
-          <div>
-            <span style={{ color: '#64748b', display: 'block', fontSize: 9, fontWeight: 600 }}>Report Date</span>
-            <strong style={{ color: '#0f172a' }}>{data.reportDate}</strong>
-          </div>
-          <div>
-            <span style={{ color: '#64748b', display: 'block', fontSize: 9, fontWeight: 600 }}>Batch Code</span>
-            <strong style={{ color: '#2563eb' }}>{data.batchCode} ({data.batchName})</strong>
-          </div>
-          <div>
-            <span style={{ color: '#64748b', display: 'block', fontSize: 9, fontWeight: 600 }}>Academic Year</span>
-            <strong style={{ color: '#0f172a' }}>{data.academicYear}</strong>
-          </div>
-        </div>
-      </div>
-
-      {/* Fixed Executive Overview Section (Shown in ALL reports) */}
-      <ExecutiveSummarySection data={data} config={config} />
-
-      {/* Render Remaining Active Streamlined Sections */}
-      <div>
-        {activeSections
-          .filter((sec) => sec.id !== 'executive-summary')
-          .map((sec) => {
-            const SectionComponent = sec.component;
-            return (
-              // Each major section starts on a fresh A4 page in print (clean,
-              // partitioned executive report). On screen it just stacks with a gap.
-              <div key={sec.id} className="report-section-page" style={{ marginBottom: 18 }}>
-                <SectionComponent data={data} config={config} />
-              </div>
-            );
-          })}
-      </div>
-
-      {/* EXECUTIVE DOCUMENT FOOTER */}
-      <div
-        className="card-avoid-break"
-        style={{
-          marginTop: 24,
-          paddingTop: 12,
-          borderTop: '1.5px solid #cbd5e1',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 9,
-          color: '#64748b',
-          pageBreakInside: 'avoid',
-          breakInside: 'avoid',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontWeight: 900, color: '#1e40af' }}>KVJ Analytics</span>
-          <span>·</span>
-          <span>Enterprise Operations Platform</span>
-          <span>·</span>
-          <span style={{ color: '#2563eb', fontWeight: 600 }}>Connect. Manage. Transform.</span>
-          <span>·</span>
-          <span>Developed by KVJ Analytics</span>
-        </div>
-        <div style={{ fontWeight: 800, color: '#0f172a', letterSpacing: '0.02em' }}>
-          CONFIDENTIAL · {isFinalReport ? 'FINAL CERTIFICATION REPORT' : 'EXECUTIVE TRAINING INTELLIGENCE REPORT'}
-        </div>
-      </div>
+      <ReportPaginator
+        blocks={blocks}
+        cover={cover}
+        renderHeader={renderHeader}
+        renderFooter={renderFooter}
+      />
     </div>
   );
 };

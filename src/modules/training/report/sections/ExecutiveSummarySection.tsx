@@ -1,6 +1,6 @@
 import React from 'react';
 import type { SectionProps } from './CoverPageSection';
-import { selectExecutiveKPIs } from '../daily-report.selectors';
+import { selectExecutiveKPIs, selectDemographicBreakdowns } from '../daily-report.selectors';
 import { AttendanceGaugeChart } from '../charts/AttendanceGaugeChart';
 import {
   GenderDonutChart,
@@ -10,21 +10,35 @@ import {
 
 export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data, config }) => {
   const kpis = selectExecutiveKPIs(data);
-  const showAttendance = config?.selectedStudentColumns?.includes('attendancePct') || config?.selectedSections?.includes('datewise-attendance');
+  const demographics = selectDemographicBreakdowns(data);
+  const showAttendance =
+    config?.selectedStudentColumns?.includes('attendancePct') ||
+    config?.selectedSections?.includes('datewise-attendance');
+
+  const maxQualCount = Math.max(...demographics.qualifications.map((q) => q.count), 1);
 
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
       <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-        📊 Executive Summary &amp; Batch Intelligence Overview
+        Executive Summary &amp; Batch Intelligence Overview
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>
         Core batch profile, enrolled strength metrics, {showAttendance ? 'attendance gauge, ' : ''}and student demographics.
       </div>
 
-      {/* Top Row: Total Students KPI Card + Overall Attendance Gauge Chart (conditional) */}
-      <div className="card-avoid-break" style={{ display: 'grid', gridTemplateColumns: showAttendance ? '1fr 1fr' : '1fr', gap: 14, marginBottom: 14, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-        
-        {/* Total Students KPI Card */}
+      {/* Top Row: Enrolled Batch Strength Card + Overall Batch Attendance Gauge */}
+      <div
+        className="card-avoid-break"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: showAttendance ? '1fr 1fr' : '1fr',
+          gap: 14,
+          marginBottom: 14,
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
+        }}
+      >
+        {/* Enrolled Batch Strength Card */}
         <div
           style={{
             background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
@@ -39,17 +53,17 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data, config }
           }}
         >
           <div style={{ fontSize: 11.5, fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            🎓 Enrolled Batch Strength
+            Enrolled Batch Strength
           </div>
           <div style={{ fontSize: 34, fontWeight: 900, color: '#0f172a', marginTop: 6, lineHeight: 1 }}>
             {kpis.totalStudents} <span style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>Enrolled Students</span>
           </div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', marginTop: 10 }}>
-            Active strength for batch: {data.batchCode} ({data.collegeName})
+            Active strength for batch: {data.batchCode || data.batchName} ({data.collegeName})
           </div>
         </div>
 
-        {/* Gauge Chart for Overall Batch Attendance % (conditional) */}
+        {/* Gauge Chart for Overall Batch Attendance % */}
         {showAttendance && (
           <div>
             <AttendanceGaugeChart
@@ -61,8 +75,18 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data, config }
         )}
       </div>
 
-      {/* Middle Row: Donut Charts Grid (Gender, Prior Course Knowledge, Laptop Availability) */}
-      <div className="chart-avoid-break" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+      {/* Middle Row: Donut Charts Grid (Gender Distribution, Prior Knowledge, Laptop Availability) */}
+      <div
+        className="chart-avoid-break"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 12,
+          marginBottom: 14,
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
+        }}
+      >
         <GenderDonutChart
           femaleCount={kpis.femaleCount}
           maleCount={kpis.maleCount}
@@ -80,7 +104,47 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data, config }
         />
       </div>
 
-      {/* EXECUTIVE TRAINING INTELLIGENCE CALLOUT BOX */}
+      {/* Bottom Row: Qualification Breakdown Bar Chart */}
+      <div
+        className="card-avoid-break"
+        style={{
+          border: '1px solid #cbd5e1',
+          borderRadius: 8,
+          padding: 14,
+          background: '#ffffff',
+          marginBottom: 14,
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
+        }}
+      >
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 10, borderBottom: '1px solid #f1f5f9', paddingBottom: 4 }}>
+          Students by Previous Qualification
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 10.5 }}>
+          {demographics.qualifications.map((q) => (
+            <div key={q.qual} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 90, fontWeight: 700, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {q.qual}
+              </span>
+              <div style={{ flex: 1, height: 12, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${(q.count / maxQualCount) * 100}%`,
+                    height: '100%',
+                    background: '#3b82f6',
+                    borderRadius: 6,
+                  }}
+                />
+              </div>
+              <span style={{ width: 60, textAlign: 'right', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
+                {q.count} ({q.pct}%)
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* EXECUTIVE CALLOUT BOX */}
       <div
         className="card-avoid-break"
         style={{
@@ -92,8 +156,8 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data, config }
           padding: '12px 16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#1e40af', marginBottom: 4 }}>
-          <span>💡</span> Executive Training Intelligence Insights
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#1e40af', marginBottom: 4 }}>
+          Executive Training Intelligence Insights
         </div>
         <div style={{ fontSize: 11, color: '#1e3a8a', lineHeight: 1.5 }}>
           Enrolled batch strength is <strong>{kpis.totalStudents} students</strong>{showAttendance ? <> with a cumulative overall attendance rate of <strong>{kpis.overallAttendancePct}%</strong></> : null}.
@@ -103,3 +167,4 @@ export const ExecutiveSummarySection: React.FC<SectionProps> = ({ data, config }
     </div>
   );
 };
+

@@ -18,7 +18,7 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
       <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-        📝 Assessment Performance &amp; Outcomes Intelligence
+         Assessment Performance &amp; Outcomes Intelligence
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>
         Detailed performance metrics, score bucket distribution, date-wise progress tracking, and student outcomes.
@@ -86,26 +86,24 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
                 </div>
               </div>
 
-              {/* Grid: Histogram + Student Outcome Lists */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                
-                {/* Score Histogram */}
-                <div>
-                  <ScoreHistogramChart buckets={histogramBuckets} passMarkPercent={ass.passMarkPercent} />
-                </div>
+              {/* Score Histogram (full width — the outcome lists sit below it) */}
+              <div style={{ marginBottom: 12 }}>
+                <ScoreHistogramChart buckets={histogramBuckets} passMarkPercent={ass.passMarkPercent} />
+              </div>
 
-                {/* Outcome Lists */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11 }}>
-                  
+              {/* Outcome Lists — dense multi-column name lists instead of one
+                  bordered chip per student, which used to run for whole pages. */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11, marginBottom: 12 }}>
+
                   {/* Failed Students */}
                   {failedStudents.length > 0 && (
-                    <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, padding: 8 }}>
-                      <strong style={{ color: '#b91c1c' }}>❌ Failed Students ({failedStudents.length}):</strong>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, padding: '8px 10px' }}>
+                      <strong style={{ color: '#b91c1c' }}>Failed Students ({failedStudents.length})</strong>
+                      <div style={{ columnCount: 3, columnGap: 14, marginTop: 5, fontSize: 9.5, color: '#7f1d1d' }}>
                         {failedStudents.map((st) => (
-                          <span key={st.id} style={{ background: '#ffffff', border: '1px solid #f87171', borderRadius: 4, padding: '2px 6px', fontSize: 10.5 }}>
-                            <strong>{st.name}</strong> ({st.phone}) — {st.assessmentScores[ass.id]?.marks}%
-                          </span>
+                          <div key={st.id} style={{ breakInside: 'avoid', lineHeight: 1.5 }}>
+                            {st.name} <span style={{ color: '#b91c1c', fontWeight: 700 }}>{st.assessmentScores[ass.id]?.marks}%</span>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -113,13 +111,13 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
 
                   {/* Not Attended Students */}
                   {notAttendedStudents.length > 0 && (
-                    <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: 8 }}>
-                      <strong style={{ color: '#b45309' }}>⚠️ Not Attended Students ({notAttendedStudents.length}):</strong>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '8px 10px' }}>
+                      <strong style={{ color: '#b45309' }}>Not Attended Students ({notAttendedStudents.length})</strong>
+                      <div style={{ columnCount: 3, columnGap: 14, marginTop: 5, fontSize: 9.5, color: '#78350f' }}>
                         {notAttendedStudents.map((st) => (
-                          <span key={st.id} style={{ background: '#ffffff', border: '1px solid #fbbf24', borderRadius: 4, padding: '2px 6px', fontSize: 10.5 }}>
-                            <strong>{st.name}</strong> ({st.phone})
-                          </span>
+                          <div key={st.id} style={{ breakInside: 'avoid', lineHeight: 1.5 }}>
+                            {st.name} <span style={{ color: '#a16207' }}>{st.phone}</span>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -130,8 +128,6 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
                     <strong>✓ Passed ({passedStudents.length} Students):</strong> Highest mark achieved ≥ {ass.passMarkPercent}%
                   </div>
 
-                </div>
-
               </div>
 
               {/* DATE-WISE ASSESSMENT STATUS, LINE CHART & PROGRESS TABLE */}
@@ -139,7 +135,7 @@ export const AssessmentStatusSection: React.FC<SectionProps> = ({ data, config }
                 <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: 12, marginTop: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>
-                      📅 Date-Wise Assessment Progress &amp; Trend Analysis
+                       Date-Wise Assessment Progress &amp; Trend Analysis
                     </div>
                     <span style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>
                       Evaluates highest mark per student across all attempts

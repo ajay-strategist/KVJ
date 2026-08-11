@@ -186,13 +186,13 @@ export function ExecutiveConsole() {
                   <Avatar name={t.name} size={32} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{t.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.batchesCount} Batches · {t.studentsTrained} Students</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.batchesCount} Batches · {t.studentsTrained} Students</div>
                   </div>
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--status-success)' }}>{t.completionRate}% Done</div>
-                  <div style={{ fontSize: 11, color: 'var(--status-warning)', fontWeight: 600 }}>⭐ {t.feedbackScore} / 5.0</div>
+                  <div style={{ fontSize: 12, color: 'var(--status-warning)', fontWeight: 600 }}>⭐ {t.feedbackScore} / 5.0</div>
                 </div>
               </div>
             ))}
@@ -218,7 +218,7 @@ export function ExecutiveConsole() {
                 <Badge tone="success">{s.overallScore}% Overall</Badge>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{s.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.college} · {s.batch}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.college} · {s.batch}</div>
               <ProgressBar value={s.attendancePct} size="sm" showLabel />
             </div>
           ))}

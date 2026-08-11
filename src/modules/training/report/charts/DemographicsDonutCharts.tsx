@@ -94,11 +94,11 @@ export const GenderDonutChart: React.FC<GenderDonutChartProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 10, height: 10, background: '#ec4899', borderRadius: 2, display: 'inline-block' }} />
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>👩 Female: {femaleCount} ({femalePct}%)</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>Female: {femaleCount} ({femalePct}%)</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 10, height: 10, background: '#3b82f6', borderRadius: 2, display: 'inline-block' }} />
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>👨 Male: {maleCount} ({malePct}%)</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>Male: {maleCount} ({malePct}%)</span>
           </div>
         </div>
       </div>
@@ -179,11 +179,11 @@ export const PriorKnowledgeDonutChart: React.FC<PriorKnowledgeDonutChartProps> =
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 10, height: 10, background: '#8b5cf6', borderRadius: 2, display: 'inline-block' }} />
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>📚 Experienced: {learnedBeforeCount} ({expPct}%)</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>Experienced: {learnedBeforeCount} ({expPct}%)</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 10, height: 10, background: '#f59e0b', borderRadius: 2, display: 'inline-block' }} />
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>🌱 New Learner: {newLearnerCount} ({newPct}%)</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>New Learner: {newLearnerCount} ({newPct}%)</span>
           </div>
         </div>
       </div>
@@ -264,11 +264,11 @@ export const LaptopAvailabilityDonutChart: React.FC<LaptopAvailabilityDonutChart
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 10, height: 10, background: '#0284c7', borderRadius: 2, display: 'inline-block' }} />
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>💻 Has Laptop: {hasLaptopCount} ({hasPct}%)</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>Has Laptop: {hasLaptopCount} ({hasPct}%)</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 10, height: 10, background: '#e11d48', borderRadius: 2, display: 'inline-block' }} />
-            <span style={{ fontWeight: 600, color: '#0f172a' }}>🖥️ Lab Required: {noLaptopCount} ({noPct}%)</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>Lab Required: {noLaptopCount} ({noPct}%)</span>
           </div>
         </div>
       </div>

@@ -1,4 +1,13 @@
 -- =============================================================================
+-- ⛔ DANGER — DO NOT RUN THIS SCRIPT (Phase 6.42 / audit finding F1) ⛔
+-- Part 2 below creates `FOR ALL USING (true) WITH CHECK (true)` policies across
+-- all business tables. `USING (true)` grants access to EVERYONE (including
+-- anonymous), and PostgreSQL OR-combines permissive policies, so running this
+-- OBLITERATES every RLS control from Phases 6.30 / 6.40 / 6.42 — trainer
+-- isolation, expense ownership, and employee role protection (employee→ADMIN).
+-- This file is retained only for the schema-column additions in Part 1; if you
+-- need those, extract them individually. Never run Part 2 against any database.
+-- =============================================================================
 -- KVJ ANALYTICS / FLOW DESK — MASTER DATABASE SAVE & RLS FIX SCRIPT
 -- Paste this entire file into Supabase SQL Editor and click Run.
 --

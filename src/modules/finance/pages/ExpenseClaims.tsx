@@ -13,9 +13,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Card, Button, Badge } from '../../../shared/ui/components';
+import { PageHeader, Card, Button, Badge, EmptyState } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, useForm } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, FileUploadField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTraining } from '../../training/hooks/useTraining';
@@ -51,19 +51,19 @@ function DynamicExpenseForm({
   onRegisterNewType,
   onSubmit,
   onCancel,
+  submittingClaim,
 }: {
   bikeRate: number;
   carRate: number;
   batches: Array<any>;
   customExpenseTypes: string[];
-  onRegisterNewType: (name: string) => Promise<void>;
+  onRegisterNewType: (name: string) => Promise<boolean>;
   onSubmit: (vals: any) => void;
   onCancel: () => void;
+  submittingClaim: boolean;
 }) {
   const { values, setValue } = useForm();
   const [newTypeInput, setNewTypeInput] = useState('');
-  const receiptFile = values.receiptFile as File | null;
-  const receiptPreview = values.receiptPreview as string || '';
 
   const category = values.categoryType || 'Office Expense';
   const isSelfTravel = values.expenseType === 'Self Travel';
@@ -112,21 +112,65 @@ function DynamicExpenseForm({
   }, [customExpenseTypes]);
 
   const handleSaveNewType = async () => {
-    if (!newTypeInput.trim()) return;
-    await onRegisterNewType(newTypeInput.trim());
-    setNewTypeInput('');
+    const val = newTypeInput.trim();
+    if (!val) return;
+    const ok = await onRegisterNewType(val);
+    if (ok) {
+      setValue('expenseType', val);
+      setNewTypeInput('');
+    }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setValue('receiptFile', file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setValue('receiptPreview', reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+  const validationRules = {
+    expenseType: [
+      (v: any) =>
+        !v || v === '' || v === '__NEW_TYPE__'
+          ? 'Please select or register a valid expense type.'
+          : null,
+    ],
+    batch: [
+      (v: any, all: any) =>
+        all.categoryType === 'Training Expense' && (!v || v === '')
+          ? 'Training Batch is mandatory for Training Expenses.'
+          : null,
+    ],
+    km: [
+      (v: any, all: any) =>
+        all.expenseType === 'Self Travel' && (v === undefined || v === null || v === '' || isNaN(Number(v)) || Number(v) <= 0)
+          ? 'Kilometers travelled must be a positive number.'
+          : null,
+    ],
+    route: [
+      (v: any, all: any) =>
+        all.expenseType === 'Self Travel' && (!v || v.trim() === '')
+          ? 'Travel Route is mandatory for Self Travel.'
+          : null,
+    ],
+    amount: [
+      (v: any, all: any) =>
+        all.expenseType !== 'Self Travel' && (v === undefined || v === null || v === '' || isNaN(Number(v)) || Number(v) <= 0)
+          ? 'Expense Amount must be a positive number.'
+          : null,
+    ],
+    receiptFile: [
+      (v: any, all: any) =>
+        all.expenseType !== 'Self Travel' && !v
+          ? 'Receipt file upload is required.'
+          : null,
+      (v: any, all: any) => {
+        if (all.expenseType === 'Self Travel' || !v) return null;
+        const fileObj = v as File;
+        if (fileObj.size > 10 * 1024 * 1024) {
+          return 'File size exceeds the 10MB limit.';
+        }
+        const ext = fileObj.name.split('.').pop()?.toLowerCase();
+        const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+        if (!ext || !allowedExts.includes(ext)) {
+          return 'Unsupported file format. Please upload JPG, PNG, WEBP, or PDF.';
+        }
+        return null;
+      }
+    ],
   };
 
   return (
@@ -145,6 +189,7 @@ function DynamicExpenseForm({
           name="batch"
           label="Training Batch (Mandatory for Training Expenses) *"
           options={batchOptions}
+          rules={validationRules.batch}
         />
       )}
 
@@ -152,6 +197,7 @@ function DynamicExpenseForm({
         name="expenseType"
         label="Expense Type *"
         options={expenseTypeOptions}
+        rules={validationRules.expenseType}
       />
 
       {values.expenseType === '__NEW_TYPE__' && (
@@ -180,12 +226,12 @@ function DynamicExpenseForm({
               { value: 'Car', label: 'Car' },
             ]}
           />
-          <TextField name="km" label="Kilometers (KM) Travelled *" placeholder="e.g. 16" />
-          <TextField name="route" label="Travel Route (Mandatory: e.g., HQ to Christ College)" placeholder="e.g. Kakkanad HQ to Irinjalakuda" />
+          <TextField name="km" label="Kilometers (KM) Travelled *" placeholder="e.g. 16" rules={validationRules.km} />
+          <TextField name="route" label="Travel Route (Mandatory: e.g., HQ to Christ College) *" placeholder="e.g. Kakkanad HQ to Irinjalakuda" rules={validationRules.route} />
 
           {kmVal > 0 && (
             <div style={{ padding: '10px 14px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Auto Calculated Reimbursement</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Auto Calculated Reimbursement</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--status-success)', marginTop: 2 }}>
                 ₹ {calculatedAmount.toFixed(2)} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({kmVal} km × ₹{rate}/km)</span>
               </div>
@@ -194,75 +240,16 @@ function DynamicExpenseForm({
         </>
       ) : (
         <>
-          <TextField name="amount" label="Expense Amount (₹) *" placeholder="e.g. 150.00" />
-
-          {/* File Upload for Receipt & Google Sheet Integration */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
-              Upload Receipt Image / PDF (Stored &amp; Linked to Google Sheet) *
-            </label>
-            <div
-              style={{
-                border: receiptFile ? '2px solid var(--status-success)' : '2px dashed var(--brand)',
-                borderRadius: 'var(--radius-md)',
-                padding: '14px 16px',
-                textAlign: 'center',
-                background: receiptFile ? 'rgba(16,185,129,0.08)' : 'var(--bg-sunken)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {receiptFile ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-                    <span style={{ fontSize: 22 }}>📄</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {receiptFile.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--status-success)', fontWeight: 600, marginTop: 2 }}>
-                        {(receiptFile.size / 1024).toFixed(1)} KB — Receipt Attached &amp; Ready for Sheet Sync
-                      </div>
-                    </div>
-                  </div>
-                   <Button
-                    size="xs"
-                    variant="secondary"
-                    type="button"
-                    onClick={() => {
-                      setValue('receiptFile', null);
-                      setValue('receiptPreview', '');
-                    }}
-                  >
-                    ✕ Remove
-                  </Button>
-                </div>
-              ) : (
-                <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '6px 0' }}>
-                  <span style={{ fontSize: 24, color: 'var(--brand)' }}>📤</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Click here to select receipt file (or drag &amp; drop)
-                  </span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    Supports JPG, PNG, WEBP &amp; PDF files (Up to 10MB)
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                  />
-                </label>
-              )}
-            </div>
-          </div>
+          <TextField name="amount" label="Expense Amount (₹) *" placeholder="e.g. 150.00" rules={validationRules.amount} />
+          <FileUploadField name="receiptFile" label="Upload Receipt Image / PDF (Stored & Linked to Google Sheet) *" rules={validationRules.receiptFile} accept="image/*,.pdf" />
         </>
       )}
 
       <TextField name="notes" label="Notes / Description (Optional)" placeholder="Additional details..." />
 
       <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <Button variant="secondary" type="button" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">Submit Expense Claim</Button>
+        <Button variant="secondary" type="button" onClick={onCancel} disabled={submittingClaim}>Cancel</Button>
+        <Button type="submit" loading={submittingClaim}>Submit Expense Claim</Button>
       </div>
     </div>
   );
@@ -272,7 +259,7 @@ export function ExpenseClaims() {
   const { toast } = useNotifications();
   const { confirm } = useDialog();
   const { user } = useAuth();
-  const { batches } = useTraining();
+  const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [rateModalOpen, setRateModalOpen] = useState(false);
@@ -283,6 +270,19 @@ export function ExpenseClaims() {
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
   const [editingRates, setEditingRates] = useState<Record<string, string>>({});
+
+  // Filter and Sort states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Expense' | 'Training Expense'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'submitted' | 'approved' | 'rejected'>('all');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'person' | 'category'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Async lock states
+  const [submittingClaim, setSubmittingClaim] = useState(false);
+  const [processingAction, setProcessingAction] = useState(false);
 
   // Load central travel rates from system settings on mount
   useEffect(() => {
@@ -342,7 +342,8 @@ export function ExpenseClaims() {
     try {
       let query = supabase
         .from('flwdsk_expense_claims')
-        .select('*');
+        .select('*')
+        .is('deleted_at', null);
       
       if (!isManagement) {
         query = query.eq('employee_id', user.id);
@@ -406,147 +407,270 @@ export function ExpenseClaims() {
     loadClaims();
   }, [loadClaims]);
 
-  const handleRegisterNewType = async (typeName: string) => {
-    setCustomExpenseTypes((prev) => Array.from(new Set([...prev, typeName])));
-    toast({ variant: 'success', title: 'Expense Type Registered', message: `Registered "${typeName}" in database.` });
+  const handleRegisterNewType = async (typeName: string): Promise<boolean> => {
+    const trimmed = typeName.trim();
+    if (!trimmed) {
+      toast({ variant: 'error', title: 'Invalid Type', message: 'Expense type cannot be empty.' });
+      return false;
+    }
+    const lower = trimmed.toLowerCase();
+    const defaultTypes = [
+      'Self Travel',
+      'Morning Tea',
+      'Lunch & Refreshments',
+      'Evening Tea',
+      'Stationery & Printing',
+      'Lab / System Supplies',
+      'Miscellaneous',
+    ];
+    const exists = defaultTypes.some(t => t.toLowerCase() === lower) || customExpenseTypes.some(t => t.toLowerCase() === lower);
+    if (exists) {
+      toast({ variant: 'warning', title: 'Already Exists', message: `Expense type "${trimmed}" is already available.` });
+      return false;
+    }
+
+    setCustomExpenseTypes((prev) => Array.from(new Set([...prev, trimmed])));
+    toast({ variant: 'success', title: 'Expense Type Registered', message: `Registered "${trimmed}" in database.` });
     try {
-      await supabase.from('flwdsk_expense_types').insert({ name: typeName });
+      await supabase.from('flwdsk_expense_types').insert({ name: trimmed });
     } catch (e) {
       console.warn('Supabase expense_types insert warning:', e);
     }
+    return true;
   };
 
   const filteredExpenses = useMemo(() => {
-    return expenses.filter((exp) => {
-      if (!isManagement) {
+    return expenses
+      .filter((exp) => {
+        if (isManagement) {
+          if (selectedPersonFilter !== 'all') {
+            if (exp.person.toLowerCase() !== selectedPersonFilter.toLowerCase()) return false;
+          }
+        } else {
+          if (exp.person.toLowerCase() !== (user?.fullName || '').toLowerCase()) return false;
+        }
+
+        if (categoryFilter !== 'all') {
+          if (exp.category !== categoryFilter) return false;
+        }
+
+        if (statusFilter !== 'all') {
+          if (exp.status !== statusFilter) return false;
+        }
+
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchName = exp.person.toLowerCase().includes(q);
+          const matchType = exp.type.toLowerCase().includes(q);
+          const matchBatch = (exp.batch || '').toLowerCase().includes(q);
+          const matchRoute = (exp.route || '').toLowerCase().includes(q);
+          if (!matchName && !matchType && !matchBatch && !matchRoute) return false;
+        }
+
+        if (startDateFilter) {
+          const [d, m, y] = exp.date.split('/');
+          const expDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          if (expDateStr < startDateFilter) return false;
+        }
+        if (endDateFilter) {
+          const [d, m, y] = exp.date.split('/');
+          const expDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          if (expDateStr > endDateFilter) return false;
+        }
+
         return true;
-      }
-      if (selectedPersonFilter !== 'all') {
-        return exp.person.toLowerCase() === selectedPersonFilter.toLowerCase();
-      }
-      return true;
-    });
-  }, [expenses, isManagement, selectedPersonFilter]);
+      })
+      .sort((a, b) => {
+        let valA: any = a[sortBy];
+        let valB: any = b[sortBy];
+
+        if (sortBy === 'date') {
+          const [dA, mA, yA] = a.date.split('/');
+          const [dB, mB, yB] = b.date.split('/');
+          valA = `${yA}-${mA.padStart(2, '0')}-${dA.padStart(2, '0')}`;
+          valB = `${yB}-${mB.padStart(2, '0')}-${dB.padStart(2, '0')}`;
+        }
+
+        if (typeof valA === 'string') {
+          return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+      });
+  }, [
+    expenses,
+    isManagement,
+    selectedPersonFilter,
+    categoryFilter,
+    statusFilter,
+    searchQuery,
+    startDateFilter,
+    endDateFilter,
+    sortBy,
+    sortOrder,
+    user?.fullName
+  ]);
 
   const handleExpenseSubmit = async (values: Record<string, unknown>) => {
-    const isSelfTravel = values.expenseType === 'Self Travel';
-    const km = Number(values.km || 0);
-    const vehicle = (values.vehicle || 'Bike') as 'Bike' | 'Car';
-    const rate = vehicle === 'Car' ? carRate : bikeRate;
-    const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
-
-    const isUUID = (str?: string) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-    const validEmpId = isUUID(user?.id) ? user?.id : null;
-
-    let receiptLink: string =
-      (typeof values.receiptPreview === 'string' && values.receiptPreview)
-        ? values.receiptPreview
-        : (typeof values.receipt === 'string' && values.receipt)
-        ? values.receipt
-        : (values.receiptFile && (values.receiptFile as File).name)
-        ? (values.receiptFile as File).name
-        : 'Uploaded Proof';
-
-    if (values.receiptFile && values.receiptFile instanceof File) {
-      try {
-        const fileObj = values.receiptFile as File;
-        let base64Content = '';
-        try {
-          base64Content = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const res = reader.result as string;
-              resolve(res.includes(',') ? res.split(',')[1] : res);
-            };
-            reader.onerror = () => resolve('');
-            reader.readAsDataURL(fileObj);
-          });
-        } catch (e) {}
-
-        const driveRes = await googleIntegration.uploadReceiptWithMetadata({
-          date: new Date().toISOString().split('T')[0],
-          personName: user?.fullName || 'Employee',
-          isOfficeExpense: values.categoryType === 'Office Expense',
-          batchName: (values.batch as string) || undefined,
-          expenseType: (values.expenseType as string) || 'Expense',
-          amount,
-          originalFileName: fileObj.name,
-          mimeType: fileObj.type || 'image/png',
-          base64Content,
-          uploadedBy: user?.fullName || 'Employee',
-        });
-        if (driveRes && driveRes.googleDriveViewUrl) {
-          receiptLink = driveRes.googleDriveViewUrl;
-        }
-      } catch (e) {
-        console.warn('Google Drive receipt upload warning:', e);
-      }
-    }
-
-    const expType = values.expenseType === '__NEW_TYPE__' ? (values.newTypeInput as string) : (values.expenseType as string) || 'Miscellaneous';
-    const newRecord: ExpenseRecord = {
-      id: `exp-${Date.now()}`,
-      date: new Date().toLocaleDateString('en-GB'),
-      person: user?.fullName || 'Employee',
-      category: (values.categoryType as any) || 'Office Expense',
-      type: expType,
-      batch: values.batch as string,
-      vehicle: isSelfTravel ? vehicle : undefined,
-      km: isSelfTravel ? km : undefined,
-      rate: isSelfTravel ? rate : undefined,
-      route: values.route as string,
-      notes: (values.notes as string) || (values.route as string) || expType,
-      amount,
-      receipt: receiptLink,
-      status: 'submitted',
-    };
-
+    if (submittingClaim) return;
+    setSubmittingClaim(true);
     try {
-      const notesJson = JSON.stringify({
-        personName: user?.fullName || 'Employee',
-        expenseType: expType,
-        batchName: values.batch as string || null,
-        route: values.route as string || null,
-        vehicle: isSelfTravel ? vehicle : null,
-        km: isSelfTravel ? km : null,
-        rate: isSelfTravel ? rate : null,
-        userNotes: (values.notes as string) || (values.route as string) || '',
-      });
+      const isSelfTravel = values.expenseType === 'Self Travel';
+      const km = Number(values.km || 0);
+      const vehicle = (values.vehicle || 'Bike') as 'Bike' | 'Car';
+      const rate = vehicle === 'Car' ? carRate : bikeRate;
+      const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
 
-      const { error } = await supabase.from('flwdsk_expense_claims').insert({
-        employee_id: validEmpId,
-        category: values.categoryType || 'Office Expense',
-        amount,
-        receipt_url: receiptLink,
-        status: 'submitted',
-        notes: notesJson,
-      });
+      const isUUID = (str?: string) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const validEmpId = isUUID(user?.id) ? user?.id : null;
 
-      if (error) {
-        console.warn('Supabase insert warning, persisting to local state:', error.message);
+      let receiptLink: string =
+        (typeof values.receiptPreview === 'string' && values.receiptPreview)
+          ? values.receiptPreview
+          : (typeof values.receipt === 'string' && values.receipt)
+          ? values.receipt
+          : (values.receiptFile && (values.receiptFile as File).name)
+          ? (values.receiptFile as File).name
+          : 'Uploaded Proof';
+
+      if (values.receiptFile && values.receiptFile instanceof File) {
+        try {
+          const fileObj = values.receiptFile as File;
+          let base64Content = '';
+          try {
+            base64Content = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const res = reader.result as string;
+                resolve(res.includes(',') ? res.split(',')[1] : res);
+              };
+              reader.onerror = () => resolve('');
+              reader.readAsDataURL(fileObj);
+            });
+          } catch (e) {}
+
+          const driveRes = await googleIntegration.uploadReceiptWithMetadata({
+            date: new Date().toISOString().split('T')[0],
+            personName: user?.fullName || 'Employee',
+            isOfficeExpense: values.categoryType === 'Office Expense',
+            batchName: (values.batch as string) || undefined,
+            expenseType: (values.expenseType as string) || 'Expense',
+            amount,
+            originalFileName: fileObj.name,
+            mimeType: fileObj.type || 'image/png',
+            base64Content,
+            uploadedBy: user?.fullName || 'Employee',
+          });
+          if (driveRes && driveRes.googleDriveViewUrl) {
+            receiptLink = driveRes.googleDriveViewUrl;
+          }
+        } catch (e) {
+          console.warn('Google Drive receipt upload warning:', e);
+        }
       }
-    } catch (e: any) {
-      console.warn('Supabase expense submit catch warning:', e);
-    }
 
-    setExpenses((prev) => [newRecord, ...(Array.isArray(prev) ? prev : [])]);
-    const todayStr = new Date().toISOString().split('T')[0];
-    const monthFolder = `${todayStr.slice(0, 4)}-${['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(todayStr.slice(5, 7), 10) - 1]}`;
-    toast({
-      variant: 'success',
-      title: 'Claim Filed & Receipt Uploaded',
-      message: values.receiptFile
-        ? `Submitted ₹${amount.toFixed(2)} claim. Receipt saved in Google Drive: Office/Flow Desk/Receipt/${monthFolder}.`
-        : `Submitted ₹${amount.toFixed(2)} expense claim for review.`,
-    });
-    setExpenseOpen(false);
+      const expType = values.expenseType === '__NEW_TYPE__' ? (values.newTypeInput as string) : (values.expenseType as string) || 'Miscellaneous';
+      
+      const assocBatch = batches.find((b: any) =>
+        b.id === values.batch ||
+        b.name === values.batch ||
+        b.batchCode === values.batch ||
+        b.code === values.batch
+      );
+      const validBatchId = assocBatch && isUUID(assocBatch.id) ? assocBatch.id : null;
+
+      const newRecord: ExpenseRecord = {
+        id: `exp-${Date.now()}`,
+        date: new Date().toLocaleDateString('en-GB'),
+        person: user?.fullName || 'Employee',
+        category: (values.categoryType as any) || 'Office Expense',
+        type: expType,
+        batch: values.batch as string,
+        vehicle: isSelfTravel ? vehicle : undefined,
+        km: isSelfTravel ? km : undefined,
+        rate: isSelfTravel ? rate : undefined,
+        route: values.route as string,
+        notes: (values.notes as string) || (values.route as string) || expType,
+        amount,
+        receipt: receiptLink,
+        status: 'submitted',
+      };
+
+      try {
+        const notesJson = JSON.stringify({
+          personName: user?.fullName || 'Employee',
+          expenseType: expType,
+          batchName: values.batch as string || null,
+          route: values.route as string || null,
+          vehicle: isSelfTravel ? vehicle : null,
+          km: isSelfTravel ? km : null,
+          rate: isSelfTravel ? rate : null,
+          userNotes: (values.notes as string) || (values.route as string) || '',
+        });
+
+        // Idempotency key: a client-generated primary key means a replayed /
+        // retried identical submit collides on the PK instead of creating a
+        // duplicate claim (DB-level backstop to the submittingClaim UX lock).
+        const claimId =
+          typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
+
+        const { error } = await supabase.from('flwdsk_expense_claims').insert({
+          ...(claimId ? { id: claimId } : {}),
+          employee_id: validEmpId,
+          person_name: user?.fullName || 'Employee',
+          expense_type: expType,
+          amount,
+          category: values.categoryType || 'Office Expense',
+          receipt_url: receiptLink,
+          status: 'submitted',
+          notes: notesJson,
+          batch_id: validBatchId,
+          batch_name: (assocBatch as any)?.name || (values.batch as string) || null,
+          is_office_expense: values.categoryType === 'Office Expense',
+          description: (values.notes as string) || (values.route as string) || expType,
+        });
+
+        if (error) {
+          toast({
+            variant: 'error',
+            title: 'Submission Failed',
+            message: `Could not save claim to database: ${error.message}`,
+          });
+          return;
+        }
+      } catch (e: any) {
+        console.warn('Supabase expense submit catch warning:', e);
+        toast({
+          variant: 'error',
+          title: 'Submission Failed',
+          message: e.message || 'An unexpected database error occurred.',
+        });
+        return;
+      }
+
+      setExpenses((prev) => [newRecord, ...(Array.isArray(prev) ? prev : [])]);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const monthFolder = `${todayStr.slice(0, 4)}-${['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(todayStr.slice(5, 7), 10) - 1]}`;
+      toast({
+        variant: 'success',
+        title: 'Claim Filed & Receipt Uploaded',
+        message: values.receiptFile
+          ? `Submitted ₹${amount.toFixed(2)} claim. Receipt saved in Google Drive: Office/Flow Desk/Receipt/${monthFolder}.`
+          : `Submitted ₹${amount.toFixed(2)} expense claim for review.`,
+      });
+      setExpenseOpen(false);
+    } finally {
+      setSubmittingClaim(false);
+    }
   };
 
   const handleUpdateRate = async (exp: ExpenseRecord, newRate: number) => {
+    if (processingAction) return;
     if (isNaN(newRate) || newRate < 0) {
       toast({ variant: 'error', title: 'Invalid Rate', message: 'Rate must be a non-negative number.' });
       return;
     }
+    setProcessingAction(true);
     const km = exp.km || 0;
     const newAmount = km * newRate;
 
@@ -583,10 +707,14 @@ export function ExpenseClaims() {
       }
     } catch (e: any) {
       toast({ variant: 'error', title: 'Update Failed', message: e.message });
+    } finally {
+      setProcessingAction(false);
     }
   };
 
   const handleApprove = async (id: string) => {
+    if (processingAction) return;
+    setProcessingAction(true);
     try {
       const { error } = await supabase
         .from('flwdsk_expense_claims')
@@ -605,10 +733,14 @@ export function ExpenseClaims() {
       }
     } catch (e: any) {
       toast({ variant: 'error', title: 'Approval Failed', message: e.message });
+    } finally {
+      setProcessingAction(false);
     }
   };
 
   const handleReject = async (id: string) => {
+    if (processingAction) return;
+    setProcessingAction(true);
     try {
       const { error } = await supabase
         .from('flwdsk_expense_claims')
@@ -625,14 +757,21 @@ export function ExpenseClaims() {
       }
     } catch (e: any) {
       toast({ variant: 'error', title: 'Rejection Failed', message: e.message });
+    } finally {
+      setProcessingAction(false);
     }
   };
 
   const handleDeleteClaim = async (id: string) => {
+    if (processingAction) return;
+    setProcessingAction(true);
     try {
       const { error } = await supabase
         .from('flwdsk_expense_claims')
-        .delete()
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id,
+        })
         .eq('id', id);
 
       if (error) {
@@ -643,6 +782,8 @@ export function ExpenseClaims() {
       }
     } catch (e: any) {
       toast({ variant: 'error', title: 'Deletion Failed', message: e.message });
+    } finally {
+      setProcessingAction(false);
     }
   };
 
@@ -662,7 +803,7 @@ export function ExpenseClaims() {
 
   const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
     const selectedIds = Object.keys(selectedExpenses).filter((id) => selectedExpenses[id]);
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0 || processingAction) return;
 
     const actionText = action === 'approve' ? 'approve' : action === 'reject' ? 'reject' : 'delete';
     const confirmOk = await confirm({
@@ -671,11 +812,15 @@ export function ExpenseClaims() {
     });
     if (!confirmOk) return;
 
+    setProcessingAction(true);
     try {
       if (action === 'delete') {
         const { error } = await supabase
           .from('flwdsk_expense_claims')
-          .delete()
+          .update({
+            deleted_at: new Date().toISOString(),
+            deleted_by: user?.id,
+          })
           .in('id', selectedIds);
         if (error) throw error;
         toast({ variant: 'warning', title: 'Claims Deleted', message: `${selectedIds.length} claim(s) successfully deleted.` });
@@ -698,6 +843,8 @@ export function ExpenseClaims() {
       loadClaims();
     } catch (e: any) {
       toast({ variant: 'error', title: 'Bulk Action Failed', message: e.message });
+    } finally {
+      setProcessingAction(false);
     }
   };
 
@@ -735,7 +882,8 @@ export function ExpenseClaims() {
 
   return (
     <AppShell>
-      <PageHeader
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader
         title="Expense Claims & Reimbursements"
         subtitle="Conditional expense filing, auto-calculated travel KM rates, and locked approval audit trails"
         actions={
@@ -782,6 +930,117 @@ export function ExpenseClaims() {
         </div>
       </Card>
 
+      {/* Filters Row */}
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Search Description, Type, Batch or Route</label>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="kvj-input"
+                style={{ padding: '6px 12px', fontSize: 13 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Classification</label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as any)}
+                className="kvj-select"
+                style={{ padding: '6px 12px', fontSize: 13, minWidth: 150 }}
+              >
+                <option value="all">All Categories</option>
+                <option value="Office Expense">Office Expense</option>
+                <option value="Training Expense">Training Expense</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="kvj-select"
+                style={{ padding: '6px 12px', fontSize: 13, minWidth: 140 }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="submitted">Submitted</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Sort By</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="kvj-select"
+                style={{ padding: '6px 12px', fontSize: 13, minWidth: 130 }}
+              >
+                <option value="date">Date</option>
+                <option value="amount">Amount</option>
+                <option value="person">Employee</option>
+                <option value="category">Classification</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Order</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as any)}
+                className="kvj-select"
+                style={{ padding: '6px 12px', fontSize: 13, minWidth: 100 }}
+              >
+                <option value="desc">Descending</option>
+                <option value="asc">Ascending</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Start Date</label>
+              <input
+                type="date"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                className="kvj-input"
+                style={{ padding: '6px 12px', fontSize: 13 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>End Date</label>
+              <input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                className="kvj-input"
+                style={{ padding: '6px 12px', fontSize: 13 }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignSelf: 'flex-end', height: '36px', alignItems: 'center' }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setCategoryFilter('all');
+                  setStatusFilter('all');
+                  setStartDateFilter('');
+                  setEndDateFilter('');
+                  setSortBy('date');
+                  setSortOrder('desc');
+                }}
+              >
+                Reset Filters
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Expense Claims Table */}
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
@@ -823,78 +1082,75 @@ export function ExpenseClaims() {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 340px)', minHeight: 200, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-          <table className="kvj-table" style={{ marginBottom: 0 }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }}>
-              <tr>
-                {isManagement && (
-                  <th style={{ width: 36 }}>
-                    <input
-                      type="checkbox"
-                      onChange={(e) => handleSelectAllExpenses(e.target.checked)}
-                      checked={
-                        filteredExpenses.length > 0 &&
-                        filteredExpenses.every((exp) => selectedExpenses[exp.id])
-                      }
-                    />
-                  </th>
-                )}
-                <th>Date</th>
-                <th>Employee</th>
-                <th>Classification</th>
-                <th>Expense Type</th>
-                <th>Batch / Route</th>
-                <th>Amount (₹)</th>
-                <th>Receipt</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredExpenses.map((exp) => {
-                const isLocked = exp.status === 'approved';
-                return (
-                  <tr key={exp.id}>
-                    {isManagement && (
+        {filteredExpenses.length === 0 ? (
+          <EmptyState
+            title="No expense claims found"
+            message="No records match your selected search query or filter criteria."
+          />
+        ) : (
+          // Horizontal scroll only — the page (AppShell main) scrolls vertically,
+          // so the table shows its full height and the last row's actions are
+          // always reachable. A nested vertical scroll previously clipped it.
+          <div style={{ overflowX: 'auto', minHeight: 200, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <table className="kvj-table" style={{ marginBottom: 0 }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }}>
+                <tr>
+                  {isManagement && (
+                    <th style={{ width: 36 }}>
+                      <input
+                        type="checkbox"
+                        onChange={(e) => handleSelectAllExpenses(e.target.checked)}
+                        checked={
+                          filteredExpenses.length > 0 &&
+                          filteredExpenses.every((exp) => selectedExpenses[exp.id])
+                        }
+                      />
+                    </th>
+                  )}
+                  <th>Date</th>
+                  <th>Employee</th>
+                  <th>Classification</th>
+                  <th>Expense Type</th>
+                  <th>Batch / Route</th>
+                  <th>Amount (₹)</th>
+                  <th>Receipt</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredExpenses.map((exp) => {
+                  const isLocked = exp.status === 'approved';
+                  return (
+                    <tr key={exp.id}>
+                      {isManagement && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!!selectedExpenses[exp.id]}
+                            onChange={(e) => handleSelectExpense(exp.id, e.target.checked)}
+                          />
+                        </td>
+                      )}
+                      <td style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{exp.date}</td>
+                      <td>{exp.person}</td>
                       <td>
-                        <input
-                          type="checkbox"
-                          checked={!!selectedExpenses[exp.id]}
-                          onChange={(e) => handleSelectExpense(exp.id, e.target.checked)}
-                        />
+                        <Badge tone={exp.category.includes('Training') ? 'info' : 'neutral'}>
+                          {exp.category}
+                        </Badge>
                       </td>
-                    )}
-                    <td style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{exp.date}</td>
-                    <td>{exp.person}</td>
-                    <td>
-                      <Badge tone={exp.category.includes('Training') ? 'info' : 'neutral'}>
-                        {exp.category}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{exp.type}</div>
-                      {exp.vehicle && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          <span>{exp.vehicle} · {exp.km} km @ ₹</span>
-                          {exp.status === 'submitted' && isManagement ? (
-                            <input
-                              type="number"
-                              value={editingRates[exp.id] !== undefined ? editingRates[exp.id] : (exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate))}
-                              onChange={(e) => setEditingRates(prev => ({ ...prev, [exp.id]: e.target.value }))}
-                              onBlur={(e) => {
-                                const val = Number(e.target.value);
-                                if (!isNaN(val) && val >= 0) {
-                                  handleUpdateRate(exp, val);
-                                }
-                                setEditingRates(prev => {
-                                  const next = { ...prev };
-                                  delete next[exp.id];
-                                  return next;
-                                });
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  const val = Number((e.target as HTMLInputElement).value);
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{exp.type}</div>
+                        {exp.vehicle && (
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                            <span>{exp.vehicle} · {exp.km} km @ ₹</span>
+                            {exp.status === 'submitted' && isManagement ? (
+                              <input
+                                type="number"
+                                value={editingRates[exp.id] !== undefined ? editingRates[exp.id] : (exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate))}
+                                onChange={(e) => setEditingRates(prev => ({ ...prev, [exp.id]: e.target.value }))}
+                                onBlur={(e) => {
+                                  const val = Number(e.target.value);
                                   if (!isNaN(val) && val >= 0) {
                                     handleUpdateRate(exp, val);
                                   }
@@ -903,117 +1159,132 @@ export function ExpenseClaims() {
                                     delete next[exp.id];
                                     return next;
                                   });
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const val = Number((e.target as HTMLInputElement).value);
+                                    if (!isNaN(val) && val >= 0) {
+                                      handleUpdateRate(exp, val);
+                                    }
+                                    setEditingRates(prev => {
+                                      const next = { ...prev };
+                                      delete next[exp.id];
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                style={{
+                                  width: '55px',
+                                  padding: '1px 3px',
+                                  fontSize: '12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: '4px',
+                                  textAlign: 'center',
+                                  background: 'var(--bg-sunken)',
+                                  color: 'var(--text-primary)',
+                                  fontWeight: 'bold'
+                                }}
+                              />
+                            ) : (
+                              <span>{exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate)}</span>
+                            )}
+                            <span>/km</span>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500, color: 'var(--brand)' }}>{exp.batch || '—'}</div>
+                        {exp.route && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>🗺 {exp.route}</div>}
+                      </td>
+                      <td style={{ fontWeight: 800, color: 'var(--status-success)', fontVariantNumeric: 'tabular-nums' }}>
+                        ₹ {exp.amount.toFixed(2)}
+                      </td>
+                      <td>
+                        {(() => {
+                          const r = exp.receipt || '';
+                          const isRealUrl = r.startsWith('http://') || r.startsWith('https://') || r.startsWith('data:');
+                          if (isRealUrl) {
+                            return (
+                              <a
+                                href={r}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                              >
+                                📎 View Receipt
+                              </a>
+                            );
+                          } else if (r && r !== 'Uploaded Proof') {
+                            return (
+                              <span title={`File: ${r}`} style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'default' }}>
+                                📎 {r}
+                              </span>
+                            );
+                          } else if (exp.vehicle) {
+                            return <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>KM Auto-Calc</span>;
+                          } else if (r === 'Uploaded Proof') {
+                            return <span title="Receipt was uploaded but the direct link is not available" style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'default' }}>📎 Uploaded</span>;
+                          } else {
+                            return <span style={{ fontSize: 12, color: 'var(--status-danger)' }}>Missing</span>;
+                          }
+                        })()}
+                      </td>
+                      <td>
+                        <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
+                          {isLocked ? '🔒 Approved' : exp.status}
+                        </Badge>
+                        {exp.approvedBy && (
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                            by {exp.approvedBy}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {!isLocked && exp.status === 'submitted' && isManagement && (
+                            <>
+                              <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>Approve</Button>
+                              <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>Reject</Button>
+                            </>
+                          )}
+                          {!isLocked && (
+                            <Button
+                              size="xs"
+                              variant="danger"
+                              loading={processingAction}
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: 'Delete Expense Claim?',
+                                  message: `Are you sure you want to delete this expense claim for ₹${exp.amount.toFixed(2)}? This cannot be undone.`,
+                                });
+                                if (ok) {
+                                  await handleDeleteClaim(exp.id);
                                 }
                               }}
-                              style={{
-                                width: '55px',
-                                padding: '1px 3px',
-                                fontSize: '11px',
-                                border: '1px solid var(--border)',
-                                borderRadius: '4px',
-                                textAlign: 'center',
-                                background: 'var(--bg-sunken)',
-                                color: 'var(--text-primary)',
-                                fontWeight: 'bold'
-                              }}
-                            />
-                          ) : (
-                            <span>{exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate)}</span>
-                          )}
-                          <span>/km</span>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500, color: 'var(--brand)' }}>{exp.batch || '—'}</div>
-                      {exp.route && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>🗺 {exp.route}</div>}
-                    </td>
-                    <td style={{ fontWeight: 800, color: 'var(--status-success)', fontVariantNumeric: 'tabular-nums' }}>
-                      ₹ {exp.amount.toFixed(2)}
-                    </td>
-                    <td>
-                      {(() => {
-                        const r = exp.receipt || '';
-                        const isRealUrl = r.startsWith('http://') || r.startsWith('https://') || r.startsWith('data:');
-                        if (isRealUrl) {
-                          return (
-                            <a
-                              href={r}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             >
-                              📎 View Receipt
-                            </a>
-                          );
-                        } else if (r && r !== 'Uploaded Proof') {
-                          return (
-                            <span title={`File: ${r}`} style={{ fontSize: 11, color: 'var(--text-muted)', cursor: 'default' }}>
-                              📎 {r}
+                              Delete
+                            </Button>
+                          )}
+                          {isLocked && (
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              🔒 Locked
                             </span>
-                          );
-                        } else if (exp.vehicle) {
-                          return <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>KM Auto-Calc</span>;
-                        } else if (r === 'Uploaded Proof') {
-                          return <span title="Receipt was uploaded but the direct link is not available" style={{ fontSize: 11, color: 'var(--text-muted)', cursor: 'default' }}>📎 Uploaded</span>;
-                        } else {
-                          return <span style={{ fontSize: 11, color: 'var(--status-danger)' }}>Missing</span>;
-                        }
-                      })()}
-                    </td>
-                    <td>
-                      <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
-                        {isLocked ? '🔒 Approved' : exp.status}
-                      </Badge>
-                      {exp.approvedBy && (
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                          by {exp.approvedBy}
+                          )}
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        {!isLocked && exp.status === 'submitted' && isManagement && (
-                          <>
-                            <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)}>Approve</Button>
-                            <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)}>Reject</Button>
-                          </>
-                        )}
-                        {!isLocked && (
-                          <Button
-                            size="xs"
-                            variant="danger"
-                            onClick={async () => {
-                              const ok = await confirm({
-                                title: 'Delete Expense Claim?',
-                                message: `Are you sure you want to delete this expense claim for ₹${exp.amount.toFixed(2)}? This cannot be undone.`,
-                              });
-                              if (ok) {
-                                await handleDeleteClaim(exp.id);
-                              }
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        )}
-                        {isLocked && (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            🔒 Locked
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
+      </div>
 
       {/* Submit Expense Drawer */}
       <Drawer open={expenseOpen} onClose={() => setExpenseOpen(false)} title="Submit Expense Claim">
-        <Form initial={{ categoryType: 'Office Expense', expenseType: 'Self Travel', vehicle: 'Bike', km: '0' }} onSubmit={handleExpenseSubmit}>
+        <Form initial={{ categoryType: 'Office Expense', expenseType: 'Self Travel', vehicle: 'Bike', km: '', route: '', amount: '' }} onSubmit={handleExpenseSubmit}>
           <DynamicExpenseForm
             bikeRate={bikeRate}
             carRate={carRate}
@@ -1022,6 +1293,7 @@ export function ExpenseClaims() {
             onRegisterNewType={handleRegisterNewType}
             onSubmit={handleExpenseSubmit}
             onCancel={() => setExpenseOpen(false)}
+            submittingClaim={submittingClaim}
           />
         </Form>
       </Drawer>

@@ -8,7 +8,7 @@ interface SessionAttendanceBarChartProps {
 
 export const SessionAttendanceBarChart: React.FC<SessionAttendanceBarChartProps> = ({
   sessions,
-  title = 'V2. Session-wise Present vs Absent',
+  title = 'Session-wise Present vs Absent',
   caption = 'Source: Daily Attendance Registry',
 }) => {
   if (!sessions || sessions.length === 0) {

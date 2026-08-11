@@ -40,7 +40,7 @@ export const StudentAttendanceDetailsSection: React.FC<SectionProps> = ({ data }
                   {st.attendancePct}%
                 </td>
                 <td style={{ padding: 8, fontWeight: 700, fontSize: 11, color: isWarning ? '#b91c1c' : '#16a34a' }}>
-                  {isWarning ? '⚠️ Low (<75%)' : '✓ Normal'}
+                  {isWarning ? 'Low (<75%)' : '✓ Normal'}
                 </td>
               </tr>
             );

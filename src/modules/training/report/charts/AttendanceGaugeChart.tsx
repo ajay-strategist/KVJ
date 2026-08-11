@@ -8,7 +8,7 @@ interface AttendanceGaugeChartProps {
 
 export const AttendanceGaugeChart: React.FC<AttendanceGaugeChartProps> = ({
   percentage,
-  title = 'V4. Attendance % Gauge',
+  title = 'Attendance % Gauge',
   caption = 'Overall Batch Attendance Rate',
 }) => {
   const pct = Math.min(Math.max(percentage, 0), 100);

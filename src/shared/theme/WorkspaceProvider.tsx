@@ -27,7 +27,7 @@ export const WORKSPACE_PRESETS: Record<string, WorkspacePreset> = {
     wallpaper: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)',
     glassOpacity: 0.88, // Apple standard: Dark theme min 88%
     glassBlur: 30,
-    accentColor: '#3B82F6',
+    accentColor: 'var(--brand)',
     cornerRadius: 24,
     shadowSoftness: 0.35,
     animationSpeed: 0.3,

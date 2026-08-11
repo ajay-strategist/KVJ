@@ -72,7 +72,7 @@ export const BatchInfoSection: React.FC<SectionProps> = ({ data }) => {
 
       {/* Batch Certificate Status (One block, not per student) */}
       <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#166534', margin: '0 0 8px 0' }}>📜 Batch Certificate Delivery Status</h4>
+        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#166534', margin: '0 0 8px 0' }}>Batch Certificate Delivery Status</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, fontSize: 12 }}>
           <div><span style={{ color: '#15803d' }}>Printed Status:</span> <strong>{cert.printed ? `Yes (${cert.printedCount}/${cert.totalCount})` : 'Pending'}</strong></div>
           <div><span style={{ color: '#15803d' }}>Delivered to College:</span> <strong>{cert.deliveredToCollege ? 'Delivered' : 'Pending Dispatch'}</strong></div>

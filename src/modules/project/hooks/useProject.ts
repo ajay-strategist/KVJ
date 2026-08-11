@@ -157,18 +157,18 @@ export function useProject() {
 
   const deleteProject = useCallback(async (projectId: UUID): Promise<CallbackResult<void>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
-    try {
-      const projectRepo = container.resolve(PROJECT_REPOSITORY_TOKEN);
-      await projectRepo.hardDelete(projectId);
+    // Soft-delete via the service: the project and its tasks are hidden but kept
+    // in the database (recoverable). No hard delete — no data is destroyed.
+    const res = await service.deleteProject(projectId, { id: user.id, role: user.role });
+    if (res.ok) {
       setProjects((prev) => prev.filter((p) => p.id !== projectId));
       setAllocations((prev) => prev.filter((a) => a.projectId !== projectId));
       setTasks((prev) => prev.filter((t) => t.projectId !== projectId));
       setTimesheets((prev) => prev.filter((ts) => ts.projectId !== projectId));
       return { ok: true, value: undefined };
-    } catch (e: any) {
-      return { ok: false, error: e.message };
     }
-  }, [user]);
+    return { ok: false, error: res.error.message };
+  }, [service, user]);
 
   const submitTask = useCallback(async (taskId: UUID, notes: string): Promise<CallbackResult<Task>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };

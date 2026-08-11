@@ -80,6 +80,31 @@ export async function fetchScheduleRange(
     }
   }
 
+  // Load declared holidays from Supabase
+  try {
+    const { data: dbHolidays, error: holidayErr } = await supabase
+      .from('flwdsk_declared_holidays')
+      .select('*')
+      .gte('date', q.from)
+      .lte('date', q.to)
+      .is('deleted_at', null);
+
+    if (!holidayErr && dbHolidays) {
+      for (const h of dbHolidays) {
+        if (!holidays.some((existing) => existing.date === h.date)) {
+          holidays.push({
+            id: h.id,
+            date: h.date,
+            name: h.name || 'Company Holiday',
+            type: (h.type as any) || 'Company',
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load declared holidays for schedule', e);
+  }
+
   const leaves: LeaveRequest[] = [];
   try {
     const { data: dbLeaves, error } = await supabase

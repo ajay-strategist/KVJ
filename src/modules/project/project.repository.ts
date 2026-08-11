@@ -19,6 +19,8 @@ export interface Client extends Entity {
 export interface Project extends Entity {
   clientId?: UUID;
   supervisorId?: UUID;
+  /** Employee ids assigned to the project (in addition to the supervisor). */
+  memberIds?: UUID[];
   title: string;
   code: string;
   category: string;

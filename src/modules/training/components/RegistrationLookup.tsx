@@ -89,7 +89,7 @@ export function RegistrationLookup({
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
               ✓ {match.fullName} ({match.gender})
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {match.qualification} · {match.email} · {match.college}
             </div>
           </div>
@@ -98,7 +98,7 @@ export function RegistrationLookup({
       )}
 
       {searched && !match && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>ℹ No registration record found for phone. You can enter details manually.</span>
         </div>
       )}

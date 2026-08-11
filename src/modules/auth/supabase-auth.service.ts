@@ -26,7 +26,14 @@
 import type { RoleKey } from '../../shared/permissions/roles';
 import { AppError } from '../../core/result';
 import { businessRules } from '../../config/business-rules';
-import { supabase } from '../../shared/integration/supabase';
+import {
+  supabase,
+  AUTH_MODE,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  setSupabaseAccessToken,
+  getSupabaseAccessToken,
+} from '../../shared/integration/supabase';
 import {
   type AuthUser,
   type BootstrapAdminInput,
@@ -248,6 +255,115 @@ export class SupabaseAuthService implements IAuthService {
 
 
   /** Build the app Session from a Supabase session + employee profile. */
+  // ── Phase 6.44 — custom-JWT (issue-session / refresh-session) helpers ────────
+  private static readonly REFRESH_KEY = 'kvj_refresh';
+
+  private fnHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    };
+  }
+
+  private clearJwtLocal(): void {
+    setSupabaseAccessToken(null);
+    try {
+      localStorage.removeItem(SupabaseAuthService.REFRESH_KEY);
+      localStorage.removeItem('kvj_app_session');
+    } catch (_) {}
+  }
+
+  private currentRememberMe(): boolean {
+    try {
+      const s = JSON.parse(localStorage.getItem('kvj_app_session') || '{}');
+      return !!s.rememberMe;
+    } catch {
+      return true;
+    }
+  }
+
+  /** Apply the token bundle returned by an Edge Function into client + storage. */
+  private applyJwtTokens(data: any, rememberMe: boolean): Session {
+    const accessToken: string = data.access_token;
+    setSupabaseAccessToken(accessToken);
+    try {
+      localStorage.setItem(SupabaseAuthService.REFRESH_KEY, data.refresh_token);
+    } catch (_) {}
+    const employee = (data.employee || {}) as EmployeeProfileRow;
+    const user = toAuthUser(employee, employee.email || '');
+    const session: Session = {
+      user,
+      token: accessToken,
+      issuedAt: Date.now(),
+      expiresAt: (typeof data.expires_at === 'number' ? data.expires_at : Math.floor(Date.now() / 1000)) * 1000,
+      rememberMe,
+    };
+    try {
+      localStorage.setItem('kvj_app_session', JSON.stringify(session));
+    } catch (_) {}
+    return session;
+  }
+
+  /** jwt mode: verify credentials server-side and mint a Supabase JWT. */
+  private async issueJwtSession(identifier: string, password: string, rememberMe: boolean): Promise<Session> {
+    let res: Response;
+    try {
+      res = await fetch(`${SUPABASE_URL}/functions/v1/issue-session`, {
+        method: 'POST',
+        headers: this.fnHeaders(),
+        body: JSON.stringify({ identifier, password }),
+      });
+    } catch {
+      throw invalidCredentials();
+    }
+    if (!res.ok) throw invalidCredentials();
+    return this.applyJwtTokens(await res.json(), rememberMe);
+  }
+
+  /** jwt mode: exchange the stored refresh token for a fresh access JWT. */
+  private async refreshJwtSession(): Promise<Session | null> {
+    let rt: string | null = null;
+    try {
+      rt = localStorage.getItem(SupabaseAuthService.REFRESH_KEY);
+    } catch (_) {}
+    if (!rt) {
+      this.clearJwtLocal();
+      return null;
+    }
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/refresh-session`, {
+        method: 'POST',
+        headers: this.fnHeaders(),
+        body: JSON.stringify({ refresh_token: rt }),
+      });
+      if (!res.ok) {
+        this.clearJwtLocal();
+        return null;
+      }
+      return this.applyJwtTokens(await res.json(), this.currentRememberMe());
+    } catch {
+      this.clearJwtLocal();
+      return null;
+    }
+  }
+
+  /** jwt mode: restore session on reload; refresh if the access token is stale. */
+  private async getJwtSession(): Promise<Session | null> {
+    let appSession: Session | null = null;
+    try {
+      const stored = localStorage.getItem('kvj_app_session');
+      appSession = stored ? (JSON.parse(stored) as Session) : null;
+    } catch {
+      appSession = null;
+    }
+    if (!appSession) return null;
+    if (getSupabaseAccessToken() && appSession.expiresAt > Date.now() + 60_000) {
+      return appSession;
+    }
+    return this.refreshJwtSession();
+  }
+
   private async buildSession(
     accessToken: string,
     expiresAtSeconds: number | undefined,
@@ -283,6 +399,13 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async login(credentials: Credentials): Promise<Session> {
+    // Phase 6.44 jwt mode: verify app credentials in the issue-session Edge
+    // Function and drive PostgREST with the returned Supabase JWT. The legacy
+    // path below is preserved and used unchanged when AUTH_MODE === 'legacy'.
+    if (AUTH_MODE === 'jwt') {
+      return this.issueJwtSession(credentials.email, credentials.password, !!credentials.rememberMe);
+    }
+
     const email = await this.resolveIdentifierToEmail(credentials.email);
     const pwd = credentials.password;
 
@@ -427,6 +550,24 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async logout(): Promise<void> {
+    if (AUTH_MODE === 'jwt') {
+      // Best-effort server-side revoke of the refresh token, then clear locally.
+      let rt: string | null = null;
+      try {
+        rt = localStorage.getItem(SupabaseAuthService.REFRESH_KEY);
+      } catch (_) {}
+      if (rt) {
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/refresh-session`, {
+            method: 'POST',
+            headers: this.fnHeaders(),
+            body: JSON.stringify({ action: 'revoke', refresh_token: rt }),
+          });
+        } catch (_) {}
+      }
+      this.clearJwtLocal();
+      return;
+    }
     try {
       localStorage.removeItem('kvj_app_session');
     } catch (_) {}
@@ -434,6 +575,7 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async getSession(): Promise<Session | null> {
+    if (AUTH_MODE === 'jwt') return this.getJwtSession();
     try {
       const stored = localStorage.getItem('kvj_app_session');
       if (stored) {
@@ -467,6 +609,7 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async refresh(): Promise<Session | null> {
+    if (AUTH_MODE === 'jwt') return this.refreshJwtSession();
     try {
       const stored = localStorage.getItem('kvj_app_session');
       if (stored) {
@@ -492,6 +635,10 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async requestPasswordReset(email: string): Promise<{ sent: boolean }> {
+    // jwt mode: credentials live in flwdsk_employees, not auth.users, and GoTrue
+    // is disabled — self-service email recovery is not wired. Report success
+    // (no account enumeration); admins reset via user management (flwdsk_set_password).
+    if (AUTH_MODE === 'jwt') return { sent: true };
     // Supabase sends the recovery mail. Always report success so this cannot be
     // used to enumerate which accounts exist.
     await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
@@ -506,6 +653,11 @@ export class SupabaseAuthService implements IAuthService {
    * user; the token is consumed by the client, not passed through here.
    */
   async resetPassword(_token: string, newPassword: string): Promise<{ ok: boolean }> {
+    // jwt mode has no GoTrue recovery-link session to update; password changes go
+    // through the app-level flwdsk_set_password path (updateUserPassword).
+    if (AUTH_MODE === 'jwt') {
+      throw serverSideOnly('Completing an email password-recovery link');
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw AppError.internal(error.message);
     return { ok: true };
@@ -641,13 +793,22 @@ export class SupabaseAuthService implements IAuthService {
   /** Soft-deletes the employee record; removing the credential needs service-role. */
   async deleteUser(userId: string): Promise<{ ok: boolean }> {
     const ts = new Date().toISOString();
-    const { data: sessionData } = await supabase.auth.getSession();
+    // Resolve the acting user id without touching GoTrue in jwt mode.
+    let actorId: string | null = null;
+    if (AUTH_MODE === 'jwt') {
+      try {
+        actorId = (JSON.parse(localStorage.getItem('kvj_app_session') || '{}')?.user?.id) ?? null;
+      } catch (_) {}
+    } else {
+      const { data: sessionData } = await supabase.auth.getSession();
+      actorId = sessionData.session?.user.id ?? null;
+    }
 
     const { error } = await supabase
       .from('flwdsk_employees')
       .update({
         deleted_at: ts,
-        deleted_by: sessionData.session?.user.id ?? null,
+        deleted_by: actorId,
         updated_at: ts,
       })
       .eq('id', userId);
@@ -730,6 +891,10 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async bootstrapInitialAdmin(input: BootstrapAdminInput): Promise<AuthUser> {
+    // Bootstrapping a Supabase Auth credential needs GoTrue/service-role, neither
+    // of which is available in jwt mode. The first admin is provisioned once via
+    // supabase/provision-admin.sql.
+    if (AUTH_MODE === 'jwt') throw serverSideOnly('Bootstrapping the initial admin');
     const { data, error } = await supabase.auth.signUp({
       email: input.email,
       password: input.password,

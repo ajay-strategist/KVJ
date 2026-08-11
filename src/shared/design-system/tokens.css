@@ -16,15 +16,16 @@
 
   /* ── Light Surfaces ── */
   --bg-app: #F8FAFF;
-  --bg-surface: rgba(255, 255, 255, 0.75);
+  --bg-surface: rgba(255, 255, 255, 0.92);
   --bg-panel: #FFFFFF;
-  --bg-sunken: rgba(241, 245, 255, 0.80);
+  --bg-sunken: rgba(241, 245, 255, 0.85);
   --bg-hover: rgba(59, 130, 246, 0.07);
   --bg-active: rgba(59, 130, 246, 0.14);
-  --bg-form: rgba(248, 250, 255, 0.95);
-  --bg-table: rgba(255, 255, 255, 0.80);
-  --bg-card: rgba(255, 255, 255, 0.75);
-  --bg-overlay: rgba(15, 23, 42, 0.40);
+  --bg-form: rgba(248, 250, 255, 0.98);
+  --bg-table: rgba(255, 255, 255, 0.94);
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-overlay: rgba(15, 23, 42, 0.45);
+  --overlay-blur: 3px;
 
   /* ── Gradient Canvas ── */
   --app-canvas:
@@ -38,7 +39,7 @@
   --border-strong: rgba(203, 213, 225, 0.98);
   --border-focus: var(--brand);
   --border-color: rgba(226, 232, 240, 0.90); /* alias for legacy code */
-  --glass-blur: 24px;
+  --glass-blur: 12px;
   --glass-border: 1px solid rgba(255, 255, 255, 0.80);
   --glow-ambient: rgba(120, 160, 255, 0.12);
 
@@ -91,15 +92,16 @@
   --accent-muted: rgba(139, 92, 246, 0.16);
 
   --bg-app: #060A13;
-  --bg-surface: rgba(15, 23, 40, 0.65);
+  --bg-surface: rgba(15, 23, 40, 0.90);
   --bg-panel: #0D1422;
-  --bg-sunken: rgba(8, 14, 26, 0.80);
+  --bg-sunken: rgba(8, 14, 26, 0.88);
   --bg-hover: rgba(59, 130, 246, 0.12);
   --bg-active: rgba(59, 130, 246, 0.22);
-  --bg-form: rgba(10, 16, 28, 0.90);
-  --bg-table: rgba(15, 23, 40, 0.70);
-  --bg-card: rgba(15, 23, 40, 0.65);
-  --bg-overlay: rgba(2, 6, 23, 0.70);
+  --bg-form: rgba(10, 16, 28, 0.94);
+  --bg-table: rgba(15, 23, 40, 0.90);
+  --bg-card: rgba(15, 23, 40, 0.90);
+  --bg-overlay: rgba(2, 6, 23, 0.60);
+  --overlay-blur: 3px;
 
   --app-canvas:
     radial-gradient(1300px 650px at 12% -5%, rgba(8, 27, 56, 0.9), transparent 65%),
@@ -113,7 +115,7 @@
   --border-strong: rgba(255, 255, 255, 0.26);
   --border-focus: var(--brand);
   --border-color: rgba(255, 255, 255, 0.14);
-  --glass-blur: 30px;
+  --glass-blur: 14px;
   --glass-border: 1px solid rgba(255, 255, 255, 0.11);
   --glow-ambient: rgba(90, 150, 255, 0.16);
   --grain-opacity: 0.05;
@@ -181,9 +183,9 @@
   --font-report: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter', serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
 
-  --font-size-xs: 11px;
-  --font-size-sm: 12px;
-  --font-size-base: 13.5px;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
   --font-size-md: 15px;
   --font-size-lg: 18px;
   --font-size-xl: 22px;
@@ -245,3 +247,26 @@
     border-color var(--dur-base) var(--ease-standard),
     box-shadow var(--dur-base) var(--ease-standard);
 }
+
+/* ── Accessibility: Universal Keyboard Focus Ring (WCAG 2.1) ── */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--brand) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Mobile Touch Targets (Min 44x44px for Apple HIG / WCAG Target Size) ── */
+@media (max-width: 640px) {
+  button:not(.kvj-badge),
+  [role="button"],
+  .kvj-btn,
+  .kvj-drawer-close {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+

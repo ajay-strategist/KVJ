@@ -45,6 +45,7 @@ const ICON_PATHS: Record<string, string> = {
   ChevronLeft: 'M15 18l-6-6 6-6',
   ChevronRight: 'M9 18l6-6-6-6',
   ChevronDown: 'M6 9l6 6 6-6',
+  ChevronUp: 'M18 15l-6-6-6 6',
   Menu: 'M3 6h18M3 12h18M3 18h18',
   Search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',
   Bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
@@ -129,7 +130,14 @@ function AppShellFrame({ children }: { children: ReactNode }) {
 
   const items = visibleNav(can, user?.role);
   const isMobile = device === 'mobile';
+  const isTablet = device === 'tablet';
   const width = collapsed && !isMobile ? 68 : 256;
+
+  // On tablet-width screens the full 256px sidebar crowds the content area, so
+  // collapse it to the icon rail automatically (desktop keeps the user's choice).
+  useEffect(() => {
+    if (isTablet) setCollapsed(true);
+  }, [isTablet]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -145,6 +153,19 @@ function AppShellFrame({ children }: { children: ReactNode }) {
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Escape closes any open menu/overlay (keyboard accessibility).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setUserOpen(false);
+        setNotifOpen(false);
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
   const filteredNotifs = notifCategory === 'all'
@@ -211,12 +232,12 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                       <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
                         {appConfig.app.productTitle}
                       </span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
                         {appConfig.app.byCompany}
                       </span>
                     </div>
                   )}
-                  <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.03em', marginTop: 2 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.03em', marginTop: 2 }}>
                     {appConfig.app.tagline}
                   </span>
                 </div>
@@ -273,7 +294,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                         position: 'absolute', top: 2, right: 2,
                         minWidth: 14, height: 14, padding: '0 3px',
                         borderRadius: 999, background: 'var(--status-danger)',
-                        color: '#fff', fontSize: 8.5, fontWeight: 800,
+                        color: '#fff', fontSize: 12, fontWeight: 800,
                         display: 'grid', placeItems: 'center', lineHeight: 1,
                       }}>
                         {unreadCount > 99 ? '99+' : unreadCount}
@@ -330,7 +351,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {user.fullName}
                       </div>
-                      <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{user.role}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{user.role}</div>
                     </div>
                   )}
                   {(!collapsed || isMobile) && <Icon name="ChevronUp" size={13} />}
@@ -353,8 +374,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                         {user && <Avatar name={user.fullName} src={user.avatarUrl} size={34} />}
                         <div>
                           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>{user?.fullName}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                            <span style={{ background: 'var(--brand-muted)', color: 'var(--brand)', padding: '1px 7px', borderRadius: 999, fontSize: 9.5, fontWeight: 700 }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                            <span style={{ background: 'var(--brand-muted)', color: 'var(--brand)', padding: '1px 7px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
                               {user?.role}
                             </span>
                           </div>
@@ -440,8 +461,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               border: '1px solid var(--border-strong, var(--border))',
               borderRadius: 'var(--radius-xl)',
               boxShadow: 'var(--e4)',
-              backdropFilter: 'blur(30px)',
-              WebkitBackdropFilter: 'blur(30px)',
+              backdropFilter: 'blur(var(--overlay-blur, 3px))',
+              WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
               zIndex: 1250,
               display: 'flex',
               flexDirection: 'column',
@@ -457,7 +478,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     onClick={markAllRead}
-                    style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                    style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
                   >
                     Mark all read
                   </button>
@@ -487,7 +508,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                         flexShrink: 0,
                         padding: '4px 10px',
                         borderRadius: 999,
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: 600,
                         whiteSpace: 'nowrap',
                         border: isSelected ? '1px solid var(--brand)' : '1px solid var(--border)',
@@ -506,7 +527,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                           background: 'var(--status-danger)',
                           color: '#fff',
                           borderRadius: 999,
-                          fontSize: 9,
+                          fontSize: 12,
                           padding: '1px 5px',
                           fontWeight: 800,
                           lineHeight: 1,
@@ -544,13 +565,17 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                     <Icon name="Bell" size={18} />
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>No notifications</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>You're all caught up!</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>You're all caught up!</span>
                 </div>
               ) : (
                 filteredNotifs.map((item) => (
                   <div
                     key={item.id}
                     onClick={() => markRead(item.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); markRead(item.id); } }}
+                    aria-label={`Mark notification "${item.title}" as read`}
                     style={{
                       padding: '10px 12px',
                       borderRadius: 'var(--radius-md)',
@@ -567,7 +592,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                         {item.title}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                        <span style={{ fontSize: 9.5, color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                           {(item as any).createdAt ? timeAgo((item as any).createdAt) : ''}
                         </span>
                         <button
@@ -597,7 +622,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                       </div>
                     </div>
                     {item.message && (
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, paddingRight: 16 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2, paddingRight: 16 }}>
                         {item.message}
                       </div>
                     )}
@@ -614,8 +639,9 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             onClick={() => setMobileOpen(false)}
             style={{
               position: 'fixed', inset: 0,
-              background: 'rgba(2,6,23,0.55)',
-              backdropFilter: 'blur(8px)',
+              background: 'var(--bg-overlay)',
+              backdropFilter: 'blur(var(--overlay-blur, 3px))',
+              WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
               zIndex: 1050,
             }}
           />
@@ -673,8 +699,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                 <span>Enterprise Operations Platform</span>
               </div>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--brand)', fontWeight: 600, fontSize: 11 }}>Connect. Manage. Transform.</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>© 2026 KVJ Analytics. All Rights Reserved.</span>
+                <span style={{ color: 'var(--brand)', fontWeight: 600, fontSize: 12 }}>Connect. Manage. Transform.</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>© 2026 KVJ Analytics. All Rights Reserved.</span>
               </div>
             </footer>
           </main>
@@ -701,13 +727,12 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               }}
             >
               {[
-                { to: '/app/workspaces/my-day', label: 'My Day', icon: 'Home' },
+                { to: '/app', label: 'My Day', icon: 'Home' },
                 { to: '/app/employees', label: 'Employees', icon: 'Users' },
                 { to: '/app/training/calendar', label: 'Training', icon: 'CalendarDays' },
-                { to: '/app/projects/tasks', label: 'Tasks', icon: 'FolderKanban' },
+                { to: '/app/project/tasks', label: 'Tasks', icon: 'FolderKanban' },
                 { to: '/app/leave', label: 'Leave', icon: 'Clock' },
               ].map((item) => {
-                const { pathname } = useLocation();
                 const active = pathname === item.to || (item.to !== '/app' && pathname.startsWith(item.to));
                 return (
                   <Link
@@ -723,7 +748,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                       height: '100%',
                       color: active ? 'var(--brand)' : 'var(--text-secondary)',
                       textDecoration: 'none',
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: active ? 700 : 500,
                       transition: 'color 140ms ease',
                     }}

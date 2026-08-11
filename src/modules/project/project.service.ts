@@ -21,6 +21,7 @@ export interface IProjectService {
   createClient(data: Partial<Client>, actor: Actor): Promise<Result<Client>>;
   createProject(data: Partial<Project>, actor: Actor): Promise<Result<Project>>;
   updateProject(projectId: UUID, patch: Partial<Project>, actor: Actor): Promise<Result<Project>>;
+  deleteProject(projectId: UUID, actor: Actor): Promise<Result<void>>;
   addMilestone(projectId: UUID, title: string, dueDate: string, actor: Actor): Promise<Result<Milestone>>;
   allocateResource(projectId: UUID, employeeId: UUID, role: string, capacity: number, actor: Actor): Promise<Result<ResourceAllocation>>;
   createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>>;
@@ -77,6 +78,34 @@ export class ProjectService implements IProjectService {
       await this.activity.log('project', project.id, actor, 'update', `Updated project code ${project.code} - ${project.title}`);
       await this.audit.log(actor, 'update', 'projects', project.id, { newValues: project });
       return Ok(project);
+    } catch (e: any) {
+      return Err(AppError.internal(e.message));
+    }
+  }
+
+  /**
+   * Soft-delete a project and cascade a soft-delete to its tasks. Nothing is
+   * hard-deleted — the project and its tasks are hidden (deletedAt set) and
+   * remain fully recoverable in the database. Restricted to ADMIN/CEO at the
+   * UI layer; enforced defensively here too.
+   */
+  async deleteProject(projectId: UUID, actor: Actor): Promise<Result<void>> {
+    try {
+      const roleUpper = (actor.role || '').toUpperCase();
+      if (roleUpper !== 'ADMIN' && roleUpper !== 'CEO') {
+        return Err(AppError.forbidden('Only Admin or CEO can delete a project.'));
+      }
+      // Cascade: soft-delete the project's tasks first (recoverable).
+      const projectTasks = await this.taskRepo.findByProject(projectId);
+      for (const t of projectTasks) {
+        if (!(t as any).deletedAt) {
+          try { await this.taskRepo.softDelete(t.id, actor); } catch (_) { /* keep going */ }
+        }
+      }
+      await this.projectRepo.softDelete(projectId, actor);
+      await this.activity.log('project', projectId, actor, 'delete', `Deleted project (soft) and ${projectTasks.length} task(s)`);
+      await this.audit.log(actor, 'delete', 'projects', projectId, {});
+      return Ok(undefined as any);
     } catch (e: any) {
       return Err(AppError.internal(e.message));
     }

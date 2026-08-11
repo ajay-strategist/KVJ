@@ -175,7 +175,7 @@ export function LoginPage() {
                 {appConfig.app.productTitle && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>{appConfig.app.byCompany}</span>}
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{appConfig.app.description}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--brand)', marginTop: 2 }}>{appConfig.app.tagline}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', marginTop: 2 }}>{appConfig.app.tagline}</div>
             </div>
             <button onClick={toggle} aria-label="Toggle theme" style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderRadius: 10, width: 36, height: 36, cursor: 'pointer' }}>{theme === 'dark' ? '☀' : '☾'}</button>
           </div>

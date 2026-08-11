@@ -68,7 +68,7 @@ export interface AttendanceLogRow {
 
 function ConditionalAttendanceFields() {
   const { values } = useForm();
-  const { batches } = useTraining();
+  const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
   
   if (values.classification === 'Training') {
     const options = batches.length > 0
@@ -100,7 +100,7 @@ export function AttendanceLogPage() {
   const { user } = useAuth();
   const { toast } = useNotifications();
   const { confirm } = useDialog();
-  const { batches } = useTraining();
+  const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
 
   const userRole = user?.role || 'EMPLOYEE';
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
@@ -172,7 +172,7 @@ export function AttendanceLogPage() {
           records = rawRecords.filter((r: any) => r && r.workDate && r.workDate >= range.from && r.workDate <= range.to);
           const allClaims = await expenseRepo.findMany();
           const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
-          claims = rawClaims.filter((c: any) => c && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
+          claims = rawClaims.filter((c: any) => c && !c.deletedAt && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
         } else {
           const empId = currentEmployee?.id || user?.id;
           if (empId) {
@@ -180,18 +180,24 @@ export function AttendanceLogPage() {
             records = Array.isArray(rawHist) ? rawHist : [];
             const allClaims = await expenseRepo.findMany();
             const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
-            claims = rawClaims.filter((c: any) => c && c.employeeId === empId && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
+            claims = rawClaims.filter((c: any) => c && !c.deletedAt && c.employeeId === empId && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
           }
         }
         setAttendanceRecords(Array.isArray(records) ? records : []);
         setExpenseClaims(Array.isArray(claims) ? claims : []);
 
-        const { data: hData } = await supabase.from('flwdsk_declared_holidays').select('*');
+        const { data: hData } = await supabase
+          .from('flwdsk_declared_holidays')
+          .select('*')
+          .is('deleted_at', null);
         if (hData) {
           setDeclaredHolidays(hData.map((h: any) => ({ date: h.date || h.holiday_date, name: h.title || h.name || 'Company Holiday' })));
         }
 
-        const { data: lData } = await supabase.from('flwdsk_leave_records').select('*');
+        const { data: lData } = await supabase
+          .from('flwdsk_leave_records')
+          .select('*')
+          .is('deleted_at', null);
         if (lData) {
           setLeaveRecords(
             lData.map((l: any) => ({
@@ -271,9 +277,11 @@ export function AttendanceLogPage() {
 
     try {
       if (action === 'delete') {
+        // Soft-delete (keep the financial audit trail), matching the Expense
+        // Claims screen. Hard DELETE would erase the record permanently.
         const { error } = await supabase
           .from('flwdsk_expense_claims')
-          .delete()
+          .update({ deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
           .in('id', selectedIds);
         if (error) throw error;
         toast({ variant: 'warning', title: 'Claims Deleted', message: `${selectedIds.length} claim(s) successfully deleted.` });
@@ -307,7 +315,10 @@ export function AttendanceLogPage() {
           message: 'Are you sure you want to delete this expense claim? This cannot be undone.',
         });
         if (!confirmOk) return;
-        const { error } = await supabase.from('flwdsk_expense_claims').delete().eq('id', id);
+        const { error } = await supabase
+          .from('flwdsk_expense_claims')
+          .update({ deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
+          .eq('id', id);
         if (error) throw error;
         toast({ variant: 'warning', title: 'Claim Deleted', message: 'Expense claim deleted successfully.' });
       } else {
@@ -871,7 +882,7 @@ export function AttendanceLogPage() {
 
   const STATUS_COLORS: Record<string, string> = {
     present: 'var(--status-success)',
-    leave: '#f59e0b',
+    leave: 'var(--status-warning)',
     holiday: 'var(--status-danger)',
     absent: 'var(--text-muted)',
   };
@@ -1152,14 +1163,14 @@ export function AttendanceLogPage() {
                         <td style={{ padding: 10 }}>
                           <div style={{ fontWeight: 600 }}>{exp.type}</div>
                           {exp.vehicle && (
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                               {exp.vehicle} · {exp.km} km
                             </div>
                           )}
                         </td>
                         <td style={{ padding: 10 }}>
                           <div style={{ fontWeight: 500, color: 'var(--brand)' }}>{exp.batch || '—'}</div>
-                          {exp.route && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>🗺 {exp.route}</div>}
+                          {exp.route && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>🗺 {exp.route}</div>}
                         </td>
                         <td style={{ padding: 10, fontWeight: 800, color: 'var(--status-success)' }}>
                           ₹ {exp.amount.toFixed(2)}
@@ -1170,9 +1181,9 @@ export function AttendanceLogPage() {
                               📎 View Receipt
                             </a>
                           ) : exp.type === 'Self Travel' ? (
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>KM Auto-Calc</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>KM Auto-Calc</span>
                           ) : (
-                            <span style={{ fontSize: 11, color: 'var(--status-danger)' }}>Missing</span>
+                            <span style={{ fontSize: 12, color: 'var(--status-danger)' }}>Missing</span>
                           )}
                         </td>
                         <td style={{ padding: 10 }}>
@@ -1198,7 +1209,7 @@ export function AttendanceLogPage() {
                               </Button>
                             )}
                             {isLocked && (
-                              <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 🔒 Locked
                               </span>
                             )}
@@ -1221,9 +1232,9 @@ export function AttendanceLogPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>📅 Today — {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--brand)', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'present').length} Present</span>
-            <span style={{ fontSize: 11, fontWeight: 600, background: '#f59e0b', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'leave').length} On Leave</span>
-            <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--bg-sunken)', color: 'var(--text-muted)', borderRadius: 999, padding: '2px 10px', border: '1px solid var(--border)' }}>{timelineRows.filter(r => r.status === 'absent').length} Absent</span>
+            <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--brand)', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'present').length} Present</span>
+            <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--status-warning)', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'leave').length} On Leave</span>
+            <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--bg-sunken)', color: 'var(--text-muted)', borderRadius: 999, padding: '2px 10px', border: '1px solid var(--border)' }}>{timelineRows.filter(r => r.status === 'absent').length} Absent</span>
           </div>
 
           {timelineRows.length === 0 ? (
@@ -1263,7 +1274,7 @@ export function AttendanceLogPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{row.name}</span>
                       <span style={{
-                        fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999,
+                        fontSize: 12, fontWeight: 600, padding: '2px 9px', borderRadius: 999,
                         background: `${STATUS_COLORS[row.status]}22`,
                         color: STATUS_COLORS[row.status],
                         border: `1px solid ${STATUS_COLORS[row.status]}55`,
@@ -1271,7 +1282,7 @@ export function AttendanceLogPage() {
                         {row.status === 'leave' && row.leaveType ? `🏖 On ${row.leaveType} Leave` : STATUS_LABELS[row.status]}
                       </span>
                       {row.status === 'present' && row.workType !== 'Office' && (
-                        <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>📍 {row.workType}</span>
+                        <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>📍 {row.workType}</span>
                       )}
                     </div>
                     {row.status === 'present' && (
@@ -1290,7 +1301,7 @@ export function AttendanceLogPage() {
                         <div style={{
                           height: '100%',
                           width: `${row.barPct}%`,
-                          background: row.barPct >= 80 ? 'var(--status-success)' : row.barPct >= 50 ? 'var(--brand)' : '#f59e0b',
+                          background: row.barPct >= 80 ? 'var(--status-success)' : row.barPct >= 50 ? 'var(--brand)' : 'var(--status-warning)',
                           borderRadius: 99,
                           transition: 'width 600ms ease',
                         }} />
@@ -1353,7 +1364,7 @@ export function AttendanceLogPage() {
                     onChange={(e) => setStartDate(e.target.value)}
                     style={{ padding: '2px 6px', fontSize: 12 }}
                   />
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>to</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
                   <input
                     type="date"
                     className="kvj-input"

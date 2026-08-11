@@ -14,7 +14,7 @@ interface RiskDistributionChartProps {
 
 export const RiskDistributionChart: React.FC<RiskDistributionChartProps> = ({
   items,
-  title = 'V13. Student Risk Distribution by Reason',
+  title = 'Student Risk Distribution by Reason',
   caption = 'Categorized risk breakdown for targeted intervention',
 }) => {
   const max = Math.max(...items.map((i) => i.count), 1);

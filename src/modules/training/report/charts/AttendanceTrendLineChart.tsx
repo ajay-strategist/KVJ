@@ -8,7 +8,7 @@ interface AttendanceTrendLineChartProps {
 
 export const AttendanceTrendLineChart: React.FC<AttendanceTrendLineChartProps> = ({
   sessions,
-  title = 'V3. Date-wise Attendance Trend',
+  title = 'Date-wise Attendance Trend',
   caption = 'Dashed line marks 75% warning threshold. Dates below 75% highlighted in red.',
 }) => {
   if (!sessions || sessions.length === 0) {

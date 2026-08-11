@@ -4,6 +4,7 @@ import { Button, Card, Badge } from '../../../shared/ui/components';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { DailyReportData, DailyReportConfig } from './daily-report.types';
 import { DailyReportDocument } from './DailyReportDocument';
+import { buildReportPdf } from './pdf/buildReport';
 import { DailyReportBuilderModal } from './DailyReportBuilderModal';
 
 interface DailyReportPreviewProps {
@@ -47,12 +48,28 @@ export const DailyReportPreview: React.FC<DailyReportPreviewProps> = ({
 
   if (!isOpen) return null;
 
-  const handlePrintPDF = () => {
-    document.body.classList.add('kvj-printing-active');
-    window.print();
-    setTimeout(() => {
-      document.body.classList.remove('kvj-printing-active');
-    }, 1000);
+  const handlePrintPDF = async () => {
+    const isFinalReport = config.reportMode === 'final' || config.selectedSections.includes('final-exam-results');
+    toast({ variant: 'info', title: 'Generating PDF', message: 'Building the A4 document…' });
+    try {
+      // Vector A4 document (real selectable text + tables, small file, true
+      // pagination with repeating headers). Replaces the old page-image export.
+      const doc = buildReportPdf(data, config);
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const reportTypeName = isFinalReport ? 'Final_Report' : 'Daily_Report';
+      const safeBatch = String(data.batchCode || data.batchName || 'Batch').replace(/[^\w-]+/g, '_');
+      doc.save(`${safeBatch}_${reportTypeName}_${dd}${mm}${now.getFullYear()}.pdf`);
+      toast({
+        variant: 'success',
+        title: 'PDF Downloaded',
+        message: `${doc.getNumberOfPages()}-page A4 report generated for ${data.batchCode || data.batchName}.`,
+      });
+    } catch (error: any) {
+      console.error('PDF generation error:', error);
+      toast({ variant: 'error', title: 'PDF Generation Failed', message: `Error: ${error?.message || 'unknown'}` });
+    }
   };
 
   const handleDownloadExcelStub = () => {

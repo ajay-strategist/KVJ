@@ -118,7 +118,7 @@ export function CalendarGrid({ year, month, events = [], onDayClick }: CalendarG
             >
               <span style={{ fontSize: 14, fontWeight: 600 }}>{day.dayNum}</span>
               {day.event?.label && (
-                <span style={{ fontSize: 9, fontWeight: 500, marginTop: 4, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', width: '100%', textAlign: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 500, marginTop: 4, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', width: '100%', textAlign: 'center' }}>
                   {day.event.label}
                 </span>
               )}

@@ -11,7 +11,7 @@ import type { Student, Enrollment } from '../training.repository';
 import { cleanBatchCode } from '../utils/batch-formatter';
 
 export function StudentLifecycle() {
-  const { students, enrollments, batches, registerStudent, enrollStudent, loading } = useTraining();
+  const { students, enrollments, batches, registerStudent, enrollStudent, loading } = useTraining({ fetchCourses: false });
   const { toast } = useNotifications();
 
   const [studentOpen, setStudentOpen] = useState(false);
@@ -81,11 +81,39 @@ export function StudentLifecycle() {
   const studentOptions = students.map((s) => ({ value: s.id, label: `${s.firstName} ${s.lastName}` }));
   const batchOptions = batches.map((b) => ({ value: b.id, label: cleanBatchCode(b.code) || b.code }));
 
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredStudents = students.filter((s) =>
+    `${s.firstName} ${s.lastName} ${s.email} ${s.phone} ${s.academicQualification}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
+
   const tabs = [
     {
       id: 'active',
       label: 'Student Directory',
-      content: <DataTable columns={studentColumns} rows={students} rowKey={(s) => s.id} loading={loading} />,
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 280px', maxWidth: 360 }}>
+              <input
+                className="kvj-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search students by name, email, phone..."
+                style={{ width: '100%' }}
+              />
+            </div>
+            {searchTerm && (
+              <Button size="sm" variant="secondary" onClick={() => setSearchTerm('')}>
+                Clear Filters
+              </Button>
+            )}
+          </div>
+          <DataTable columns={studentColumns} rows={filteredStudents} rowKey={(s) => s.id} loading={loading} />
+        </div>
+      ),
     },
     {
       id: 'enrollments',

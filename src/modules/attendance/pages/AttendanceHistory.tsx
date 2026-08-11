@@ -169,7 +169,7 @@ export function AttendanceHistory() {
                       <div style={{ marginTop: 4 }}>In: {new Date(s.clockIn).toLocaleTimeString()}</div>
                       {s.clockOut && <div style={{ marginTop: 2 }}>Out: {new Date(s.clockOut).toLocaleTimeString()}</div>}
                       {s.clockInGeo && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                           Location: {s.clockInGeo.latitude.toFixed(4)}, {s.clockInGeo.longitude.toFixed(4)} (accuracy {s.clockInGeo.accuracy?.toFixed(1)}m)
                         </div>
                       )}

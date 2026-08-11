@@ -210,7 +210,7 @@ export function InitialAdminBootstrapScreen({ onBootstrapSuccess }: { onBootstra
                 padding: '12px',
                 fontSize: 14,
                 fontWeight: 700,
-                background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                background: 'linear-gradient(135deg, var(--brand) 0%, #6366f1 100%)',
                 color: '#fff',
                 borderRadius: 12,
                 boxShadow: '0 4px 14px rgba(99,102,241,0.4)'
@@ -221,7 +221,7 @@ export function InitialAdminBootstrapScreen({ onBootstrapSuccess }: { onBootstra
           </div>
         </form>
 
-        <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
           🔒 This bootstrap setup will automatically self-disable after creation. Public registration is permanently disabled.
         </p>
       </Card>

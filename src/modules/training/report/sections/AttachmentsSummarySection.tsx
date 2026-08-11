@@ -24,7 +24,7 @@ export const AttachmentsSummarySection: React.FC<SectionProps> = ({ data }) => {
         <tbody>
           {attachments.map((att: any) => (
             <tr key={att.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-              <td style={{ padding: 8, fontWeight: 700, color: '#2563eb' }}>📁 {att.fileName || att.name}</td>
+              <td style={{ padding: 8, fontWeight: 700, color: '#2563eb' }}> {att.fileName || att.name}</td>
               <td style={{ padding: 8, color: '#475569' }}>{att.fileType || att.type || 'Document'}</td>
               <td style={{ padding: 8, textAlign: 'center', fontWeight: 600 }}>{att.fileSize || '1.2 MB'}</td>
               <td style={{ padding: 8, color: '#0f172a' }}>{att.uploadedBy || data.trainerName}</td>

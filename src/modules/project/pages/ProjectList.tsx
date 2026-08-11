@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { PageHeader, Button, Card, SectionHeader, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, DatePickerField, TextAreaField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, DatePickerField, TextAreaField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
@@ -10,6 +10,58 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useProject } from '../hooks/useProject';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
+
+/**
+ * Multi-select of project members, bound to the shared Form's `memberIds` value.
+ * A member is any employee assigned to the project alongside the supervisor.
+ */
+function ProjectMembersField({ employees }: { employees: Array<{ id: string; firstName?: string; lastName?: string; designation?: string }> }) {
+  const { values, setValue } = useForm();
+  const selected: string[] = Array.isArray((values as any).memberIds) ? (values as any).memberIds : [];
+  const [q, setQ] = useState('');
+
+  const toggle = (id: string) => {
+    const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+    setValue('memberIds', next);
+  };
+
+  const list = employees.filter((e) => {
+    const name = `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase();
+    return !q.trim() || name.includes(q.toLowerCase());
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Project Members {selected.length > 0 ? `(${selected.length} selected)` : ''}
+      </label>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search employees to add as members…"
+        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+      />
+      <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {list.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>No matching employees.</div>
+        ) : (
+          list.map((e) => {
+            const on = selected.includes(e.id);
+            return (
+              <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 6, cursor: 'pointer', background: on ? 'var(--bg-sunken)' : 'transparent' }}>
+                <input type="checkbox" checked={on} onChange={() => toggle(e.id)} />
+                <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                  {e.firstName} {e.lastName}
+                  {e.designation ? <span style={{ color: 'var(--text-muted)' }}> · {e.designation}</span> : null}
+                </span>
+              </label>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
 
 export interface ProjectCardData {
   id: string;
@@ -44,6 +96,8 @@ export function ProjectList({
   const { user } = useAuth();
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  // Deleting a project is restricted to Admin and CEO (soft-delete, recoverable).
+  const canDeleteProject = ['ADMIN', 'CEO'].includes(userRole);
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
@@ -249,6 +303,7 @@ export function ProjectList({
       status: initialStatus as any,
       priority: 'medium',
       supervisorId: values.supervisorId as string,
+      memberIds: Array.isArray(values.memberIds) ? (values.memberIds as string[]) : [],
     } as any);
 
     if (res.ok) {
@@ -287,6 +342,7 @@ export function ProjectList({
       clientName: !matchedClient ? typedName : undefined,
       status: values.status as any,
       supervisorId: values.supervisorId as string,
+      memberIds: Array.isArray(values.memberIds) ? (values.memberIds as string[]) : [],
     } as any);
 
     if (res.ok) {
@@ -444,7 +500,7 @@ export function ProjectList({
             <tbody>
               ${p.members.length > 0 ? p.members.map(m => `
                 <tr>
-                  <td><span class="avatar">${m.name.charAt(0)}</span>${m.name}</td>
+                  <td><span class="avatar">${(m.name || '?').charAt(0)}</span>${m.name || '—'}</td>
                   <td style="text-align:right;font-weight:700;color:#6366f1;">${m.hours} hrs</td>
                 </tr>
               `).join('') : '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No members assigned.</td></tr>'}
@@ -501,12 +557,12 @@ export function ProjectList({
 
   const tableColumns: Column<ProjectCardData>[] = [
     { key: 'code', header: 'Project Code', sortable: true, render: (p) => <strong>{p.code}</strong> },
-    { key: 'title', header: 'Project Name & Client', sortable: true, render: (p) => <div><div style={{ fontWeight: 600 }}>{p.title}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Client: {p.client}</div></div> },
+    { key: 'title', header: 'Project Name & Client', sortable: true, render: (p) => <div><div style={{ fontWeight: 600 }}>{p.title}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Client: {p.client}</div></div> },
     { key: 'supervisor', header: 'Manager (Operations)', render: (p) => p.supervisor ? <span>👤 {p.supervisor}</span> : <span>—</span> },
     { key: 'members', header: 'Assigned Members & Hours', render: (p) => (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {p.members.map((m, idx) => (
-          <span key={idx} style={{ fontSize: 11, background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>
+          <span key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>
             {m.name}: <strong>{m.hours}h</strong>
           </span>
         ))}
@@ -542,50 +598,45 @@ export function ProjectList({
   ];
 
   return (
-    <div>
-      <PageHeader
-        title="Project Catalog & Work Logs"
-        subtitle="Manage client projects, supervisors, assigned member hours, completion ratios, and reports"
-        actions={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {/* View Mode Toggle: Card View vs Table View */}
-            <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
-              <button
-                type="button"
-                onClick={() => setViewMode('card')}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: 'none',
-                  background: viewMode === 'card' ? 'var(--brand)' : 'var(--bg-surface)',
-                  color: viewMode === 'card' ? 'white' : 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
-              >
-                🎴 Card View
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: 'none',
-                  background: viewMode === 'table' ? 'var(--brand)' : 'var(--bg-surface)',
-                  color: viewMode === 'table' ? 'white' : 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
-              >
-                📊 Table View
-              </button>
-            </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Action Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {/* View Mode Toggle: Card View vs Table View */}
+        <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
+          <button
+            type="button"
+            onClick={() => setViewMode('card')}
+            style={{
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              border: 'none',
+              background: viewMode === 'card' ? 'var(--brand)' : 'var(--bg-surface)',
+              color: viewMode === 'card' ? 'white' : 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            🎴 Card View
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            style={{
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              border: 'none',
+              background: viewMode === 'table' ? 'var(--brand)' : 'var(--bg-surface)',
+              color: viewMode === 'table' ? 'white' : 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            📊 Table View
+          </button>
+        </div>
 
-            <Button onClick={() => setCreateProjectOpen(true)}>Create Master Project</Button>
-          </div>
-        }
-      />
+        <Button onClick={() => setCreateProjectOpen(true)}>Create Master Project</Button>
+      </div>
 
       {/* Top Row: KPI Cards Left & Status Filter Right */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -593,12 +644,12 @@ export function ProjectList({
         {/* Left Side: KPI Cards */}
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', flex: '1 1 auto' }}>
           <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16, minWidth: 200, flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
           </Card>
 
           <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16, minWidth: 200, flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
               {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
             </div>
@@ -633,7 +684,7 @@ export function ProjectList({
               ))}
             </div>
           </div>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>
             Showing {filteredProjects.length}/{projectsList.length}
           </span>
         </Card>
@@ -650,13 +701,13 @@ export function ProjectList({
                   {/* Top Bar: Code & Status */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)', letterSpacing: '0.05em' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', letterSpacing: '0.05em' }}>
                         {p.code}
                       </span>
                       <h3 style={{ fontSize: 15, fontWeight: 700, margin: '2px 0 0 0', color: 'var(--text-primary)' }}>
                         {p.title}
                       </h3>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Client: {p.client}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Client: {p.client}</div>
                     </div>
                     <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Progress' ? 'progress' : 'info'}>
                       {p.status}
@@ -672,12 +723,12 @@ export function ProjectList({
 
                   {/* Member-specific Hours Breakdown */}
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase' }}>
                       Assigned Members & Hours Worked:
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {p.members.map((m, idx) => (
-                        <div key={idx} style={{ fontSize: 11, background: 'var(--bg-sunken)', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: 4 }}>
+                        <div key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: 4 }}>
                           👤 {m.name}: <strong style={{ color: 'var(--brand)' }}>{m.hours} hrs</strong>
                         </div>
                       ))}
@@ -687,11 +738,11 @@ export function ProjectList({
                   {/* Total Hours Worked & Task Completion Ratio (Clearly Presented) */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 12 }}>
                     <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 700 }}>Total Hours Worked:</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase', fontWeight: 700 }}>Total Hours Worked:</span>
                       <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>⏱ {p.totalHours} hrs</div>
                     </div>
                     <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 700 }}>Task Ratio:</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase', fontWeight: 700 }}>Task Ratio:</span>
                       <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
                         {p.tasksCompleted} / {p.tasksTotal} ({pct}%)
                       </div>
@@ -736,9 +787,10 @@ export function ProjectList({
       {selectedProject && reportOpen && (
         <div
           style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0,0,0,0.65)',
-            backdropFilter: 'blur(8px)',
+            position: 'fixed', inset: 0, zIndex: 1250,
+            background: 'var(--bg-overlay)',
+            backdropFilter: 'blur(var(--overlay-blur, 3px))',
+            WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
           }}
@@ -768,7 +820,7 @@ export function ProjectList({
               flexShrink: 0,
             }}>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', opacity: 0.7, letterSpacing: 2, marginBottom: 4 }}>📊 Detailed Project Report</div>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', opacity: 0.7, letterSpacing: 2, marginBottom: 4 }}>📊 Detailed Project Report</div>
                 <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{selectedProject.title}</div>
                 <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ background: 'rgba(255,255,255,0.15)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>{selectedProject.code}</span>
@@ -793,7 +845,20 @@ export function ProjectList({
                 >
                   ✏️ Edit Details
                 </Button>
-                {isMgmt && (
+                <Button
+                  size="sm"
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                    fontWeight: 600,
+                    fontSize: 12
+                  }}
+                  onClick={() => setAddTaskOpen(true)}
+                >
+                  ➕ Add Task
+                </Button>
+                {canDeleteProject && (
                   <Button
                     size="sm"
                     variant="danger"
@@ -804,12 +869,12 @@ export function ProjectList({
                     onClick={async () => {
                       const ok = await confirm({
                         title: 'Delete Project?',
-                        message: `Are you sure you want to delete project "${selectedProject.title}"? This will permanently delete the project, milestones, tasks, and timesheets.`
+                        message: `Delete project "${selectedProject.title}"? The project and its tasks will be hidden from the app. Nothing is permanently erased — this can be recovered.`
                       });
                       if (ok) {
                         const res = await deleteProject(selectedProject.id as UUID);
                         if (res.ok) {
-                          toast({ variant: 'warning', title: 'Project Deleted', message: `"${selectedProject.title}" has been deleted.` });
+                          toast({ variant: 'warning', title: 'Project Deleted', message: `"${selectedProject.title}" and its tasks have been hidden (recoverable).` });
                           setReportOpen(false);
                         } else {
                           toast({ variant: 'error', title: 'Delete Failed', message: res.error });
@@ -840,7 +905,7 @@ export function ProjectList({
                   { label: 'Milestones', value: `${selectedProject.milestonesCount} Planned`, icon: '🏁', bg: '#fef9c3', border: '#ca8a04', color: '#a16207' },
                 ].map((kpi) => (
                   <div key={kpi.label} style={{ background: kpi.bg, borderRadius: 12, padding: '14px 16px', borderLeft: `4px solid ${kpi.border}`, transition: 'transform 0.15s' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: kpi.color, letterSpacing: 0.8, marginBottom: 6 }}>{kpi.icon} {kpi.label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: kpi.color, letterSpacing: 0.8, marginBottom: 6 }}>{kpi.icon} {kpi.label}</div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
                   </div>
                 ))}
@@ -880,9 +945,9 @@ export function ProjectList({
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ width: 30, height: 30, borderRadius: '50%', background: `hsl(${(idx * 67 + 240) % 360},60%,55%)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                              {m.name.charAt(0)}
+                              {(m.name || '?').charAt(0)}
                             </span>
-                            <span style={{ fontSize: 12, fontWeight: 600 }}>{m.name}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600 }}>{m.name || '—'}</span>
                           </div>
                           <span style={{ fontSize: 13, fontWeight: 800, color: '#4f46e5', background: '#ede9fe', padding: '2px 8px', borderRadius: 6 }}>{m.hours}h</span>
                         </div>
@@ -900,12 +965,12 @@ export function ProjectList({
                     <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: 'white', textAlign: 'left' }}>
-                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Task</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Assignee</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Hrs</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Due</th>
-                          <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11 }}>Del</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Task</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Assignee</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Hrs</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Due</th>
+                          <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 12 }}>Del</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -919,7 +984,7 @@ export function ProjectList({
                                   await updateTask(t.id, { assigneeId: e.target.value });
                                   toast({ variant: 'success', title: 'Assignee Updated' });
                                 }}
-                                style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer', maxWidth: 110 }}
+                                style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer', maxWidth: 110 }}
                               >
                                 <option value="">Unassigned</option>
                                 {employees.map((emp) => (
@@ -939,7 +1004,7 @@ export function ProjectList({
                                   }
                                   toast({ variant: 'success', title: 'Status Updated' });
                                 }}
-                                style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }}
+                                style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }}
                               >
                                 <option value="todo">To Do</option>
                                 <option value="in_progress">In Progress</option>
@@ -948,7 +1013,7 @@ export function ProjectList({
                               </select>
                             </td>
                             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged} hrs</td>
-                            <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 11 }}>{t.dueDate}</td>
+                            <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{t.dueDate}</td>
                             <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                               <button
                                 type="button"
@@ -985,7 +1050,7 @@ export function ProjectList({
 
             {/* ── Footer ── */}
             <div style={{ padding: '14px 28px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', flexShrink: 0 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {selectedProjectTasks.length} task{selectedProjectTasks.length !== 1 ? 's' : ''} &nbsp;·&nbsp; {selectedProject.members.length} team member{selectedProject.members.length !== 1 ? 's' : ''}
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
@@ -1030,7 +1095,7 @@ export function ProjectList({
               {clients.map((c: any) => <option key={c.id} value={c.name} />)}
             </datalist>
             {clientNameInput && !clients.find((c: any) => c.name.toLowerCase() === clientNameInput.toLowerCase()) && (
-              <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>⚡ New client will be registered: "{clientNameInput}"</div>
+              <div style={{ fontSize: 12, color: 'var(--status-warning)', marginTop: 2 }}>⚡ New client will be registered: "{clientNameInput}"</div>
             )}
           </div>
 
@@ -1042,6 +1107,7 @@ export function ProjectList({
               label: `${e.firstName} ${e.lastName}${e.designation ? ` (${e.designation})` : ''}`,
             }))}
           />
+          <ProjectMembersField employees={employees} />
           <SelectField
             name="status"
             label="Initial Phase *"
@@ -1089,6 +1155,7 @@ export function ProjectList({
               title: selectedProject.title,
               status: selectedProject.status === 'Completed' ? 'closure' : selectedProject.status === 'In Progress' ? 'execution' : 'not_started',
               supervisorId: projects.find((p: any) => p.id === selectedProject.id)?.supervisorId || '',
+              memberIds: projects.find((p: any) => p.id === selectedProject.id)?.memberIds || [],
             }}
             onSubmit={handleEditProject}
           >
@@ -1128,6 +1195,7 @@ export function ProjectList({
                 label: `${e.firstName} ${e.lastName}${e.designation ? ` (${e.designation})` : ''}`,
               }))}
             />
+            <ProjectMembersField employees={employees} />
             <SelectField
               name="status"
               label="Phase *"

@@ -17,11 +17,11 @@ export const StudentRiskAnalysisSection: React.FC<SectionProps> = ({ data }) => 
         <RiskDistributionChart items={riskCategories} />
 
         <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: 12 }}>
-          <h4 style={{ margin: '0 0 8px 0', fontSize: 13, fontWeight: 800, color: '#9f1239' }}>⚠️ Intervention Protocol</h4>
+          <h4 style={{ margin: '0 0 8px 0', fontSize: 13, fontWeight: 800, color: '#9f1239' }}>Intervention Protocol</h4>
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11.5, color: '#881337', lineHeight: 1.5 }}>
-            <li><strong>High Severity:</strong> Mandatory 1-on-1 counseling + immediate retest assignment.</li>
-            <li><strong>Low Attendance (&lt;75%):</strong> Notification sent to College Coordinator for attendance tracking.</li>
-            <li><strong>Failed Assessments:</strong> Dedicated remedial workshop before final exam retest.</li>
+            <li><strong>High Severity:</strong>Mandatory 1-on-1 counseling + immediate retest assignment.</li>
+            <li><strong>Low Attendance (&lt;75%):</strong>Notification sent to College Coordinator for attendance tracking.</li>
+            <li><strong>Failed Assessments:</strong>Dedicated remedial workshop before final exam retest.</li>
           </ul>
         </div>
       </div>

@@ -25,6 +25,11 @@ function chunk<T>(arr: T[], size: number): T[][] {
 export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => {
   const selectedCols = config.selectedStudentColumns;
   const selectedAsses = data.assessments.filter((a) => config.selectedAssessmentIds.includes(a.id));
+  // Final-exam marks are raw scores out of the course maximum. The pass mark is a
+  // percentage, so scale it to the mark scale before comparing/displaying — never
+  // compare a raw mark (e.g. 754) against a percentage (e.g. 70), and never show "/ 100".
+  const finalExamMax = data.courseMaxMarks || 100;
+  const finalExamPassMarks = Math.round(((data.finalExamPassMarkPercent || 70) / 100) * finalExamMax);
 
   // ── Identity columns: repeated in EVERY sub-table so a student is always
   //    identifiable regardless of which slice of data is shown. ──
@@ -98,8 +103,8 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
       render: (st) => {
         const mark = st.finalExamMark;
         if (mark === undefined) return <span style={{ color: '#94a3b8' }}>—</span>;
-        const passed = mark >= (data.finalExamPassMarkPercent || 70);
-        return <span style={{ fontWeight: 800, color: passed ? '#16a34a' : '#dc2626' }}>{mark} / 100</span>;
+        const passed = mark >= finalExamPassMarks;
+        return <span style={{ fontWeight: 800, color: passed ? '#16a34a' : '#dc2626' }}>{mark} / {finalExamMax}</span>;
       },
     });
   }
@@ -108,7 +113,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
     dataCols.push({
       id: 'finalExamResult', header: 'Final Exam Result', short: 'Result', align: 'center',
       render: (st) => {
-        const res = st.finalExamResult || ((st.finalExamMark ?? 0) >= (data.finalExamPassMarkPercent || 70) ? 'Passed' : 'Failed');
+        const res = st.finalExamResult || ((st.finalExamMark ?? 0) >= finalExamPassMarks ? 'Passed' : 'Failed');
         const isPass = res === 'Passed';
         return (
           <span
@@ -131,13 +136,19 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
 
   const groups = dataCols.length > 0 ? chunk(dataCols, MAX_DATA_COLS_PER_TABLE) : [[]];
   const multi = groups.length > 1;
+  // Split the roster into page-sized row blocks so a large batch prints as a
+  // series of readable tables (each with its own repeated header) instead of one
+  // giant table that the exporter has to shrink to fit.
+  const ROWS_PER_TABLE = 16;
+  const studentPages = chunk(data.students, ROWS_PER_TABLE);
+  const multiRow = studentPages.length > 1;
 
   const thStyle: React.CSSProperties = { padding: '9px 6px', fontSize: 10.5, fontWeight: 700, color: '#ffffff' };
 
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
       <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4, paddingLeft: 10, borderLeft: '4px solid #1e40af' }}>
-        👨‍🎓 Student Performance Register
+         Student Performance Register
       </h2>
       <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
         Complete academic performance, attendance, assessment, and final exam certification records for every enrolled student.
@@ -147,40 +158,51 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
       {groups.map((group, gi) => {
         const cols = [...identityCols, ...group];
         return (
-          <div key={gi} className="report-student-table" style={{ marginBottom: multi ? 16 : 0 }}>
-            {multi && (
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 6 }}>
-                Register — Part {gi + 1} of {groups.length}
-                <span style={{ color: '#94a3b8', fontWeight: 600 }}>
-                  {' · '}{group.map((c) => c.short).join(' · ')}
-                </span>
-              </div>
-            )}
+          <React.Fragment key={gi}>
+            {studentPages.map((studentSlice, ri) => (
+              <div
+                key={`${gi}-${ri}`}
+                className="report-student-table"
+                style={{ marginBottom: 12, breakInside: 'avoid', pageBreakInside: 'avoid' }}
+              >
+                {(multi || multiRow) && (
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569', marginBottom: 5 }}>
+                    Register
+                    {multi ? ` — Part ${gi + 1} of ${groups.length}` : ''}
+                    {multiRow ? ` — Students ${ri * ROWS_PER_TABLE + 1}–${ri * ROWS_PER_TABLE + studentSlice.length} of ${data.students.length}` : ''}
+                    {multi && (
+                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>
+                        {' · '}{group.map((c) => c.short).join(' · ')}
+                      </span>
+                    )}
+                  </div>
+                )}
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, border: '1px solid #cbd5e1' }}>
-              <thead>
-                {/* Deep-blue header repeats on every page the register spans. */}
-                <tr style={{ background: '#1e40af', borderBottom: '2px solid #1e3a8a' }}>
-                  {cols.map((c) => (
-                    <th key={c.id} style={{ ...thStyle, textAlign: c.align, width: c.id === 'photo' ? 52 : undefined }}>
-                      {c.header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.students.map((st, idx) => (
-                  <tr key={st.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                    {cols.map((c) => (
-                      <td key={c.id} style={{ padding: '4px 6px', textAlign: c.align }}>
-                        {c.render(st)}
-                      </td>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, border: '1px solid #cbd5e1' }}>
+                  <thead>
+                    <tr style={{ background: '#1e40af', borderBottom: '2px solid #1e3a8a' }}>
+                      {cols.map((c) => (
+                        <th key={c.id} style={{ ...thStyle, textAlign: c.align, width: c.id === 'photo' ? 52 : undefined }}>
+                          {c.header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentSlice.map((st, idx) => (
+                      <tr key={st.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                        {cols.map((c) => (
+                          <td key={c.id} style={{ padding: '4px 6px', textAlign: c.align }}>
+                            {c.render(st)}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </React.Fragment>
         );
       })}
     </div>

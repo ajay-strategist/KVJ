@@ -57,9 +57,9 @@ export function AttendanceCalendarView({
       case 'present':
         return { bg: 'rgba(34, 197, 94, 0.12)', border: '#22C55E', text: 'var(--status-success)' };
       case 'leave':
-        return { bg: 'rgba(245, 158, 11, 0.18)', border: '#F59E0B', text: '#D97706' };
+        return { bg: 'rgba(245, 158, 11, 0.18)', border: 'var(--status-warning)', text: '#D97706' };
       case 'holiday':
-        return { bg: 'rgba(239, 68, 68, 0.16)', border: '#EF4444', text: 'var(--status-danger)' };
+        return { bg: 'rgba(239, 68, 68, 0.16)', border: 'var(--status-danger)', text: 'var(--status-danger)' };
       case 'absent':
       default:
         return { bg: 'var(--bg-sunken)', border: 'var(--border)', text: 'var(--text-muted)' };
@@ -307,18 +307,18 @@ export function AttendanceCalendarView({
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: styles.text }}>{d.dateNum}</span>
-                      <span style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--text-muted)' }}>{d.dayName}</span>
+                      <span style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--text-muted)' }}>{d.dayName}</span>
                     </div>
 
                     {/* Grouped Multiple Sessions or Single Session */}
                     {d.sessions && d.sessions.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
                         {d.sessions.map((s, sIdx) => (
-                          <div key={sIdx} style={{ fontSize: 9.5, lineHeight: 1.25, background: 'var(--bg-surface)', padding: '2px 4px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
+                          <div key={sIdx} style={{ fontSize: 12, lineHeight: 1.25, background: 'var(--bg-surface)', padding: '2px 4px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
                             <div style={{ fontWeight: 700, color: 'var(--brand)', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }} title={s.location}>
                               📍 {s.location}
                             </div>
-                            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                               🕒 {s.startTime} - {s.endTime}
                             </div>
                           </div>
@@ -327,13 +327,13 @@ export function AttendanceCalendarView({
                     ) : (
                       <>
                         {d.location && (
-                          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }} title={d.location}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', marginBottom: 2, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }} title={d.location}>
                             📍 {d.location}
                           </div>
                         )}
 
                         {d.startTime && d.endTime && (
-                          <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
                             🕒 {d.startTime} - {d.endTime}
                           </div>
                         )}
@@ -343,7 +343,7 @@ export function AttendanceCalendarView({
                     {d.tasks && d.tasks.length > 0 && !d.sessions && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
                         {d.tasks.slice(0, 1).map((t, idx) => (
-                          <div key={idx} style={{ fontSize: 9, color: 'var(--text-muted)', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                          <div key={idx} style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                             ✓ {t.title}
                           </div>
                         ))}
@@ -352,7 +352,7 @@ export function AttendanceCalendarView({
                   </div>
 
                   {d.hoursWorked && (
-                    <div style={{ fontSize: 10, fontWeight: 700, color: styles.text, textAlign: 'right', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: styles.text, textAlign: 'right', marginTop: 4 }}>
                       ⏱ {d.hoursWorked}
                     </div>
                   )}

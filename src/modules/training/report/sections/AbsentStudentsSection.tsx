@@ -17,7 +17,7 @@ export const AbsentStudentsSection: React.FC<SectionProps> = ({ data }) => {
           <div key={idx} style={{ border: `1px solid ${item.isWarning ? '#fca5a5' : '#e2e8f0'}`, borderRadius: 6, padding: 10, background: item.isWarning ? '#fef2f2' : '#ffffff' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
               <span style={{ fontWeight: 700, color: item.isWarning ? '#b91c1c' : '#0f172a' }}>
-                📅 Session Date: {item.date} {item.isWarning && '(⚠️ Attendance <75%)'}
+                 Session Date: {item.date} {item.isWarning && '(Attendance <75%)'}
               </span>
               <span style={{ fontWeight: 700, color: '#64748b' }}>
                 Absent Count: {item.absentStudents.length} Students ({item.attendancePct}% Present)
@@ -27,10 +27,13 @@ export const AbsentStudentsSection: React.FC<SectionProps> = ({ data }) => {
             {item.absentStudents.length === 0 ? (
               <div style={{ fontSize: 11.5, color: '#16a34a', fontWeight: 600 }}>✓ Full Attendance — 100% Present</div>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              // Dense multi-column list: one bordered chip per absentee used to
+              // consume whole pages on large batches.
+              <div style={{ columnCount: 3, columnGap: 14, fontSize: 10 }}>
                 {item.absentStudents.map((st) => (
-                  <div key={st.id} style={{ background: item.isWarning ? '#ffe4e6' : '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 4, padding: '4px 8px', fontSize: 11 }}>
-                    <strong style={{ color: '#0f172a' }}>{st.name}</strong> <span style={{ color: '#64748b' }}>({st.phone})</span>
+                  <div key={st.id} style={{ breakInside: 'avoid', lineHeight: 1.5 }}>
+                    <span style={{ color: '#0f172a' }}>{st.name}</span>{' '}
+                    <span style={{ color: '#94a3b8' }}>{st.phone}</span>
                   </div>
                 ))}
               </div>

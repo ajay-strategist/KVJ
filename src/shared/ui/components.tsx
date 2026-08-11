@@ -629,7 +629,7 @@ export function FilterChip({
       {count !== undefined && (
         <span
           style={{
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: 700,
             padding: '1px 5px',
             borderRadius: 999,
@@ -702,7 +702,7 @@ export function Kbd({ children }: { children: ReactNode }) {
         display: 'inline-flex',
         alignItems: 'center',
         padding: '2px 7px',
-        fontSize: 11,
+        fontSize: 12,
         fontFamily: 'var(--font-mono)',
         fontWeight: 600,
         background: 'var(--bg-sunken)',

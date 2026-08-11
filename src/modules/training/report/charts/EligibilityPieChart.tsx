@@ -10,7 +10,7 @@ interface EligibilityPieChartProps {
 export const EligibilityPieChart: React.FC<EligibilityPieChartProps> = ({
   eligibleCount,
   notEligibleCount,
-  title = 'V9. Final Exam Eligibility Breakdown',
+  title = 'Final Exam Eligibility Breakdown',
   caption = 'Based on cleared prerequisite assessments.',
 }) => {
   const total = eligibleCount + notEligibleCount;

@@ -54,7 +54,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid #e2e8f0', paddingBottom: 6 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
-            📅 Attendance Intelligence &amp; Trend Analysis
+             Attendance Intelligence &amp; Trend Analysis
           </h2>
           <span style={{ fontSize: 11, color: '#64748b' }}>
             Session-by-session attendance trend line chart, date-wise attendance log table, absentees directory, and low attendance warning list.
@@ -73,7 +73,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
       {/* 2ND: DATE-WISE SESSION ATTENDANCE LOG TABLE (Natural Flow Across Pages) */}
       <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}>
         <div style={{ background: '#f8fafc', padding: '8px 12px', borderBottom: '1px solid #cbd5e1', fontWeight: 800, fontSize: 12, color: '#0f172a' }}>
-          📊 Date-Wise Session Attendance Log
+           Date-Wise Session Attendance Log
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
@@ -104,7 +104,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
                     {sess.attendancePct}%
                   </td>
                   <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: isWarning ? '#dc2626' : '#16a34a' }}>
-                    {isWarning ? '⚠️ Low (<75%)' : '✓ Satisfactory'}
+                    {isWarning ? 'Low (<75%)' : '✓ Satisfactory'}
                   </td>
                 </tr>
               );
@@ -115,7 +115,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
 
       {/* 3RD: DATE-WISE ABSENTEES REGISTRY */}
       <div style={{ marginBottom: 6 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>📋 Date-Wise Absentees List</h3>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Date-Wise Absentees List</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {datewiseAbsent.map((item, idx) => {
             const isLowAttendance = item.attendancePct < 75;
@@ -135,7 +135,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 6, alignItems: 'center' }}>
                   <span style={{ fontWeight: 700, color: isLowAttendance ? '#9f1239' : '#0f172a' }}>
-                    📅 Date: {item.date} {isLowAttendance && <span style={{ color: '#dc2626', fontWeight: 800 }}> (⚠️ Attendance &lt; 75%)</span>}
+                     Date: {item.date} {isLowAttendance && <span style={{ color: '#dc2626', fontWeight: 800 }}>(Attendance &lt; 75%)</span>}
                   </span>
                   <span style={{ fontWeight: 700, color: isLowAttendance ? '#b91c1c' : '#64748b' }}>
                     Absentees: {item.absentStudents.length} Students ({item.attendancePct}% Present)
@@ -145,22 +145,21 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
                 {item.absentStudents.length === 0 ? (
                   <div style={{ fontSize: 10.5, color: '#16a34a', fontWeight: 600 }}>✓ 100% Full Attendance</div>
                 ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  // Dense multi-column list keeps a long absentee roster to a few
+                  // lines instead of a full page of bordered chips.
+                  <div style={{ columnCount: 4, columnGap: 14, fontSize: 10 }}>
                     {item.absentStudents.map((st) => (
-                      <span
+                      <div
                         key={st.id}
                         style={{
-                          background: isLowAttendance ? '#fee2e2' : '#f1f5f9',
-                          border: `1px solid ${isLowAttendance ? '#fca5a5' : '#cbd5e1'}`,
-                          color: isLowAttendance ? '#dc2626' : '#1e293b',
-                          fontWeight: isLowAttendance ? 800 : 600,
-                          borderRadius: 4,
-                          padding: '3px 8px',
-                          fontSize: 11,
+                          breakInside: 'avoid',
+                          lineHeight: 1.5,
+                          color: isLowAttendance ? '#b91c1c' : '#1e293b',
+                          fontWeight: isLowAttendance ? 700 : 500,
                         }}
                       >
                         {st.name}
-                      </span>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -174,7 +173,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
       <div style={{ border: '1.5px solid #fca5a5', borderRadius: 8, overflow: 'hidden', background: '#fff1f2' }}>
         <div style={{ padding: '8px 12px', background: '#ffe4e6', borderBottom: '1px solid #fca5a5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: 800, fontSize: 12, color: '#9f1239' }}>
-            🚨 Students with Less Than 75% Attendance ({lowAttendanceStudents.length} Students)
+             Students with Less Than 75% Attendance ({lowAttendanceStudents.length} Students)
           </span>
           <span style={{ fontSize: 10, background: '#fecdd3', color: '#881337', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
             Mandatory Attendance Warning (&lt;75%)
@@ -200,7 +199,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
                 <tr key={student.id} style={{ borderBottom: '1px solid #fecdd3', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <td style={{ padding: '8px 10px', fontWeight: 700, color: '#9f1239' }}>{student.name}</td>
                   <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 800, color: '#dc2626' }}>
-                    {pct}% ⚠️
+                    {pct}%
                   </td>
                   <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#16a34a' }}>
                     {presentDays} Days
@@ -230,7 +229,7 @@ export const DatewiseAttendanceSection: React.FC<DatewiseAttendanceSectionProps>
         }}
       >
         <div style={{ fontWeight: 800, fontSize: 11.5, color: '#854d0e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>💡 Attendance Intelligence &amp; Strategic Recommendations</span>
+          <span>Attendance Intelligence &amp; Strategic Recommendations</span>
         </div>
         <div>
           Batch attendance averages <strong>{overallAttendancePct}%</strong>.{' '}

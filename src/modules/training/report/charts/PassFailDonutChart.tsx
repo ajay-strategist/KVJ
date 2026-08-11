@@ -12,7 +12,7 @@ export const PassFailDonutChart: React.FC<PassFailDonutChartProps> = ({
   passed,
   failed,
   notAttempted = 0,
-  title = 'V6. Pass vs Fail Distribution',
+  title = 'Pass vs Fail Distribution',
   caption = 'Assessment Result Summary',
 }) => {
   const total = passed + failed + notAttempted;

@@ -25,7 +25,7 @@ export interface College {
 }
 
 export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' | 'colleges' }) {
-  const { courses, createCourse, updateCourse, loading, refresh } = useTraining();
+  const { courses, createCourse, updateCourse, loading, refresh } = useTraining({ fetchStudents: false, fetchBatches: false, fetchEnrollments: false });
   const { toast } = useNotifications();
 
   // Active Tab State
@@ -295,7 +295,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
             <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-primary)' }}>
               Max Marks: <strong>{max}</strong>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>
+            <div style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>
               Pass Criteria: 🎯 {pct}% (<strong>{passMarks} marks</strong>)
             </div>
           </div>
@@ -347,7 +347,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
           <div>
             <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{c.name}</div>
             {c.imageUrl && (
-              <a href={c.imageUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none' }}>
+              <a href={c.imageUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'none' }}>
                 🖼️ View Campus Image
               </a>
             )}
@@ -361,7 +361,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       key: 'contact',
       header: 'Contact Info',
       render: (c) => (
-        <div style={{ fontSize: 11.5 }}>
+        <div style={{ fontSize: 12 }}>
           {c.contactEmail && <div>📧 {c.contactEmail}</div>}
           {c.contactPhone && <div style={{ color: 'var(--text-muted)' }}>📞 {c.contactPhone}</div>}
           {!c.contactEmail && !c.contactPhone && '—'}
@@ -450,7 +450,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
                 value={newCheckitemText}
                 onChange={(e) => setNewCheckitemText(e.target.value)}
                 placeholder="Type new required task..."
-                style={{ fontSize: 11.5, flex: 1, padding: '4px 8px' }}
+                style={{ fontSize: 12, flex: 1, padding: '4px 8px' }}
               />
               <Button type="button" size="sm" onClick={handleAddChecklistItem}>➕ Add Task</Button>
             </div>
@@ -465,7 +465,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)',
-                    border: '1px solid var(--border)', fontSize: 11.5, cursor: 'grab',
+                    border: '1px solid var(--border)', fontSize: 12, cursor: 'grab',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -512,7 +512,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
                   value={newCheckitemText}
                   onChange={(e) => setNewCheckitemText(e.target.value)}
                   placeholder="Type new required task..."
-                  style={{ fontSize: 11.5, flex: 1, padding: '4px 8px' }}
+                  style={{ fontSize: 12, flex: 1, padding: '4px 8px' }}
                 />
                 <Button type="button" size="sm" onClick={handleAddChecklistItem}>➕ Add Task</Button>
               </div>
@@ -527,7 +527,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)',
-                      border: '1px solid var(--border)', fontSize: 11.5, cursor: 'grab',
+                      border: '1px solid var(--border)', fontSize: 12, cursor: 'grab',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

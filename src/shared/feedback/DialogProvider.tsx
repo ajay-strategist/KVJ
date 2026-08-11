@@ -61,7 +61,17 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {children}
       {dialog && (
         <div role="dialog" aria-modal="true" onKeyDown={(e) => e.key === 'Escape' && close({ ok: false })}
-          style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'grid', placeItems: 'center', background: 'rgba(2,6,23,.5)', padding: 16 }}>
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1250,
+            display: 'grid',
+            placeItems: 'center',
+            background: 'var(--bg-overlay)',
+            backdropFilter: 'blur(var(--overlay-blur, 3px))',
+            WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
+            padding: 16
+          }}>
           <div style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--e4)', width: 'min(440px, 100%)', overflow: 'hidden' }}>
             <div style={{ height: 4, background: accent[dialog.variant ?? 'confirm'] }} />
             <div style={{ padding: 24 }}>

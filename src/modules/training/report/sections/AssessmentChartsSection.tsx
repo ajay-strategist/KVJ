@@ -25,7 +25,7 @@ export const AssessmentChartsSection: React.FC<SectionProps> = ({ data, config }
           return (
             <div key={ass.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#f8fafc' }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
-                📊 Analytics: {ass.title} <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>(Pass Target: {ass.passMarkPercent}%)</span>
+                 Analytics: {ass.title} <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>(Pass Target: {ass.passMarkPercent}%)</span>
               </h3>
 
               <div className="report-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>

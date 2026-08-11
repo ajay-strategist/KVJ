@@ -9,6 +9,8 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import type { Announcement } from '../communication.repository';
 import { supabase } from '../../../shared/integration/supabase';
 
+import { useAuth } from '../../auth/AuthProvider';
+
 export interface DeclaredHoliday {
   id: string;
   date: string;
@@ -18,6 +20,10 @@ export interface DeclaredHoliday {
 }
 
 export function AnnouncementsBoard() {
+  const { user } = useAuth();
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+
   const { announcements, postAnnouncement, loading } = useCommunication();
   const { toast, addNotification } = useNotifications();
   const [open, setOpen] = useState(false);
@@ -27,7 +33,10 @@ export function AnnouncementsBoard() {
 
   useEffect(() => {
     const fetchHolidays = async () => {
-      const { data } = await supabase.from('flwdsk_declared_holidays').select('*');
+      const { data } = await supabase
+        .from('flwdsk_declared_holidays')
+        .select('*')
+        .is('deleted_at', null);
       if (data && data.length > 0) {
         setHolidays(
           data.map((h) => ({
@@ -44,6 +53,10 @@ export function AnnouncementsBoard() {
   }, []);
 
   const handlePostSubmit = async (values: Record<string, unknown>) => {
+    if (!isMgmt) {
+      toast({ variant: 'error', title: 'Permission Denied', message: 'Only Admin, CEO, or Manager can post announcements.' });
+      return;
+    }
     const res = await postAnnouncement({
       title: values.title as string,
       content: values.content as string,
@@ -60,6 +73,10 @@ export function AnnouncementsBoard() {
   };
 
   const handleDeclareHoliday = async (values: Record<string, unknown>) => {
+    if (!isMgmt) {
+      toast({ variant: 'error', title: 'Permission Denied', message: 'Only Admin, CEO, or Manager can declare holidays.' });
+      return;
+    }
     const date = values.date as string;
     const name = values.name as string;
     const type = (values.type as string) || 'Company Holiday';
@@ -110,6 +127,10 @@ export function AnnouncementsBoard() {
   };
 
   const handleToggleHolidayStatus = async (id: string, currentStatus: 'active' | 'cancelled', name: string) => {
+    if (!isMgmt) {
+      toast({ variant: 'error', title: 'Permission Denied', message: 'Only Admin, CEO, or Manager can modify declared holidays.' });
+      return;
+    }
     const nextStatus = currentStatus === 'active' ? 'cancelled' : 'active';
     setHolidays((prev) =>
       prev.map((h) => (h.id === id ? { ...h, status: nextStatus } : h))
@@ -141,12 +162,14 @@ export function AnnouncementsBoard() {
         title="Corporate Announcements & Holiday Board"
         subtitle="Publish announcements, manage company holidays, and broadcast company bulletins"
         actions={
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button variant="secondary" onClick={() => setHolidayOpen(true)}>
-              🎉 Declare Holiday
-            </Button>
-            <Button onClick={() => setOpen(true)}>Post Announcement</Button>
-          </div>
+          isMgmt ? (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button variant="secondary" onClick={() => setHolidayOpen(true)}>
+                🎉 Declare Holiday
+              </Button>
+              <Button onClick={() => setOpen(true)}>Post Announcement</Button>
+            </div>
+          ) : undefined
         }
       />
 
@@ -162,14 +185,14 @@ export function AnnouncementsBoard() {
                   <th style={{ padding: 8 }}>Holiday Name</th>
                   <th style={{ padding: 8 }}>Type</th>
                   <th style={{ padding: 8 }}>Status</th>
-                  <th style={{ padding: 8, textAlign: 'right' }}>Action</th>
+                  {isMgmt && <th style={{ padding: 8, textAlign: 'right' }}>Action</th>}
                 </tr>
               </thead>
               <tbody>
                 {holidays.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      No declared holidays. Click "Declare Holiday" above to schedule a public or company holiday.
+                    <td colSpan={isMgmt ? 5 : 4} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No declared holidays. {isMgmt ? 'Click "Declare Holiday" above to schedule a public or company holiday.' : ''}
                     </td>
                   </tr>
                 ) : (
@@ -183,15 +206,17 @@ export function AnnouncementsBoard() {
                           {h.status.toUpperCase()}
                         </Badge>
                       </td>
-                      <td style={{ padding: 8, textAlign: 'right' }}>
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleToggleHolidayStatus(h.id, h.status, h.name)}
-                          style={{ padding: '4px 10px', fontSize: 11 }}
-                        >
-                          {h.status === 'active' ? '❌ Cancel Holiday' : '✓ Reactivate'}
-                        </Button>
-                      </td>
+                      {isMgmt && (
+                        <td style={{ padding: 8, textAlign: 'right' }}>
+                          <Button
+                            variant="secondary"
+                            onClick={() => handleToggleHolidayStatus(h.id, h.status, h.name)}
+                            style={{ padding: '4px 10px', fontSize: 12 }}
+                          >
+                            {h.status === 'active' ? '❌ Cancel Holiday' : '✓ Reactivate'}
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

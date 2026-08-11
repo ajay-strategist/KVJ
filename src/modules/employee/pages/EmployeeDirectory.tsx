@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Avatar, SearchInput, Button, Badge, SectionHeader } from '../../../shared/ui/components';
@@ -12,9 +12,11 @@ import type { Employee } from '../employee.repository';
 import { useProject } from '../../project/hooks/useProject';
 import { supabase } from '../../../shared/integration/supabase';
 import { Authorize } from '../../../shared/permissions/react';
+import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
+  const { confirm } = useDialog();
   const { employees, createEmployee, updateProfile, deleteEmployee, loading } = useEmployee();
   const { createUser, resetToDefaultPassword, updateUser, deleteUser, getUsers, user } = useAuth();
   const { tasks } = useProject();
@@ -26,6 +28,9 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
+  // Blocks duplicate create/edit records from a rapid double-click (raw forms,
+  // so the shared Form guard does not apply here).
+  const savingRef = useRef(false);
 
   const [usersList, setUsersList] = useState<any[]>([]);
 
@@ -47,6 +52,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
+  const [leaveToday, setLeaveToday] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadStatusInfo() {
@@ -68,6 +74,17 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           .is('deleted_at', null);
         if (taskData) {
           setActiveTasks(taskData);
+        }
+
+        // Approved leaves that cover today (start <= today <= end).
+        const { data: leaveData } = await supabase
+          .from('flwdsk_leave_records')
+          .select('employee_id, start_date, end_date, status')
+          .lte('start_date', todayStr)
+          .gte('end_date', todayStr)
+          .is('deleted_at', null);
+        if (leaveData) {
+          setLeaveToday(leaveData.filter((l: any) => String(l.status || '').toLowerCase() === 'approved'));
         }
       } catch (e) {
         console.warn('Could not load status info:', e);
@@ -145,6 +162,12 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     const empId = emp.id;
     const empEmail = emp.email?.toLowerCase();
 
+    // Highest priority: an approved leave covering today. Only rows whose date
+    // range still includes today are loaded, so a finished leave never matches.
+    if (leaveToday.some((l) => l.employee_id === empId)) {
+      return { label: '🌴 On Leave', tone: 'warning' as const };
+    }
+
     // Check local clock-in state if this employee is the logged-in user
     if (user && user.email?.toLowerCase() === empEmail) {
       try {
@@ -200,6 +223,9 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       return;
     }
 
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
     const res = await createEmployee({
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -246,12 +272,17 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     } else {
       toast({ variant: 'error', title: 'Employee Creation Failed', message: res.error || 'Could not save employee. Check email format and network connection.' });
     }
+    } finally {
+      savingRef.current = false;
+    }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEmployee) return;
-
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
     const res = await updateProfile(editingEmployee.id, {
       firstName: editForm.firstName,
       lastName: editForm.lastName,
@@ -291,6 +322,9 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         message: res.error || 'Could not update employee details.',
       });
     }
+    } finally {
+      savingRef.current = false;
+    }
   };
 
   const handleBatchDelete = async () => {
@@ -299,7 +333,14 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       .filter((e) => selectedIds.includes(e.id))
       .map((e) => `${e.firstName} ${e.lastName}`)
       .join(', ');
-    if (!window.confirm(`Permanently delete ${selectedIds.length} employee(s)?\n\n${names}\n\nThis action cannot be undone.`)) return;
+    
+    const ok = await confirm({
+      title: 'Delete Employees?',
+      message: `Are you sure you want to permanently delete ${selectedIds.length} employee(s)?\n\n${names}\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'delete',
+    });
+    if (!ok) return;
 
     setBatchDeleting(true);
     let successCount = 0;
@@ -451,7 +492,13 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
             variant="danger"
             onClick={async (e) => {
               e.stopPropagation();
-              if (window.confirm(`Are you sure you want to delete ${r.firstName} ${r.lastName}?`)) {
+              const ok = await confirm({
+                title: 'Delete Employee?',
+                message: `Are you sure you want to delete ${r.firstName} ${r.lastName}?`,
+                confirmLabel: 'Delete',
+                variant: 'delete',
+              });
+              if (ok) {
                 const res = await deleteEmployee(r.id);
                 if (res.ok) {
                   try {
@@ -510,8 +557,15 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
       {defaultTabId === 'directory' ? (
         <div>
-          <div style={{ marginBottom: 20, maxWidth: 360 }}>
-            <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search directory..." />
+          <div style={{ marginBottom: 20, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 280px', maxWidth: 360 }}>
+              <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search directory..." />
+            </div>
+            {searchTerm && (
+              <Button size="sm" variant="secondary" onClick={() => setSearchTerm('')}>
+                Clear Filters
+              </Button>
+            )}
           </div>
 
           <DataTable
@@ -537,7 +591,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
                     <Avatar name={`${r.firstName} ${r.lastName}`} size={28} />
                     <div>
                       <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{`${r.firstName} ${r.lastName}`}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.designation}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.designation}</div>
                     </div>
                   </div>
                 ),

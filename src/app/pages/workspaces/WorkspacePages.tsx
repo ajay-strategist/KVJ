@@ -54,11 +54,17 @@ const statusMap = {
 
 function ConditionalAttendanceFields() {
   const { values } = useForm();
-  const { batches } = useTraining();
+  const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
   
   if (values.classification === 'Training') {
     const options = batches.length > 0
-      ? batches.map((b) => ({ value: b.code, label: b.code }))
+      ? batches.map((b) => {
+          // Canonical batch label (corrects a stale generated code's batch number
+          // from the batch's Batch-No field) — same as everywhere else, so no
+          // duplicate/missing batch appears here.
+          const label = cleanBatchCode(b.code, b.batchNo) || b.trainingName || 'Batch';
+          return { value: label, label };
+        })
       : [{ value: 'No Batches Available', label: 'No Batches Available' }];
     return (
       <SelectField
@@ -113,7 +119,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   const { confirm } = useDialog();
   const { toast } = useNotifications();
   const { user } = useAuth();
-  const { batches, courses } = useTraining();
+  const { batches, courses } = useTraining({ fetchStudents: false, fetchEnrollments: false });
   const { employees } = useEmployee();
   const [clockInOpen, setClockInOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
@@ -127,6 +133,25 @@ export const AttendancePanel = memo(function AttendancePanel({
   }, [employees, user]);
 
   const [assignedTodayBatchIds, setAssignedTodayBatchIds] = useState<Set<string>>(new Set());
+  // Real enrolled-student count per batch (from actual enrollments, not capacity).
+  const [batchStudentCounts, setBatchStudentCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('flwdsk_enrollments')
+      .select('batch_id')
+      .is('deleted_at', null)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const counts: Record<string, number> = {};
+        (data || []).forEach((e: any) => {
+          if (e.batch_id) counts[e.batch_id] = (counts[e.batch_id] || 0) + 1;
+        });
+        setBatchStudentCounts(counts);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     async function loadAssignedSessions() {
@@ -173,6 +198,10 @@ export const AttendancePanel = memo(function AttendancePanel({
 
     const mapped = batches.map((b) => {
       const courseObj = courses.find((c) => c.id === b.courseId);
+      // cleanBatchCode(code, batchNo) syncs a stale generated code's "Batch N" to
+      // the batch's current Batch-No field, so each batch shows its correct,
+      // distinct number (matches Batch Management). This is the single canonical
+      // batch label used everywhere.
       const cleanCode = cleanBatchCode(b.code, b.batchNo);
       const name = cleanCode || b.trainingName || 'Training Batch';
 
@@ -192,7 +221,7 @@ export const AttendancePanel = memo(function AttendancePanel({
         college: b.college || '—',
         course: courseObj?.title || b.trainingName || 'Training Program',
         time: '09:00 AM - 12:00 PM',
-        students: b.capacity || 30,
+        students: batchStudentCounts[b.id] ?? 0,
         trainer: b.coordinator || (b as any).trainer || 'Assigned Trainer',
         isMyAssigned,
       };
@@ -204,7 +233,7 @@ export const AttendancePanel = memo(function AttendancePanel({
       if (!a.isMyAssigned && b.isMyAssigned) return 1;
       return 0;
     });
-  }, [batches, courses, user, currentEmployee, assignedTodayBatchIds]);
+  }, [batches, courses, user, currentEmployee, assignedTodayBatchIds, batchStudentCounts]);
 
   const [selectedBatch, setSelectedBatch] = useState('');
 
@@ -375,7 +404,7 @@ export const AttendancePanel = memo(function AttendancePanel({
         >
           {/* CURRENT STATUS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CURRENT STATUS
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
@@ -385,7 +414,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
           {/* GPS LOCATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               GPS LOCATION
             </span>
             <span style={{ fontSize: 13.5, fontWeight: 700, color: '#6366f1', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
@@ -395,7 +424,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
           {/* CLOCK IN TIME */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CLOCK IN TIME
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
@@ -405,7 +434,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
           {/* DURATION TODAY */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               DURATION TODAY
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
@@ -415,7 +444,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
           {/* BREAK DURATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 11, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               BREAK DURATION
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
@@ -459,7 +488,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 disabled={loading}
                 onClick={handleDirectStartBreak}
                 style={{
-                  background: '#f59e0b',
+                  background: 'var(--status-warning)',
                   color: 'white',
                   border: 'none',
                   padding: '10px 22px',
@@ -481,7 +510,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 disabled={loading}
                 onClick={handleClockOut}
                 style={{
-                  background: '#ef4444',
+                  background: 'var(--status-danger)',
                   color: 'white',
                   border: 'none',
                   padding: '10px 22px',
@@ -604,7 +633,7 @@ export const AttendancePanel = memo(function AttendancePanel({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Select Training Batch</span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{availableBatches.length} Batches Available</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{availableBatches.length} Batches Available</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
                 {availableBatches.length === 0 ? (
@@ -636,7 +665,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                           </div>
                           <Badge tone={active ? 'info' : 'neutral'}>{b.course}</Badge>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
                           <span>🏫 {b.college}</span>
                           <span>👥 {b.students} Students</span>
                           <span>🕒 {b.time}</span>
@@ -658,15 +687,15 @@ export const AttendancePanel = memo(function AttendancePanel({
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
                   🟢 GPS Status: Verified
                 </span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>High Accuracy (3m)</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>High Accuracy (3m)</span>
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, marginTop: 6 }}>📍 Location: {resolveLocationName(locationStr)}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Coordinates: {locationStr}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Coordinates: {locationStr}</div>
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${locationStr}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'underline', display: 'inline-block', marginTop: 6 }}
+                style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'underline', display: 'inline-block', marginTop: 6 }}
               >
                 View on Google Maps ↗
               </a>
@@ -1044,12 +1073,12 @@ export const TaskWidget = memo(function TaskWidget({
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{t.title}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong></span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• 📅 Due: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong></span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong></span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>• 📅 Due: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong></span>
                     {(() => {
                       const info = getTimeLeftInfo(t.due);
                       return (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                           • ⏳ Time Left:{' '}
                           <strong style={{ color: info.tone === 'danger' ? 'var(--status-danger)' : info.tone === 'warning' ? 'var(--status-warning)' : 'var(--brand)' }}>
                             {info.label}
@@ -1058,10 +1087,10 @@ export const TaskWidget = memo(function TaskWidget({
                       );
                     })()}
                     {t.assignee && (
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• 👤 Assignee: <strong style={{ color: 'var(--text-primary)' }}>{t.assignee}</strong></span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>• 👤 Assignee: <strong style={{ color: 'var(--text-primary)' }}>{t.assignee}</strong></span>
                     )}
                     {t.supervisor && (
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>• 🧑‍💼 Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{t.supervisor}</strong></span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>• 🧑‍💼 Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{t.supervisor}</strong></span>
                     )}
                   </div>
                 </div>
@@ -1142,8 +1171,33 @@ export const TaskWidget = memo(function TaskWidget({
 export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
   const { user } = useAuth();
   const [selectedDay, setSelectedDay] = useState<number>(0);
-  const { tasks } = useProject();
+  const { tasks, projects } = useProject();
+  const { employees } = useEmployee();
   const [dbSchedules, setDbSchedules] = useState<any[]>([]);
+
+  const empName = useCallback((id?: string) => {
+    if (!id) return '';
+    const e = (employees || []).find((x: any) => x.id === id);
+    return e ? `${e.firstName} ${e.lastName}`.trim() : '';
+  }, [employees]);
+
+  const projTitle = useCallback((id?: string) => {
+    if (!id) return 'Office Task';
+    const p = (projects || []).find((x: any) => x.id === id);
+    return p ? p.title : 'Office Task';
+  }, [projects]);
+
+  // Human-readable time remaining until a due date (relative to today).
+  const timeLeftLabel = useCallback((due?: string, todayIso?: string) => {
+    if (!due) return 'No due date';
+    const d = due.slice(0, 10);
+    const t = todayIso || toLocalISODate(new Date());
+    const diff = Math.round((new Date(d + 'T00:00:00').getTime() - new Date(t + 'T00:00:00').getTime()) / 86400000);
+    if (diff < 0) return `Overdue by ${Math.abs(diff)} day${Math.abs(diff) === 1 ? '' : 's'}`;
+    if (diff === 0) return 'Due today';
+    if (diff === 1) return '1 day left';
+    return `${diff} days left`;
+  }, []);
 
   useEffect(() => {
     async function loadSchedules() {
@@ -1189,8 +1243,10 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
         }
 
         if (!isManagement) {
+          // Employees see tasks assigned to them PLUS tasks they supervise.
           const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || ((t as any).assignee && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
-          if (!isMyTask) return false;
+          const iSupervise = t.supervisorId === user?.id || (t as any).assignedByEmployeeId === user?.id;
+          if (!isMyTask && !iSupervise) return false;
         }
         const taskDate = (t.dueDate || '').slice(0, 10);
         if (!taskDate) return i === 0;
@@ -1204,6 +1260,11 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
         time: (t.dueDate || '').slice(0, 10) < isoDate ? 'Overdue' : 'Due Today',
         title: `Task: ${t.title}`,
         type: 'Projects' as const,
+        project: projTitle(t.projectId),
+        dueDate: (t.dueDate || '').slice(0, 10) || '—',
+        timeLeft: timeLeftLabel(t.dueDate, isoDate),
+        assignee: empName(t.assigneeId) || 'Unassigned',
+        supervisor: empName(t.supervisorId) || empName((t as any).assignedByEmployeeId) || '—',
       }));
 
       // 2. Gather training schedules on this date
@@ -1234,7 +1295,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
     }
 
     return result;
-  }, [tasks, dbSchedules]);
+  }, [tasks, dbSchedules, user, employees, projects, empName, projTitle, timeLeftLabel]);
 
   const currentDayEvents = upcoming7Days[selectedDay]?.events || [];
 
@@ -1271,10 +1332,20 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
           </div>
         ) : (
           currentDayEvents.map((e) => (
-            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
-              <div>
+            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>🕒 {e.time}</div>
+                {e.type === 'Projects' ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 14px', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                    <span>📁 Project: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).project}</strong></span>
+                    <span>📅 Due: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).dueDate}</strong></span>
+                    <span>⏳ <strong style={{ color: (e as any).timeLeft?.startsWith('Overdue') ? 'var(--status-danger)' : 'var(--text-secondary)' }}>{(e as any).timeLeft}</strong></span>
+                    <span>👤 Assignee: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).assignee}</strong></span>
+                    <span>🧑‍💼 Supervisor: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).supervisor}</strong></span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>🕒 {e.time}</div>
+                )}
               </div>
               <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Projects' ? 'progress' : 'neutral'}>{e.type}</Badge>
             </div>
@@ -1305,7 +1376,7 @@ const dateNavBtnStyle: React.CSSProperties = {
   border: '1px solid var(--border)',
   borderRadius: 'var(--radius-sm)',
   padding: '4px 8px',
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 600,
   color: 'var(--text-secondary)',
   cursor: 'pointer',
@@ -1357,7 +1428,7 @@ export const TimelineWidget = memo(function TimelineWidget({
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
               Daily Activity Timeline
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               Clock In → Work → Clock Out Logs
             </div>
           </div>
@@ -1369,7 +1440,7 @@ export const TimelineWidget = memo(function TimelineWidget({
         {/* User Level Employee Filter Dropdown for Executive Roles */}
         {false && isExecutive && employeeList.length > 0 && onEmpIdChange && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-sunken)', padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)' }}>👤 Filter Timeline:</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>👤 Filter Timeline:</span>
             <select
               value={selectedEmpId || 'me'}
               onChange={(e) => onEmpIdChange?.(e.target.value)}
@@ -1487,7 +1558,7 @@ export const TimelineWidget = memo(function TimelineWidget({
                 background: 'none',
                 border: 'none',
                 color: 'var(--brand)',
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 700,
                 cursor: 'pointer',
                 textDecoration: 'underline',
@@ -1579,11 +1650,11 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    {isHigh && <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}>📌 Pinned</span>}
+                    {isHigh && <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 700 }}>📌 Pinned</span>}
                     <Badge tone={tone}>{targetLabel[a.targetType] ?? a.targetType}</Badge>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{when}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{when}</span>
                     <button
                       type="button"
                       onClick={() => handleDismiss(a.id)}
@@ -1623,7 +1694,7 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
                       background: 'none',
                       border: 'none',
                       color: 'var(--brand)',
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 700,
                       cursor: 'pointer',
                       textAlign: 'left',
@@ -1649,7 +1720,7 @@ function ResizedStatPill({ label, value, tone = 'neutral', icon }: { label: stri
     <div className="kvj-card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', minHeight: 64, borderRadius: 16 }}>
       {icon && <span className={`kvj-badge kvj-badge--${tone}`} style={{ width: 34, height: 34, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, fontSize: 16 }}>{icon}</span>}
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{label}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{label}</span>
         <span style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
       </div>
     </div>

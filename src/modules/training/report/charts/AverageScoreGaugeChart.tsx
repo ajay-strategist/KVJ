@@ -12,7 +12,7 @@ export const AverageScoreGaugeChart: React.FC<AverageScoreGaugeChartProps> = ({
   score,
   maxScore = 100,
   passMarkPercent = 84,
-  title = 'V7. Average Score Gauge',
+  title = 'Average Score Gauge',
   caption = 'Batch Mean Performance',
 }) => {
   const pct = Math.min(Math.max(Math.round((score / maxScore) * 100), 0), 100);

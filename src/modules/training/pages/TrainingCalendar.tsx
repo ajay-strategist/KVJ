@@ -25,6 +25,7 @@ import {
 import { BATCH_REPOSITORY_TOKEN, COURSE_REPOSITORY_TOKEN, type Batch, type Course } from '../training.repository';
 import { cleanBatchCode } from '../utils/batch-formatter';
 import { supabase } from '../../../shared/integration/supabase';
+import { useTraining } from '../hooks/useTraining';
 
 const EMPTY: ScheduleRangeResult = { sessions: [], leaves: [], holidays: [], daysLoaded: 0 };
 
@@ -71,6 +72,8 @@ export function TrainingCalendar() {
   const isExecutive = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
+  const { saveCalendarSession, deleteCalendarSession } = useTraining();
+  const [submittingSession, setSubmittingSession] = useState(false);
 
   // ── Date range (default: current month) ──
   const [preset, setPreset] = useState<PresetId>('current_month');
@@ -97,6 +100,9 @@ export function TrainingCalendar() {
 
   const [batches, setBatches] = useState<Batch[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  // Real enrolled-student count per batch (from the batch's actual student data),
+  // not the batch capacity. Keyed by batch id.
+  const [batchStudentCounts, setBatchStudentCounts] = useState<Record<string, number>>({});
 
   // Load schedule sessions from Supabase flwdsk_calendar_sessions table
   const loadDbSessions = useCallback(async () => {
@@ -132,7 +138,7 @@ export function TrainingCalendar() {
             mode: (r.mode === 'Online' ? 'Online' : 'Offline') as any,
             studentCount: r.student_count || matchedBatch?.capacity || 30,
             status: (r.status || 'Scheduled') as any,
-            color: r.color || '#3b82f6',
+            color: r.color || 'var(--brand)',
           };
         });
 
@@ -219,6 +225,20 @@ export function TrainingCalendar() {
       setBatches(bRes.data);
       setCourses(cRes.data);
     });
+
+    // Real enrolled-student counts per batch (not capacity). Count the batch's
+    // actual, non-deleted enrollments.
+    supabase
+      .from('flwdsk_enrollments')
+      .select('batch_id')
+      .is('deleted_at', null)
+      .then(({ data }) => {
+        const counts: Record<string, number> = {};
+        (data || []).forEach((e: any) => {
+          if (e.batch_id) counts[e.batch_id] = (counts[e.batch_id] || 0) + 1;
+        });
+        setBatchStudentCounts(counts);
+      });
   }, [isExecutive, user]);
 
   const dynamicBatchPresets = useMemo(() => {
@@ -262,13 +282,14 @@ export function TrainingCalendar() {
         coordinator: b.coordinator || '—',
         venue: b.venue || '—',
         mode: (b.onlineLink ? 'Online' : 'Offline') as 'Online' | 'Offline',
-        studentCount: b.capacity || 0,
+        // Real enrolled-student count from the batch's student data (not capacity).
+        studentCount: batchStudentCounts[b.id] ?? 0,
         fullLabel,
       });
     });
 
     return list;
-  }, [batches, courses]);
+  }, [batches, courses, batchStudentCounts]);
 
   const trainerIds = useMemo(() => trainers.map((t) => t.id), [trainers]);
   const trainerName = useCallback(
@@ -508,9 +529,17 @@ export function TrainingCalendar() {
   };
 
   const handleSaveSession = async () => {
+    if (submittingSession) return;
     const effectiveTrainerId = assignForm.trainerId || user?.id || trainers[0]?.id || '';
     if (!effectiveTrainerId) {
       toast({ variant: 'error', title: 'Trainer Required', message: 'Please select a trainer for the schedule.' });
+      return;
+    }
+
+    // End time must be after start time (times are zero-padded "HH:MM", so a
+    // plain string comparison is correct). Prevents an impossible session slot.
+    if (assignForm.startTime && assignForm.endTime && assignForm.endTime <= assignForm.startTime) {
+      toast({ variant: 'error', title: 'Invalid Time', message: 'End time must be later than the start time.' });
       return;
     }
 
@@ -548,7 +577,7 @@ export function TrainingCalendar() {
       mode: assignForm.mode,
       studentCount: Number(assignForm.studentCount) || 20,
       status: 'Scheduled',
-      color: '#3b82f6',
+      color: 'var(--brand)',
     };
 
     // Persist to Supabase flwdsk_calendar_sessions table
@@ -564,19 +593,24 @@ export function TrainingCalendar() {
       mode: sessionObj.mode,
       student_count: sessionObj.studentCount,
       status: sessionObj.status,
-      color: sessionObj.color || '#3b82f6',
+      color: sessionObj.color || 'var(--brand)',
     };
 
-    const { error: saveError } = await supabase.from('flwdsk_calendar_sessions').upsert(payload);
+    setSubmittingSession(true);
+    try {
+      const res = await saveCalendarSession(payload);
 
-    if (saveError) {
-      console.error('Calendar session save error:', saveError.message);
-      toast({
-        variant: 'error',
-        title: 'Save Failed',
-        message: saveError.message || 'Could not save session to database.',
-      });
-      return;
+      if (!res.ok) {
+        console.error('Calendar session save error:', res.error);
+        toast({
+          variant: 'error',
+          title: 'Save Failed',
+          message: res.error || 'Could not save session to database.',
+        });
+        return;
+      }
+    } finally {
+      setSubmittingSession(false);
     }
 
     await loadDbSessions();
@@ -604,26 +638,30 @@ export function TrainingCalendar() {
   };
 
   const handleDeleteSession = async () => {
-    if (!editingSessionId) return;
+    if (!editingSessionId || submittingSession) return;
     const deletedId = editingSessionId;
-
-    if (UUID_RE.test(deletedId)) {
-      const { error } = await supabase.from('flwdsk_calendar_sessions').delete().eq('id', deletedId);
-      if (error) {
-        console.error('Supabase schedule_sessions delete error:', error.message);
-        toast({
-          variant: 'error',
-          title: 'Delete Failed',
-          message: error.message,
-        });
-        return;
+    setSubmittingSession(true);
+    try {
+      if (UUID_RE.test(deletedId)) {
+        const res = await deleteCalendarSession(deletedId);
+        if (!res.ok) {
+          console.error('Supabase schedule_sessions delete error:', res.error);
+          toast({
+            variant: 'error',
+            title: 'Delete Failed',
+            message: res.error,
+          });
+          return;
+        }
       }
-    }
 
-    setCustomSessions((prev) => prev.filter((s) => s.id !== deletedId));
-    setIsAssignDrawerOpen(false);
-    setEditingSessionId(null);
-    toast({ variant: 'info', title: 'Schedule Removed', message: 'Assigned schedule deleted.' });
+      setCustomSessions((prev) => prev.filter((s) => s.id !== deletedId));
+      setIsAssignDrawerOpen(false);
+      setEditingSessionId(null);
+      toast({ variant: 'info', title: 'Schedule Removed', message: 'Assigned schedule deleted.' });
+    } finally {
+      setSubmittingSession(false);
+    }
   };
 
   const resetFilters = () => {
@@ -684,7 +722,7 @@ export function TrainingCalendar() {
               <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                 Training Resource Planner
               </h1>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 500 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
                 Resource Allocation &amp; Matrix Scheduling
               </div>
             </div>
@@ -844,7 +882,7 @@ export function TrainingCalendar() {
 
           {/* Reset Filters Button */}
           {activeFilterCount > 0 && (
-            <Button size="sm" variant="ghost" onClick={resetFilters} style={{ height: 32, fontSize: 11.5, color: '#dc2626' }}>
+            <Button size="sm" variant="ghost" onClick={resetFilters} style={{ height: 32, fontSize: 12, color: '#dc2626' }}>
               ↺ Reset ({activeFilterCount})
             </Button>
           )}
@@ -852,7 +890,7 @@ export function TrainingCalendar() {
 
         {/* Active Filter Pills Bar */}
         {activeFilterCount > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', fontSize: 11 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', fontSize: 12 }}>
             <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Active Filters:</span>
             {filters.search && (
               <FilterPill label={`Search: "${filters.search}"`} onClear={() => setFilters((f) => ({ ...f, search: '' }))} />
@@ -878,7 +916,7 @@ export function TrainingCalendar() {
         <section style={{ border: '1px solid #fca5a5', borderRadius: 'var(--radius-lg, 12px)', background: '#fff1f2', padding: '12px 16px', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
             <span style={{ fontSize: 13, fontWeight: 800, color: '#dc2626' }}>⚠️ Schedule Overlap Conflicts</span>
-            <span style={{ fontSize: 11, background: '#dc2626', color: '#fff', borderRadius: 999, padding: '1px 8px', fontWeight: 800 }}>{shownConflicts.length}</span>
+            <span style={{ fontSize: 12, background: '#dc2626', color: '#fff', borderRadius: 999, padding: '1px 8px', fontWeight: 800 }}>{shownConflicts.length}</span>
             
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <button
@@ -889,7 +927,7 @@ export function TrainingCalendar() {
                   border: '1px solid #fca5a5',
                   borderRadius: 6,
                   cursor: 'pointer',
-                  fontSize: 11.5,
+                  fontSize: 12,
                   fontWeight: 700,
                   color: '#9f1239',
                   padding: '4px 10px',
@@ -954,7 +992,7 @@ export function TrainingCalendar() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: 700,
                     borderRight: '1px solid var(--border)',
                     whiteSpace: 'nowrap',
@@ -1002,7 +1040,7 @@ export function TrainingCalendar() {
                   <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: r.isToday ? 800 : 500, color: r.isToday ? 'var(--text-today)' : 'inherit' }}>
                     {r.date}
                     {r.isToday && (
-                      <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, background: 'var(--brand)', color: 'var(--brand-contrast, #ffffff)', padding: '1px 5px', borderRadius: 4, letterSpacing: '0.04em' }}>
+                      <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, background: 'var(--brand)', color: 'var(--brand-contrast, #ffffff)', padding: '1px 5px', borderRadius: 4, letterSpacing: '0.04em' }}>
                         TODAY
                       </span>
                     )}
@@ -1011,8 +1049,8 @@ export function TrainingCalendar() {
                 <FrozenCell w={FROZEN.day} left={FROZEN.date} bg={tint}>{r.dayName}</FrozenCell>
                 <FrozenCell w={FROZEN.holiday} left={FROZEN.date + FROZEN.day} bg={tint}>
                   {r.holiday
-                    ? <span style={{ fontSize: 11, color: 'var(--text-holiday)', fontWeight: 700 }}>{r.holiday.name}</span>
-                    : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>}
+                    ? <span style={{ fontSize: 12, color: 'var(--text-holiday)', fontWeight: 700 }}>{r.holiday.name}</span>
+                    : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>}
                 </FrozenCell>
 
                 <div style={{ position: 'relative', width: colVirt.getTotalSize(), height: '100%' }}>
@@ -1053,14 +1091,15 @@ export function TrainingCalendar() {
               <button
                 type="button"
                 onClick={handleDeleteSession}
-                style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                disabled={submittingSession}
+                style={{ color: '#dc2626', background: 'none', border: 'none', cursor: submittingSession ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, opacity: submittingSession ? 0.5 : 1 }}
               >
                 🗑️ Remove Schedule
               </button>
             ) : <div />}
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button variant="secondary" onClick={() => setIsAssignDrawerOpen(false)}>Cancel</Button>
-              <Button onClick={handleSaveSession}>{editingSessionId ? '💾 Update Schedule' : '💾 Save Schedule Allocation'}</Button>
+              <Button variant="secondary" onClick={() => setIsAssignDrawerOpen(false)} disabled={submittingSession}>Cancel</Button>
+              <Button onClick={handleSaveSession} loading={submittingSession}>{editingSessionId ? '💾 Update Schedule' : '💾 Save Schedule Allocation'}</Button>
             </div>
           </div>
         }
@@ -1135,7 +1174,7 @@ export function TrainingCalendar() {
             border: '1px solid var(--border)',
             borderRadius: 8,
             padding: '10px 12px',
-            fontSize: 11.5,
+            fontSize: 12,
             color: 'var(--text-secondary)',
             display: 'flex',
             flexDirection: 'column',
@@ -1232,9 +1271,9 @@ function Kpi({ label, value, tone, hint, onClick }: { label: string; value: stri
         boxShadow: 'var(--e1)',
       }}
     >
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.04em' }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.04em' }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 900, color: tone, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      {hint && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{hint}</div>}
     </div>
   );
 }
@@ -1246,7 +1285,7 @@ function FilterPill({ label, onClear }: { label: string; onClear: () => void }) 
       border: '1px solid var(--border)',
       borderRadius: 12,
       padding: '2px 8px',
-      fontSize: 10.5,
+      fontSize: 12,
       fontWeight: 600,
       color: 'var(--text-primary)',
       display: 'inline-flex',
@@ -1254,7 +1293,7 @@ function FilterPill({ label, onClear }: { label: string; onClear: () => void }) 
       gap: 4,
     }}>
       {label}
-      <button type="button" onClick={onClear} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, padding: 0, color: 'var(--text-muted)' }}>✕</button>
+      <button type="button" onClick={onClear} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, padding: 0, color: 'var(--text-muted)' }}>✕</button>
     </span>
   );
 }
@@ -1265,7 +1304,7 @@ function HeadCell({ w, left, children }: { w: number; left: number; children: Re
       position: 'sticky', left, width: w, minWidth: w, zIndex: 25,
       background: 'var(--bg-sunken)', borderRight: '1px solid var(--border)',
       display: 'flex', alignItems: 'center', padding: '0 10px',
-      fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em',
+      fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em',
       color: 'var(--text-secondary)', boxSizing: 'border-box',
     }}>{children}</div>
   );
@@ -1302,12 +1341,12 @@ const ConflictCard = memo(function ConflictCard({ c, onDetails, onResolve, onRea
       borderRadius: 'var(--radius-sm, 6px)', padding: 10, background: '#ffffff',
     }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{meta.icon} {c.type}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>
         {c.trainerName} · {c.date}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.time}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Batches: {c.batches.join(', ')}</div>
-      <div style={{ fontSize: 10.5, marginTop: 4 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.time}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Batches: {c.batches.join(', ')}</div>
+      <div style={{ fontSize: 12, marginTop: 4 }}>
         Severity <strong>{c.severity}</strong> · Status <strong>{c.status}</strong>
       </div>
       <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
@@ -1323,7 +1362,7 @@ const ConflictCard = memo(function ConflictCard({ c, onDetails, onResolve, onRea
 function MiniBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
     <button type="button" onClick={onClick} style={{
-      fontSize: 10.5, padding: '3px 7px', borderRadius: 'var(--radius-xs, 4px)',
+      fontSize: 12, padding: '3px 7px', borderRadius: 'var(--radius-xs, 4px)',
       border: '1px solid var(--border)', background: 'var(--bg-sunken)',
       color: 'var(--text-secondary)', cursor: 'pointer',
     }}>{children}</button>
@@ -1355,7 +1394,7 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
       }}
     >
       {leave && (
-        <div style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, padding: '3px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           🟧 {leave.duration} {leave.type} ({leave.status})
         </div>
       )}
@@ -1383,13 +1422,13 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
             }}
             style={{
               textAlign: 'left',
-              borderLeft: `4px solid ${s.color || '#3b82f6'}`,
+              borderLeft: `4px solid ${s.color || 'var(--brand)'}`,
               background: 'var(--bg-panel)',
               border: '1px solid var(--border)',
               borderRadius: 6,
               padding: '6px 8px',
               cursor: 'pointer',
-              fontSize: 11,
+              fontSize: 12,
               color: 'var(--text-primary)',
               overflow: 'hidden',
               boxSizing: 'border-box',
@@ -1402,7 +1441,7 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
             <div
               style={{
                 fontWeight: 700,
-                fontSize: 11,
+                fontSize: 12,
                 color: 'var(--brand-primary, #1e40af)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -1415,7 +1454,7 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
             <div
               style={{
                 color: 'var(--text-secondary)',
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 500,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -1426,7 +1465,7 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
               ⏰ {timeDisplay} {s.name && cleanBatchCode(s.name) !== batchDisplay ? `· ${cleanBatchCode(s.name)}` : ''}
             </div>
             {expanded && (
-              <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
                 📍 {s.venue} · {s.mode} · 👥 {s.studentCount}<br />🏛️ {s.college} · 👤 {s.coordinator}
               </div>
             )}
@@ -1434,7 +1473,7 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
         );
       })}
       {!leave && sessions.length === 0 && (
-        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontStyle: 'italic', alignSelf: 'center', marginTop: 'auto', marginBottom: 'auto', opacity: 0.6 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', alignSelf: 'center', marginTop: 'auto', marginBottom: 'auto', opacity: 0.6 }}>
           Office
         </div>
       )}

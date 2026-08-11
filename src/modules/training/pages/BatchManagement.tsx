@@ -23,6 +23,8 @@ import { DailyReportPreview } from '../report/DailyReportPreview';
 import type { DailyReportConfig, DailyReportData } from '../report/daily-report.types';
 import { useMemo } from 'react';
 import { cleanBatchCode } from '../utils/batch-formatter';
+import { calculateFinalExamEligibility } from '../utils/eligibility';
+import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 // Workspace Navigation Tabs
 type WorkspaceTab =
@@ -117,12 +119,13 @@ interface DocumentItem {
 }
 
 export function BatchManagement() {
+  const { confirm } = useDialog();
   const { can } = usePermissions();
   const { user } = useAuth();
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const canCreateBatch = true;
   const canViewDailyReport = true;
-  const { batches, courses, createBatch, updateBatch, students: dbStudents, enrollments, loading: batchesLoading, error: batchesError, refresh: refreshBatches, registerStudent, enrollStudent } = useTraining();
+  const { batches, courses, createBatch, updateBatch, students: dbStudents, enrollments, loading: batchesLoading, error: batchesError, refresh: refreshBatches, registerStudent, enrollStudent, removeEnrollment, removeBatch, getCertificateDelivery, saveCertificateDelivery, uploadCertificateReceipt, getCertificateReceiptUrl, logSessionAttendanceCell, updateSessionDate, updateSessionHour, deleteSessionColumn, issueVoucher, recordExamAttempt, updateStudentProfile, updateVoucherSentStatus, verifyRetestPayment, saveBatchEligibilityRules, resolveExamAttemptDiscrepancy, syncVoucher, syncExamAttempt } = useTraining({ fetchStudents: false });
   const { toast } = useNotifications();
   const [trainers, setTrainers] = useState<Employee[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
@@ -378,13 +381,17 @@ export function BatchManagement() {
     const target = batches.find((b) => b.id === batchId);
     if (!target) return;
     const label = target.trainingName || target.code || batchId;
-    if (!window.confirm(`Permanently delete batch "${label}"?\n\nThis will also remove ALL student enrollments for this batch. This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete Batch?',
+      message: `Are you sure you want to permanently delete batch "${label}"?\n\nThis will also remove ALL student enrollments for this batch. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'delete',
+    });
+    if (!ok) return;
     try {
-      // Remove enrollments first
-      await supabase.from('flwdsk_enrollments').delete().eq('batch_id', batchId);
-      // Remove the batch
-      const { error } = await supabase.from('flwdsk_batches').delete().eq('id', batchId);
-      if (error) throw error;
+      const res = await removeBatch(batchId);
+      if (!res.ok) throw new Error(res.error);
+
       // If deleted batch was selected, clear selection
       if (selectedBatchId === batchId) setSelectedBatchId(safeBatches.find((b) => b.id !== batchId)?.id ?? '');
       refreshBatches();
@@ -424,12 +431,18 @@ export function BatchManagement() {
     ],
   });
 
-  // Certificate tracker parameter state
-  const [certificateDeliveryDate, setCertificateDeliveryDate] = useState('2026-07-28');
-  const [certificateStatus, setCertificateStatus] = useState<'Generated' | 'Printed' | 'Dispatched' | 'Delivered' | 'Received'>('Printed');
-  const [courierName, setCourierName] = useState('DTDC Express');
-  const [trackingNumber, setTrackingNumber] = useState('DTDC-992019A');
-  const [signedReceiptUploaded, setSignedReceiptUploaded] = useState(false);
+  // Certificate delivery per-student state
+  const [certSelectedStudentId, setCertSelectedStudentId] = useState<string>('');
+  const [certDeliveryDate, setCertDeliveryDate] = useState<string>('');
+  const [certCollectedBy, setCertCollectedBy] = useState<string>('');
+  const [certCount, setCertCount] = useState<string>('');
+  const [certReceiptFile, setCertReceiptFile] = useState<File | null>(null);
+  const [certReceiptPath, setCertReceiptPath] = useState<string>('');
+  const [certSaving, setCertSaving] = useState(false);
+  const [certUploading, setCertUploading] = useState(false);
+  const [certRecord, setCertRecord] = useState<any>(null);
+  const [certLoading, setCertLoading] = useState(false);
+  const [certReceiptUrl, setCertReceiptUrl] = useState<string>('');
 
   // Modals & Action Handlers for Student Data Management
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -494,17 +507,39 @@ export function BatchManagement() {
     };
 
     try {
-      const { data, error } = await supabase.from('flwdsk_student_records').insert({
-        ...payload,
-        phone: normalizeStudentKey(newFinalExamStudentForm.phone || '9876500000'),
-      }).select('id');
+      const phone = newFinalExamStudentForm.phone || '+91 90000 00000';
+      const repo = container.resolve(STUDENT_REPOSITORY_TOKEN);
+      const existing = await repo.findByRegisterNo(phone);
+      let studentId = '';
 
-      if (error) throw error;
-      
-      const newId = data?.[0]?.id || `s-${Date.now()}`;
+      if (existing) {
+        studentId = existing.id;
+        const res = await updateStudentProfile(studentId, {
+          customFields: payload.custom_fields
+        });
+        if (!res.ok) throw new Error(res.error);
+      } else {
+        const res = await registerStudent({
+          firstName,
+          lastName,
+          phone,
+          email: `${newFinalExamStudentForm.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
+          customFields: payload.custom_fields,
+        });
+        if (res.ok) {
+          studentId = res.value.id;
+        } else {
+          throw new Error(res.error);
+        }
+      }
 
-      if (selectedBatchId && data?.[0]?.id) {
-        await enrollStudent(data[0].id, selectedBatchId);
+      const newId = studentId || `s-${Date.now()}`;
+
+      if (selectedBatchId && studentId) {
+        const alreadyEnrolled = enrollments.some(e => e.batchId === selectedBatchId && e.studentId === studentId);
+        if (!alreadyEnrolled) {
+          await enrollStudent(studentId, selectedBatchId);
+        }
       }
 
       const newStudent: StudentRecord = {
@@ -532,7 +567,13 @@ export function BatchManagement() {
         examAttemptCount: 1,
       };
 
-      setStudents((prev) => [...prev, newStudent]);
+      setStudents((prev) => {
+        const exists = prev.some((s) => s.id === newId);
+        if (exists) {
+          return prev.map((s) => (s.id === newId ? { ...s, ...newStudent } : s));
+        }
+        return [...prev, newStudent];
+      });
       setAddFinalExamModalOpen(false);
       setNewFinalExamStudentForm({
         name: '',
@@ -697,65 +738,31 @@ export function BatchManagement() {
     loadAttendanceFromDb();
   }, [selectedBatchId]);
 
-  // Sync attendanceMatrix and attendanceSessions back to Supabase
-  useEffect(() => {
-    if (!selectedBatchId) return;
-    async function syncAttendance() {
-      try {
-        for (const studentId of Object.keys(attendanceMatrix)) {
-          const isRealUuid = studentId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
-          if (!isRealUuid) continue;
-          
-          const studentSessions = attendanceMatrix[studentId];
-          for (const colId of Object.keys(studentSessions)) {
-            const status = studentSessions[colId];
-            const col = attendanceSessions.find((c) => c.id === colId);
-            if (!col) continue;
-            
-            const sessionTitle = `Hour ${col.hour || 1}`;
-            const { data, error } = await supabase
-              .from('flwdsk_schedule_sessions')
-              .select('id')
-              .eq('batch_id', selectedBatchId)
-              .eq('student_id', studentId)
-              .eq('date', col.date)
-              .eq('session_title', sessionTitle)
-              .maybeSingle();
-              
-            if (!error) {
-              const payload = {
-                batch_id: selectedBatchId,
-                student_id: studentId,
-                date: col.date,
-                status: status.toUpperCase(),
-                topic: 'Batch Session',
-                session_title: sessionTitle,
-              };
-              
-              if (data?.id) {
-                await supabase.from('flwdsk_schedule_sessions').update(payload).eq('id', data.id);
-              } else {
-                await supabase.from('flwdsk_schedule_sessions').insert(payload);
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to sync attendance to Supabase:', err);
+  const saveAttendanceCellToDb = async (studentId: string, colId: string, status: string) => {
+    const isRealUuid = studentId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
+    if (!isRealUuid || !selectedBatchId) return;
+
+    const col = attendanceSessions.find((c) => c.id === colId);
+    if (!col) return;
+
+    const sessionTitle = `Hour ${col.hour || 1}`;
+    try {
+      const res = await logSessionAttendanceCell(selectedBatchId, studentId, col.date, sessionTitle, status);
+      if (!res.ok) {
+        console.error('Failed to sync attendance cell:', res.error);
       }
+    } catch (err) {
+      console.warn('Failed to sync attendance cell:', err);
     }
-    
-    if (Object.keys(attendanceMatrix).length > 0) {
-      syncAttendance();
-    }
-  }, [attendanceMatrix, attendanceSessions, selectedBatchId]);
+  };
 
   const toggleSessionStatus = (studentId: string, colId: string, statusOverride?: 'present' | 'absent' | 'late') => {
+    const studentSessions = attendanceMatrix[studentId] || {};
+    const current = studentSessions[colId] || 'present';
+    const nextStatus = statusOverride || (current === 'present' ? 'absent' : current === 'absent' ? 'late' : 'present');
+
     setAttendanceMatrix((prev) => {
       const sMap = prev[studentId] || {};
-      const current = sMap[colId] || 'present';
-      const nextStatus = statusOverride || (current === 'present' ? 'absent' : current === 'absent' ? 'late' : 'present');
-      
       const updatedSMap = { ...sMap, [colId]: nextStatus };
       const updatedMatrix = { ...prev, [studentId]: updatedSMap };
 
@@ -770,7 +777,7 @@ export function BatchManagement() {
             const updated: StudentRecord = {
               ...st,
               attendancePct: calcPct,
-              attendanceStatus: calcPct >= 84 ? 'Regular' : 'Irregular',
+              attendanceStatus: (!considerAttendance || calcPct >= attendanceThreshold) ? 'Regular' : 'Irregular',
             };
             saveStudentToDb(updated);
             return updated;
@@ -781,19 +788,54 @@ export function BatchManagement() {
 
       return updatedMatrix;
     });
+
+    saveAttendanceCellToDb(studentId, colId, nextStatus);
   };
 
-  const handleUpdateSessionDate = (colId: string, newDateVal: string) => {
+  const handleUpdateSessionDate = async (colId: string, newDateVal: string) => {
     if (!newDateVal) return;
+    const col = attendanceSessions.find((c) => c.id === colId);
+    if (!col) return;
+    const oldDate = col.date;
+    const sessionTitle = `Hour ${col.hour || 1}`;
+
     setAttendanceSessions((prev) =>
       prev.map((c) => c.id === colId ? { ...c, date: newDateVal } : c)
     );
+
+    if (selectedBatchId) {
+      try {
+        const res = await updateSessionDate(selectedBatchId, oldDate, newDateVal, sessionTitle);
+        if (!res.ok) {
+          console.error('Failed to sync session date update:', res.error);
+        }
+      } catch (err) {
+        console.error('Failed to sync session date update:', err);
+      }
+    }
   };
 
-  const handleUpdateSessionHour = (colId: string, newHourVal: number) => {
+  const handleUpdateSessionHour = async (colId: string, newHourVal: number) => {
+    const col = attendanceSessions.find((c) => c.id === colId);
+    if (!col) return;
+    const oldHour = col.hour;
+    const oldSessionTitle = `Hour ${oldHour || 1}`;
+    const newSessionTitle = `Hour ${newHourVal}`;
+
     setAttendanceSessions((prev) =>
       prev.map((c) => c.id === colId ? { ...c, hour: newHourVal } : c)
     );
+
+    if (selectedBatchId) {
+      try {
+        const res = await updateSessionHour(selectedBatchId, col.date, oldSessionTitle, newSessionTitle);
+        if (!res.ok) {
+          console.error('Failed to sync session hour update:', res.error);
+        }
+      } catch (err) {
+        console.error('Failed to sync session hour update:', err);
+      }
+    }
   };
 
   const handleAddHourSessionColumn = () => {
@@ -818,7 +860,7 @@ export function BatchManagement() {
     });
   };
 
-  const handleDeleteSessionColumn = (colId: string) => {
+  const handleDeleteSessionColumn = async (colId: string) => {
     if (attendanceSessions.length <= 1) {
       toast({
         variant: 'warning',
@@ -827,7 +869,24 @@ export function BatchManagement() {
       });
       return;
     }
+
+    const col = attendanceSessions.find((c) => c.id === colId);
+    if (!col) return;
+    const sessionTitle = `Hour ${col.hour || 1}`;
+
     setAttendanceSessions((prev) => prev.filter((c) => c.id !== colId));
+
+    if (selectedBatchId) {
+      try {
+        const res = await deleteSessionColumn(selectedBatchId, col.date, sessionTitle);
+        if (!res.ok) {
+          console.error('Failed to sync session column deletion:', res.error);
+        }
+      } catch (err) {
+        console.error('Failed to sync session column deletion:', err);
+      }
+    }
+
     toast({
       variant: 'info',
       title: 'Session Column Deleted',
@@ -888,12 +947,12 @@ export function BatchManagement() {
         if (bulkEmailType === 'Voucher Mail' && student.voucherId) {
           const { data: v } = await supabase.from('flwdsk_vouchers').select('id').eq('student_id', student.id).eq('voucher_type', 'Initial').maybeSingle();
           if (v) {
-            await supabase.from('flwdsk_vouchers').update({ sent_status: 'Sent', sent_time: new Date().toISOString() }).eq('id', v.id);
+            await updateVoucherSentStatus(v.id, 'Sent');
           }
         } else if (bulkEmailType === 'Retest' && student.retestVoucherId) {
           const { data: v } = await supabase.from('flwdsk_vouchers').select('id').eq('student_id', student.id).eq('voucher_type', 'Retest').maybeSingle();
           if (v) {
-            await supabase.from('flwdsk_vouchers').update({ sent_status: 'Sent', sent_time: new Date().toISOString() }).eq('id', v.id);
+            await updateVoucherSentStatus(v.id, 'Sent');
           }
         }
 
@@ -935,12 +994,169 @@ export function BatchManagement() {
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showEligibilityPanel, setShowEligibilityPanel] = useState(false);
 
-  // Attendance threshold (editable, default 84%)
+  // Attendance config
+  const [considerAttendance, setConsiderAttendance] = useState(false);
   const [attendanceThreshold, setAttendanceThreshold] = useState(84);
+  const [assessmentPassPercentage, setAssessmentPassPercentage] = useState(84);
+  const [selectedAttemptTypes, setSelectedAttemptTypes] = useState<Record<string, 'Initial' | 'Retest' | ''>>({});
+
+  interface ReconciledStudentState {
+    studentId: string;
+    batchId: string;
+    testAttemptMark: number | null;
+    retestAttemptMark: number | null;
+    cachedTestScore: number;
+    cachedRetestScore: number;
+    testStatus: 'MATCHED' | 'ATTEMPT_ONLY' | 'LEGACY_ONLY' | 'CONFLICT' | 'AMBIGUOUS_ZERO' | 'CONFIRMED_ZERO_ATTEMPT' | 'DUPLICATE_ATTEMPT';
+    retestStatus: 'MATCHED' | 'ATTEMPT_ONLY' | 'LEGACY_ONLY' | 'CONFLICT' | 'AMBIGUOUS_ZERO' | 'CONFIRMED_ZERO_ATTEMPT' | 'DUPLICATE_ATTEMPT';
+    conflict: boolean;
+    duplicate: boolean;
+  }
+
+  const [reconciliationReport, setReconciliationReport] = useState<Record<string, ReconciledStudentState>>({});
+  const [reconciliationDrawerOpen, setReconciliationDrawerOpen] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'ALL' | 'MATCHED' | 'ATTEMPT_ONLY' | 'LEGACY_ONLY' | 'CONFLICT' | 'AMBIGUOUS_ZERO' | 'CONFIRMED_ZERO_ATTEMPT' | 'DUPLICATE_ATTEMPT'>('ALL');
+
+  const [resolvingDiscrepancy, setResolvingDiscrepancy] = useState<{
+    studentId: string;
+    studentName: string;
+    attemptType: 'Initial' | 'Retest';
+    category: 'CONFLICT' | 'ATTEMPT_ONLY' | 'LEGACY_ONLY' | 'DUPLICATE_ATTEMPT';
+    dbMark: number | null;
+    cacheMark: number;
+    duplicateAttemptsList?: any[];
+  } | null>(null);
+
+  const [resolutionAction, setResolutionAction] = useState<'SYNC_TO_CACHE' | 'CREATE_LOG' | 'USE_LOG_SCORE' | 'USE_CACHE_SCORE' | 'KEEP_SELECTED_DUPLICATE' | ''>('');
+  const [selectedDuplicateId, setSelectedDuplicateId] = useState<string>('');
+  const [resolutionReason, setResolutionReason] = useState<string>('');
+  const [resolutionConfirmState, setResolutionConfirmState] = useState<boolean>(false);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isSavingResolution, setIsSavingResolution] = useState<boolean>(false);
 
   // Course Maximum Marks & Pass % Criteria (editable, default 100 max, 70%)
   const [courseMaxMarks, setCourseMaxMarks] = useState<number>(100);
   const [coursePassPct, setCoursePassPct] = useState<number>(70);
+
+  // Load eligibility config from database with localStorage fallback on batch change
+  useEffect(() => {
+    if (!selectedBatchId) return;
+
+    let isMounted = true;
+
+    async function loadConfig() {
+      try {
+        const { data, error } = await supabase
+          .from('flwdsk_batch_eligibility_rules')
+          .select('*')
+          .eq('batch_id', selectedBatchId)
+          .maybeSingle();
+
+        if (error) {
+          console.warn('Error loading eligibility rules from DB:', error.message);
+        }
+
+        if (data) {
+          // Found in database, this is the source of truth!
+          if (!isMounted) return;
+          setConsiderAttendance(data.consider_attendance);
+          setAttendanceThreshold(data.attendance_pass_percentage);
+          setAssessmentPassPercentage(data.assessment_pass_percentage);
+          if (Array.isArray(data.eligibility_criteria)) {
+            const clean: EligibilityCriterion[] = data.eligibility_criteria
+              .filter((c: any) => c && c.assessment && c.assessment !== 'finalExam')
+              .map((c: any) => ({
+                assessment: c.assessment as SortableCol,
+                threshold: Number(c.threshold !== undefined ? c.threshold : data.assessment_pass_percentage)
+              }));
+            setEligibilityCriteria(clean);
+          }
+        } else {
+          // Fallback to localStorage
+          const saved = localStorage.getItem(`kvj_eligibility_config_${selectedBatchId}`);
+          let loadedConsiderAttendance = false;
+          let loadedAttendanceThreshold = 84;
+          let loadedCriteria: EligibilityCriterion[] = [
+            { assessment: 'ass1', threshold: 84 },
+            { assessment: 'ass2', threshold: 84 },
+            { assessment: 'ass3', threshold: 84 },
+          ];
+
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              if (typeof parsed.considerAttendance === 'boolean') {
+                loadedConsiderAttendance = parsed.considerAttendance;
+              }
+              if (typeof parsed.attendanceThreshold === 'number') {
+                loadedAttendanceThreshold = parsed.attendanceThreshold;
+              }
+              if (Array.isArray(parsed.eligibilityCriteria)) {
+                loadedCriteria = parsed.eligibilityCriteria
+                  .filter((c: any) => c && c.assessment && c.assessment !== 'finalExam')
+                  .map((c: any) => ({
+                    assessment: c.assessment as SortableCol,
+                    threshold: Number(c.threshold || 0)
+                  }));
+              }
+            } catch (jsonErr) {
+              console.warn('Failed to parse localStorage config', jsonErr);
+            }
+          }
+
+          if (!isMounted) return;
+          setConsiderAttendance(loadedConsiderAttendance);
+          setAttendanceThreshold(loadedAttendanceThreshold);
+          setAssessmentPassPercentage(84);
+          setEligibilityCriteria(loadedCriteria);
+
+          // Initialize DB row
+          const initRes = await saveBatchEligibilityRules(
+            selectedBatchId,
+            loadedConsiderAttendance,
+            loadedAttendanceThreshold,
+            84,
+            loadedCriteria
+          );
+
+          if (!initRes.ok) {
+            console.error('Failed to auto-initialize DB eligibility rules:', initRes.error);
+          }
+        }
+      } catch (err) {
+        console.error('Error in loadConfig flow:', err);
+      }
+    }
+
+    loadConfig();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedBatchId]);
+
+  const saveEligibilityConfig = async (
+    cAttendance: boolean,
+    aThreshold: number,
+    criteria: EligibilityCriterion[]
+  ) => {
+    if (!selectedBatchId) return;
+    try {
+      const res = await saveBatchEligibilityRules(
+        selectedBatchId,
+        cAttendance,
+        aThreshold,
+        assessmentPassPercentage,
+        criteria
+      );
+
+      if (!res.ok) {
+        console.error('Failed to save eligibility config to DB:', res.error);
+      }
+    } catch (e) {
+      console.warn('Failed to save eligibility config', e);
+    }
+  };
 
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; message: string } | null>(null);
 
@@ -1082,9 +1298,9 @@ export function BatchManagement() {
 
   // Assessment eligibility criteria rows
   const [eligibilityCriteria, setEligibilityCriteria] = useState<EligibilityCriterion[]>([
-    { assessment: 'ass1', threshold: 40 },
-    { assessment: 'ass2', threshold: 40 },
-    { assessment: 'ass3', threshold: 40 },
+    { assessment: 'ass1', threshold: 84 },
+    { assessment: 'ass2', threshold: 84 },
+    { assessment: 'ass3', threshold: 84 },
   ]);
 
   const allSortableCols: SortableCol[] = ['ass1', 'ass2', 'ass3', 'finalExam', 'attendancePct'];
@@ -1113,23 +1329,41 @@ export function BatchManagement() {
   const handleAddEligCriterion = () => {
     const usedAssess = eligibilityCriteria.map((c) => c.assessment);
     const nextAssess = (['ass1', 'ass2', 'ass3'] as SortableCol[]).find((a) => !usedAssess.includes(a));
-    if (nextAssess) setEligibilityCriteria((prev) => [...prev, { assessment: nextAssess, threshold: 40 }]);
+    if (nextAssess) {
+      const nextCriteria = [...eligibilityCriteria, { assessment: nextAssess, threshold: assessmentPassPercentage }];
+      setEligibilityCriteria(nextCriteria);
+      saveEligibilityConfig(considerAttendance, attendanceThreshold, nextCriteria);
+    }
   };
   const handleRemoveEligCriterion = (idx: number) => {
-    setEligibilityCriteria((prev) => prev.filter((_, i) => i !== idx));
+    const nextCriteria = eligibilityCriteria.filter((_, i) => i !== idx);
+    setEligibilityCriteria(nextCriteria);
+    saveEligibilityConfig(considerAttendance, attendanceThreshold, nextCriteria);
   };
   const handleUpdateEligCriterion = (idx: number, field: 'assessment' | 'threshold', value: string | number) => {
-    setEligibilityCriteria((prev) => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
+    const nextCriteria = eligibilityCriteria.map((c, i) => i === idx ? { ...c, [field]: value } : c);
+    setEligibilityCriteria(nextCriteria);
+    saveEligibilityConfig(considerAttendance, attendanceThreshold, nextCriteria);
   };
 
-  // Compute eligibility: attendance >= editable threshold + all criteria met
+  // Compute eligibility using the shared engine
   const isStudentEligible = (s: StudentRecord) => {
-    const attendanceOk = s.attendancePct >= attendanceThreshold;
-    const assessmentsOk = eligibilityCriteria.every((crit) => {
-      const score = s[crit.assessment as keyof StudentRecord] as number;
-      return score >= crit.threshold;
-    });
-    return attendanceOk && assessmentsOk;
+    const rules = {
+      consider_attendance: considerAttendance,
+      attendance_pass_percentage: attendanceThreshold,
+      eligibility_criteria: eligibilityCriteria
+    };
+    return calculateFinalExamEligibility(s, rules).eligible;
+  };
+
+  const getEligibilityReason = (s: StudentRecord) => {
+    const rules = {
+      consider_attendance: considerAttendance,
+      attendance_pass_percentage: attendanceThreshold,
+      eligibility_criteria: eligibilityCriteria
+    };
+    const res = calculateFinalExamEligibility(s, rules);
+    return res.eligible ? '' : res.reason;
   };
 
 
@@ -1237,14 +1471,19 @@ export function BatchManagement() {
             }
 
             try {
-              const updated = {
-                ...updatedStudents[sIdx],
-                voucherId: fileVoucher,
-                voucherStatus: 'Assigned',
-              };
-              updatedStudents[sIdx] = updated;
-              await saveStudentToDb(updated);
-              updatedCount++;
+              const res = await issueVoucher(updatedStudents[sIdx].id, selectedBatchId, fileVoucher, 'Initial');
+              if (res.ok) {
+                const updated = {
+                  ...updatedStudents[sIdx],
+                  voucherId: fileVoucher,
+                  voucherStatus: 'Assigned',
+                };
+                updatedStudents[sIdx] = updated;
+                updatedCount++;
+              } else {
+                console.error(`Failed to assign voucher to student ${filePhone}:`, res.error);
+                failedRows++;
+              }
             } catch (err) {
               console.error('Failed to update student:', err);
               failedRows++;
@@ -1280,7 +1519,7 @@ export function BatchManagement() {
     const firstName = parts[0];
     const lastName = parts.slice(1).join(' ') || 'Student';
 
-    const eligible = Number(newStudentForm.attendancePct) >= 84;
+    const eligible = !considerAttendance || Number(newStudentForm.attendancePct) >= attendanceThreshold;
     const finalCollege = activeBatch?.college || 'Christ College';
     const finalDept = activeBatch?.program || 'BBA';
 
@@ -1288,7 +1527,7 @@ export function BatchManagement() {
       college: finalCollege,
       department: finalDept,
       attendancePct: Number(newStudentForm.attendancePct),
-      attendanceStatus: Number(newStudentForm.attendancePct) >= 84 ? 'Regular' : 'Irregular',
+      attendanceStatus: (!considerAttendance || Number(newStudentForm.attendancePct) >= attendanceThreshold) ? 'Regular' : 'Irregular',
       ass1: Number(newStudentForm.ass1),
       ass2: Number(newStudentForm.ass2),
       ass3: Number(newStudentForm.ass3),
@@ -1354,7 +1593,7 @@ export function BatchManagement() {
         college: finalCollege,
         department: finalDept,
         attendancePct: Number(newStudentForm.attendancePct),
-        attendanceStatus: Number(newStudentForm.attendancePct) >= 84 ? 'Regular' : 'Irregular',
+        attendanceStatus: (!considerAttendance || Number(newStudentForm.attendancePct) >= attendanceThreshold) ? 'Regular' : 'Irregular',
         ass1: Number(newStudentForm.ass1),
         ass2: Number(newStudentForm.ass2),
         ass3: Number(newStudentForm.ass3),
@@ -1428,27 +1667,111 @@ export function BatchManagement() {
             return;
           }
 
-          // Apply to this batch's students, matched by normalized phone.
-          const toSave: StudentRecord[] = [];
-          const updatedStudents = students.map((st) => {
-            if (!batchStudentIds.has(st.id)) return st;
+          // Fetch existing attempts for this batch to determine attempt type and handle duplicates/idempotency
+          const { data: batchAttempts, error: attemptsErr } = await supabase
+            .from('flwdsk_exam_attempts')
+            .select('*')
+            .eq('batch_id', selectedBatchId)
+            .is('deleted_at', null);
+
+          if (attemptsErr) throw attemptsErr;
+
+          let successCount = 0;
+          let skipCount = 0;
+          let warningCount = 0;
+
+          const updatedStudents = [...students];
+
+          for (const st of students) {
+            if (!batchStudentIds.has(st.id)) continue;
             const key = normalizeStudentKey(st.phone);
-            if (!markMap.has(key)) return st;
+            if (!markMap.has(key)) continue;
+
             const mark = markMap.get(key)!;
-            const next = { ...st, finalExam: mark, retestScore: mark };
-            toSave.push(next);
-            return next;
-          });
+            const studentAttempts = batchAttempts?.filter(a => a.student_id === st.id) || [];
+            
+            // Determine attempt type: if 'Initial' already exists, it is a Retest
+            const hasInitial = studentAttempts.some(a => a.attempt_type === 'Initial');
+            const attemptType = hasInitial ? 'Retest' : 'Initial';
+
+            // Duplicate safety / Idempotency check:
+            // If the same attempt score is already recorded, skip to prevent duplicate updates.
+            const existingAttempt = studentAttempts.find(a => a.attempt_type === attemptType);
+            if (existingAttempt && existingAttempt.mark === mark) {
+              skipCount++;
+              continue;
+            }
+
+            try {
+              const res = await recordExamAttempt(
+                st.id,
+                selectedBatchId,
+                attemptType,
+                mark,
+                null,
+                null,
+                'Trainer CSV Import'
+              );
+
+              if (res.ok) {
+                const currentFields = (st as any).custom_fields || {};
+                const updatedFields = {
+                  ...currentFields,
+                  ...(attemptType === 'Initial'
+                    ? {
+                        finalExam: mark,
+                        // Pass threshold scaled to the course's mark scale.
+                        finalExamResult: mark >= Math.round((coursePassPct / 100) * (courseMaxMarks || 100)) ? 'Passed' : 'Failed',
+                        examAttemptCount: 1
+                      }
+                    : {
+                        retestScore: mark,
+                        examAttemptCount: 2
+                      })
+                };
+
+                const stIdx = updatedStudents.findIndex(s => s.id === st.id);
+                if (stIdx !== -1) {
+                  updatedStudents[stIdx] = {
+                    ...st,
+                    finalExam: attemptType === 'Initial' ? mark : st.finalExam,
+                    retestScore: attemptType === 'Retest' ? mark : st.retestScore,
+                    custom_fields: updatedFields
+                  } as any;
+                }
+                successCount++;
+              } else {
+                console.error('Failed to sync CSV record for student:', st.id, res.error);
+                warningCount++;
+              }
+            } catch (err) {
+              console.error('Failed to sync CSV record for student:', st.id, err);
+              warningCount++;
+            }
+          }
+
           setStudents(updatedStudents);
 
-          for (const st of toSave) {
-            await saveStudentToDb(st);
+          if (successCount > 0) {
+            toast({
+              variant: 'success',
+              title: 'CSV Import Completed',
+              message: `Successfully processed ${successCount} marks. Skipped ${skipCount} identical records. Warnings/failures: ${warningCount}.`
+            });
+            setRefreshTrigger(prev => prev + 1);
+          } else if (skipCount > 0) {
+            toast({
+              variant: 'info',
+              title: 'No Updates Found',
+              message: `Skipped ${skipCount} records because they are already in sync with the database.`
+            });
+          } else {
+            toast({
+              variant: 'error',
+              title: 'CSV Import Failed',
+              message: 'No marks could be processed successfully.'
+            });
           }
-          toast({
-            variant: 'success',
-            title: 'Exam Marks Updated',
-            message: `Updated the final exam mark for ${toSave.length} student${toSave.length !== 1 ? 's' : ''}.`,
-          });
         } catch (err: any) {
           toast({ variant: 'error', title: 'Parsing Failed', message: err?.message || 'Could not read the file.' });
         }
@@ -1639,11 +1962,15 @@ export function BatchManagement() {
     const activeTrainer = selectedBatch ? safeTrainers.find((t) => t && t.id === selectedBatch.trainerId) : null;
     const trainerNameStr = activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'Lead Trainer';
 
-    // Populate assessments
+    // Resolve pass mark percentages from eligibility criteria, defaulting to 84%
+    const ass1PassThreshold = eligibilityCriteria.find(c => c.assessment === 'ass1')?.threshold ?? 84;
+    const ass2PassThreshold = eligibilityCriteria.find(c => c.assessment === 'ass2')?.threshold ?? 84;
+    const ass3PassThreshold = eligibilityCriteria.find(c => c.assessment === 'ass3')?.threshold ?? 84;
+
     const assessments = [
-      { id: 'ass1', title: 'Assessment 1', type: 'MCQ Test', maxMarks: 100, passMarkPercent: 84 },
-      { id: 'ass2', title: 'Assessment 2', type: 'Practical Lab', maxMarks: 100, passMarkPercent: 84 },
-      { id: 'ass3', title: 'Assessment 3', type: 'Project Viva', maxMarks: 100, passMarkPercent: 84 },
+      { id: 'ass1', title: 'Assessment 1', type: 'MCQ Test', maxMarks: 100, passMarkPercent: ass1PassThreshold },
+      { id: 'ass2', title: 'Assessment 2', type: 'Practical Lab', maxMarks: 100, passMarkPercent: ass2PassThreshold },
+      { id: 'ass3', title: 'Assessment 3', type: 'Project Viva', maxMarks: 100, passMarkPercent: ass3PassThreshold },
     ];
 
     // Populate sessions based on logged attendance sessions
@@ -1692,8 +2019,18 @@ export function BatchManagement() {
       const ass2Attempted = s.ass2 !== undefined && s.ass2 > 0;
       const ass3Attempted = s.ass3 !== undefined && s.ass3 > 0;
 
-      const allPassed = s.ass1 >= 84 && s.ass2 >= 84 && s.ass3 >= 84;
-      const eligible = s.attendancePct >= 75 && allPassed;
+      const passAss1 = s.ass1 >= ass1PassThreshold;
+      const passAss2 = s.ass2 >= ass2PassThreshold;
+      const passAss3 = s.ass3 >= ass3PassThreshold;
+
+      const allPassed = eligibilityCriteria
+        .filter((crit) => crit.assessment !== 'finalExam')
+        .every((crit) => {
+          const score = s[crit.assessment as keyof StudentRecord] as number;
+          return score >= crit.threshold;
+        });
+
+      const eligible = isStudentEligible(s);
 
       return {
         id: s.id,
@@ -1712,17 +2049,20 @@ export function BatchManagement() {
         totalPresent: totalPresentVal,
         totalSessions: totalSessionsVal,
         assessmentScores: {
-          ass1: { marks: s.ass1 || 0, maxMarks: 100, grade: s.ass1 >= 84 ? 'A' : 'F', passed: s.ass1 >= 84, attempted: ass1Attempted },
-          ass2: { marks: s.ass2 || 0, maxMarks: 100, grade: s.ass2 >= 84 ? 'A' : 'F', passed: s.ass2 >= 84, attempted: ass2Attempted },
-          ass3: { marks: s.ass3 || 0, maxMarks: 100, grade: s.ass3 >= 84 ? 'A' : 'F', passed: s.ass3 >= 84, attempted: ass3Attempted },
+          ass1: { marks: s.ass1 || 0, maxMarks: 100, grade: passAss1 ? 'A' : 'F', passed: passAss1, attempted: ass1Attempted },
+          ass2: { marks: s.ass2 || 0, maxMarks: 100, grade: passAss2 ? 'A' : 'F', passed: passAss2, attempted: ass2Attempted },
+          ass3: { marks: s.ass3 || 0, maxMarks: 100, grade: passAss3 ? 'A' : 'F', passed: passAss3, attempted: ass3Attempted },
         },
         assessmentStatus: allPassed ? 'Completed' as const : 'Pending' as const,
         finalExamEligibility: (eligible ? 'Eligible' : 'Not Eligible') as 'Eligible' | 'Not Eligible',
         finalExamMark: s.finalExam || 0,
-        finalExamResult: (s.finalExam >= 60 ? 'Passed' : 'Failed') as 'Passed' | 'Failed',
+        // Pass = raw mark >= (pass % of the course's maximum marks). coursePassPct
+        // is a percentage, so it must be scaled to the mark scale — comparing a
+        // raw mark like 754 directly against 70 wrongly passed almost everyone.
+        finalExamResult: ((s.finalExam || 0) >= Math.round((coursePassPct / 100) * (courseMaxMarks || 100)) ? 'Passed' : 'Failed') as 'Passed' | 'Failed',
         eligibilityReason: !eligible
-          ? s.attendancePct < 75
-            ? 'Low attendance (<75%)'
+          ? (considerAttendance && s.attendancePct < attendanceThreshold)
+            ? `Low attendance (<${attendanceThreshold}%)`
             : 'Failed prerequisite assessment(s)'
           : undefined,
       };
@@ -1731,8 +2071,13 @@ export function BatchManagement() {
     // Populate risk items dynamically
     const riskItems = filteredStudents
       .map((st) => {
-        const lowAttendance = st.attendancePct < 75;
-        const failedCount = (st.ass1 < 84 ? 1 : 0) + (st.ass2 < 84 ? 1 : 0) + (st.ass3 < 84 ? 1 : 0);
+        const lowAttendance = considerAttendance && st.attendancePct < attendanceThreshold;
+        const failedCount = eligibilityCriteria
+          .filter((crit) => crit.assessment !== 'finalExam')
+          .filter((crit) => {
+            const score = st[crit.assessment as keyof StudentRecord] as number;
+            return score < crit.threshold;
+          }).length;
         
         let riskReason: 'Low Attendance (<75%)' | 'Failed Assessments' | 'Pending Assessments' | 'Multiple Issues' | null = null;
         let severity: 'High' | 'Medium' | 'Low' = 'Low';
@@ -1768,13 +2113,19 @@ export function BatchManagement() {
       batchCode: selectedBatch?.code || '',
       batchName: selectedBatch?.trainingName || '',
       collegeName: selectedBatch?.college || '',
-      courseName: selectedBatch?.courseId || '',
-      academicYear: '2026',
+      // Human-readable course name (resolved from the batch's courseId) — never
+      // the raw course UUID. Academic year comes from the batch, not hardcoded.
+      courseName:
+        (Array.isArray(courses) ? courses : []).find((c) => c && c.id === selectedBatch?.courseId)?.title ||
+        selectedBatch?.program ||
+        selectedBatch?.trainingName ||
+        '',
+      academicYear: selectedBatch?.academicYear || '',
       trainerName: trainerNameStr,
       coordinatorName: selectedBatch?.coordinator || 'Coordinator',
       totalStudents: filteredStudents.length,
-      courseMaxMarks: 100,
-      finalExamPassMarkPercent: 60,
+      courseMaxMarks: courseMaxMarks,
+      finalExamPassMarkPercent: coursePassPct,
       assessments,
       sessions,
       students: studentsList,
@@ -1782,7 +2133,7 @@ export function BatchManagement() {
       riskItems,
       defaultTrainerNotes: 'No notes registered.',
     };
-  }, [selectedBatchId, batches, filteredStudents, trainers, attendanceSessions, attendanceMatrix]);
+  }, [selectedBatchId, batches, courses, filteredStudents, trainers, attendanceSessions, attendanceMatrix]);
 
   // Daily Report Builder & Preview States
   const [dailyReportBuilderOpen, setDailyReportBuilderOpen] = useState(false);
@@ -1846,8 +2197,8 @@ export function BatchManagement() {
           examAttemptCount: fields.examAttemptCount ?? 1,
           retestScore: fields.retestScore ?? 0,
           retestApproved: fields.retestApproved ?? false,
-          retestPaymentStatus: fields.retestPaymentStatus || 'Unpaid',
-          retestCollectedAmount: fields.retestCollectedAmount ?? 0,
+          retestPaymentStatus: (selectedBatchId && fields[`retestPaymentStatus_${selectedBatchId}`]) || fields.retestPaymentStatus || 'Pending',
+          retestCollectedAmount: (selectedBatchId && fields[`retestCollectedAmount_${selectedBatchId}`]) ?? fields.retestCollectedAmount ?? 0,
           retestVoucherId: fields.retestVoucherId || '',
           gender: fields.gender || 'Female',
           qualification: fields.qualification || s.academicQualification || '',
@@ -1876,6 +2227,12 @@ export function BatchManagement() {
         if (error) throw error;
         if (!data || !active) return;
 
+        const { data: dbVerifications } = await supabase
+          .from('flwdsk_retest_payment_verifications')
+          .select('*')
+          .eq('batch_id', selectedBatchId)
+          .is('deleted_at', null);
+
         const batchStudents = data
           .map((d: any) => d.student)
           .filter(Boolean);
@@ -1889,6 +2246,16 @@ export function BatchManagement() {
           const email = s.email || '';
           
           const customFields = s.custom_fields || s.customFields || {};
+          
+          // Resolve verification from ledger prioritizing the latest record
+          const studentVerification = dbVerifications?.filter((v: any) => v.student_id === s.id)
+            .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+          const resolvedStatus = studentVerification
+            ? (studentVerification.status === 'Verified' ? 'Paid' : 'Pending')
+            : (customFields[`retestPaymentStatus_${selectedBatchId}`] || customFields.retest_payment_status || customFields.retestPaymentStatus || 'Pending');
+
+          const resolvedAmount = customFields[`retestCollectedAmount_${selectedBatchId}`] ?? customFields.retest_collected_amount ?? customFields.retestCollectedAmount ?? 0;
           
           return {
             id: s.id,
@@ -1913,8 +2280,8 @@ export function BatchManagement() {
             examAttemptCount: customFields.exam_attempt_count ?? customFields.examAttemptCount ?? 1,
             retestScore: customFields.retest_score ?? customFields.retestScore ?? 0,
             retestApproved: customFields.retest_approved ?? customFields.retestApproved ?? false,
-            retestPaymentStatus: customFields.retest_payment_status || customFields.retestPaymentStatus || 'Unpaid',
-            retestCollectedAmount: customFields.retest_collected_amount ?? customFields.retestCollectedAmount ?? 0,
+            retestPaymentStatus: resolvedStatus,
+            retestCollectedAmount: resolvedAmount,
             retestVoucherId: customFields.retest_voucher_id || customFields.retestVoucherId || '',
             gender: customFields.gender || 'Female',
             qualification: customFields.qualification || s.academic_qualification || s.academicQualification || '',
@@ -1939,7 +2306,35 @@ export function BatchManagement() {
     return () => {
       active = false;
     };
-  }, [selectedBatchId, dbStudents, enrollments]);
+  }, [selectedBatchId, dbStudents, enrollments, refreshTrigger]);
+
+  // Trigger Final Exam attempts reconciliation only when the user enters the Final Exam or Retest management tab
+  useEffect(() => {
+    if (!selectedBatchId || !students.length) return;
+    if (activeTab !== 'final-exam' && activeTab !== 'retest') return;
+
+    let active = true;
+    const fetchAttemptsAndReconcile = async () => {
+      try {
+        const { data: attempts, error: attemptsErr } = await supabase
+          .from('flwdsk_exam_attempts')
+          .select('*')
+          .eq('batch_id', selectedBatchId)
+          .is('deleted_at', null);
+
+        if (!attemptsErr && attempts && active) {
+          runInMemoryReconciliation(attempts, students.filter(s => batchStudentIds.has(s.id)));
+        }
+      } catch (err: any) {
+        console.error('Error fetching attempts for reconciliation:', err.message);
+      }
+    };
+
+    fetchAttemptsAndReconcile();
+    return () => {
+      active = false;
+    };
+  }, [selectedBatchId, activeTab, students, batchStudentIds, refreshTrigger]);
 
   /**
    * Remove duplicate students from the ACTIVE batch by normalized phone number.
@@ -1988,13 +2383,11 @@ export function BatchManagement() {
     }
 
     try {
-      // 3) Delete the duplicate ENROLLMENTS for this batch (not the students).
-      const { error } = await supabase
-        .from('flwdsk_enrollments')
-        .delete()
-        .eq('batch_id', selectedBatchId)
-        .in('student_id', duplicateIds);
-      if (error) throw error;
+      // 3) Soft-delete the duplicate ENROLLMENTS for this batch (not the students).
+      for (const studentId of duplicateIds) {
+        const res = await removeEnrollment(studentId, selectedBatchId, 'ENROLLMENT_DEDUPLICATED');
+        if (!res.ok) throw new Error(res.error);
+      }
 
       // 4) Remove them from local state.
       setStudents((prev) => prev.filter((s) => !duplicateIds.includes(s.id)));
@@ -2030,12 +2423,8 @@ export function BatchManagement() {
   const handleRemoveStudentFromBatch = useCallback(async (student: StudentRecord) => {
     if (!selectedBatchId) return;
     try {
-      const { error } = await supabase
-        .from('flwdsk_enrollments')
-        .delete()
-        .eq('batch_id', selectedBatchId)
-        .eq('student_id', student.id);
-      if (error) throw error;
+      const res = await removeEnrollment(student.id, selectedBatchId, 'ENROLLMENT_REMOVED');
+      if (!res.ok) throw new Error(res.error);
       setStudents((prev) => prev.filter((s) => s.id !== student.id));
       setConfirmRemoveStudentId(null);
       toast({ variant: 'success', title: 'Student Removed', message: 'Student removed from batch.' });
@@ -2052,18 +2441,20 @@ export function BatchManagement() {
       .filter((s) => ids.includes(s.id))
       .map((s) => s.name)
       .join(', ');
-    if (!window.confirm(`Remove ${ids.length} student(s) from this batch?\n\n${names}\n\nThis only removes them from the batch, not from the system.`)) return;
+    const confirmOk = await confirm({
+      title: 'Remove Students from Batch?',
+      message: `Are you sure you want to remove ${ids.length} student(s) from this batch?\n\n${names}\n\nThis only removes them from the batch, not from the system.`,
+      confirmLabel: 'Remove',
+      variant: 'delete',
+    });
+    if (!confirmOk) return;
 
     setBatchRemovingMatrix(true);
     let ok = 0; let fail = 0;
     for (const id of ids) {
       try {
-        const { error } = await supabase
-          .from('flwdsk_enrollments')
-          .delete()
-          .eq('batch_id', selectedBatchId)
-          .eq('student_id', id);
-        if (error) throw error;
+        const res = await removeEnrollment(id, selectedBatchId, 'ENROLLMENT_BULK_REMOVED');
+        if (!res.ok) throw new Error(res.error);
         ok++;
       } catch { fail++; }
     }
@@ -2080,49 +2471,749 @@ export function BatchManagement() {
   const syncVouchersToDb = async (studentId: string, voucherCode: string, type: 'Initial' | 'Retest', paymentVerified?: string) => {
     if (!voucherCode.trim() || !selectedBatchId) return;
     try {
-      const payload: any = {
-        student_id: studentId,
-        batch_id: selectedBatchId,
-        voucher_type: type,
-        voucher_code: voucherCode.trim(),
-        assigned_date: new Date().toISOString(),
-        payment_verified: paymentVerified || 'Pending',
-        status: 'assigned',
-        assigned_student_register_no: ''
-      };
-
-      const { data: existing } = await supabase
-        .from('flwdsk_vouchers')
-        .select('id')
-        .eq('student_id', studentId)
-        .eq('voucher_type', type)
-        .eq('batch_id', selectedBatchId)
-        .limit(1)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from('flwdsk_vouchers')
-          .update(payload)
-          .eq('id', existing.id);
-      } else {
-        await supabase
-          .from('flwdsk_vouchers')
-          .insert(payload);
+      const res = await syncVoucher(
+        studentId,
+        selectedBatchId,
+        type,
+        voucherCode.trim(),
+        (paymentVerified || 'Pending') as 'Pending' | 'Verified'
+      );
+      if (!res.ok) {
+        console.error('Error syncing voucher to DB:', res.error);
       }
     } catch (e) {
       console.error('Error syncing voucher to DB:', e);
     }
   };
 
+  const syncExamAttemptToDb = async (
+    studentId: string,
+    batchId: string,
+    attemptType: 'Initial' | 'Retest',
+    mark: number
+  ) => {
+    try {
+      const res = await syncExamAttempt(
+        studentId,
+        batchId,
+        attemptType,
+        mark
+      );
+      if (!res.ok) {
+        console.error('Failed to sync exam attempt:', res.error);
+      }
+    } catch (err) {
+      console.warn('Failed to sync exam attempt:', err);
+    }
+  };
+
+  const runInMemoryReconciliation = (attempts: any[], studentList: StudentRecord[]) => {
+    const report: Record<string, ReconciledStudentState> = {};
+    if (!selectedBatchId) return;
+
+    for (const s of studentList) {
+      const studentAttempts = attempts.filter(a => a.student_id === s.id);
+      const initialAttempts = studentAttempts.filter(a => a.attempt_type === 'Initial');
+      const retestAttempts = studentAttempts.filter(a => a.attempt_type === 'Retest');
+
+      const legacyTest = s.finalExam || 0;
+      const legacyRetest = s.retestScore || 0;
+
+      const initCount = initialAttempts.length;
+      const retCount = retestAttempts.length;
+
+      let testAttemptMark: number | null = null;
+      let retestAttemptMark: number | null = null;
+      let testStatus: ReconciledStudentState['testStatus'] = 'AMBIGUOUS_ZERO';
+      let retestStatus: ReconciledStudentState['retestStatus'] = 'AMBIGUOUS_ZERO';
+
+      // Reconcile Initial / Test
+      if (initCount > 1) {
+        testStatus = 'DUPLICATE_ATTEMPT';
+        testAttemptMark = initialAttempts[0].mark;
+      } else if (initCount === 1) {
+        const attemptMark = initialAttempts[0].mark;
+        testAttemptMark = attemptMark;
+        if (attemptMark === 0) {
+          testStatus = 'CONFIRMED_ZERO_ATTEMPT';
+        } else if (attemptMark === legacyTest) {
+          testStatus = 'MATCHED';
+        } else if (legacyTest === 0) {
+          testStatus = 'ATTEMPT_ONLY';
+        } else {
+          testStatus = 'CONFLICT';
+        }
+      } else {
+        if (legacyTest === 0) {
+          testStatus = 'AMBIGUOUS_ZERO';
+        } else {
+          testStatus = 'LEGACY_ONLY';
+        }
+      }
+
+      // Reconcile Retest
+      if (retCount > 1) {
+        retestStatus = 'DUPLICATE_ATTEMPT';
+        retestAttemptMark = retestAttempts[0].mark;
+      } else if (retCount === 1) {
+        const attemptMark = retestAttempts[0].mark;
+        retestAttemptMark = attemptMark;
+        if (attemptMark === 0) {
+          retestStatus = 'CONFIRMED_ZERO_ATTEMPT';
+        } else if (attemptMark === legacyRetest) {
+          retestStatus = 'MATCHED';
+        } else if (legacyRetest === 0) {
+          retestStatus = 'ATTEMPT_ONLY';
+        } else {
+          retestStatus = 'CONFLICT';
+        }
+      } else {
+        if (legacyRetest === 0) {
+          retestStatus = 'AMBIGUOUS_ZERO';
+        } else {
+          retestStatus = 'LEGACY_ONLY';
+        }
+      }
+
+      const conflict = testStatus === 'CONFLICT' || retestStatus === 'CONFLICT';
+      const duplicate = testStatus === 'DUPLICATE_ATTEMPT' || retestStatus === 'DUPLICATE_ATTEMPT';
+
+      report[s.id] = {
+        studentId: s.id,
+        batchId: selectedBatchId,
+        testAttemptMark,
+        retestAttemptMark,
+        cachedTestScore: legacyTest,
+        cachedRetestScore: legacyRetest,
+        testStatus,
+        retestStatus,
+        conflict,
+        duplicate
+      };
+    }
+
+    setReconciliationReport(report);
+  };
+
+  const renderReconciliationDrawer = () => {
+    if (!reconciliationDrawerOpen) return null;
+
+    // Calculate Summary counts directly from in-memory reconciliation report
+    const summary = {
+      matched: 0,
+      attemptOnly: 0,
+      legacyOnly: 0,
+      conflict: 0,
+      ambiguousZero: 0,
+      confirmedZero: 0,
+      duplicate: 0,
+      total: 0
+    };
+
+    Object.values(reconciliationReport).forEach((rep) => {
+      summary.total++;
+      
+      // Initial (Test) attempt check
+      if (rep.testStatus === 'MATCHED') summary.matched++;
+      else if (rep.testStatus === 'ATTEMPT_ONLY') summary.attemptOnly++;
+      else if (rep.testStatus === 'LEGACY_ONLY') summary.legacyOnly++;
+      else if (rep.testStatus === 'CONFLICT') summary.conflict++;
+      else if (rep.testStatus === 'AMBIGUOUS_ZERO') summary.ambiguousZero++;
+      else if (rep.testStatus === 'CONFIRMED_ZERO_ATTEMPT') summary.confirmedZero++;
+      else if (rep.testStatus === 'DUPLICATE_ATTEMPT') summary.duplicate++;
+
+      // Retest attempt check (if retest is relevant)
+      if (rep.retestStatus === 'MATCHED') summary.matched++;
+      else if (rep.retestStatus === 'ATTEMPT_ONLY') summary.attemptOnly++;
+      else if (rep.retestStatus === 'LEGACY_ONLY') summary.legacyOnly++;
+      else if (rep.retestStatus === 'CONFLICT') summary.conflict++;
+      else if (rep.retestStatus === 'AMBIGUOUS_ZERO') summary.ambiguousZero++;
+      else if (rep.retestStatus === 'CONFIRMED_ZERO_ATTEMPT') summary.confirmedZero++;
+      else if (rep.retestStatus === 'DUPLICATE_ATTEMPT') summary.duplicate++;
+    });
+
+    const enrolled = students.filter(s => batchStudentIds.has(s.id));
+    const filteredList = enrolled.filter((s) => {
+      const rep = reconciliationReport[s.id];
+      if (!rep) return false;
+      if (selectedFilter === 'ALL') return true;
+      return rep.testStatus === selectedFilter || rep.retestStatus === selectedFilter;
+    });
+
+    return (
+      <Drawer
+        open={true}
+        onClose={() => setReconciliationDrawerOpen(false)}
+        title="🔍 Final Exam Attempts Reconciliation"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%', padding: '0 4px' }}>
+          {/* Summary Cards Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
+            {[
+              { label: 'Matched', count: summary.matched, color: 'var(--status-success, var(--status-success))', bg: 'rgba(16, 185, 129, 0.1)' },
+              { label: 'Conflict', count: summary.conflict, color: 'var(--status-danger, var(--status-danger))', bg: 'rgba(239, 68, 68, 0.1)' },
+              { label: 'Duplicate', count: summary.duplicate, color: '#d97706', bg: 'rgba(217, 119, 6, 0.1)' },
+              { label: 'Attempt Only', count: summary.attemptOnly, color: 'var(--status-info, var(--brand))', bg: 'rgba(59, 130, 246, 0.1)' },
+              { label: 'Legacy Only', count: summary.legacyOnly, color: 'var(--accent)', bg: 'rgba(139, 92, 246, 0.1)' },
+              { label: 'Confirmed Zero', count: summary.confirmedZero, color: '#4b5563', bg: 'rgba(75, 85, 99, 0.1)' },
+              { label: 'Ambiguous Zero', count: summary.ambiguousZero, color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' },
+            ].map((c) => (
+              <div key={c.label} style={{ background: c.bg, border: `1.5px solid ${c.color}`, borderRadius: 8, padding: '8px 4px', textAlign: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: c.color, whiteSpace: 'nowrap' }}>{c.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4, color: c.color }}>{c.count}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Filter Selector & Refresh Button */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)', paddingBottom: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[
+                { id: 'ALL', label: 'All' },
+                { id: 'MATCHED', label: 'Matched' },
+                { id: 'CONFLICT', label: 'Conflicts' },
+                { id: 'DUPLICATE_ATTEMPT', label: 'Duplicates' },
+                { id: 'ATTEMPT_ONLY', label: 'Attempt Only' },
+                { id: 'LEGACY_ONLY', label: 'Legacy Only' },
+                { id: 'CONFIRMED_ZERO_ATTEMPT', label: 'Confirmed Zero' },
+                { id: 'AMBIGUOUS_ZERO', label: 'Ambiguous Zero' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setSelectedFilter(f.id as any)}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    border: selectedFilter === f.id ? '1.5px solid var(--brand)' : '1px solid var(--border)',
+                    background: selectedFilter === f.id ? 'var(--brand)' : 'var(--bg-sunken)',
+                    color: selectedFilter === f.id ? '#fff' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const { data: attempts } = await supabase
+                    .from('flwdsk_exam_attempts')
+                    .select('*')
+                    .eq('batch_id', selectedBatchId)
+                    .is('deleted_at', null);
+                  if (attempts) {
+                    runInMemoryReconciliation(attempts, enrolled);
+                    toast({ variant: 'success', title: 'Reconciliation Refreshed', message: 'Calculations updated in-memory.' });
+                  }
+                } catch (e: any) {
+                  toast({ variant: 'error', title: 'Refresh Failed', message: e.message });
+                }
+              }}
+              style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+            >
+              🔄 Refresh
+            </Button>
+          </div>
+
+          {/* Reconciliation List */}
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
+            {filteredList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                🎉 No students found matching this filter.
+              </div>
+            ) : (
+              filteredList.map((s) => {
+                const rep = reconciliationReport[s.id];
+                if (!rep) return null;
+                
+                return (
+                  <div key={s.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: 'var(--bg-surface)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-primary)' }}>{s.photo} {s.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Phone: {s.phone}</div>
+                      </div>
+                      <div>
+                        <Badge tone={rep.conflict ? 'danger' : rep.duplicate ? 'warning' : 'success'}>
+                          {rep.conflict ? 'Conflict 🚨' : rep.duplicate ? 'Duplicate 🔄' : 'Consistent ✅'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                      {/* Test Attempt Section */}
+                      <div style={{ paddingRight: 6, borderRight: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)', marginBottom: 4 }}>📝 Initial Test (Attempt 1)</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12 }}>
+                          <div><strong>Attempts Log:</strong> {rep.testAttemptMark !== null ? `${rep.testAttemptMark} marks` : 'None'}</div>
+                          <div><strong>Legacy Cache:</strong> {rep.cachedTestScore} marks</div>
+                          <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <Badge tone={
+                              rep.testStatus === 'MATCHED' ? 'success' :
+                              rep.testStatus === 'CONFLICT' ? 'danger' :
+                              rep.testStatus === 'DUPLICATE_ATTEMPT' ? 'warning' :
+                              rep.testStatus === 'AMBIGUOUS_ZERO' ? 'neutral' : 'info'
+                            }>
+                              {rep.testStatus.replace('_', ' ')}
+                            </Badge>
+                            {['CONFLICT', 'ATTEMPT_ONLY', 'LEGACY_ONLY', 'DUPLICATE_ATTEMPT'].includes(rep.testStatus) && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenResolutionModal(s, 'Initial', rep.testStatus as any)}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 800,
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  border: '1.5px solid var(--brand)',
+                                  background: 'transparent',
+                                  color: 'var(--brand)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                🛠️ Resolve
+                              </button>
+                            )}
+                          </div>
+                          {rep.testStatus === 'AMBIGUOUS_ZERO' && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                              Ambiguous Zero: Cache has 0 but no database attempt row exists.
+                            </div>
+                          )}
+                          {rep.testStatus === 'ATTEMPT_ONLY' && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                              Attempt exists in database attempts log but legacy score cache is 0 or missing.
+                            </div>
+                          )}
+                          {rep.testStatus === 'LEGACY_ONLY' && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                              Legacy score cache has a value, but no attempts log exists in database.
+                            </div>
+                          )}
+                          {rep.testStatus === 'CONFLICT' && (
+                            <div style={{ fontSize: 12, color: 'var(--status-danger, var(--status-danger))', marginTop: 4, fontStyle: 'italic' }}>
+                              Discrepancy detected between database attempt row and legacy cache.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Retest Attempt Section */}
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#b45309', marginBottom: 4 }}>🔄 Retest (Attempt 2)</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12 }}>
+                          <div><strong>Attempts Log:</strong> {rep.retestAttemptMark !== null ? `${rep.retestAttemptMark} marks` : 'None'}</div>
+                          <div><strong>Legacy Cache:</strong> {rep.cachedRetestScore} marks</div>
+                          <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <Badge tone={
+                              rep.retestStatus === 'MATCHED' ? 'success' :
+                              rep.retestStatus === 'CONFLICT' ? 'danger' :
+                              rep.retestStatus === 'DUPLICATE_ATTEMPT' ? 'warning' :
+                              rep.retestStatus === 'AMBIGUOUS_ZERO' ? 'neutral' : 'info'
+                            }>
+                              {rep.retestStatus.replace('_', ' ')}
+                            </Badge>
+                            {['CONFLICT', 'ATTEMPT_ONLY', 'LEGACY_ONLY', 'DUPLICATE_ATTEMPT'].includes(rep.retestStatus) && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenResolutionModal(s, 'Retest', rep.retestStatus as any)}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 800,
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  border: '1.5px solid var(--brand)',
+                                  background: 'transparent',
+                                  color: 'var(--brand)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                🛠️ Resolve
+                              </button>
+                            )}
+                          </div>
+                          {rep.retestStatus === 'AMBIGUOUS_ZERO' && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                              Ambiguous Zero: Cache has 0 but no database attempt row exists.
+                            </div>
+                          )}
+                          {rep.retestStatus === 'ATTEMPT_ONLY' && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                              Attempt exists in database attempts log but legacy score cache is 0 or missing.
+                            </div>
+                          )}
+                          {rep.retestStatus === 'LEGACY_ONLY' && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                              Legacy score cache has a value, but no attempts log exists in database.
+                            </div>
+                          )}
+                          {rep.retestStatus === 'CONFLICT' && (
+                            <div style={{ fontSize: 12, color: 'var(--status-danger, var(--status-danger))', marginTop: 4, fontStyle: 'italic' }}>
+                              Discrepancy detected between database attempt row and legacy cache.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </Drawer>
+    );
+  };
+
+  const handleOpenResolutionModal = async (
+    student: StudentRecord,
+    attemptType: 'Initial' | 'Retest',
+    category: 'CONFLICT' | 'ATTEMPT_ONLY' | 'LEGACY_ONLY' | 'DUPLICATE_ATTEMPT'
+  ) => {
+    try {
+      const { data: attempts, error } = await supabase
+        .from('flwdsk_exam_attempts')
+        .select('*')
+        .eq('student_id', student.id)
+        .eq('batch_id', selectedBatchId)
+        .eq('attempt_type', attemptType)
+        .is('deleted_at', null);
+
+      if (error) throw error;
+
+      const dbMark = (attempts && attempts.length > 0) ? attempts[0].mark : null;
+      const cacheMark = attemptType === 'Initial' ? student.finalExam : (student.retestScore ?? 0);
+
+      setResolvingDiscrepancy({
+        studentId: student.id,
+        studentName: student.name,
+        attemptType,
+        category,
+        dbMark,
+        cacheMark,
+        duplicateAttemptsList: attempts || []
+      });
+
+      setResolutionAction('');
+      setSelectedDuplicateId('');
+      setResolutionReason('');
+      setResolutionConfirmState(false);
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Failed to Load Details', message: e.message });
+    }
+  };
+
+  const handleExecuteResolution = async () => {
+    if (!resolvingDiscrepancy) return;
+    const { studentId, attemptType, category, dbMark, cacheMark } = resolvingDiscrepancy;
+
+    setIsSavingResolution(true);
+    try {
+      const res = await resolveExamAttemptDiscrepancy(
+        studentId,
+        selectedBatchId,
+        attemptType,
+        category,
+        resolutionAction,
+        resolutionReason,
+        selectedDuplicateId,
+        dbMark,
+        cacheMark,
+        coursePassPct
+      );
+
+      if (!res.ok) {
+        throw new Error(res.error);
+      }
+
+      toast({ variant: 'success', title: 'Resolution Successful', message: 'Exam reconciliation discrepancy resolved.' });
+
+      // Close modal and increment trigger to refresh student list and reconciliation drawer
+      setResolvingDiscrepancy(null);
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Resolution Failed', message: err.message });
+    } finally {
+      setIsSavingResolution(false);
+    }
+  };
+
+  const renderResolutionModal = () => {
+    if (!resolvingDiscrepancy) return null;
+    const { studentName, attemptType, category, dbMark, cacheMark, duplicateAttemptsList } = resolvingDiscrepancy;
+
+    const isConfirmDisabled =
+      !resolutionAction ||
+      !resolutionReason.trim() ||
+      (category === 'DUPLICATE_ATTEMPT' && !selectedDuplicateId);
+
+    const activeBatchCode = activeBatch?.code || 'Active Batch';
+
+    return (
+      <Drawer
+        open={true}
+        onClose={() => setResolvingDiscrepancy(null)}
+        title="🛠️ Resolve Exam Attempt Discrepancy"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '0 4px', height: '100%' }}>
+          {!resolutionConfirmState ? (
+            <>
+              {/* Info panel */}
+              <div style={{ background: 'var(--bg-sunken)', borderRadius: 8, padding: 12, fontSize: 12, border: '1px solid var(--border)' }}>
+                <div><strong>Student:</strong> {studentName}</div>
+                <div><strong>Batch:</strong> {activeBatchCode}</div>
+                <div><strong>Attempt Type:</strong> {attemptType === 'Initial' ? 'Initial Test' : 'Retest'}</div>
+                <div><strong>Reconciliation Category:</strong> {category.replace('_', ' ')}</div>
+              </div>
+
+              {/* Side-by-side comparison */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg-surface)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)', marginBottom: 4 }}>💻 Database Attempt Log</div>
+                  <div style={{ fontSize: 12 }}>
+                    {category === 'DUPLICATE_ATTEMPT' ? (
+                      <span style={{ color: 'var(--status-warning, #d97706)', fontWeight: 700 }}>Multiple Rows Detected</span>
+                    ) : dbMark !== null ? (
+                      `${dbMark} marks`
+                    ) : (
+                      'None'
+                    )}
+                  </div>
+                </div>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg-surface)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 4 }}>💾 Legacy Student Cache</div>
+                  <div style={{ fontSize: 12 }}>{cacheMark} marks</div>
+                </div>
+              </div>
+
+              {/* Duplicate List Selector */}
+              {category === 'DUPLICATE_ATTEMPT' && duplicateAttemptsList && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>Select Attempt Row to Keep:</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {duplicateAttemptsList.map((a: any) => (
+                      <label key={a.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, cursor: 'pointer', padding: '6px 8px', borderRadius: 4, background: selectedDuplicateId === a.id ? 'var(--bg-sunken)' : 'transparent', border: selectedDuplicateId === a.id ? '1px solid var(--brand)' : '1px solid transparent' }}>
+                        <input
+                          type="radio"
+                          name="duplicate_select"
+                          value={a.id}
+                          checked={selectedDuplicateId === a.id}
+                          onChange={() => {
+                            setSelectedDuplicateId(a.id);
+                            setResolutionAction('KEEP_SELECTED_DUPLICATE');
+                          }}
+                          style={{ marginTop: 2 }}
+                        />
+                        <div>
+                          <div><strong>ID:</strong> {a.id.slice(0, 8)}... | <strong>Mark:</strong> {a.mark} marks ({a.result})</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                            Submitted by: {a.submitted_by} | Created: {new Date(a.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action selectors */}
+              {category === 'CONFLICT' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800 }}>Choose Action:</div>
+                  {[
+                    { id: 'USE_LOG_SCORE', label: `Use Attempts Log score (${dbMark} marks) & update cache` },
+                    { id: 'USE_CACHE_SCORE', label: `Use Legacy Cache score (${cacheMark} marks) & update database log` }
+                  ].map(opt => (
+                    <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="resolution_action"
+                        value={opt.id}
+                        checked={resolutionAction === opt.id}
+                        onChange={() => setResolutionAction(opt.id as any)}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {category === 'ATTEMPT_ONLY' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800 }}>Choose Action:</div>
+                  {[
+                    { id: 'SYNC_TO_CACHE', label: `Sync attempts log score (${dbMark} marks) to student record cache` }
+                  ].map(opt => (
+                    <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="resolution_action"
+                        value={opt.id}
+                        checked={resolutionAction === opt.id}
+                        onChange={() => setResolutionAction(opt.id as any)}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {category === 'LEGACY_ONLY' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800 }}>Choose Action:</div>
+                  {[
+                    { id: 'CREATE_LOG', label: `Reconstruct historical attempt log in database with cache score (${cacheMark} marks)` }
+                  ].map(opt => (
+                    <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="resolution_action"
+                        value={opt.id}
+                        checked={resolutionAction === opt.id}
+                        onChange={() => setResolutionAction(opt.id as any)}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {/* Mandatory Reason */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 4 }}>Resolution Reason *</label>
+                <textarea
+                  className="kvj-input"
+                  rows={3}
+                  required
+                  placeholder="Provide brief explanation/remarks for the audit trail..."
+                  value={resolutionReason}
+                  onChange={(e) => setResolutionReason(e.target.value)}
+                  style={{ fontSize: 12, resize: 'vertical' }}
+                />
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <Button variant="secondary" size="sm" disabled={isSavingResolution} onClick={() => setResolvingDiscrepancy(null)}>Cancel</Button>
+                <Button size="sm" disabled={isConfirmDisabled || isSavingResolution} onClick={() => setResolutionConfirmState(true)}>Confirm Details</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Step 2: Final Confirmation View */}
+              <div style={{ border: '2px solid var(--status-warning, #d97706)', background: 'rgba(217,119,6,0.06)', borderRadius: 8, padding: 14, fontSize: 12 }}>
+                <strong style={{ display: 'block', fontSize: 13, color: 'var(--status-warning, #d97706)', marginBottom: 8 }}>
+                  ⚠️ You are about to modify exam reconciliation data.
+                </strong>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div><strong>Student:</strong> {studentName}</div>
+                  <div><strong>Batch:</strong> {activeBatchCode}</div>
+                  <div><strong>Attempt Type:</strong> {attemptType === 'Initial' ? 'Initial Test' : 'Retest'}</div>
+                  <div><strong>Reconciliation Category:</strong> {category.replace('_', ' ')}</div>
+                  <div><strong>Resolution Action:</strong> {resolutionAction.replace(/_/g, ' ')}</div>
+                  <div>
+                    <strong>New Value Authority:</strong> {
+                      resolutionAction === 'USE_LOG_SCORE' || resolutionAction === 'SYNC_TO_CACHE' ? `${dbMark} marks (DB Attempts Log)` : `${cacheMark} marks (Legacy Cache)`
+                    }
+                  </div>
+                  <div style={{ marginTop: 6, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 6 }}>
+                    <strong>Trainer Reason:</strong> {resolutionReason}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <Button variant="secondary" size="sm" disabled={isSavingResolution} onClick={() => setResolutionConfirmState(false)}>Cancel / Go Back</Button>
+                <Button size="sm" disabled={isSavingResolution} onClick={handleExecuteResolution}>
+                  {isSavingResolution ? 'Saving...' : 'Confirm Resolution'}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Drawer>
+    );
+  };
+
+  const saveRetestPaymentVerificationLedger = async (studentId: string, status: 'Paid' | 'Pending') => {
+    if (!selectedBatchId) return;
+
+    const dbStatus = status === 'Paid' ? 'Verified' : 'Pending';
+
+    try {
+      const res = await verifyRetestPayment(studentId, selectedBatchId, dbStatus);
+      if (!res.ok) {
+        console.error('Failed to save retest payment verification to ledger:', res.error);
+      }
+    } catch (err) {
+      console.error('Failed to save retest payment verification to ledger:', err);
+    }
+  };
+
   const saveStudentToDb = async (student: StudentRecord) => {
     try {
-      const names = student.name.split(' ');
+      const names = (student.name || '').trim().split(' ').filter(Boolean);
       const firstName = names[0] || 'Student';
       const lastName = names.slice(1).join(' ') || '';
       
       const isRealUuid = student.id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
       
+      // Fetch current custom_fields to prevent wiping other batch-scoped keys
+      let dbCustomFields: Record<string, any> = {};
+      if (isRealUuid) {
+        const { data: currentRecord } = await supabase
+          .from('flwdsk_student_records')
+          .select('custom_fields')
+          .eq('id', student.id)
+          .maybeSingle();
+        if (currentRecord?.custom_fields) {
+          dbCustomFields = currentRecord.custom_fields;
+        }
+      }
+
+      const mergedCustomFields = {
+        ...dbCustomFields,
+        college: student.college,
+        department: student.department,
+        course: student.course || '',
+        examDate: student.examDate || '',
+        photoUrl: student.photoUrl || '',
+        gender: (student as any).gender || 'Female',
+        qualification: (student as any).qualification || '',
+        hasComputer: (student as any).hasComputer || 'Yes',
+        learnedBefore: (student as any).learnedBefore || 'No',
+        ass1: student.ass1,
+        ass2: student.ass2,
+        ass3: student.ass3,
+        project: student.project,
+        finalExam: student.finalExam,
+        retestScore: student.retestScore,
+        examAttemptCount: student.examAttemptCount,
+        retestApproved: student.retestApproved,
+        voucherId: student.voucherId,
+        retestVoucherId: student.retestVoucherId,
+        voucherStatus: student.voucherStatus,
+        certificateStatus: student.certificateStatus,
+        selectedVoucherId: (student as any).selectedVoucherId || '',
+        attendancePct: student.attendancePct,
+        attendanceStatus: student.attendanceStatus,
+        overallScore: student.overallScore,
+      } as any;
+
+      if (selectedBatchId) {
+        mergedCustomFields[`retestPaymentStatus_${selectedBatchId}`] = student.retestPaymentStatus;
+        mergedCustomFields[`retestCollectedAmount_${selectedBatchId}`] = student.retestCollectedAmount;
+        // Keep the student-global legacy fields for fallback compatibility:
+        mergedCustomFields.retestPaymentStatus = student.retestPaymentStatus;
+        mergedCustomFields.retestCollectedAmount = student.retestCollectedAmount;
+      }
+
       const payload = {
         first_name: firstName,
         last_name: lastName,
@@ -2130,48 +3221,42 @@ export function BatchManagement() {
         email: student.email,
         photo_url: student.photoUrl || '',
         notes: (student as any).notes || '',
-        custom_fields: {
-          college: student.college,
-          department: student.department,
-          course: student.course || '',
-          examDate: student.examDate || '',
-          photoUrl: student.photoUrl || '',
-          gender: (student as any).gender || 'Female',
-          qualification: (student as any).qualification || '',
-          hasComputer: (student as any).hasComputer || 'Yes',
-          learnedBefore: (student as any).learnedBefore || 'No',
-          ass1: student.ass1,
-          ass2: student.ass2,
-          ass3: student.ass3,
-          project: student.project,
-          finalExam: student.finalExam,
-          retestScore: student.retestScore,
-          examAttemptCount: student.examAttemptCount,
-          retestApproved: student.retestApproved,
-          retestPaymentStatus: student.retestPaymentStatus,
-          retestCollectedAmount: student.retestCollectedAmount,
-          voucherId: student.voucherId,
-          retestVoucherId: student.retestVoucherId,
-          voucherStatus: student.voucherStatus,
-          certificateStatus: student.certificateStatus,
-          selectedVoucherId: (student as any).selectedVoucherId || '',
-        }
+        custom_fields: mergedCustomFields
       };
 
       let finalStudentId = student.id;
       if (isRealUuid) {
-        await supabase.from('flwdsk_student_records').update(payload).eq('id', student.id);
-      } else {
-        const { data, error } = await supabase.from('flwdsk_student_records').insert({
-          ...payload,
+        const res = await updateStudentProfile(student.id, {
+          firstName,
+          lastName,
           phone: normalizeStudentKey(student.phone || '9876500000'),
-        }).select('id');
-        if (!error && data && data[0]) {
-          finalStudentId = data[0].id;
-          student.id = data[0].id;
+          email: student.email,
+          photoUrl: student.photoUrl || '',
+          notes: (student as any).notes || '',
+          customFields: mergedCustomFields
+        });
+        if (!res.ok) throw new Error(res.error);
+      } else {
+        const res = await registerStudent({
+          firstName,
+          lastName,
+          phone: student.phone || '9876500000',
+          email: student.email,
+          photoUrl: student.photoUrl || '',
+          notes: (student as any).notes || '',
+          customFields: mergedCustomFields
+        });
+        if (res.ok) {
+          finalStudentId = res.value.id;
+          student.id = res.value.id;
           if (selectedBatchId) {
-            await enrollStudent(data[0].id, selectedBatchId);
+            await enrollStudent(res.value.id, selectedBatchId);
           }
+        } else {
+          // Registration failed — stop here so we don't sync vouchers/exam
+          // attempts against a student that was never saved, and so the caller's
+          // catch surfaces the failure to the user.
+          throw new Error(res.error || 'Failed to register student.');
         }
       }
 
@@ -2183,8 +3268,24 @@ export function BatchManagement() {
         const payStatus = student.retestPaymentStatus === 'Paid' ? 'Verified' : 'Pending';
         await syncVouchersToDb(finalStudentId, student.retestVoucherId, 'Retest', payStatus);
       }
+
+      // Sync initial and retest exam attempts to structured table based on explicit selection
+      if (selectedBatchId) {
+        const activeMode = selectedAttemptTypes[student.id];
+        if (activeMode === 'Initial' && student.finalExam !== undefined) {
+          await syncExamAttemptToDb(finalStudentId, selectedBatchId, 'Initial', student.finalExam);
+        }
+        if (activeMode === 'Retest' && student.retestScore !== undefined) {
+          await syncExamAttemptToDb(finalStudentId, selectedBatchId, 'Retest', student.retestScore);
+        }
+      }
     } catch (err) {
       console.warn('Failed to save student to Supabase:', err);
+      toast({
+        variant: 'error',
+        title: 'Save Failed',
+        message: `Could not save "${student.name}" to the database. Your last change may not be stored. ${(err as any)?.message || ''}`.trim(),
+      });
     }
   };
 
@@ -2262,7 +3363,7 @@ export function BatchManagement() {
         return {
           ...s,
           attendancePct: newPct,
-          attendanceStatus: newPct >= 84 ? 'Regular' : newPct >= 70 ? 'Irregular' : 'Critical',
+          attendanceStatus: (!considerAttendance || newPct >= attendanceThreshold) ? 'Regular' : newPct >= 70 ? 'Irregular' : 'Critical',
         };
       })
     );
@@ -2313,6 +3414,14 @@ export function BatchManagement() {
   useEffect(() => { studentsRef.current = students; }, [students]);
   useEffect(() => { enrollmentsRef.current = enrollments; }, [enrollments]);
   useEffect(() => { activeBatchRef.current = activeBatch; }, [activeBatch]);
+
+  // Sync Course Max Marks and Pass Percentage from activeCourse
+  useEffect(() => {
+    if (activeCourse) {
+      setCourseMaxMarks(activeCourse.maxMarks ?? 100);
+      setCoursePassPct(activeCourse.passPercentage ?? 70);
+    }
+  }, [activeCourse]);
 
   const handleToggleCheck = (stage: string, itemId: string) => {
     const list = checklist[stage].map((item) =>
@@ -2417,7 +3526,7 @@ export function BatchManagement() {
         .maybeSingle();
 
       if (v) {
-        await supabase.from('flwdsk_vouchers').update({ sent_status: 'Sent', sent_time: new Date().toISOString() }).eq('id', v.id);
+        await updateVoucherSentStatus(v.id, 'Sent');
       }
 
       toast({
@@ -2433,6 +3542,14 @@ export function BatchManagement() {
   /** Generate a clean, spacious A4 Student Performance Report (crisp vector PDF). */
   const downloadPDF = () => {
     const list = filteredStudents;
+    if (!list || list.length === 0) {
+      toast({
+        variant: 'warning',
+        title: 'No Students Found',
+        message: 'Cannot generate a performance report for a batch with no students.'
+      });
+      return;
+    }
     const b = activeBatch;
     const trainerName = activeTrainer ? `${activeTrainer.firstName} ${activeTrainer.lastName}` : 'N/A';
 
@@ -2485,7 +3602,7 @@ export function BatchManagement() {
 
     // ── SUMMARY STATS ──
     const total = list.length;
-    const eligible = list.filter((s) => s.attendancePct >= 84).length;
+    const eligible = list.filter((s) => !considerAttendance || s.attendancePct >= attendanceThreshold).length;
     const avgAtt = total ? Math.round(list.reduce((a, s) => a + (s.attendancePct || 0), 0) / total) : 0;
     const avgOverall = total ? Math.round(list.reduce((a, s) => a + (s.overallScore || 0), 0) / total) : 0;
     const stats = [
@@ -2510,9 +3627,15 @@ export function BatchManagement() {
 
     // ── STUDENT TABLE ──
     const body = list.map((s, i) => [
-      String(i + 1), s.name, s.phone, `${s.attendancePct}%`,
-      String(s.ass1 ?? 0), String(s.ass2 ?? 0), String(s.ass3 ?? 0),
-      String(s.overallScore ?? 0), s.voucherStatus || 'Unassigned',
+      String(i + 1),
+      s.name || '—',
+      s.phone || '—',
+      `${s.attendancePct !== undefined && s.attendancePct !== null ? s.attendancePct : 0}%`,
+      String(s.ass1 ?? 0),
+      String(s.ass2 ?? 0),
+      String(s.ass3 ?? 0),
+      String(s.overallScore ?? 0),
+      s.voucherStatus || 'Unassigned',
     ]);
 
     autoTable(doc, {
@@ -2520,26 +3643,26 @@ export function BatchManagement() {
       head: [['#', 'Name', 'Phone', 'Attendance %', 'Ass 1', 'Ass 2', 'Ass 3', 'Overall', 'Voucher Status']],
       body,
       margin: { left: M, right: M, bottom: M },
-      styles: { font: 'helvetica', fontSize: 8, cellPadding: 2.6, textColor: [26, 26, 26], minCellHeight: 9, valign: 'middle', lineColor: [226, 232, 240], lineWidth: 0.1 },
-      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, minCellHeight: 9, halign: 'center' },
+      styles: { font: 'helvetica', fontSize: 12, cellPadding: 2.6, textColor: [26, 26, 26], minCellHeight: 9, valign: 'middle', lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12, minCellHeight: 9, halign: 'center' },
       alternateRowStyles: { fillColor: [248, 249, 250] },
       columnStyles: {
-        0: { cellWidth: 8, halign: 'center' },
-        1: { cellWidth: 48 },
-        2: { cellWidth: 28 },
-        3: { cellWidth: 22, halign: 'center' },
-        4: { cellWidth: 14, halign: 'center' },
-        5: { cellWidth: 14, halign: 'center' },
-        6: { cellWidth: 14, halign: 'center' },
-        7: { cellWidth: 18, halign: 'center' },
-        8: { cellWidth: 24, halign: 'center' },
+        0: { cellWidth: 6, halign: 'center' },
+        1: { cellWidth: 42 },
+        2: { cellWidth: 24 },
+        3: { cellWidth: 20, halign: 'center' },
+        4: { cellWidth: 12, halign: 'center' },
+        5: { cellWidth: 12, halign: 'center' },
+        6: { cellWidth: 12, halign: 'center' },
+        7: { cellWidth: 16, halign: 'center' },
+        8: { cellWidth: 26, halign: 'center' },
       },
       didParseCell: (d: any) => {
         if (d.section !== 'body') return;
         const s = list[d.row.index];
         if (!s) return;
         if (d.column.index === 3) {
-          d.cell.styles.textColor = s.attendancePct >= 84 ? [22, 163, 74] : [220, 38, 38];
+          d.cell.styles.textColor = (!considerAttendance || s.attendancePct >= attendanceThreshold) ? [22, 163, 74] : [220, 38, 38];
           d.cell.styles.fontStyle = 'bold';
         }
         if (d.column.index === 8) {
@@ -2571,9 +3694,9 @@ export function BatchManagement() {
   };
 
   // Calculating overall metrics
-  const eligibleCount = students.filter((s) => s.attendancePct >= 84).length;
-  const attendanceAvg = Math.round(students.reduce((acc, s) => acc + s.attendancePct, 0) / students.length);
-  const scoreAvg = Math.round(students.reduce((acc, s) => acc + s.overallScore, 0) / students.length);
+  const eligibleCount = students.filter((s) => !considerAttendance || s.attendancePct >= attendanceThreshold).length;
+  const attendanceAvg = students.length ? Math.round(students.reduce((acc, s) => acc + s.attendancePct, 0) / students.length) : 0;
+  const scoreAvg = students.length ? Math.round(students.reduce((acc, s) => acc + s.overallScore, 0) / students.length) : 0;
 
   // Dedicated Full Page for Student Data Matrix
   if (showFullStudentReport) {
@@ -2595,7 +3718,7 @@ export function BatchManagement() {
                 📊 Students Performance & Exam Eligibility Matrix
               </h1>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                Active Batch: <strong>{cleanBatchCode(activeBatch?.code, activeBatch?.batchNo) || 'Christ 3BBA Data Analytics B1'}</strong> ({activeBatch?.college || 'Christ College'}) · Minimum attendance for voucher: <strong>84%</strong>.
+                Active Batch: <strong>{cleanBatchCode(activeBatch?.code, activeBatch?.batchNo) || 'Christ 3BBA Data Analytics B1'}</strong> ({activeBatch?.college || 'Christ College'}) · Minimum attendance for voucher: <strong>{considerAttendance ? `${attendanceThreshold}%` : 'Not considered'}</strong>.
               </p>
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2675,7 +3798,7 @@ export function BatchManagement() {
                         className="kvj-input"
                         value={matrixEligFilter}
                         onChange={(e) => setMatrixEligFilter(e.target.value as EligibilityFilter)}
-                        style={{ fontSize: 11.5, padding: '4px 8px', minWidth: 130, fontWeight: 600 }}
+                        style={{ fontSize: 12, padding: '4px 8px', minWidth: 130, fontWeight: 600 }}
                       >
                         <option value="all">All Students</option>
                         <option value="eligible">✅ Eligible Only</option>
@@ -2688,7 +3811,7 @@ export function BatchManagement() {
                         onClick={() => dedupeBatchStudents()}
                         title="Find and remove students enrolled more than once (by phone number)"
                         style={{
-                          fontSize: 11.5, padding: '5px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer',
+                          fontSize: 12, padding: '5px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer',
                           background: 'transparent', color: 'var(--status-danger)',
                           border: '1px solid var(--status-danger)',
                         }}
@@ -2703,7 +3826,7 @@ export function BatchManagement() {
                         disabled={batchRemovingMatrix}
                         title="Remove all selected students from this batch"
                         style={{
-                          fontSize: 11.5, padding: '5px 14px', borderRadius: 6, fontWeight: 700,
+                          fontSize: 12, padding: '5px 14px', borderRadius: 6, fontWeight: 700,
                           cursor: batchRemovingMatrix ? 'not-allowed' : 'pointer',
                           background: 'var(--status-danger)', color: '#fff',
                           border: '1px solid var(--status-danger)',
@@ -2728,7 +3851,7 @@ export function BatchManagement() {
                         if (showSortPanel) setShowSortPanel(false);
                       }}
                       style={{
-                        fontSize: 11.5, padding: '5px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer',
+                        fontSize: 12, padding: '5px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer',
                         border: showEligibilityPanel ? '1.5px solid var(--brand)' : '1px solid var(--border)',
                         background: showEligibilityPanel ? 'var(--brand)' : 'var(--bg-surface)',
                         color: showEligibilityPanel ? '#fff' : 'var(--text-primary)',
@@ -2746,7 +3869,7 @@ export function BatchManagement() {
                         if (showEligibilityPanel) setShowEligibilityPanel(false);
                       }}
                       style={{
-                        fontSize: 11.5, padding: '5px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer',
+                        fontSize: 12, padding: '5px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer',
                         border: matrixSortLevels.length > 0 ? '1.5px solid var(--brand)' : '1px solid var(--border)',
                         background: matrixSortLevels.length > 0 ? 'var(--brand)' : 'var(--bg-surface)',
                         color: matrixSortLevels.length > 0 ? '#fff' : 'var(--text-primary)',
@@ -2767,7 +3890,7 @@ export function BatchManagement() {
                         type="button"
                         onClick={handleAddEligCriterion}
                         disabled={eligibilityCriteria.length >= 3}
-                        style={{ fontSize: 10, padding: '3px 10px', borderRadius: 5, border: '1px solid var(--brand)', background: 'var(--brand)', color: '#fff', cursor: eligibilityCriteria.length >= 3 ? 'not-allowed' : 'pointer', opacity: eligibilityCriteria.length >= 3 ? 0.5 : 1 }}
+                        style={{ fontSize: 12, padding: '3px 10px', borderRadius: 5, border: '1px solid var(--brand)', background: 'var(--brand)', color: '#fff', cursor: eligibilityCriteria.length >= 3 ? 'not-allowed' : 'pointer', opacity: eligibilityCriteria.length >= 3 ? 0.5 : 1 }}
                       >
                         ➕ Add Assessment
                       </button>
@@ -2776,24 +3899,46 @@ export function BatchManagement() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {/* Attendance row */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)', border: '1px solid var(--border)', flex: '1 1 270px' }}>
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)' }}>📊 Attendance</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>≥</span>
-                        <input
-                          type="number"
-                          className="kvj-input"
-                          value={attendanceThreshold}
-                          onChange={(e) => setAttendanceThreshold(Number(e.target.value))}
-                          min={0}
-                          max={100}
-                          style={{ fontSize: 12, padding: '3px 6px', width: 55, textAlign: 'center', fontWeight: 700, borderRadius: 5 }}
-                        />
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>%</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', marginLeft: 'auto' }}>default: 84%</span>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={considerAttendance}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setConsiderAttendance(checked);
+                              saveEligibilityConfig(checked, attendanceThreshold, eligibilityCriteria);
+                            }}
+                          />
+                          📊 Attendance
+                        </label>
+                        {considerAttendance && (
+                          <>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>≥</span>
+                            <input
+                              type="number"
+                              className="kvj-input"
+                              value={attendanceThreshold}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setAttendanceThreshold(val);
+                                saveEligibilityConfig(considerAttendance, val, eligibilityCriteria);
+                              }}
+                              min={0}
+                              max={100}
+                              style={{ fontSize: 12, padding: '3px 6px', width: 55, textAlign: 'center', fontWeight: 700, borderRadius: 5 }}
+                            />
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>%</span>
+                          </>
+                        )}
+                        {!considerAttendance && (
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8, fontStyle: 'italic' }}>(Not Considered)</span>
+                        )}
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginLeft: 'auto' }}>default: 84%</span>
                       </div>
 
                       {/* Course Max Marks & Pass % Criteria row */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)', border: '1px solid var(--border)', flex: '1 1 270px' }}>
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)' }}>🎓 Max Marks</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>🎓 Max Marks</span>
                         <input
                           type="number"
                           className="kvj-input"
@@ -2802,8 +3947,8 @@ export function BatchManagement() {
                           min={1}
                           style={{ fontSize: 12, padding: '3px 6px', width: 55, textAlign: 'center', fontWeight: 700, borderRadius: 5 }}
                         />
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)', marginLeft: 6 }}>Pass %</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>≥</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginLeft: 6 }}>Pass %</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>≥</span>
                         <input
                           type="number"
                           className="kvj-input"
@@ -2813,8 +3958,8 @@ export function BatchManagement() {
                           max={100}
                           style={{ fontSize: 12, padding: '3px 6px', width: 55, textAlign: 'center', fontWeight: 700, borderRadius: 5 }}
                         />
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>%</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>%</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginLeft: 'auto' }}>
                           Pass: {Math.round((courseMaxMarks * coursePassPct) / 100)}m
                         </span>
                       </div>
@@ -2826,7 +3971,7 @@ export function BatchManagement() {
                             className="kvj-input"
                             value={crit.assessment}
                             onChange={(e) => handleUpdateEligCriterion(idx, 'assessment', e.target.value as SortableCol)}
-                            style={{ fontSize: 11.5, padding: '3px 6px', fontWeight: 600 }}
+                            style={{ fontSize: 12, padding: '3px 6px', fontWeight: 600 }}
                           >
                             {(['ass1', 'ass2', 'ass3'] as SortableCol[]).map((a) => (
                               <option key={a} value={a} disabled={eligibilityCriteria.some((c, i) => i !== idx && c.assessment === a)}>
@@ -2834,7 +3979,7 @@ export function BatchManagement() {
                               </option>
                             ))}
                           </select>
-                          <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>≥</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>≥</span>
                           <input
                             type="number"
                             className="kvj-input"
@@ -2844,7 +3989,7 @@ export function BatchManagement() {
                             max={100}
                             style={{ fontSize: 12, padding: '3px 6px', width: 55, textAlign: 'center', fontWeight: 700, borderRadius: 5 }}
                           />
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>marks</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>marks</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveEligCriterion(idx)}
@@ -2863,7 +4008,7 @@ export function BatchManagement() {
                       <strong style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>↕ Multi-Level Sort Configuration</strong>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {matrixSortLevels.length > 0 && (
-                          <button type="button" onClick={() => setMatrixSortLevels([])} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg-sunken)', cursor: 'pointer', color: 'var(--status-danger)' }}>
+                          <button type="button" onClick={() => setMatrixSortLevels([])} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg-sunken)', cursor: 'pointer', color: 'var(--status-danger)' }}>
                             ✕ Clear All
                           </button>
                         )}
@@ -2871,7 +4016,7 @@ export function BatchManagement() {
                           type="button"
                           onClick={handleAddSortLevel}
                           disabled={matrixSortLevels.length >= allSortableCols.length}
-                          style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, border: '1px solid var(--brand)', background: 'var(--brand)', color: '#fff', cursor: matrixSortLevels.length >= allSortableCols.length ? 'not-allowed' : 'pointer', opacity: matrixSortLevels.length >= allSortableCols.length ? 0.5 : 1 }}
+                          style={{ fontSize: 12, padding: '2px 8px', borderRadius: 5, border: '1px solid var(--brand)', background: 'var(--brand)', color: '#fff', cursor: matrixSortLevels.length >= allSortableCols.length ? 'not-allowed' : 'pointer', opacity: matrixSortLevels.length >= allSortableCols.length ? 0.5 : 1 }}
                         >
                           ➕ Add Level
                         </button>
@@ -2879,18 +4024,18 @@ export function BatchManagement() {
                     </div>
 
                     {matrixSortLevels.length === 0 && (
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', padding: '6px 0' }}>No sort levels configured. Click "➕ Add Level" to start.</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>No sort levels configured. Click "➕ Add Level" to start.</div>
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {matrixSortLevels.map((lvl, idx) => (
                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 6, background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', minWidth: 50 }}>Level {idx + 1}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', minWidth: 50 }}>Level {idx + 1}</span>
                           <select
                             className="kvj-input"
                             value={lvl.col}
                             onChange={(e) => handleUpdateSortLevel(idx, 'col', e.target.value)}
-                            style={{ fontSize: 11.5, padding: '3px 6px', flex: 1, fontWeight: 600 }}
+                            style={{ fontSize: 12, padding: '3px 6px', flex: 1, fontWeight: 600 }}
                           >
                             {allSortableCols.map((c) => (
                               <option key={c} value={c} disabled={matrixSortLevels.some((l, i) => i !== idx && l.col === c)}>
@@ -2902,7 +4047,7 @@ export function BatchManagement() {
                             className="kvj-input"
                             value={lvl.dir}
                             onChange={(e) => handleUpdateSortLevel(idx, 'dir', e.target.value)}
-                            style={{ fontSize: 11.5, padding: '3px 6px', minWidth: 110, fontWeight: 600 }}
+                            style={{ fontSize: 12, padding: '3px 6px', minWidth: 110, fontWeight: 600 }}
                           >
                             <option value="asc">Ascending ▲</option>
                             <option value="desc">Descending ▼</option>
@@ -3092,7 +4237,7 @@ export function BatchManagement() {
                                   const val = e.target.value;
                                   setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, phone: val } : st));
                                 }}
-                                style={{ fontSize: 11.5, padding: '3px 8px', width: 120, color: 'var(--text-primary)', border: '1px dashed var(--border)', background: 'transparent', borderRadius: 5 }}
+                                style={{ fontSize: 12, padding: '3px 8px', width: 120, color: 'var(--text-primary)', border: '1px dashed var(--border)', background: 'transparent', borderRadius: 5 }}
                                 onFocus={(e) => { e.currentTarget.style.border = '1px solid var(--brand)'; e.currentTarget.style.background = 'var(--bg-sunken)'; }}
                                 onBlur={(e) => {
                                   e.currentTarget.style.border = '1px dashed var(--border)';
@@ -3112,7 +4257,7 @@ export function BatchManagement() {
                                   const val = e.target.value;
                                   setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, email: val } : st));
                                 }}
-                                style={{ fontSize: 11.5, padding: '3px 8px', width: 160, border: '1px dashed var(--border)', background: 'transparent', borderRadius: 5 }}
+                                style={{ fontSize: 12, padding: '3px 8px', width: 160, border: '1px dashed var(--border)', background: 'transparent', borderRadius: 5 }}
                                 onFocus={(e) => { e.currentTarget.style.border = '1px solid var(--brand)'; e.currentTarget.style.background = 'var(--bg-sunken)'; }}
                                 onBlur={(e) => {
                                   e.currentTarget.style.border = '1px dashed var(--border)';
@@ -3124,7 +4269,7 @@ export function BatchManagement() {
 
                             {/* Attendance */}
                             <td style={{ padding: 12, textAlign: 'center' }}>
-                              <strong style={{ color: s.attendancePct >= attendanceThreshold ? 'var(--status-success)' : 'var(--status-danger)' }}>
+                              <strong style={{ color: !considerAttendance ? 'var(--text-primary)' : s.attendancePct >= attendanceThreshold ? 'var(--status-success)' : 'var(--status-danger)' }}>
                                 {s.attendancePct}%
                               </strong>
                             </td>
@@ -3135,8 +4280,8 @@ export function BatchManagement() {
                                 {eligible ? 'Eligible' : 'Not Eligible'}
                               </Badge>
                               {!eligible && (
-                                <div style={{ fontSize: 10, color: 'var(--status-danger)', marginTop: 2 }}>
-                                  {s.attendancePct < 84 ? `Attendance: ${s.attendancePct}% (need 84%)` : 'Missing assessments'}
+                                <div style={{ fontSize: 12, color: 'var(--status-danger)', marginTop: 2 }}>
+                                  {getEligibilityReason(s)}
                                 </div>
                               )}
                             </td>
@@ -3176,7 +4321,7 @@ export function BatchManagement() {
                                           background: isShowChecklist ? 'var(--brand)' : 'var(--bg-sunken)',
                                           color: isShowChecklist ? '#fff' : 'var(--text-primary)',
                                           cursor: 'pointer',
-                                          fontSize: 11, padding: '2px 6px', borderRadius: 5,
+                                          fontSize: 12, padding: '2px 6px', borderRadius: 5,
                                           fontWeight: 600, transition: 'all 120ms',
                                         }}
                                       >
@@ -3195,7 +4340,7 @@ export function BatchManagement() {
                                         }}
                                       >
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
-                                          <strong style={{ fontSize: 11.5, color: 'var(--text-primary)' }}>📋 Pass Criteria & Course Tasks</strong>
+                                          <strong style={{ fontSize: 12, color: 'var(--text-primary)' }}>📋 Pass Criteria & Course Tasks</strong>
                                           <button
                                             type="button"
                                             onClick={() => setActiveChecklistStudentId(null)}
@@ -3205,7 +4350,7 @@ export function BatchManagement() {
                                           </button>
                                         </div>
 
-                                        <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: (hasTakenExam && examScore >= requiredPassScore) ? 'var(--status-success)' : 'var(--status-danger)' }}>
                                             <span>{(hasTakenExam && examScore >= requiredPassScore) ? '✅' : '❌'}</span>
                                             <span>Final Exam: <strong>{hasTakenExam ? `${examScore} / ${courseMaxMarks} marks (${Math.round((examScore / courseMaxMarks) * 100)}%)` : 'Not Attended'}</strong> (Pass: {requiredPassScore}m / {coursePassPct}%)</span>
@@ -3219,7 +4364,7 @@ export function BatchManagement() {
                                             <span>Assessments Met: <strong>{eligible ? 'Passed' : 'Failed'}</strong></span>
                                           </div>
 
-                                          <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--border)', fontSize: 10, color: 'var(--text-muted)' }}>
+                                          <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
                                             <em>Pass Criteria set in Course Catalog ({coursePassPct}% of {courseMaxMarks} Max Marks).</em>
                                           </div>
                                         </div>
@@ -3236,14 +4381,14 @@ export function BatchManagement() {
                                 <input
                                   type="text"
                                   className="kvj-input"
-                                  style={{ padding: '4px 8px', fontSize: 11, width: 140 }}
+                                  style={{ padding: '4px 8px', fontSize: 12, width: 140 }}
                                   value={s.voucherId}
                                   onChange={(e) => assignVoucherId(s.id, e.target.value)}
                                   placeholder="Assign Voucher ID"
                                 />
                                 <Button
                                   size="sm"
-                                  style={{ padding: '4px 8px', fontSize: 10 }}
+                                  style={{ padding: '4px 8px', fontSize: 12 }}
                                   onClick={() => notifyTrainerVoucher(s.name, s.voucherId)}
                                 >
                                   Notify
@@ -3254,10 +4399,10 @@ export function BatchManagement() {
                               <td style={{ padding: 12, textAlign: 'center' }}>
                                 {confirmRemoveStudentId === s.id ? (
                                   <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'stretch', minWidth: 150, background: 'var(--bg-panel)', border: '1px solid var(--status-danger-border)', borderRadius: 8, padding: 8, boxShadow: 'var(--e2)' }}>
-                                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Remove <strong>{s.name}</strong> from batch?</span>
+                                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Remove <strong>{s.name}</strong> from batch?</span>
                                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                      <button type="button" onClick={() => setConfirmRemoveStudentId(null)} style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Cancel</button>
-                                      <button type="button" onClick={() => handleRemoveStudentFromBatch(s)} style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 5, border: 'none', background: 'var(--status-danger)', color: '#fff', cursor: 'pointer' }}>Remove</button>
+                                      <button type="button" onClick={() => setConfirmRemoveStudentId(null)} style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Cancel</button>
+                                      <button type="button" onClick={() => handleRemoveStudentFromBatch(s)} style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 5, border: 'none', background: 'var(--status-danger)', color: '#fff', cursor: 'pointer' }}>Remove</button>
                                     </div>
                                   </div>
                                 ) : (
@@ -3376,7 +4521,7 @@ export function BatchManagement() {
                           }}>
                             {/* Session Header Top Bar */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                                 Session {idx + 1}
                               </span>
                               <button
@@ -3405,7 +4550,7 @@ export function BatchManagement() {
                                 value={col.date}
                                 onChange={(e) => handleUpdateSessionDate(col.id, e.target.value)}
                                 style={{
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: 700,
                                   padding: '2px 4px',
                                   borderRadius: 6,
@@ -3423,7 +4568,7 @@ export function BatchManagement() {
                                 onChange={(e) => handleUpdateSessionHour(col.id, Number(e.target.value))}
                                 title="Select Hour Number"
                                 style={{
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: 800,
                                   padding: '2px 4px',
                                   borderRadius: 6,
@@ -3460,29 +4605,29 @@ export function BatchManagement() {
                                 width: '100%',
                               }}>
                                 <span style={{
-                                  color: 'var(--status-success, #10b981)',
+                                  color: 'var(--status-success, var(--status-success))',
                                   background: 'rgba(16, 185, 129, 0.12)',
                                   padding: '2px 5px',
                                   borderRadius: 4,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: 800,
                                 }} title={`${presentCount} Present`}>
                                   🟢 {presentCount}
                                 </span>
                                 <span style={{
-                                  color: 'var(--status-danger, #ef4444)',
+                                  color: 'var(--status-danger, var(--status-danger))',
                                   background: 'rgba(239, 68, 68, 0.12)',
                                   padding: '2px 5px',
                                   borderRadius: 4,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: 800,
                                 }} title={`${absentCount} Absent`}>
                                   🔴 {absentCount}
                                 </span>
                                 <span style={{
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: 800,
-                                  color: sessionPct >= 80 ? 'var(--status-success, #10b981)' : 'var(--status-danger, #ef4444)',
+                                  color: sessionPct >= 80 ? 'var(--status-success, var(--status-success))' : 'var(--status-danger, var(--status-danger))',
                                   marginLeft: 2,
                                 }}>
                                   {sessionPct}%
@@ -3501,7 +4646,7 @@ export function BatchManagement() {
                                   width: `${sessionPct}%`,
                                   height: '100%',
                                   borderRadius: 999,
-                                  background: sessionPct >= 80 ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #ef4444, #f87171)',
+                                  background: sessionPct >= 80 ? 'linear-gradient(90deg, var(--status-success), #34d399)' : 'linear-gradient(90deg, var(--status-danger), #f87171)',
                                   transition: 'width 300ms ease-in-out',
                                 }} />
                               </div>
@@ -3519,7 +4664,7 @@ export function BatchManagement() {
                         background: 'var(--bg-sunken)',
                         zIndex: 20,
                       }}>
-                        <Button size="sm" variant="secondary" onClick={handleAddHourSessionColumn} style={{ fontSize: 11, padding: '4px 8px' }}>
+                        <Button size="sm" variant="secondary" onClick={handleAddHourSessionColumn} style={{ fontSize: 12, padding: '4px 8px' }}>
                           ➕ Add Hour Column
                         </Button>
                       </th>
@@ -3528,7 +4673,7 @@ export function BatchManagement() {
                   <tbody>
                     {students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id)).map((s) => {
                       const studentRecord = attendanceMatrix[s.id] || {};
-                      const eligible = s.attendancePct >= 84;
+                      const eligible = !considerAttendance || s.attendancePct >= attendanceThreshold;
 
                       return (
                         <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -3562,10 +4707,10 @@ export function BatchManagement() {
                           {attendanceSessions.map((col) => {
                             const status = studentRecord[col.id] || 'present';
                             const badgeBg = status === 'present'
-                              ? 'var(--status-success, #10b981)'
+                              ? 'var(--status-success, var(--status-success))'
                               : status === 'absent'
-                              ? 'var(--status-danger, #ef4444)'
-                              : 'var(--status-warning, #f59e0b)';
+                              ? 'var(--status-danger, var(--status-danger))'
+                              : 'var(--status-warning, var(--status-warning))';
 
                             const badgeText = status === 'present'
                               ? '🟢 Present'
@@ -3581,7 +4726,7 @@ export function BatchManagement() {
                                   onClick={() => toggleSessionStatus(s.id, col.id)}
                                   style={{
                                     padding: '5px 12px',
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: 700,
                                     borderRadius: 999,
                                     border: 'none',
@@ -3633,10 +4778,18 @@ export function BatchManagement() {
                       e.target.value = '';
                     }}
                   />
-                  <Button size="sm" variant="secondary" onClick={() => examMarkFileRef.current?.click()} title="Upload an Excel/CSV with Phone and Mark columns to set final exam marks" style={{ fontSize: 11.5 }}>
+                  <Button size="sm" variant="secondary" onClick={() => examMarkFileRef.current?.click()} title="Upload an Excel/CSV with Phone and Mark columns to set final exam marks" style={{ fontSize: 12 }}>
                     📤 Upload Exam Marks
                   </Button>
-                  <Button size="sm" onClick={handleAddFinalExamStudentRow} style={{ fontSize: 11.5 }}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setReconciliationDrawerOpen(true)}
+                    style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    🔍 Reconcile Attempts
+                  </Button>
+                  <Button size="sm" onClick={handleAddFinalExamStudentRow} style={{ fontSize: 12 }}>
                     ➕ Add Student
                   </Button>
                 </div>
@@ -3691,7 +4844,7 @@ export function BatchManagement() {
                                 setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
                                 saveStudentToDb(updated);
                               }}
-                              style={{ fontSize: 11.5, padding: '3px 6px', width: 125 }}
+                              style={{ fontSize: 12, padding: '3px 6px', width: 125 }}
                             />
                           </td>
 
@@ -3706,7 +4859,7 @@ export function BatchManagement() {
                                 setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, college: val } : st));
                               }}
                               onBlur={() => saveStudentToDb(s)}
-                              style={{ fontSize: 11.5, padding: '3px 6px', width: 140, fontWeight: 600 }}
+                              style={{ fontSize: 12, padding: '3px 6px', width: 140, fontWeight: 600 }}
                             />
                           </td>
 
@@ -3752,7 +4905,7 @@ export function BatchManagement() {
                               }}
                               onBlur={() => saveStudentToDb(s)}
                               placeholder="+91 98765 00000"
-                              style={{ fontSize: 11.5, padding: '3px 6px', width: 130, color: 'var(--text-muted)' }}
+                              style={{ fontSize: 12, padding: '3px 6px', width: 130, color: 'var(--text-muted)' }}
                             />
                             <datalist id={`phone-autofill-${s.id}`}>
                               {students.filter((st) => !selectedBatchId || batchStudentIds.has(st.id)).map((st) => (
@@ -3776,7 +4929,7 @@ export function BatchManagement() {
                                   setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, name: val } : st));
                                 }}
                                 onBlur={() => saveStudentToDb(s)}
-                                style={{ fontSize: 11.5, padding: '3px 6px', width: 125, fontWeight: 700 }}
+                                style={{ fontSize: 12, padding: '3px 6px', width: 125, fontWeight: 700 }}
                               />
                             </div>
                           </td>
@@ -3785,32 +4938,74 @@ export function BatchManagement() {
                           <td style={{ padding: 12 }}>
                             <span
                               title="Course is set on the batch"
-                              style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--brand)' }}
+                              style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)' }}
                             >
                               {courseVal}
                             </span>
                           </td>
 
-                          {/* 6. Exam Mark (Updates Final Exam + Retest Mark in Sync!) */}
+                           {/* 6. Exam Mark (Manual Entry with Explicit Attempt Type Select) */}
                           <td style={{ padding: 12, textAlign: 'center' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                              <select
+                                className="kvj-input"
+                                value={selectedAttemptTypes[s.id] || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value as 'Initial' | 'Retest' | '';
+                                  setSelectedAttemptTypes(prev => ({ ...prev, [s.id]: val }));
+                                }}
+                                style={{ fontSize: 12, padding: '2px 4px', width: 90, borderRadius: 5, fontWeight: 600 }}
+                              >
+                                <option value="">Select Type</option>
+                                <option value="Initial">Test</option>
+                                <option value="Retest">Retest</option>
+                              </select>
+
                               <input
                                 type="number"
                                 className="kvj-input"
-                                value={s.finalExam || ''}
+                                disabled={!selectedAttemptTypes[s.id]}
+                                value={
+                                  selectedAttemptTypes[s.id] === 'Initial'
+                                    ? (s.finalExam || '')
+                                    : selectedAttemptTypes[s.id] === 'Retest'
+                                    ? (s.retestScore || '')
+                                    : ''
+                                }
                                 onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, finalExam: val, retestScore: val } : st));
+                                  const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                  const mode = selectedAttemptTypes[s.id];
+                                  if (!mode) return;
+                                  
+                                  setStudents((prev) =>
+                                    prev.map((st) => {
+                                      if (st.id !== s.id) return st;
+                                      if (mode === 'Initial') {
+                                        return { ...st, finalExam: val };
+                                      } else {
+                                        return { ...st, retestScore: val, examAttemptCount: 2 };
+                                      }
+                                    })
+                                  );
                                 }}
-                                onBlur={() => saveStudentToDb(s)}
-                                placeholder="Mark"
-                                style={{ fontSize: 11.5, padding: '3px 6px', width: 65, textAlign: 'center', fontWeight: 700 }}
+                                onBlur={() => {
+                                  if (selectedAttemptTypes[s.id]) {
+                                    saveStudentToDb(s);
+                                  }
+                                }}
+                                placeholder={selectedAttemptTypes[s.id] ? "Mark" : "Type?"}
+                                style={{ fontSize: 12, padding: '3px 6px', width: 65, textAlign: 'center', fontWeight: 700 }}
                               />
-                              {s.finalExam > 0 && (
-                                <Badge tone={hasPassed ? 'success' : 'danger'}>
-                                  {hasPassed ? 'Passed 🏆' : 'Failed ❌'}
-                                </Badge>
-                              )}
+                              {(() => {
+                                const mode = selectedAttemptTypes[s.id];
+                                const scoreToCheck = mode === 'Initial' ? (s.finalExam || 0) : mode === 'Retest' ? (s.retestScore || 0) : 0;
+                                const checkPassed = scoreToCheck >= coursePassPct;
+                                return scoreToCheck > 0 ? (
+                                  <Badge tone={checkPassed ? 'success' : 'danger'}>
+                                    {checkPassed ? 'Passed 🏆' : 'Failed ❌'}
+                                  </Badge>
+                                ) : null;
+                              })()}
                             </div>
                           </td>
 
@@ -3834,7 +5029,7 @@ export function BatchManagement() {
                                   });
                                 }}
                                 style={{
-                                  fontSize: 10,
+                                  fontSize: 12,
                                   color: 'var(--brand)',
                                   background: 'transparent',
                                   border: 'none',
@@ -3864,7 +5059,7 @@ export function BatchManagement() {
                                   });
                                 }}
                                 style={{
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: 700,
                                   padding: '3px 6px',
                                   borderRadius: 6,
@@ -3888,11 +5083,11 @@ export function BatchManagement() {
                                   onChange={(e) => assignVoucherId(s.id, e.target.value)}
                                   onBlur={() => saveStudentToDb(s)}
                                   placeholder="VOUCH-XXX-000"
-                                  style={{ fontSize: 11, padding: '3px 6px', width: 135 }}
+                                  style={{ fontSize: 12, padding: '3px 6px', width: 135 }}
                                 />
                                 <Button
                                   size="sm"
-                                  style={{ padding: '3px 8px', fontSize: 10 }}
+                                  style={{ padding: '3px 8px', fontSize: 12 }}
                                   onClick={() => notifyTrainerVoucher(s.name, firstVoucher)}
                                 >
                                   Notify
@@ -3910,7 +5105,7 @@ export function BatchManagement() {
                               style={{
                                 border: 'none',
                                 background: 'transparent',
-                                color: 'var(--status-danger, #ef4444)',
+                                color: 'var(--status-danger, var(--status-danger))',
                                 cursor: 'pointer',
                                 fontSize: 14,
                                 padding: '4px 6px',
@@ -3986,8 +5181,8 @@ export function BatchManagement() {
                   </thead>
                   <tbody>
                     {students.filter((s) => !selectedBatchId || batchStudentIds.has(s.id)).map((s) => {
-                      const pStatus = s.retestPaymentStatus || (s.attendancePct >= 84 ? 'Paid' : 'Pending');
-                      const collectedAmt = s.retestCollectedAmount !== undefined ? s.retestCollectedAmount : (pStatus === 'Paid' ? 500 : 0);
+                      const pStatus = s.retestPaymentStatus === 'Paid' ? 'Paid' : 'Pending';
+                      const collectedAmt = s.retestCollectedAmount !== undefined ? s.retestCollectedAmount : 0;
                       const retestVouch = s.retestVoucherId || s.voucherId || `VOUCH-RETEST-${s.id.replace('s-', '10')}`;
 
                       return (
@@ -4007,29 +5202,30 @@ export function BatchManagement() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <select
                                 value={pStatus}
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                   const nextP = e.target.value as 'Paid' | 'Pending';
                                   const updated = { ...s, retestPaymentStatus: nextP };
                                   setStudents((prev) => prev.map((st) => st.id === s.id ? updated : st));
+                                  await saveRetestPaymentVerificationLedger(s.id, nextP);
                                   saveStudentToDb(updated);
                                 }}
                                 style={{
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: 700,
                                   padding: '3px 6px',
                                   borderRadius: 6,
                                   border: '1px solid var(--border)',
                                   background: 'var(--bg-surface)',
-                                  color: pStatus === 'Paid' ? 'var(--status-success, #10b981)' : 'var(--status-warning, #f59e0b)',
+                                  color: pStatus === 'Paid' ? 'var(--status-success, var(--status-success))' : 'var(--status-warning, var(--status-warning))',
                                   cursor: 'pointer',
                                 }}
                               >
-                                <option value="Paid">Paid</option>
-                                <option value="Pending">Pending</option>
+                                <option value="Paid">Verified</option>
+                                <option value="Pending">Pending Verification</option>
                               </select>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>₹</span>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }} title="External Fee reference">₹</span>
                                 <input
                                   type="number"
                                   className="kvj-input"
@@ -4038,9 +5234,17 @@ export function BatchManagement() {
                                     const amt = Number(e.target.value);
                                     setStudents((prev) => prev.map((st) => st.id === s.id ? { ...st, retestCollectedAmount: amt } : st));
                                   }}
-                                  onBlur={() => saveStudentToDb(s)}
-                                  placeholder="Amount"
-                                  style={{ fontSize: 11.5, padding: '3px 6px', width: 70, fontWeight: 700 }}
+                                  onBlur={async () => {
+                                    const latest = students.find(st => st.id === s.id);
+                                    if (latest) {
+                                      const resolvedStatus = latest.retestPaymentStatus === 'Paid' ? 'Paid' : 'Pending';
+                                      await saveRetestPaymentVerificationLedger(latest.id, resolvedStatus);
+                                      saveStudentToDb(latest);
+                                    }
+                                  }}
+                                  placeholder="Fee Ref"
+                                  title="External Payment Fee Amount Reference"
+                                  style={{ fontSize: 12, padding: '3px 6px', width: 70, fontWeight: 700 }}
                                 />
                               </div>
                             </div>
@@ -4051,16 +5255,16 @@ export function BatchManagement() {
                             <input
                               type="number"
                               className="kvj-input"
-                              value={s.retestScore !== undefined ? (s.retestScore || '') : (s.finalExam || '')}
+                              value={s.retestScore || ''}
                               onChange={(e) => {
                                 const markVal = e.target.value === '' ? 0 : Number(e.target.value);
+                                setSelectedAttemptTypes(prev => ({ ...prev, [s.id]: 'Retest' }));
                                 setStudents((prev) =>
                                   prev.map((st) =>
                                     st.id === s.id
                                       ? {
                                           ...st,
                                           retestScore: markVal,
-                                          finalExam: markVal,
                                           examAttemptCount: 2,
                                         }
                                       : st
@@ -4069,7 +5273,7 @@ export function BatchManagement() {
                               }}
                               onBlur={() => saveStudentToDb(s)}
                               placeholder="Mark"
-                              style={{ fontSize: 11.5, padding: '3px 6px', width: 65, textAlign: 'center', fontWeight: 700 }}
+                              style={{ fontSize: 12, padding: '3px 6px', width: 65, textAlign: 'center', fontWeight: 700 }}
                             />
                           </td>
 
@@ -4085,7 +5289,7 @@ export function BatchManagement() {
                               }}
                               onBlur={() => saveStudentToDb(s)}
                               placeholder="New Voucher ID"
-                              style={{ fontSize: 11, padding: '3px 6px', width: 155 }}
+                              style={{ fontSize: 12, padding: '3px 6px', width: 155 }}
                             />
                           </td>
 
@@ -4093,7 +5297,7 @@ export function BatchManagement() {
                           <td style={{ padding: 12, textAlign: 'center' }}>
                             <Button
                               size="sm"
-                              style={{ padding: '4px 10px', fontSize: 11 }}
+                              style={{ padding: '4px 10px', fontSize: 12 }}
                               onClick={() => {
                                 toast({
                                   variant: 'success',
@@ -4159,7 +5363,7 @@ export function BatchManagement() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
                       <div>
                         <SectionHeader title="📋 Matched Student Registration Records (Google Sheet)" />
-                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                           Showing only registrations matched with current students data using Phone Number as Primary Key.
                         </div>
                       </div>
@@ -4170,7 +5374,7 @@ export function BatchManagement() {
                           value={registrationSearchQuery}
                           onChange={(e) => setRegistrationSearchQuery(e.target.value)}
                           placeholder="🔍 Search Name, Phone, Email, Reg No..."
-                          style={{ fontSize: 11.5, padding: '5px 10px', width: 220, borderRadius: 6 }}
+                          style={{ fontSize: 12, padding: '5px 10px', width: 220, borderRadius: 6 }}
                         />
 
                         <Badge tone="success">
@@ -4266,7 +5470,7 @@ export function BatchManagement() {
                                   </Badge>
                                 </td>
                                 <td style={{ padding: 10 }}>{r.certiportUser || '—'}</td>
-                                <td style={{ padding: 10, color: 'var(--text-muted)', fontSize: 11 }}>{r.timestamp || '—'}</td>
+                                <td style={{ padding: 10, color: 'var(--text-muted)', fontSize: 12 }}>{r.timestamp || '—'}</td>
                               </tr>
                             ))
                           )}
@@ -4281,92 +5485,243 @@ export function BatchManagement() {
 
           {studentSubTab === 'certificates' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <SectionHeader title="📜 Certificate Logistics & Delivery tracking" />
-              
+              <SectionHeader title="📜 Certificate Delivery Record" />
+
+              {/* Student selector */}
               <Card style={{ padding: 18 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Logistics Delivery Status
-                      </label>
-                      <select
-                        className="kvj-select"
-                        value={certificateStatus}
-                        onChange={(e) => setCertificateStatus(e.target.value as any)}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
-                      >
-                        <option value="Generated">Generated</option>
-                        <option value="Printed">Printed</option>
-                        <option value="Dispatched">Dispatched</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Received">Received</option>
-                      </select>
-                    </div>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                    Select Student
+                  </label>
+                  <select
+                    className="kvj-select"
+                    value={certSelectedStudentId}
+                    onChange={async (e) => {
+                      const sid = e.target.value;
+                      setCertSelectedStudentId(sid);
+                      setCertDeliveryDate('');
+                      setCertCollectedBy('');
+                      setCertCount('');
+                      setCertReceiptFile(null);
+                      setCertReceiptPath('');
+                      setCertRecord(null);
+                      setCertReceiptUrl('');
+                      if (!sid) return;
+                      const enrollment = enrollments.find(
+                        (en) => en.batchId === selectedBatchId && en.studentId === sid
+                      );
+                      if (!enrollment) return;
+                      setCertLoading(true);
+                      const res = await getCertificateDelivery(enrollment.id);
+                      if (res.ok && res.value) {
+                        const rec = res.value;
+                        setCertRecord(rec);
+                        setCertDeliveryDate(rec.deliveryDate || '');
+                        setCertCollectedBy(rec.collectedBy || '');
+                        setCertCount(rec.certificateCount != null ? String(rec.certificateCount) : '');
+                        setCertReceiptPath(rec.certificateReceiptPath || '');
+                        if (rec.certificateReceiptPath) {
+                          const urlRes = await getCertificateReceiptUrl(rec.certificateReceiptPath);
+                          if (urlRes.ok) setCertReceiptUrl(urlRes.value);
+                        }
+                      }
+                      setCertLoading(false);
+                    }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                  >
+                    <option value="">— Select a student —</option>
+                    {filteredStudents.map((st) => (
+                      <option key={st.id} value={st.id}>{st.name}</option>
+                    ))}
+                  </select>
+                </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Expected/Delivered Date
-                      </label>
-                      <input
-                        type="date"
-                        className="kvj-input"
-                        value={certificateDeliveryDate}
-                        onChange={(e) => setCertificateDeliveryDate(e.target.value)}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
-                      />
-                    </div>
+                {certLoading && (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 0' }}>
+                    Loading delivery record…
                   </div>
+                )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {certSelectedStudentId && !certLoading && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
+                    {certRecord && (
+                      <div style={{ fontSize: 12, color: 'var(--success)', background: 'var(--success-bg, rgba(34,197,94,0.08))', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--success)' }}>
+                        ✅ Existing delivery record loaded. Saving will update it.
+                      </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      {/* Delivery Date */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                          Delivery Date <span style={{ color: 'var(--error)' }}>*</span>
+                        </label>
+                        <input
+                          type="date"
+                          className="kvj-input"
+                          value={certDeliveryDate}
+                          onChange={(e) => setCertDeliveryDate(e.target.value)}
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                        />
+                      </div>
+
+                      {/* Collected By */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                          Collected By <span style={{ color: 'var(--error)' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="kvj-input"
+                          placeholder="Name of recipient at College"
+                          value={certCollectedBy}
+                          onChange={(e) => setCertCollectedBy(e.target.value)}
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* No. of Certificates */}
                     <div>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Courier Name
+                        No. of Certificates <span style={{ color: 'var(--error)' }}>*</span>
                       </label>
                       <input
-                        type="text"
+                        type="number"
+                        min={1}
                         className="kvj-input"
-                        value={courierName}
-                        onChange={(e) => setCourierName(e.target.value)}
+                        placeholder="e.g. 1"
+                        value={certCount}
+                        onChange={(e) => setCertCount(e.target.value)}
                         style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
                       />
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Tracking reference ID
+                    {/* Certificate Receipt upload */}
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                        Certificate Receipt <span style={{ color: 'var(--error)' }}>*</span>
+                        <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
+                          (JPEG, PNG, WEBP or PDF — max 5 MB)
+                        </span>
                       </label>
-                      <input
-                        type="text"
-                        className="kvj-input"
-                        value={trackingNumber}
-                        onChange={(e) => setTrackingNumber(e.target.value)}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
-                      />
-                    </div>
-                  </div>
 
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                      Signed Courier Receipt Document
-                    </label>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      {certReceiptPath && (
+                        <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 12, color: 'var(--success)' }}>✅ Receipt on file:</span>
+                          {certReceiptUrl ? (
+                            <a
+                              href={certReceiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'underline' }}
+                            >
+                              View / Download
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                              {certReceiptPath.split('/').pop()}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <input
+                          id="cert-receipt-file-input"
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] || null;
+                            setCertReceiptFile(f);
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={certUploading}
+                          onClick={() => document.getElementById('cert-receipt-file-input')?.click()}
+                        >
+                          {certReceiptFile ? `📎 ${certReceiptFile.name}` : certReceiptPath ? '🔄 Replace Receipt' : '📤 Attach Receipt'}
+                        </Button>
+                        {certReceiptFile && !certUploading && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={async () => {
+                              if (!certReceiptFile || !certSelectedStudentId) return;
+                              setCertUploading(true);
+                              const ext = certReceiptFile.name.split('.').pop() || 'pdf';
+                              const path = `${certSelectedStudentId}/${Date.now()}.${ext}`;
+                              const res = await uploadCertificateReceipt(certReceiptFile, path);
+                              if (res.ok) {
+                                setCertReceiptPath(res.value);
+                                toast({ variant: 'success', title: 'Receipt Uploaded', message: 'Receipt file uploaded successfully.' });
+                                const urlRes = await getCertificateReceiptUrl(res.value);
+                                if (urlRes.ok) setCertReceiptUrl(urlRes.value);
+                              } else {
+                                toast({ variant: 'error', title: 'Upload Failed', message: res.error });
+                              }
+                              setCertUploading(false);
+                            }}
+                          >
+                            {certUploading ? 'Uploading…' : '☁️ Upload Now'}
+                          </Button>
+                        )}
+                        {certUploading && (
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Uploading…</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Save button */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 16 }}>
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setSignedReceiptUploaded(true);
-                          toast({ variant: 'success', title: 'Receipt Uploaded', message: 'Signed receipt has been linked successfully.' });
+                        variant="primary"
+                        disabled={certSaving || !certDeliveryDate || !certCollectedBy || !certCount || !certReceiptPath}
+                        onClick={async () => {
+                          if (!certSelectedStudentId) return;
+                          const enrollment = enrollments.find(
+                            (en) => en.batchId === selectedBatchId && en.studentId === certSelectedStudentId
+                          );
+                          if (!enrollment) {
+                            toast({ variant: 'error', title: 'Enrollment Not Found', message: 'Cannot find enrollment for this student in the selected batch.' });
+                            return;
+                          }
+                          const count = parseInt(certCount, 10);
+                          if (isNaN(count) || count <= 0) {
+                            toast({ variant: 'error', title: 'Invalid Count', message: 'Number of certificates must be a positive integer.' });
+                            return;
+                          }
+                          if (!certReceiptPath) {
+                            toast({ variant: 'error', title: 'Receipt Required', message: 'Please upload the certificate receipt before saving.' });
+                            return;
+                          }
+                          setCertSaving(true);
+                          const res = await saveCertificateDelivery(
+                            enrollment.id,
+                            certSelectedStudentId,
+                            certDeliveryDate,
+                            certCollectedBy,
+                            count,
+                            certReceiptPath
+                          );
+                          if (res.ok) {
+                            setCertRecord(res.value);
+                            toast({ variant: 'success', title: 'Delivery Recorded', message: 'Certificate delivery record saved successfully.' });
+                          } else {
+                            toast({ variant: 'error', title: 'Save Failed', message: res.error });
+                          }
+                          setCertSaving(false);
                         }}
                       >
-                        {signedReceiptUploaded ? '✅ Change Uploaded Document' : '📤 Upload Signed Receipt'}
+                        {certSaving ? 'Saving…' : certRecord ? '💾 Update Delivery Record' : '💾 Save Delivery Record'}
                       </Button>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        {signedReceiptUploaded ? 'receipt_christ_signed_co.pdf' : 'Pending upload'}
-                      </span>
                     </div>
                   </div>
-                </div>
+                )}
               </Card>
             </div>
           )}
@@ -4785,6 +6140,8 @@ export function BatchManagement() {
           </form>
         </Drawer>
       )}
+      {renderReconciliationDrawer()}
+      {renderResolutionModal()}
       </AppShell>
     );
   }
@@ -4932,7 +6289,7 @@ export function BatchManagement() {
                 ))}
               </select>
               {courses.length === 0 && (
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
                   No courses in catalog yet. Add courses in the Course Catalog first.
                 </p>
               )}
@@ -5395,6 +6752,8 @@ export function BatchManagement() {
           </form>
         </Drawer>
       )}
+      {renderReconciliationDrawer()}
+      {renderResolutionModal()}
 
       {/* Daily Report Builder Modal */}
       {dailyReportBuilderOpen && (
@@ -5463,7 +6822,7 @@ export function BatchManagement() {
                 ))}
               </select>
               {courses.length === 0 && (
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
                   No courses in catalog yet. Add courses in the Course Catalog first.
                 </p>
               )}
@@ -5657,8 +7016,9 @@ export function BatchManagement() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(4px)',
+          background: 'var(--bg-overlay)',
+          backdropFilter: 'blur(var(--overlay-blur, 3px))',
+          WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

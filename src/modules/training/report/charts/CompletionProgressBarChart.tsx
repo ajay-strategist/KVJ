@@ -14,7 +14,7 @@ export const CompletionProgressBarChart: React.FC<CompletionProgressBarChartProp
   pending,
   notAttempted,
   total,
-  title = 'V8. Completion Progress Bar',
+  title = 'Completion Progress Bar',
   caption = 'Assessment Submission Status',
 }) => {
   const safeTotal = Math.max(total, 1);

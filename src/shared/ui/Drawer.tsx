@@ -7,7 +7,7 @@ export interface DrawerProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export function Drawer({ open, onClose, title, children, footer, size = 'md' }: DrawerProps) {
@@ -15,22 +15,28 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
   const isMobile = device === 'mobile';
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open]);
+  }, [open, onClose]);
 
   if (!open) return null;
 
   const widthMap = {
-    sm: 'min(360px, 100vw)',
-    md: 'min(480px, 100vw)',
-    lg: 'min(640px, 100vw)',
+    sm: 'min(380px, 100vw)',
+    md: 'min(520px, 100vw)',
+    lg: 'min(680px, 100vw)',
+    xl: 'min(860px, 100vw)',
   };
 
   return (
@@ -40,9 +46,10 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.18)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 1100,
+        backgroundColor: 'var(--bg-overlay)',
+        backdropFilter: 'blur(var(--overlay-blur, 3px))',
+        WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
+        zIndex: 1250,
         display: 'flex',
         justifyContent: 'flex-end',
       }}
@@ -52,39 +59,54 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
         onClick={(e) => e.stopPropagation()}
         style={{
           width: isMobile ? '100vw' : widthMap[size],
-          height: '100vh',
-          maxHeight: '100vh',
-          backgroundColor: 'var(--bg-surface)',
+          height: '100dvh',
+          maxHeight: '100dvh',
+          backgroundColor: 'var(--bg-panel)',
           color: 'var(--text-primary)',
           boxShadow: 'var(--e4)',
           display: 'flex',
           flexDirection: 'column',
+          overflow: 'hidden',
+          position: 'relative',
           animation: 'slideIn var(--dur-base) var(--ease-emphasized)',
         }}
       >
-        {/* Header */}
+        {/* Header (Sticky, solid panel background, never scrolls away) */}
         <div
           style={{
+            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
             padding: '16px 20px',
+            background: 'var(--bg-panel)',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{title}</h3>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close drawer"
+            title="Close drawer"
+            className="kvj-drawer-close"
             style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              fontSize: 20,
+              background: 'var(--bg-sunken)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
+              fontSize: 18,
               cursor: 'pointer',
               lineHeight: 1,
-              padding: 4,
+              padding: '6px',
+              minWidth: 44,
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 'var(--radius-sm)',
             }}
           >
             ×
@@ -98,12 +120,16 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
         {footer && (
           <div
             style={{
+              flexShrink: 0,
+              position: 'sticky',
+              bottom: 0,
+              zIndex: 20,
               padding: '14px 20px',
               borderTop: '1px solid var(--border)',
               display: 'flex',
               justifyContent: 'flex-end',
               gap: 8,
-              background: 'var(--bg-sunken)',
+              background: 'var(--bg-panel)',
             }}
           >
             {footer}

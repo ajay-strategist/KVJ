@@ -474,7 +474,7 @@ export function ChatChannels() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 800,
                       color: 'var(--text-muted)',
                       textTransform: 'uppercase',
@@ -527,7 +527,7 @@ export function ChatChannels() {
                                 )}
                                 {c.name}
                               </span>
-                              {c.isMuted && <span style={{ fontSize: 11, opacity: 0.6 }}>🔇</span>}
+                              {c.isMuted && <span style={{ fontSize: 12, opacity: 0.6 }}>🔇</span>}
                             </button>
                           );
                         })
@@ -568,7 +568,7 @@ export function ChatChannels() {
                 </h3>
                 {activeChannel.type === 'announcement' && <Badge tone="warning">Announcements Only</Badge>}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                 {activeChannel.description || 'Enterprise collaboration room'} · {activeChannel.membersCount} members
               </div>
             </div>
@@ -664,9 +664,9 @@ export function ChatChannels() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                       {/* Name + Time */}
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
                         <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{msg.senderName}</span>
-                        <span style={{ fontSize: 9, opacity: 0.7 }}>{msg.senderRole}</span>
+                        <span style={{ fontSize: 12, opacity: 0.7 }}>{msg.senderRole}</span>
                         <span>{msg.createdAt}</span>
                         {msg.isPinned && <span>📌</span>}
                         {msg.isEdited && <span style={{ fontStyle: 'italic' }}>(edited)</span>}
@@ -679,7 +679,7 @@ export function ChatChannels() {
                           borderRadius: '6px',
                           background: 'var(--bg-sunken)',
                           borderLeft: '3px solid var(--brand)',
-                          fontSize: 11,
+                          fontSize: 12,
                           color: 'var(--text-muted)',
                           marginBottom: 4,
                           maxWidth: 320,
@@ -728,7 +728,7 @@ export function ChatChannels() {
                               <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {msg.fileAttachment.name}
                               </div>
-                              <div style={{ fontSize: 10, opacity: 0.8 }}>{msg.fileAttachment.size}</div>
+                              <div style={{ fontSize: 12, opacity: 0.8 }}>{msg.fileAttachment.size}</div>
                             </div>
                             <Button
                               size="xs"
@@ -749,7 +749,7 @@ export function ChatChannels() {
                             type="button"
                             onClick={() => hookToggleReaction(msg.id as UUID, emoji)}
                             style={{
-                              fontSize: 11,
+                              fontSize: 12,
                               padding: '2px 7px',
                               borderRadius: 999,
                               border: users.includes(user?.fullName || '') ? '1px solid var(--brand)' : '1px solid var(--border)',
@@ -782,14 +782,14 @@ export function ChatChannels() {
                         <button
                           type="button"
                           onClick={() => setReplyToMessage({ id: msg.id, senderName: msg.senderName, text: msg.text })}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--brand)', fontWeight: 700 }}
                         >
                           Reply
                         </button>
                         <button
                           type="button"
                           onClick={() => hookTogglePinMessage(msg.id as UUID)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}
                         >
                           {msg.isPinned ? 'Unpin' : 'Pin'}
                         </button>
@@ -798,20 +798,20 @@ export function ChatChannels() {
                             <button
                               type="button"
                               onClick={() => { setEditingMessageId(msg.id); setText(msg.text); }}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => hookDeleteMessage(msg.id as UUID)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--status-danger)' }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--status-danger)' }}
                             >
                               Delete
                             </button>
                           </>
                         )}
-                        {isMe && <span style={{ fontSize: 11, color: 'var(--brand)', marginLeft: 4 }}>✓✓</span>}
+                        {isMe && <span style={{ fontSize: 12, color: 'var(--brand)', marginLeft: 4 }}>✓✓</span>}
                       </div>
                     </div>
                   </div>
@@ -1132,7 +1132,7 @@ export function ChatChannels() {
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                       {activeChannel.dmParticipant.designation}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--brand)', marginTop: 2 }}>
                       {activeChannel.dmParticipant.departmentId || '—'}
                     </div>
                   </div>
@@ -1180,7 +1180,7 @@ export function ChatChannels() {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <strong>{pm.senderName}</strong>
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{pm.createdAt}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pm.createdAt}</span>
                       </div>
                       <div>{pm.text}</div>
                     </div>
@@ -1267,7 +1267,7 @@ export function ChatChannels() {
                 <Avatar name={`${emp.firstName} ${emp.lastName}`} src={emp.avatarUrl} size={36} />
                 <div>
                   <strong style={{ display: 'block', fontSize: 13 }}>{emp.firstName} {emp.lastName}</strong>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{emp.designation} · {emp.departmentId || '—'}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{emp.designation} · {emp.departmentId || '—'}</span>
                 </div>
               </button>
             ))

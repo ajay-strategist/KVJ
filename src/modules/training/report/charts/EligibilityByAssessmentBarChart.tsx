@@ -18,7 +18,7 @@ interface EligibilityByAssessmentBarChartProps {
 
 export const EligibilityByAssessmentBarChart: React.FC<EligibilityByAssessmentBarChartProps> = ({
   assessments,
-  title = '📊 Cleared Students per Assessment',
+  title = 'Cleared Students per Assessment',
   caption = 'Number of students who cleared each prerequisite assessment',
 }) => {
   if (!assessments || assessments.length === 0) {

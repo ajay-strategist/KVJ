@@ -16,6 +16,7 @@ import { PageHeader, Card, Button, Badge, WorkflowStrip } from '../../../shared/
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
+import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
 import { todayISO, addDaysISO } from '../../../shared/utils/date';
@@ -65,8 +66,13 @@ export function TaskBoard({
 }) {
   const { user } = useAuth();
   const { toast } = useNotifications();
+  const { prompt } = useDialog();
   const { can } = usePermissions();
   const isSupervisorRole = can('task', 'approve');
+  // Assignment/creation approval is the CEO's decision (Admin included as the
+  // system superuser). Managers can still review finished work below, but they
+  // cannot approve who a task is assigned to.
+  const canApproveAssignment = ['CEO', 'ADMIN'].includes((user?.role || '').toUpperCase());
 
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Task' | 'Project Task'>('all');
   const [dateWindowFilter, setDateWindowFilter] = useState<'next_3_days' | 'today' | 'all'>('all');
@@ -278,8 +284,10 @@ export function TaskBoard({
     // Only link a project when one is explicitly chosen. A task with no project
     // is an Office Task — it must NOT be forced into the first project.
     const proj = projects.find((p: any) => p.title === values.projectName || p.id === values.projectId);
-    const assignee = employees.find((e) => `${e.firstName} ${e.lastName}` === values.assignee || e.id === values.assigneeId);
-    const supervisor = employees.find((e) => `${e.firstName} ${e.lastName}` === values.supervisor || e.id === values.supervisorId);
+    // Assignee/Supervisor selects carry the employee id as their value (matching
+    // by name silently self-assigned when names didn't line up exactly).
+    const assignee = employees.find((e) => e.id === values.assignee || e.id === values.assigneeId);
+    const supervisor = employees.find((e) => e.id === values.supervisor || e.id === values.supervisorId);
 
     // If supervisor is not explicitly selected, assigning employee is automatically the supervisor
     const finalSupervisorId = supervisor ? supervisor.id : user?.id;
@@ -321,9 +329,9 @@ export function TaskBoard({
       toast({ 
         variant: approvalStatus ? 'warning' : 'success', 
         title: approvalStatus ? 'Assignment Pending Approval' : 'Task Created', 
-        message: approvalStatus 
-          ? `Assignment request sent to Manager/Admin/CEO queue for approval.` 
-          : `Task "${values.name}" created successfully.` 
+        message: approvalStatus
+          ? `Assignment sent to the CEO for approval.`
+          : `Task "${values.name}" created successfully.`
       });
       setCreateTaskOpen(false);
     } else {
@@ -497,10 +505,16 @@ export function TaskBoard({
     const updatedName = (values.name as string) || editingTask.name;
     const updatedCategory = (values.category as any) || editingTask.category;
     const updatedProjectName = (values.projectName as string) || editingTask.projectName;
-    const updatedAssignee = (values.assignee as string) || editingTask.assignee;
-    const updatedSupervisor = (values.supervisor as string) || editingTask.supervisor;
+    // Assignee/Supervisor selects carry employee ids as their value.
+    const updatedAssigneeId = (values.assignee as string) ?? editingTask.assigneeId ?? '';
+    const updatedSupervisorId = (values.supervisor as string) ?? editingTask.supervisorId ?? '';
     const updatedDueDate = (values.dueDate as string) || editingTask.dueDate;
     const updatedStatus = (values.status as TaskStatus) || editingTask.status;
+
+    const assigneeEmp = employees.find((e) => e.id === updatedAssigneeId);
+    const supervisorEmp = employees.find((e) => e.id === updatedSupervisorId);
+    const updatedAssignee = assigneeEmp ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}` : editingTask.assignee;
+    const updatedSupervisor = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : editingTask.supervisor;
 
     setTasksList((prev) =>
       prev.map((t) =>
@@ -511,7 +525,9 @@ export function TaskBoard({
               category: updatedCategory,
               projectName: updatedProjectName,
               assignee: updatedAssignee,
+              assigneeId: assigneeEmp ? assigneeEmp.id : t.assigneeId,
               supervisor: updatedSupervisor,
+              supervisorId: supervisorEmp ? supervisorEmp.id : t.supervisorId,
               dueDate: updatedDueDate,
               status: updatedStatus,
             }
@@ -528,8 +544,6 @@ export function TaskBoard({
     };
 
     try {
-      const assigneeEmp = employees.find((e) => `${e.firstName} ${e.lastName}` === updatedAssignee);
-      const supervisorEmp = employees.find((e) => `${e.firstName} ${e.lastName}` === updatedSupervisor);
       await updateTask(editingTask.id, {
         title: updatedName,
         dueDate: updatedDueDate,
@@ -563,14 +577,12 @@ export function TaskBoard({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <PageHeader
-        title="Task Operations & Approval Workflow"
-        subtitle="Manage office & project tasks, task creation approval, assignee acceptance, and time entry reviews"
-        actions={<Button onClick={() => setCreateTaskOpen(true)}>➕ Create Task</Button>}
-      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+        <Button onClick={() => setCreateTaskOpen(true)}>➕ Create Task</Button>
+      </div>
 
-      {/* ── Pending Task Approvals Banner (Managers/CEO/Admin) ── */}
-      {isSupervisorRole && pendingApprovalTasks.length > 0 && (
+      {/* ── Pending Task Assignment Approvals Banner (CEO/Admin only) ── */}
+      {canApproveAssignment && pendingApprovalTasks.length > 0 && (
         <Card style={{ borderLeft: '4px solid var(--status-warning)', background: 'var(--status-warning-bg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -595,7 +607,7 @@ export function TaskBoard({
               >
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{pt.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     Assigned to: <strong>{pt.assignee}</strong> · Category: {pt.category} · Due: {pt.dueDate}
                   </div>
                 </div>
@@ -612,17 +624,17 @@ export function TaskBoard({
       {/* KPI Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks Active</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks Active</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--status-danger)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due Today</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)} hrs</div>
         </Card>
       </div>
@@ -782,7 +794,7 @@ export function TaskBoard({
                       Project: <strong>{t.projectName}</strong> · Assignee: <strong>{t.assignee}</strong>{t.supervisor ? <> · Supervisor: <strong>{t.supervisor}</strong></> : null}
                     </div>
                     {t.approvedBy && (
-                      <div style={{ fontSize: 11, color: 'var(--status-success)', marginTop: 3 }}>
+                      <div style={{ fontSize: 12, color: 'var(--status-success)', marginTop: 3 }}>
                         ✓ Approved by {t.approvedBy} {t.approvedAt && `(${t.approvedAt})`}
                       </div>
                     )}
@@ -791,7 +803,7 @@ export function TaskBoard({
                       <div style={{ marginTop: 6, fontSize: 12, color: timers[t.id]?.isRunning ? 'var(--status-success)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
                         <span>⏱️ Active Work Timer:</span>
                         <span style={{ fontVariantNumeric: 'tabular-nums', background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>{getTaskDurationString(t.id)}</span>
-                        {timers[t.id]?.isRunning ? <span style={{ fontSize: 10 }}>● Running</span> : <span style={{ fontSize: 10 }}>Paused</span>}
+                        {timers[t.id]?.isRunning ? <span style={{ fontSize: 12 }}>● Running</span> : <span style={{ fontSize: 12 }}>Paused</span>}
                       </div>
                     )}
                     {t.approvalStatus === 'rework' && t.reworkNotes && (
@@ -819,7 +831,7 @@ export function TaskBoard({
                             </Button>
                           );
                         } else {
-                          return <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Requires CEO Approval</span>;
+                          return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Requires CEO Approval</span>;
                         }
                       }
 
@@ -900,9 +912,13 @@ export function TaskBoard({
 
                     {/* Action: Rework Task (Manager / Supervisor) */}
                     {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
-                      <Button size="sm" variant="danger" onClick={() => {
-                        const notes = prompt("Enter rework reason:");
-                        if (notes) handleRequestRework(t, notes);
+                      <Button size="sm" variant="danger" onClick={async () => {
+                        const { ok, reason } = await prompt({
+                          title: 'Request rework',
+                          message: 'Enter the reason this task needs rework:',
+                          variant: 'confirm',
+                        });
+                        if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
                       }}>
                         🔄 Rework
                       </Button>
@@ -941,7 +957,7 @@ export function TaskBoard({
                           key={e.id}
                           style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            fontSize: 11.5, padding: '4px 8px', background: 'var(--bg-sunken)',
+                            fontSize: 12, padding: '4px 8px', background: 'var(--bg-sunken)',
                             borderRadius: 'var(--radius-xs)',
                           }}
                         >
@@ -977,12 +993,12 @@ export function TaskBoard({
           <SelectField
             name="assignee"
             label="Assignee Name"
-            options={[{ value: '', label: 'Unassigned' }, ...employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` }))]}
+            options={[{ value: '', label: 'Unassigned' }, ...employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` }))]}
           />
           <SelectField
             name="supervisor"
             label="Supervisor Name"
-            options={[{ value: '', label: 'None' }, ...employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` }))]}
+            options={[{ value: '', label: 'None' }, ...employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` }))]}
           />
           <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -1013,8 +1029,8 @@ export function TaskBoard({
               name: editingTask.name,
               category: editingTask.category,
               projectName: editingTask.projectName || '',
-              assignee: editingTask.assignee || '',
-              supervisor: editingTask.supervisor || '',
+              assignee: editingTask.assigneeId || '',
+              supervisor: editingTask.supervisorId || '',
               dueDate: editingTask.dueDate || todayStr,
               status: editingTask.status,
             }}
@@ -1033,12 +1049,12 @@ export function TaskBoard({
             <SelectField
               name="assignee"
               label="Assignee Name"
-              options={employees.length > 0 ? employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` })) : [{ value: editingTask.assignee, label: editingTask.assignee }]}
+              options={[{ value: '', label: 'Unassigned' }, ...(employees.length > 0 ? employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` })) : (editingTask.assigneeId ? [{ value: editingTask.assigneeId, label: editingTask.assignee }] : []))]}
             />
             <SelectField
               name="supervisor"
               label="Supervisor Name"
-              options={employees.length > 0 ? employees.map((e) => ({ value: `${e.firstName} ${e.lastName}`, label: `${e.firstName} ${e.lastName}` })) : [{ value: editingTask.supervisor, label: editingTask.supervisor }]}
+              options={[{ value: '', label: 'None' }, ...(employees.length > 0 ? employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` })) : (editingTask.supervisorId ? [{ value: editingTask.supervisorId, label: editingTask.supervisor }] : []))]}
             />
             <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
             <SelectField

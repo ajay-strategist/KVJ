@@ -395,10 +395,6 @@ export function TaskWorklogView({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <PageHeader
-        title="Task Worklog & Time Entries Audit"
-        subtitle="Role-differentiated daily work logs, hours worked, and supervisor approval workflow"
-      />
 
       {/* ── Work Sessions timeline ── */}
       <Card>
@@ -413,7 +409,7 @@ export function TaskWorklogView({
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase' }}>
+              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
                 {['Employee', 'Supervisor', 'Work Code', 'Work / Project', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Duration', 'Status'].map((h) => (
                   <th key={h} style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
@@ -453,17 +449,17 @@ export function TaskWorklogView({
       {/* KPI Cards Banner */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Logged Entries</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Logged Entries</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{filteredLogs.length} Entries</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursLogged.toFixed(1)} hrs</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--status-warning)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Pending Approvals</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Pending Approvals</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-warning)', marginTop: 4 }}>⏳ {pendingCount} Pending</div>
         </Card>
       </div>
@@ -529,7 +525,7 @@ export function TaskWorklogView({
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
                     📅 {log.date} — {log.employeeName}
                     {log.isSynthetic && (
-                      <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, color: 'var(--brand)', background: 'var(--brand-subtle)', padding: '2px 6px', borderRadius: 4 }}>
+                      <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: 'var(--brand)', background: 'var(--brand-subtle)', padding: '2px 6px', borderRadius: 4 }}>
                         LIVE TRACKING
                       </span>
                     )}
@@ -557,7 +553,7 @@ export function TaskWorklogView({
                       ⏱ {(log.durationHrs || 0).toFixed(1)} hrs
                     </div>
                     {isSupervisor && log.reviewStatus === 'Pending Review' && (
-                      <Button size="sm" onClick={() => handleApprove(log.id)} style={{ fontSize: 11 }}>
+                      <Button size="sm" onClick={() => handleApprove(log.id)} style={{ fontSize: 12 }}>
                         ✓ Approve
                       </Button>
                     )}

@@ -11,7 +11,7 @@ import type { Batch } from '../training.repository';
 import { cleanBatchCode } from '../utils/batch-formatter';
 
 export function StudentAttendance() {
-  const { batches, enrollments, students, loading } = useTraining();
+  const { batches, enrollments, students, loading } = useTraining({ fetchCourses: false });
   const { toast } = useNotifications();
 
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);

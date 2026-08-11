@@ -76,13 +76,24 @@ export function DataTable<T>({
 
   if (loading) {
     return (
-      <div className="kvj-card"><div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={40} />)}
-      </div></div>
+      <div className="kvj-card">
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} height={40} />
+          ))}
+        </div>
+      </div>
     );
   }
   if (rows.length === 0) {
-    return <div className="kvj-card"><EmptyState title={emptyTitle} message={emptyMessage} /></div>;
+    return (
+      <div className="kvj-card">
+        <EmptyState
+          title={emptyTitle}
+          message={emptyMessage || 'No matching records found. Try adjusting your search query or active filter settings.'}
+        />
+      </div>
+    );
   }
 
   // Mobile: stacked cards (label:value) — critical for approvals/expenses on phones.
@@ -90,12 +101,19 @@ export function DataTable<T>({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {pageRows.map((row) => (
-          <div key={rowKey(row)} className="kvj-card kvj-card--hover" onClick={() => onRowClick?.(row)} style={{ cursor: onRowClick ? 'pointer' : 'default' }}>
+          <div
+            key={rowKey(row)}
+            className="kvj-card kvj-card--hover"
+            onClick={() => onRowClick?.(row)}
+            style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+          >
             <div className="kvj-card__body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {columns.map((c) => (
                 <div key={c.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
                   <span style={{ color: 'var(--text-muted)' }}>{c.header}</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{c.render ? c.render(row) : String(c.accessor?.(row) ?? '')}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                    {c.render ? c.render(row) : String(c.accessor?.(row) ?? '')}
+                  </span>
                 </div>
               ))}
             </div>
@@ -106,16 +124,47 @@ export function DataTable<T>({
     );
   }
 
+  const allPageSelected = pageRows.length > 0 && pageRows.every((r) => selected.has(rowKey(r)));
+
+  const toggleSelectAll = () => {
+    const pageIds = pageRows.map(rowKey);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        pageIds.forEach((id) => next.add(id));
+      }
+      onSelectionChange?.([...next]);
+      return next;
+    });
+  };
+
   return (
     <div className="kvj-card" style={{ overflow: 'hidden' }}>
       <div style={{ overflowX: 'auto', maxHeight: 520 }}>
         <table className="kvj-table">
           <thead>
             <tr>
-              {selectable && <th style={{ width: 40 }} />}
+              {selectable && (
+                <th style={{ width: 40, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={allPageSelected}
+                    onChange={toggleSelectAll}
+                    aria-label="Select all visible rows"
+                    title="Select all visible rows on this page"
+                  />
+                </th>
+              )}
               {columns.map((c) => (
-                <th key={c.key} onClick={() => toggleSort(c)} style={{ cursor: c.sortable ? 'pointer' : 'default', textAlign: c.numeric ? 'right' : 'left' }}>
-                  {c.header}{sort?.key === c.key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+                <th
+                  key={c.key}
+                  onClick={() => toggleSort(c)}
+                  style={{ cursor: c.sortable ? 'pointer' : 'default', textAlign: c.numeric ? 'right' : 'left' }}
+                >
+                  {c.header}
+                  {sort?.key === c.key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
                 </th>
               ))}
             </tr>
@@ -126,13 +175,23 @@ export function DataTable<T>({
               return (
                 <tr key={id} onClick={() => onRowClick?.(row)} style={{ cursor: onRowClick ? 'pointer' : 'default' }}>
                   {selectable && (
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={selected.has(id)} onChange={() => toggleSelect(id)} />
+                    <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(id)}
+                        onChange={() => toggleSelect(id)}
+                        aria-label={`Select row ${id}`}
+                      />
                     </td>
                   )}
-                  {columns.map((c) => (
-                    <td key={c.key} className={c.numeric ? 'kvj-num' : ''}>{c.render ? c.render(row) : String(c.accessor?.(row) ?? '')}</td>
-                  ))}
+                  {columns.map((c) => {
+                    const rawVal = c.accessor ? String(c.accessor(row) ?? '') : undefined;
+                    return (
+                      <td key={c.key} className={c.numeric ? 'kvj-num' : ''} title={rawVal}>
+                        {c.render ? c.render(row) : (rawVal ?? '')}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}
@@ -146,11 +205,41 @@ export function DataTable<T>({
 
 function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderTop: '1px solid var(--border)', fontSize: 13, color: 'var(--text-secondary)' }}>
-      <span>Page {page} of {totalPages}</span>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '10px 14px',
+        borderTop: '1px solid var(--border)',
+        fontSize: 13,
+        color: 'var(--text-secondary)',
+      }}
+    >
+      <span>
+        Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+      </span>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button className="kvj-btn kvj-btn--secondary kvj-btn--sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>Prev</button>
-        <button className="kvj-btn kvj-btn--secondary kvj-btn--sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>Next</button>
+        <button
+          className="kvj-btn kvj-btn--secondary kvj-btn--sm"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          aria-label="Go to previous page"
+          title="Previous Page"
+          style={{ minHeight: 34, minWidth: 64 }}
+        >
+          Prev
+        </button>
+        <button
+          className="kvj-btn kvj-btn--secondary kvj-btn--sm"
+          disabled={page >= totalPages}
+          onClick={() => onChange(page + 1)}
+          aria-label="Go to next page"
+          title="Next Page"
+          style={{ minHeight: 34, minWidth: 64 }}
+        >
+          Next
+        </button>
       </div>
     </div>
   );

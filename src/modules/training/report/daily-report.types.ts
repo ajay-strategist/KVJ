@@ -18,6 +18,8 @@ export type SectionId =
   | 'final-exam-eligibility'
   | 'eligibility-charts'
   | 'final-exam-results'
+  | 'toppers-overview'
+  | 'mock-vs-final'
   | 'student-data'
   | 'progress-analytics'
   | 'risk-analysis'
@@ -105,6 +107,12 @@ export interface StudentReportRow {
   finalExamEligibility: 'Eligible' | 'Not Eligible';
   finalExamMark?: number;
   finalExamResult?: 'Passed' | 'Failed';
+  finalExamDate?: string;
+  finalExamTimeMinutes?: number;
+  mockMark?: number;
+  mockAttemptsCount?: number;
+  mockExamTimeMinutes?: number;
+  practiceTimeHours?: number;
   eligibilityReason?: string;
   remarks?: string;
 }

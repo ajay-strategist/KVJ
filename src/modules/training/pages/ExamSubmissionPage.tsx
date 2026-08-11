@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { supabase } from '../../../shared/integration/supabase';
 import { normalizeStudentKey } from '../supabase-training.repository';
+import { calculateFinalExamEligibility } from '../utils/eligibility';
+import { useTraining } from '../hooks/useTraining';
 
 export function ExamSubmissionPage() {
+  const { recordExamAttempt } = useTraining({ fetchStudents: false });
   const [phone, setPhone] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [mark, setMark] = useState<number | ''>('');
@@ -13,7 +16,9 @@ export function ExamSubmissionPage() {
   const [overwriteAllowed, setOverwriteAllowed] = useState(false);
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
 
-  const autoResult = mark !== '' ? (Number(mark) >= 50 ? 'Passed' : 'Failed') : '';
+  const [passMark, setPassMark] = useState<number>(70);
+
+  const autoResult = mark !== '' ? (Number(mark) >= passMark ? 'Passed' : 'Failed') : '';
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,30 +65,102 @@ export function ExamSubmissionPage() {
         return;
       }
 
-      // 2. Find student by phone
-      const { data: student, error: sErr } = await supabase
-        .from('flwdsk_student_records')
-        .select('*')
-        .eq('phone', normalisedPhone)
-        .is('deleted_at', null)
-        .limit(1)
-        .maybeSingle();
-
-      if (sErr || !student) {
-        setStatusMsg({ type: 'error', text: 'No registered student found with this phone number.' });
+      if (voucher.voucher_type === 'Retest' && voucher.payment_verified !== 'Verified') {
+        setStatusMsg({ type: 'error', text: 'Retest payment verification is pending. Please contact your trainer/administrator.' });
         setLoading(false);
         return;
       }
 
-      // 3. Verify voucher belongs to this student
-      // Check either student_id or assigned_student_register_no
+      // Fetch batch and course to determine dynamic course-level pass percentage
+      let dynamicPassMark = 70;
+      if (voucher.batch_id) {
+        const { data: batchData } = await supabase
+          .from('flwdsk_batches')
+          .select('course_id')
+          .eq('id', voucher.batch_id)
+          .maybeSingle();
+
+        if (batchData?.course_id) {
+          const { data: courseData } = await supabase
+            .from('flwdsk_courses')
+            .select('passPercentage, pass_percentage')
+            .eq('id', batchData.course_id)
+            .maybeSingle();
+
+          if (courseData) {
+            dynamicPassMark = courseData.passPercentage ?? courseData.pass_percentage ?? 70;
+          }
+        }
+      }
+      setPassMark(dynamicPassMark);
+
+      // 2. Find student associated with the voucher to prevent cross-batch mismatch
+      let student = null;
+      let sErr = null;
+
+      if (voucher.student_id) {
+        const { data: st, error: err } = await supabase
+          .from('flwdsk_student_records')
+          .select('*')
+          .eq('id', voucher.student_id)
+          .is('deleted_at', null)
+          .maybeSingle();
+        student = st;
+        sErr = err;
+      } else {
+        // Fallback for unassigned voucher with register no, scoped by batch ID
+        const { data: enrollments } = await supabase
+          .from('flwdsk_enrollments')
+          .select('student_id')
+          .eq('batch_id', voucher.batch_id);
+
+        const studentIdsInBatch = enrollments?.map(e => e.student_id) || [];
+
+        const { data: st, error: err } = await supabase
+          .from('flwdsk_student_records')
+          .select('*')
+          .eq('phone', normalisedPhone)
+          .in('id', studentIdsInBatch)
+          .is('deleted_at', null)
+          .maybeSingle();
+        student = st;
+        sErr = err;
+      }
+
+      if (sErr || !student) {
+        setStatusMsg({ type: 'error', text: 'No registered student found matching this phone number and voucher context.' });
+        setLoading(false);
+        return;
+      }
+
+      // 3. Verify voucher belongs to this student (identity verification check)
+      const studentPhone = normalizeStudentKey(student.phone || '');
       const belongs = voucher.student_id === student.id || 
                       normalizeStudentKey(voucher.assigned_student_register_no) === normalisedPhone;
 
-      if (!belongs) {
+      if (!belongs || studentPhone !== normalisedPhone) {
         setStatusMsg({ type: 'error', text: 'This Voucher ID does not belong to the entered phone number.' });
         setLoading(false);
         return;
+      }
+
+      // 3.5 Verify student eligibility for final exam
+      if (voucher.batch_id) {
+        const { data: eligibilityRules } = await supabase
+          .from('flwdsk_batch_eligibility_rules')
+          .select('*')
+          .eq('batch_id', voucher.batch_id)
+          .maybeSingle();
+
+        const eligResult = calculateFinalExamEligibility(student, eligibilityRules);
+        if (!eligResult.eligible) {
+          setStatusMsg({
+            type: 'error',
+            text: `You are not eligible to submit this exam. Reason: ${eligResult.reason}`
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       // 4. Check if already submitted
@@ -94,51 +171,24 @@ export function ExamSubmissionPage() {
         return;
       }
 
-      // 5. Determine attempt type and number
+      // 5. Submit exam attempt via Training Service
       const attemptType = voucher.voucher_type === 'Retest' ? 'Retest' : 'Initial';
-      const { data: existingAttempts } = await supabase
-        .from('flwdsk_exam_attempts')
-        .select('attempt_number')
-        .eq('student_id', student.id)
-        .eq('attempt_type', attemptType);
+      const finalResult = Number(mark) >= dynamicPassMark ? 'Passed' : 'Failed';
 
-      const attemptNum = (existingAttempts?.length ?? 0) + 1;
+      const res = await recordExamAttempt(
+        student.id,
+        voucher.batch_id,
+        attemptType,
+        Number(mark),
+        voucher.voucher_code,
+        screenshot || null,
+        'Student',
+        overwriteAllowed || forceOverwrite
+      );
 
-      // 6. Submit exam attempt
-      const attemptPayload = {
-        student_id: student.id,
-        batch_id: voucher.batch_id,
-        attempt_type: attemptType,
-        attempt_number: attemptNum,
-        mark: Number(mark),
-        result: autoResult,
-        screenshot_url: screenshot || null,
-        submitted_by: 'Student',
-        remarks: 'Uploaded by student via secure portal.'
-      };
+      if (!res.ok) throw new Error(res.error);
 
-      const { error: attemptErr } = await supabase
-        .from('flwdsk_exam_attempts')
-        .insert(attemptPayload);
-
-      if (attemptErr) throw attemptErr;
-
-      // 7. Update voucher status
-      await supabase
-        .from('flwdsk_vouchers')
-        .update({ status: 'Redeemed', sent_status: 'Sent' })
-        .eq('id', voucher.id);
-
-      // 8. Log audit
-      await supabase.from('flwdsk_audit_logs').insert({
-        action: 'Exam Submission',
-        entity_type: 'exam_attempts',
-        entity_id: student.id,
-        new_value: { mark, result: autoResult, attemptType, attemptNum },
-        reason: 'Student self-submission'
-      });
-
-      setStatusMsg({ type: 'success', text: `Success! Your final exam result (${autoResult}) has been uploaded successfully.` });
+      setStatusMsg({ type: 'success', text: `Success! Your final exam result (${finalResult}) has been uploaded successfully.` });
       // Reset form fields
       setPhone('');
       setVoucherCode('');
@@ -169,8 +219,8 @@ export function ExamSubmissionPage() {
         width: '100%',
         maxWidth: '480px',
         background: 'rgba(255, 255, 255, 0.04)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backdropFilter: 'blur(var(--glass-blur, 12px))',
+        WebkitBackdropFilter: 'blur(var(--glass-blur, 12px))',
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '24px',
         padding: '36px',
@@ -197,7 +247,7 @@ export function ExamSubmissionPage() {
             lineHeight: '1.4',
             marginBottom: '24px',
             background: statusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : statusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-            border: `1px solid ${statusMsg.type === 'success' ? '#10b981' : statusMsg.type === 'error' ? '#ef4444' : '#3b82f6'}`,
+            border: `1px solid ${statusMsg.type === 'success' ? 'var(--status-success)' : statusMsg.type === 'error' ? 'var(--status-danger)' : 'var(--brand)'}`,
             color: statusMsg.type === 'success' ? '#34d399' : statusMsg.type === 'error' ? '#f87171' : '#60a5fa',
           }}>
             {statusMsg.text}
@@ -210,12 +260,12 @@ export function ExamSubmissionPage() {
                     validateAndSubmit(true);
                   }}
                   style={{
-                    background: '#ef4444',
+                    background: 'var(--status-danger)',
                     border: 'none',
                     borderRadius: '6px',
                     color: '#ffffff',
                     padding: '6px 12px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 700,
                     cursor: 'pointer'
                   }}
@@ -234,7 +284,7 @@ export function ExamSubmissionPage() {
                     borderRadius: '6px',
                     color: '#ffffff',
                     padding: '6px 12px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer'
                   }}
@@ -297,7 +347,39 @@ export function ExamSubmissionPage() {
                 boxSizing: 'border-box'
               }}
               onFocus={(e) => e.target.style.borderColor = '#818cf8'}
-              onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+              onBlur={async (e) => {
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                if (!voucherCode.trim()) return;
+                try {
+                  const { data: voucher } = await supabase
+                    .from('flwdsk_vouchers')
+                    .select('batch_id')
+                    .eq('voucher_code', voucherCode.trim())
+                    .maybeSingle();
+
+                  if (voucher?.batch_id) {
+                    const { data: batch } = await supabase
+                      .from('flwdsk_batches')
+                      .select('course_id')
+                      .eq('id', voucher.batch_id)
+                      .maybeSingle();
+
+                    if (batch?.course_id) {
+                      const { data: course } = await supabase
+                        .from('flwdsk_courses')
+                        .select('passPercentage, pass_percentage')
+                        .eq('id', batch.course_id)
+                        .maybeSingle();
+
+                      if (course) {
+                        setPassMark(course.passPercentage ?? course.pass_percentage ?? 70);
+                      }
+                    }
+                  }
+                } catch (err) {
+                  console.warn('Failed to resolve pass mark for voucher:', err);
+                }
+              }}
             />
           </div>
 

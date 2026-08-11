@@ -6,6 +6,8 @@ import { Form, TextField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../../shared/integration/supabase';
+import { calculateFinalExamEligibility } from '../utils/eligibility';
+import { useTraining } from '../hooks/useTraining';
 
 export interface ExamRecord {
   id: string;
@@ -14,6 +16,8 @@ export interface ExamRecord {
   email: string;
   college: string;
   batch: string;
+  /** The batch_id derived from the student's enrollment — used to scope exam-attempt inserts. */
+  batchId?: string;
   attendancePct: number;
   voucherCode?: string;
   voucherStatus: 'Unassigned' | 'Assigned' | 'Redeemed' | 'Expired';
@@ -23,11 +27,16 @@ export interface ExamRecord {
   isRetestEligible?: boolean;
   retestStatus?: 'None' | 'Pending' | 'Completed';
   certificateEligible: boolean;
+  passMark: number;
+  isExamEligible: boolean;
+  eligibilityReason: string;
+  eligibilityResult: any;
 }
 
 export function FinalExamModule() {
   const { user } = useAuth();
   const { toast } = useNotifications();
+  const { issueVoucher, deleteVoucher, recordExamAttempt } = useTraining({ fetchStudents: false });
 
   const [records, setRecords] = useState<ExamRecord[]>([]);
   const [search, setSearch] = useState('');
@@ -63,7 +72,12 @@ export function FinalExamModule() {
       }
 
       const { data: dbVouchers } = await supabase.from('flwdsk_vouchers').select('*');
-      const { data: dbAttempts } = await supabase.from('flwdsk_exam_attempts').select('*');
+      // F-01: exclude soft-deleted attempts so they never affect score computation.
+      const { data: dbAttempts } = await supabase.from('flwdsk_exam_attempts').select('*').is('deleted_at', null);
+      const { data: dbBatches } = await supabase.from('flwdsk_batches').select('*');
+      const { data: dbCourses } = await supabase.from('flwdsk_courses').select('*');
+      const { data: dbEnrollments } = await supabase.from('flwdsk_enrollments').select('*');
+      const { data: dbRules } = await supabase.from('flwdsk_batch_eligibility_rules').select('*');
 
       if (dbStudents && dbStudents.length > 0) {
         const mapped: ExamRecord[] = dbStudents.map((s: any) => {
@@ -76,16 +90,29 @@ export function FinalExamModule() {
           const initialAttempts = studentAttempts.filter(a => a.attempt_type === 'Initial');
           const retestAttempts = studentAttempts.filter(a => a.attempt_type === 'Retest');
           
-          const orig = initialAttempts.length > 0 ? Math.max(...initialAttempts.map(a => a.mark)) : (fields.originalScore ?? fields.ass1 ?? 0);
-          const retest = retestAttempts.length > 0 ? Math.max(...retestAttempts.map(a => a.mark)) : fields.retestScore;
+          const orig = initialAttempts.length > 0
+            ? Math.max(...initialAttempts.map(a => a.mark))
+            : (fields.originalScore !== undefined ? fields.originalScore : (fields.finalExam !== undefined ? fields.finalExam : undefined));
+          const retest = retestAttempts.length > 0
+            ? Math.max(...retestAttempts.map(a => a.mark))
+            : (fields.retestScore !== undefined ? fields.retestScore : undefined);
           
-          const finalScore = studentAttempts.length > 0 ? Math.max(...scores) : (fields.finalExam ?? 0);
+          const finalScore = studentAttempts.length > 0
+            ? Math.max(...scores)
+            : (fields.finalExam !== undefined ? fields.finalExam : (fields.originalScore !== undefined ? fields.originalScore : undefined));
           
           const initialV = dbVouchers?.find(v => v.student_id === s.id && v.voucher_type === 'Initial');
           const retestV = dbVouchers?.find(v => v.student_id === s.id && v.voucher_type === 'Retest');
 
           const attPct = fields.attendancePct ?? 85;
-          const passMark = 50;
+
+          const enrollment = dbEnrollments?.find(e => e.student_id === s.id);
+          const studentBatch = enrollment ? dbBatches?.find(b => b.id === enrollment.batch_id) : null;
+          const studentCourse = studentBatch ? dbCourses?.find(c => c.id === studentBatch.course_id) : null;
+          const passMark = studentCourse?.passPercentage ?? studentCourse?.pass_percentage ?? 70;
+
+          const batchRules = studentBatch ? dbRules?.find(r => r.batch_id === studentBatch.id) : null;
+          const eligRes = calculateFinalExamEligibility(s, batchRules);
 
           return {
             id: s.id,
@@ -94,21 +121,31 @@ export function FinalExamModule() {
             email: s.email || '',
             college: fields.college || 'Christ College',
             batch: fields.department || 'BBA',
+            // F-02: carry the authoritative batch_id from the enrollment so trainer
+            // override inserts can be correctly batch-scoped.
+            batchId: enrollment?.batch_id ?? undefined,
             attendancePct: attPct,
             voucherCode: initialV?.voucher_code || fields.voucherId || '',
             voucherStatus: (initialV?.status || fields.voucherStatus || 'Unassigned') as any,
             originalScore: orig,
             retestScore: retest,
             finalScore: finalScore,
-            isRetestEligible: finalScore < passMark,
+            isRetestEligible: finalScore !== undefined ? finalScore < passMark : false,
             retestStatus: retestV ? 'Pending' : (retest !== undefined ? 'Completed' : 'None'),
-            certificateEligible: finalScore >= passMark && attPct >= 80,
+            certificateEligible: finalScore !== undefined
+              ? (finalScore >= passMark && (!eligRes.attendanceConsidered || (eligRes.attendanceEligible ?? true)))
+              : false,
+            passMark: passMark,
+            isExamEligible: eligRes.eligible,
+            eligibilityReason: eligRes.reason,
+            eligibilityResult: eligRes,
           };
         });
         setRecords(mapped);
       }
     } catch (e) {
       console.warn('Failed to load students for final exams:', e);
+      toast({ variant: 'error', title: 'Load Failed', message: 'Could not load the final exam list. Please refresh and try again.' });
     }
   };
 
@@ -123,6 +160,7 @@ export function FinalExamModule() {
         .from('flwdsk_exam_attempts')
         .select('*')
         .eq('student_id', record.id)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       const { data: emails } = await supabase
@@ -197,23 +235,18 @@ export function FinalExamModule() {
     const r = records.find(rec => rec.id === id);
     if (!r) return;
 
-    try {
-      await supabase.from('flwdsk_vouchers').insert({
-        student_id: id,
-        voucher_type: 'Initial',
-        voucher_code: code,
-        status: 'Assigned',
-        assigned_date: new Date().toISOString(),
-        assigned_by: user?.id || null
+    if (!r.isExamEligible) {
+      toast({
+        variant: 'error',
+        title: 'Voucher Assignment Blocked',
+        message: `Cannot assign final exam voucher: ${r.eligibilityReason}`
       });
+      return;
+    }
 
-      await supabase.from('flwdsk_audit_logs').insert({
-        action: 'Voucher Assignment',
-        entity_type: 'vouchers',
-        entity_id: id,
-        new_value: { voucherCode: code, type: 'Initial' },
-        reason: 'Manual trainer assignment'
-      });
+    try {
+      const res = await issueVoucher(id, r.batchId || '', code, 'Initial');
+      if (!res.ok) throw new Error(res.error);
 
       toast({ variant: 'success', title: 'Voucher Assigned', message: `Assigned voucher code ${code}.` });
       loadStudents();
@@ -223,19 +256,12 @@ export function FinalExamModule() {
   };
 
   const handleRevokeVoucher = async (id: string) => {
-    try {
-      await supabase
-        .from('flwdsk_vouchers')
-        .delete()
-        .eq('student_id', id)
-        .eq('voucher_type', 'Initial');
+    const r = records.find(rec => rec.id === id);
+    if (!r) return;
 
-      await supabase.from('flwdsk_audit_logs').insert({
-        action: 'Voucher Revoked',
-        entity_type: 'vouchers',
-        entity_id: id,
-        reason: 'Manual trainer revoke'
-      });
+    try {
+      const res = await deleteVoucher(id, r.batchId || '', 'Initial');
+      if (!res.ok) throw new Error(res.error);
 
       toast({ variant: 'info', title: 'Voucher Revoked' });
       loadStudents();
@@ -276,38 +302,51 @@ export function FinalExamModule() {
     const orig = values.originalScore ? Number(values.originalScore) : undefined;
     const retest = values.retestScore ? Number(values.retestScore) : undefined;
 
+    // F-02: resolve the authoritative batch_id from the ExamRecord populated during
+    // loadStudents. If it is unavailable (legacy record with no enrollment), fall back
+    // to a fresh DB lookup so the attempt is never written without a batch context.
+    let resolvedBatchId: string | null = selectedRecord.batchId ?? null;
+    if (!resolvedBatchId) {
+      const { data: enr } = await supabase
+        .from('flwdsk_enrollments')
+        .select('batch_id')
+        .eq('student_id', selectedRecord.id)
+        .limit(1)
+        .maybeSingle();
+      resolvedBatchId = enr?.batch_id ?? null;
+    }
+
+    if (!resolvedBatchId) {
+      toast({ variant: 'error', title: 'Update Failed', message: 'Could not resolve batch context for student.' });
+      return;
+    }
+
     try {
       if (orig !== undefined) {
-        await supabase.from('flwdsk_exam_attempts').insert({
-          student_id: selectedRecord.id,
-          attempt_type: 'Initial',
-          mark: orig,
-          result: orig >= 50 ? 'Passed' : 'Failed',
-          submitted_by: 'Trainer Manual Entry',
-          updated_by: user?.id || null,
-          remarks: 'Manual entry by trainer.'
-        });
+        const res = await recordExamAttempt(
+          selectedRecord.id,
+          resolvedBatchId,
+          'Initial',
+          orig,
+          null,
+          null,
+          'Trainer Manual Entry'
+        );
+        if (!res.ok) throw new Error(res.error);
       }
 
       if (retest !== undefined) {
-        await supabase.from('flwdsk_exam_attempts').insert({
-          student_id: selectedRecord.id,
-          attempt_type: 'Retest',
-          mark: retest,
-          result: retest >= 50 ? 'Passed' : 'Failed',
-          submitted_by: 'Trainer Manual Entry',
-          updated_by: user?.id || null,
-          remarks: 'Manual entry by trainer.'
-        });
+        const res = await recordExamAttempt(
+          selectedRecord.id,
+          resolvedBatchId,
+          'Retest',
+          retest,
+          null,
+          null,
+          'Trainer Manual Entry'
+        );
+        if (!res.ok) throw new Error(res.error);
       }
-
-      await supabase.from('flwdsk_audit_logs').insert({
-        action: 'Trainer Score Override',
-        entity_type: 'exam_attempts',
-        entity_id: selectedRecord.id,
-        new_value: { originalScore: orig, retestScore: retest },
-        reason: 'Trainer manual override'
-      });
 
       toast({ variant: 'success', title: 'Exam Marks Updated' });
       setMarksDrawerOpen(false);
@@ -320,20 +359,40 @@ export function FinalExamModule() {
   const handleBulkVoucherSubmit = async (values: Record<string, unknown>) => {
     const prefix = (values.prefix as string) || 'VOUCH-BATCH';
     try {
-      const unassigned = records.filter(r => !r.voucherCode);
-      for (let i = 0; i < unassigned.length; i++) {
-        const student = unassigned[i];
+      // F-03: only assign vouchers to students who are both unvouchered AND eligible.
+      // Ineligible students are logged and skipped — no DB row is written for them.
+      const eligibleUnassigned = records.filter(r => !r.voucherCode && r.isExamEligible);
+      const ineligibleSkipped = records.filter(r => !r.voucherCode && !r.isExamEligible);
+
+      if (ineligibleSkipped.length > 0) {
+        console.info(
+          `[BulkVoucher] Skipping ${ineligibleSkipped.length} ineligible student(s):`,
+          ineligibleSkipped.map(r => `${r.studentName} (${r.eligibilityReason})`)
+        );
+      }
+
+      for (let i = 0; i < eligibleUnassigned.length; i++) {
+        const student = eligibleUnassigned[i];
         const code = `${prefix}-${100 + i}`;
-        await supabase.from('flwdsk_vouchers').insert({
-          student_id: student.id,
-          voucher_type: 'Initial',
-          voucher_code: code,
-          status: 'Assigned',
-          assigned_date: new Date().toISOString(),
-          assigned_by: user?.id || null
+        const res = await issueVoucher(student.id, student.batchId || '', code, 'Initial');
+        if (!res.ok) throw new Error(res.error);
+      }
+
+      if (eligibleUnassigned.length === 0 && ineligibleSkipped.length > 0) {
+        toast({
+          variant: 'warning',
+          title: 'No Eligible Students',
+          message: `All ${ineligibleSkipped.length} unvouchered student(s) are ineligible for the final exam.`
+        });
+      } else {
+        toast({
+          variant: ineligibleSkipped.length > 0 ? 'warning' : 'success',
+          title: 'Bulk Vouchers Generated',
+          message: ineligibleSkipped.length > 0
+            ? `Assigned to ${eligibleUnassigned.length} eligible student(s). Skipped ${ineligibleSkipped.length} ineligible student(s).`
+            : `Assigned vouchers to ${eligibleUnassigned.length} student(s).`
         });
       }
-      toast({ variant: 'success', title: 'Bulk Vouchers Generated' });
       setBulkVoucherOpen(false);
       loadStudents();
     } catch (e: any) {
@@ -359,17 +418,17 @@ export function FinalExamModule() {
       {/* Summary KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
         <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Vouchers Assigned</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Vouchers Assigned</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{assignedCount} / {records.length}</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--status-warning)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Retest Eligible Students</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Retest Eligible Students</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-warning)', marginTop: 4 }}>⚠️ {retestCount} Students</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Certificate Eligible</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Certificate Eligible</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
             🎓 {records.filter((r) => r.certificateEligible).length} Eligible
           </div>
@@ -403,6 +462,7 @@ export function FinalExamModule() {
                 <th>Student</th>
                 <th>Batch</th>
                 <th>Attendance</th>
+                <th>Exam Eligibility</th>
                 <th>Voucher Code</th>
                 <th>Exam Scores</th>
                 <th>Retest Status</th>
@@ -415,13 +475,26 @@ export function FinalExamModule() {
                 <tr key={r.id}>
                   <td>
                     <div style={{ fontWeight: 700 }}>{r.studentName}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.email}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.email}</div>
                   </td>
                   <td>{r.batch}</td>
                   <td>
-                    <span style={{ fontWeight: 700, color: r.attendancePct >= 80 ? 'var(--status-success)' : 'var(--status-danger)' }}>
+                    <span style={{
+                      fontWeight: 700,
+                      color: (!r.eligibilityResult.attendanceConsidered || (r.eligibilityResult.attendanceEligible ?? true))
+                        ? 'var(--status-success)'
+                        : 'var(--status-danger)'
+                    }}>
                       {r.attendancePct}%
                     </span>
+                  </td>
+                  <td>
+                    <Badge tone={r.isExamEligible ? 'success' : 'danger'}>
+                      {r.isExamEligible ? 'Eligible' : 'Not Eligible'}
+                    </Badge>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {r.eligibilityReason}
+                    </div>
                   </td>
                   <td>
                     {r.voucherCode ? (
@@ -436,11 +509,11 @@ export function FinalExamModule() {
                     )}
                   </td>
                   <td>
-                    <div style={{ fontWeight: 800, fontSize: 14, color: (r.finalScore ?? 0) >= 50 ? 'var(--status-success)' : 'var(--status-danger)' }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: (r.finalScore ?? 0) >= r.passMark ? 'var(--status-success)' : 'var(--status-danger)' }}>
                       Final: {r.finalScore ?? '—'}%
                     </div>
                     {r.retestScore !== undefined && (
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                         Orig: {r.originalScore}% | Retest: {r.retestScore}% (Highest Used)
                       </div>
                     )}
@@ -449,7 +522,7 @@ export function FinalExamModule() {
                     {r.isRetestEligible ? (
                       <Badge tone="warning">Retest Eligible</Badge>
                     ) : (
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
                     )}
                   </td>
                   <td>
@@ -479,7 +552,14 @@ export function FinalExamModule() {
 
                       {/* Voucher Assign/Revoke */}
                       {!r.voucherCode ? (
-                        <Button size="xs" onClick={() => handleAssignVoucher(r.id)}>Assign Voucher</Button>
+                        <Button
+                          size="xs"
+                          disabled={!r.isExamEligible}
+                          title={!r.isExamEligible ? r.eligibilityReason : 'Assign final exam voucher'}
+                          onClick={() => handleAssignVoucher(r.id)}
+                        >
+                          Assign Voucher
+                        </Button>
                       ) : (
                         <>
                           <Button size="xs" variant="secondary" onClick={() => handleSendVoucherEmail(r)}>✉️ Email</Button>
@@ -506,7 +586,7 @@ export function FinalExamModule() {
         >
           <TextField name="originalScore" label="Original Exam Score (%)" placeholder="e.g. 48" />
           <TextField name="retestScore" label="Retest Score (%) (If retest taken)" placeholder="e.g. 88" />
-          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -6 }}>
             Note: System automatically selects the highest score between original and retest as final score.
           </p>
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -532,11 +612,11 @@ export function FinalExamModule() {
                       <span style={{ fontWeight: 700, fontSize: 12 }}>Attempt #{h.attempt_number} ({h.attempt_type})</span>
                       <Badge tone={h.result === 'Passed' ? 'success' : 'danger'}>{h.result} ({h.mark}%)</Badge>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                       Submitted by: {h.submitted_by} · Date: {new Date(h.created_at).toLocaleString()}
                     </div>
                     {h.screenshot_url && (
-                      <a href={h.screenshot_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'underline', display: 'inline-block', marginTop: 4 }}>
+                      <a href={h.screenshot_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'underline', display: 'inline-block', marginTop: 4 }}>
                         View Screenshot
                       </a>
                     )}
@@ -559,7 +639,7 @@ export function FinalExamModule() {
                       <span style={{ fontWeight: 650, fontSize: 12 }}>{e.mail_type}</span>
                       <Badge tone="success">{e.status}</Badge>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                       Subject: "{e.subject}" · Date: {new Date(e.created_at).toLocaleString()}
                     </div>
                   </div>
@@ -581,7 +661,7 @@ export function FinalExamModule() {
                       <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12 }}>{v.voucher_code}</span>
                       <Badge tone={v.status === 'Redeemed' ? 'success' : 'info'}>{v.voucher_type} Voucher</Badge>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                       Assigned Date: {new Date(v.assigned_date).toLocaleString()} · Dispatch: {v.sent_status}
                     </div>
                   </div>
@@ -601,9 +681,9 @@ export function FinalExamModule() {
                   <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg-sunken)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 700, fontSize: 12 }}>{a.action}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(a.created_at).toLocaleString()}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{new Date(a.created_at).toLocaleString()}</span>
                     </div>
-                    {a.reason && <div style={{ fontSize: 11, marginTop: 4 }}>Reason: <em>{a.reason}</em></div>}
+                    {a.reason && <div style={{ fontSize: 12, marginTop: 4 }}>Reason: <em>{a.reason}</em></div>}
                   </div>
                 ))}
               </div>

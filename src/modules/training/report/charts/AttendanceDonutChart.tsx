@@ -10,7 +10,7 @@ interface AttendanceDonutChartProps {
 export const AttendanceDonutChart: React.FC<AttendanceDonutChartProps> = ({
   present,
   absent,
-  title = 'V1. Attendance Breakdown',
+  title = 'Attendance Breakdown',
   caption = 'Source: Daily Session Registry',
 }) => {
   const total = present + absent;

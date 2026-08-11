@@ -138,7 +138,7 @@ export function EmployeeProfile() {
                   <Avatar name={`${manager.firstName} ${manager.lastName}`} src={manager.avatarUrl} size={28} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{manager.firstName} {manager.lastName}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{manager.designation}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{manager.designation}</div>
                   </div>
                 </div>
               </div>
@@ -158,7 +158,7 @@ export function EmployeeProfile() {
                       <Avatar name={`${rep.firstName} ${rep.lastName}`} src={rep.avatarUrl} size={28} />
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 500 }}>{rep.firstName} {rep.lastName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{rep.designation}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{rep.designation}</div>
                       </div>
                     </div>
                   ))}

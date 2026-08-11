@@ -62,6 +62,12 @@ export function LeaveBoard() {
     const start = (values.startDate as string) || todayStr;
     const end = (values.endDate as string) || start;
 
+    // End date cannot be before the start date (impossible leave range).
+    if (end < start) {
+      toast({ variant: 'error', title: 'Invalid Dates', message: 'The leave end date cannot be before the start date.' });
+      return;
+    }
+
     let certName = values.medCert ? (values.medCert as any).name : undefined;
 
     if (values.medCert) {
@@ -193,7 +199,7 @@ export function LeaveBoard() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 4,
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     color: '#059669',
                     background: '#ecfdf5',
@@ -314,7 +320,7 @@ export function LeaveBoard() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 4,
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     color: r.status === 'approved' ? '#166534' : r.status === 'rejected' ? '#991b1b' : r.status === 'cancelled' ? '#6b7280' : '#b45309',
                     background: r.status === 'approved' ? '#f0fdf4' : r.status === 'rejected' ? '#fef2f2' : r.status === 'cancelled' ? '#f3f4f6' : '#fffbeb',

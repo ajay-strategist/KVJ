@@ -5,7 +5,7 @@
  * DatePicker/TimePicker/FileUpload use native inputs now (upgradeable later).
  */
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode, type FormEvent } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode, type FormEvent } from 'react';
 import '../ui/ui.css';
 
 // ── Lightweight validation (no external dependency) ──────────────────────────
@@ -38,6 +38,10 @@ export function Form({ initial = {}, onSubmit, children }: {
   const [values, setValues] = useState<Record<string, unknown>>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rules] = useState<Map<string, Validator<never>[]>>(new Map());
+  // Guards against duplicate records from a rapid double-click / double-submit
+  // while the previous onSubmit is still running. Ref (not state) so the guard
+  // is synchronous and never depends on a re-render.
+  const submittingRef = useRef(false);
 
   const setValue = useCallback((name: string, value: unknown) => setValues((v) => ({ ...v, [name]: value })), []);
   const register = useCallback((name: string, r?: Validator<never>[]) => { if (r) rules.set(name, r); }, [rules]);
@@ -60,7 +64,14 @@ export function Form({ initial = {}, onSubmit, children }: {
       }
     }
     setErrors(next);
-    if (Object.keys(next).length === 0) await onSubmit(values);
+    if (Object.keys(next).length > 0) return;
+    if (submittingRef.current) return; // ignore double-submit while in flight
+    submittingRef.current = true;
+    try {
+      await onSubmit(values);
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   const ctx = useMemo(() => ({ values, errors, setValue, register, validateField }), [values, errors, setValue, register, validateField]);
@@ -84,11 +95,16 @@ function Field({ name, label, rules, children }: { name: string; label?: string;
   const { values, errors, setValue, register, validateField } = useForm();
   register(name, rules);
   const error = errors[name];
+  const isRequired = Array.isArray(rules) && rules.length > 0;
   return (
     <div className="kvj-field" style={{ marginBottom: 16 }}>
-      {label && <label className="kvj-label" htmlFor={name}>{label}</label>}
+      {label && (
+        <label className={`kvj-label ${isRequired ? 'kvj-label--required' : ''}`} htmlFor={name}>
+          {label}
+        </label>
+      )}
       {children({ value: values[name] as never, onChange: (v) => setValue(name, v), onBlur: () => validateField(name), invalid: !!error })}
-      {error && <span className="kvj-error">{error}</span>}
+      {error && <span className="kvj-field-error">⚠️ {error}</span>}
     </div>
   );
 }
