@@ -220,7 +220,11 @@ export function TaskBoard({
 
   useEffect(() => {
     setTasksList(mappedTasks);
-  }, [mappedTasks]);
+    // Synchronize global timer store with database actualHours for loaded tasks
+    (tasks || []).forEach((t) => {
+      taskTimerStore.syncTaskTime(t.id, t.actualHours || 0);
+    });
+  }, [mappedTasks, tasks]);
 
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);

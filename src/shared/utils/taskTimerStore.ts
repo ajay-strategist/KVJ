@@ -207,4 +207,28 @@ export const taskTimerStore = {
     saveTimers(current);
     this.notify();
   },
+
+  syncTaskTime(taskId: string, actualHours: number) {
+    const current = loadTimers();
+    const dbMs = Math.round((actualHours || 0) * 3600 * 1000);
+    const existing = current[taskId];
+
+    if (!existing) {
+      current[taskId] = {
+        taskId,
+        startTime: Date.now(),
+        elapsedMs: dbMs,
+        isRunning: false,
+      };
+      saveTimers(current);
+      this.notify();
+    } else if (!existing.isRunning && existing.elapsedMs !== dbMs) {
+      current[taskId] = {
+        ...existing,
+        elapsedMs: dbMs,
+      };
+      saveTimers(current);
+      this.notify();
+    }
+  },
 };

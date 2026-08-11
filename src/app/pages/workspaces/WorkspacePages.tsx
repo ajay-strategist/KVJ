@@ -1806,6 +1806,11 @@ export function MyDayPage() {
     const now = Date.now();
     const updatedStates = { ...storedStates };
 
+    // Synchronize global timer store with database actualHours for loaded tasks
+    (projectTasks || []).forEach((t) => {
+      taskTimerStore.syncTaskTime(t.id, t.actualHours || 0);
+    });
+
     const mapped: TaskItem[] = (projectTasks || [])
       .filter((t) => {
         if (!t) return false;
@@ -1854,7 +1859,8 @@ export function MyDayPage() {
             secondsToday = 0;
             active = false;
           } else {
-            secondsToday = Math.max(secondsToday, stored.secondsToday || 0);
+            // Trust the database actualHours as the primary source of truth.
+            // If the task was active, compute elapsed time since lastStartTime and add it.
             if (stored.active && stored.lastStartTime) {
               // Only add elapsed time if lastStartTime is from today
               const lastStartDate = new Date(stored.lastStartTime);
