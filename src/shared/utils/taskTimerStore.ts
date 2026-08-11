@@ -16,25 +16,50 @@ const MY_DAY_KEY = 'kvj_task_timer_state_v1';
 type TimerListener = (timers: Record<string, TaskTimerState>) => void;
 const listeners = new Set<TimerListener>();
 
+function getTodayDateStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function isSameDay(timestampMs: number): boolean {
+  const d = new Date(timestampMs);
+  const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return ds === getTodayDateStr();
+}
+
 function loadTimers(): Record<string, TaskTimerState> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const result: Record<string, TaskTimerState> = raw ? JSON.parse(raw) : {};
 
+    // Guard: if a running timer's startTime is from a previous day, reset it
+    // so stale elapsed time is not carried over into today's counter.
+    Object.keys(result).forEach((id) => {
+      const t = result[id];
+      if (t.isRunning && t.startTime && !isSameDay(t.startTime)) {
+        result[id] = { ...t, isRunning: false, elapsedMs: 0 };
+      }
+    });
+
     // Merge from MyDay storage key if present
     const rawMyDay = localStorage.getItem(MY_DAY_KEY);
     if (rawMyDay) {
-      const myDayData: Record<string, { secondsToday: number; active: boolean; lastStartTime?: number }> = JSON.parse(rawMyDay);
+      const myDayData: Record<string, { secondsToday: number; active: boolean; lastStartTime?: number; date?: string }> = JSON.parse(rawMyDay);
+      const todayStr = getTodayDateStr();
       Object.entries(myDayData).forEach(([id, val]) => {
+        // Skip stale entries from a previous day
+        const isStale = val.date && val.date !== todayStr;
+        if (isStale) return;
+
         if (!result[id]) {
           result[id] = {
             taskId: id,
             startTime: val.lastStartTime || Date.now(),
             elapsedMs: (val.secondsToday || 0) * 1000,
-            isRunning: !!val.active,
+            isRunning: !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime)),
           };
         } else {
-          result[id].isRunning = !!val.active;
+          result[id].isRunning = !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime));
           if (val.secondsToday && val.secondsToday * 1000 > result[id].elapsedMs) {
             result[id].elapsedMs = val.secondsToday * 1000;
           }

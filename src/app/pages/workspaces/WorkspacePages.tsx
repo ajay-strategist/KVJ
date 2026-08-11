@@ -815,6 +815,8 @@ export interface StoredTaskState {
   active: boolean;
   lastStartTime?: number;
   underReview?: boolean;
+  /** ISO date string (YYYY-MM-DD) of the day this state was recorded — used to detect cross-day stale state */
+  date?: string;
 }
 
 const getStoredTaskStates = (): Record<string, StoredTaskState> => {
@@ -929,14 +931,16 @@ export const TaskWidget = memo(function TaskWidget({
         });
         if (changed) {
           const states = getStoredTaskStates();
-          const now = Date.now();
+          const tickNow = Date.now();
+          const tickDateStr = toLocalISODate(new Date());
           next.forEach((t) => {
             if (t.active) {
               states[t.id] = {
                 secondsToday: t.secondsToday,
                 active: true,
-                lastStartTime: now,
+                lastStartTime: tickNow,
                 underReview: t.underReview,
+                date: tickDateStr,
               };
             }
           });
@@ -1839,15 +1843,32 @@ export function MyDayPage() {
         }
 
         if (stored) {
-          secondsToday = stored.secondsToday || 0;
-          if (stored.active && stored.lastStartTime) {
-            const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
-            if (elapsed > 0 && elapsed < 86400) {
-              secondsToday += elapsed;
-            }
-            active = true;
+          // If the stored state is from a previous day, reset the daily timer to zero
+          // and mark the task as paused — this prevents cross-midnight elapsed time
+          // from being incorrectly added to today's counter.
+          const storedDate = stored.date || '';
+          const isStaleDay = storedDate && storedDate !== todayStr;
+
+          if (isStaleDay) {
+            // New day: discard yesterday's secondsToday and active flag
+            secondsToday = 0;
+            active = false;
           } else {
-            active = stored.active;
+            secondsToday = stored.secondsToday || 0;
+            if (stored.active && stored.lastStartTime) {
+              // Only add elapsed time if lastStartTime is from today
+              const lastStartDate = new Date(stored.lastStartTime);
+              const lastStartDateStr = `${lastStartDate.getFullYear()}-${String(lastStartDate.getMonth() + 1).padStart(2, '0')}-${String(lastStartDate.getDate()).padStart(2, '0')}`;
+              if (lastStartDateStr === todayStr) {
+                const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
+                if (elapsed > 0 && elapsed < 86400) {
+                  secondsToday += elapsed;
+                }
+              }
+              active = true;
+            } else {
+              active = stored.active;
+            }
           }
           if (stored.underReview !== undefined && !isRework && !isApproved) {
             underReview = stored.underReview;
@@ -1864,6 +1885,7 @@ export function MyDayPage() {
           active,
           lastStartTime: active ? now : undefined,
           underReview,
+          date: todayStr,
         };
 
         // Resolve UUID IDs to display names using the employees list
@@ -1967,12 +1989,14 @@ export function MyDayPage() {
         t.id === id ? { ...t, active: nextActive } : { ...t, active: false }
       );
       const states = getStoredTaskStates();
+      const todayDateStr = toLocalISODate(new Date());
       updated.forEach((t) => {
         states[t.id] = {
           secondsToday: t.secondsToday,
           active: t.active,
           lastStartTime: t.active ? now : undefined,
           underReview: t.underReview,
+          date: todayDateStr,
         };
       });
       saveStoredTaskStates(states);
