@@ -2462,11 +2462,11 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
         const today = toLocalISODate(new Date());
         
         // Find attendance for today
-        const attRes = await attRepo.findMany();
+        const attRes = await attRepo.findMany({ pageSize: 1000 });
         const todayPresent = (attRes?.data || []).filter((r) => r.workDate === today && r.firstClockIn).length;
 
         // Find pending expenses (submitted status)
-        const expRes = await expRepo.findMany();
+        const expRes = await expRepo.findMany({ pageSize: 1000 });
         const pendingExp = (expRes?.data || []).filter((c) => c.status === 'submitted').length;
 
         if (active) {

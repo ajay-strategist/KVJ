@@ -39,11 +39,11 @@ export function useProject() {
       const timesheetRepo = container.resolve(TIMESHEET_REPOSITORY_TOKEN);
 
       const [clPage, prPage, alPage, tkPage, tsPage] = await Promise.all([
-        clientRepo.findMany(),
-        projectRepo.findMany(),
-        allocationRepo.findMany(),
-        taskRepo.findMany(),
-        timesheetRepo.findMany(),
+        clientRepo.findMany({ pageSize: 1000 }),
+        projectRepo.findMany({ pageSize: 1000 }),
+        allocationRepo.findMany({ pageSize: 1000 }),
+        taskRepo.findMany({ pageSize: 1000 }),
+        timesheetRepo.findMany({ pageSize: 1000 }),
       ]);
 
       let allClients = Array.isArray(clPage?.data) ? clPage.data : [];

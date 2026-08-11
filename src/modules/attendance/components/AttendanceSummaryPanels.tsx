@@ -58,16 +58,16 @@ export function AttendanceSummaryPanels({
         let claims: ExpenseClaim[] = [];
 
         if (selectedEmployee === 'All Employees') {
-          const allRes = await attendanceRepo.findMany();
+          const allRes = await attendanceRepo.findMany({ pageSize: 1000 });
           records = allRes.data.filter(r => r.workDate >= range.from && r.workDate <= range.to);
-          const allClaims = await expenseRepo.findMany();
+          const allClaims = await expenseRepo.findMany({ pageSize: 1000 });
           claims = allClaims.data.filter(c => c.createdAt >= range.from && c.createdAt <= range.to);
         } else {
           const emp = employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployee);
           const empId = emp?.id;
           if (empId) {
             records = await attendanceRepo.findHistory(empId, range);
-            const allClaims = await expenseRepo.findMany();
+            const allClaims = await expenseRepo.findMany({ pageSize: 1000 });
             claims = allClaims.data.filter(c => c.employeeId === empId && c.createdAt >= range.from && c.createdAt <= range.to);
           }
         }

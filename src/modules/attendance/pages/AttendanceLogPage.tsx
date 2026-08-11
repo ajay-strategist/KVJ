@@ -167,10 +167,10 @@ export function AttendanceLogPage() {
         let claims: ExpenseClaim[] = [];
 
         if (isManagement && selectedEmployee === 'All Employees') {
-          const allRes = await attendanceRepo.findMany();
+          const allRes = await attendanceRepo.findMany({ pageSize: 1000 });
           const rawRecords = Array.isArray(allRes?.data) ? allRes.data : Array.isArray(allRes) ? allRes : [];
           records = rawRecords.filter((r: any) => r && r.workDate && r.workDate >= range.from && r.workDate <= range.to);
-          const allClaims = await expenseRepo.findMany();
+          const allClaims = await expenseRepo.findMany({ pageSize: 1000 });
           const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
           claims = rawClaims.filter((c: any) => c && !c.deletedAt && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
         } else {
@@ -178,7 +178,7 @@ export function AttendanceLogPage() {
           if (empId) {
             const rawHist = await attendanceRepo.findHistory(empId, range);
             records = Array.isArray(rawHist) ? rawHist : [];
-            const allClaims = await expenseRepo.findMany();
+            const allClaims = await expenseRepo.findMany({ pageSize: 1000 });
             const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
             claims = rawClaims.filter((c: any) => c && !c.deletedAt && c.employeeId === empId && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
           }
@@ -222,7 +222,7 @@ export function AttendanceLogPage() {
       try {
         const attendanceRepo = container.resolve(ATTENDANCE_REPOSITORY_TOKEN);
         const today = todayISO();
-        const allRes = await attendanceRepo.findMany();
+        const allRes = await attendanceRepo.findMany({ pageSize: 1000 });
         const rawRecords = Array.isArray(allRes?.data) ? allRes.data : Array.isArray(allRes) ? allRes : [];
         const filtered = rawRecords.filter((r: any) => r && r.workDate === today);
         setTodayRecords(filtered);

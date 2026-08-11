@@ -43,13 +43,13 @@ export function useFinance() {
       const salaryRepo = container.resolve(SALARY_STRUCTURE_REPOSITORY_TOKEN);
 
       const [buPage, exPage, trPage, vePage, poPage, asPage, saPage] = await Promise.all([
-        budgetRepo.findMany(),
-        expenseRepo.findMany(),
-        travelRepo.findMany(),
-        vendorRepo.findMany(),
-        poRepo.findMany(),
-        assetRepo.findMany(),
-        salaryRepo.findMany(),
+        budgetRepo.findMany({ pageSize: 1000 }),
+        expenseRepo.findMany({ pageSize: 1000 }),
+        travelRepo.findMany({ pageSize: 1000 }),
+        vendorRepo.findMany({ pageSize: 1000 }),
+        poRepo.findMany({ pageSize: 1000 }),
+        assetRepo.findMany({ pageSize: 1000 }),
+        salaryRepo.findMany({ pageSize: 1000 }),
       ]);
 
       setBudgets(Array.isArray(buPage?.data) ? buPage.data : []);

@@ -28,8 +28,8 @@ export function useAnalytics() {
       const reportRepo = container.resolve(SAVED_REPORT_REPOSITORY_TOKEN);
 
       const [kpiPage, reportPage] = await Promise.all([
-        kpiRepo.findMany(),
-        reportRepo.findMany()
+        kpiRepo.findMany({ pageSize: 1000 }),
+        reportRepo.findMany({ pageSize: 1000 })
       ]);
 
       setKpis(kpiPage.data);

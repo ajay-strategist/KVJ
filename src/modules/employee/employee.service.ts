@@ -68,7 +68,7 @@ export class EmployeeService implements IEmployeeService {
 
   async listEmployees(): Promise<Result<Employee[]>> {
     try {
-      const page = await this.repo.findMany({ pageSize: 100 });
+      const page = await this.repo.findMany({ pageSize: 1000 });
       return Ok(page.data);
     } catch (err) {
       return Err(AppError.internal());

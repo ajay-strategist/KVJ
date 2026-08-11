@@ -83,19 +83,19 @@ export class AnalyticsService implements IAnalyticsService {
       const budgetRepo = container.resolve(BUDGET_REPOSITORY_TOKEN);
 
       const [emps, courses, projects, budgets] = await Promise.all([
-        empRepo.findMany(),
-        courseRepo.findMany(),
-        projectRepo.findMany(),
-        budgetRepo.findMany()
+        empRepo.findMany({ pageSize: 1000 }),
+        courseRepo.findMany({ pageSize: 1000 }),
+        projectRepo.findMany({ pageSize: 1000 }),
+        budgetRepo.findMany({ pageSize: 1000 })
       ]);
 
       const totalBudgetsAllocated = budgets.data.reduce((sum, b) => sum + b.allocatedAmount, 0);
       const totalBudgetsSpent = budgets.data.reduce((sum, b) => sum + b.spentAmount, 0);
 
       return Ok({
-        totalEmployees: emps.total,
-        activeCourses: courses.total,
-        activeProjects: projects.total,
+        totalEmployees: emps.data.length,
+        activeCourses: courses.data.length,
+        activeProjects: projects.data.length,
         totalBudgetsAllocated,
         totalBudgetsSpent
       });

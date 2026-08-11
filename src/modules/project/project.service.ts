@@ -149,9 +149,12 @@ export class ProjectService implements IProjectService {
 
   async createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
-      const isSelfAssigned = !data.assigneeId || data.assigneeId === actor.id;
       const roleUpper = (actor.role || '').toUpperCase();
-      const needsAssignmentApproval = !isSelfAssigned && roleUpper !== 'CEO';
+      const finalAssigneeId = data.assigneeId || actor.id;
+      // Self-assigned: the assignee IS the actor (same id or no assignee specified)
+      const isSelfAssigned = finalAssigneeId === actor.id;
+      // CEO/ADMIN can freely assign without approval; self-assignment never needs approval
+      const needsAssignmentApproval = !isSelfAssigned && roleUpper !== 'CEO' && roleUpper !== 'ADMIN';
 
       // Automatically set supervisor to assigning employee (actor.id) if not specified
       const supervisorId = data.supervisorId || actor.id;
@@ -184,8 +187,9 @@ export class ProjectService implements IProjectService {
         ...data,
         projectId,
         supervisorId,
-        assigneeId: data.assigneeId || actor.id,
-        approvalStatus: needsAssignmentApproval ? 'pending_assignment_approval' : (data.approvalStatus ?? null),
+        assigneeId: finalAssigneeId,
+        // Respect an explicit null/value passed by caller; only override when approval is actually needed
+        approvalStatus: needsAssignmentApproval ? 'pending_assignment_approval' : null,
         assignedByEmployeeId: actor.id,
       };
 
@@ -207,16 +211,29 @@ export class ProjectService implements IProjectService {
 
   async updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
+      const roleUpper = (actor.role || '').toUpperCase();
+      const isFullControlRole = roleUpper === 'CEO' || roleUpper === 'ADMIN';
       const existing = await this.taskRepo.findById(taskId);
+
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
+        // Self-re-assignment (actor assigns to themselves) never needs approval
         const isSelfAssigned = patch.assigneeId === actor.id;
-        const roleUpper = (actor.role || '').toUpperCase();
-        if (!isSelfAssigned && roleUpper !== 'CEO') {
-          patch.approvalStatus = 'pending_assignment_approval';
-          (patch as any).assignedByEmployeeId = actor.id;
-          if (!patch.supervisorId) patch.supervisorId = actor.id;
+        // CEO/ADMIN can assign to anyone without approval gate
+        if (!isSelfAssigned && !isFullControlRole) {
+          patch = {
+            ...patch,
+            approvalStatus: 'pending_assignment_approval',
+            assignedByEmployeeId: actor.id,
+            supervisorId: patch.supervisorId || actor.id,
+          } as Partial<Task>;
+        } else {
+          // For self-assignment or privileged roles, clear any stale pending approval
+          if ((patch as any).approvalStatus === undefined) {
+            patch = { ...patch, approvalStatus: null } as Partial<Task>;
+          }
         }
       }
+
       const updated = await this.taskRepo.update(taskId, patch, actor);
       if (updated) {
         await this.activity.log('project', updated.projectId, actor, 'update', `Updated task: ${updated.title}`);

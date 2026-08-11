@@ -98,13 +98,15 @@ export function TaskBoard({
     timesheets,
     createTask,
     updateTask,
+    deleteTask,
     submitTask,
     requestRework,
     approveTaskSubmission,
     requestTaskAssignment,
     approveTaskAssignment,
     logTimesheet,
-    approveTimesheet
+    approveTimesheet,
+    refresh,
   } = actualProjectData;
 
   // Active timers tracking synced with taskTimerStore
@@ -544,13 +546,19 @@ export function TaskBoard({
     };
 
     try {
-      await updateTask(editingTask.id, {
+      const res = await updateTask(editingTask.id, {
         title: updatedName,
         dueDate: updatedDueDate,
         assigneeId: assigneeEmp ? assigneeEmp.id : undefined,
         supervisorId: supervisorEmp ? supervisorEmp.id : undefined,
         status: dbStatusMap[updatedStatus] || 'todo',
       });
+
+      if (res.ok) {
+        // Re-fetch from DB to ensure consistent state (prevents tasks disappearing
+        // if a DB-side approval recalculation changes the record)
+        await refresh();
+      }
     } catch (e) {
       console.warn('DB task update warning:', e);
     }

@@ -244,7 +244,7 @@ export class LeaveService implements ILeaveService {
 
   async listAllLeaves(): Promise<Result<LeaveRecord[]>> {
     try {
-      const all = await this.repo.findMany();
+      const all = await this.repo.findMany({ pageSize: 1000 });
       return Ok(all.data);
     } catch {
       return Err(AppError.internal());

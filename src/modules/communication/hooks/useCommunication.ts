@@ -33,7 +33,7 @@ export function useCommunication(activeChannelId?: UUID) {
   const fetchChannels = useCallback(async () => {
     try {
       const channelRepo = container.resolve(CHAT_CHANNEL_REPOSITORY_TOKEN);
-      const res = await channelRepo.findMany();
+      const res = await channelRepo.findMany({ pageSize: 1000 });
       const all = Array.isArray(res?.data) ? res.data : [];
       const uid = user?.id;
       // Membership-based visibility:
@@ -67,7 +67,7 @@ export function useCommunication(activeChannelId?: UUID) {
   const fetchAnnouncements = useCallback(async () => {
     try {
       const annRepo = container.resolve(ANNOUNCEMENT_REPOSITORY_TOKEN);
-      const res = await annRepo.findMany();
+      const res = await annRepo.findMany({ pageSize: 1000 });
       setAnnouncements(Array.isArray(res?.data) ? res.data : []);
     } catch (e: any) {
       setError(e.message);
@@ -77,7 +77,7 @@ export function useCommunication(activeChannelId?: UUID) {
   const fetchEmailLogs = useCallback(async () => {
     try {
       const emailRepo = container.resolve(EMAIL_LOG_REPOSITORY_TOKEN);
-      const res = await emailRepo.findMany();
+      const res = await emailRepo.findMany({ pageSize: 1000 });
       setEmailLogs(Array.isArray(res?.data) ? res.data : []);
     } catch (e: any) {
       setError(e.message);
