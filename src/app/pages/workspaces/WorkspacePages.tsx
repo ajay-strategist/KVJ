@@ -2504,8 +2504,8 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
         name: p.title,
         client: client ? client.name : 'Unknown Client',
         progress: 0,
-        health: p.status === 'suspended' ? 'Suspended' : p.status === 'execution' ? 'In Progress' : 'Planned',
-        healthTone: (p.status === 'suspended' ? 'danger' : p.status === 'execution' ? 'success' : 'neutral') as any,
+        health: p.status === 'closure' ? 'Completed' : p.status === 'execution' ? 'In Execution' : p.status === 'planning' ? 'Kick Off' : p.status === 'suspended' ? 'Suspended' : 'Not Started',
+        healthTone: (p.status === 'closure' ? 'success' : p.status === 'execution' ? 'progress' : p.status === 'suspended' ? 'danger' : 'neutral') as any,
       };
     });
   }, [projects, clients]);

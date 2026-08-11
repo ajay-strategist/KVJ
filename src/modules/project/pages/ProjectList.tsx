@@ -63,13 +63,35 @@ function ProjectMembersField({ employees }: { employees: Array<{ id: string; fir
   );
 }
 
+export type ProjectStatusLabel = 'Not Started' | 'Kick Off' | 'In Execution' | 'Completed';
+
+/** The four project statuses (stored value ⇄ display label). */
+export const PROJECT_STATUS_OPTIONS: { value: string; label: ProjectStatusLabel }[] = [
+  { value: 'not_started', label: 'Not Started' },
+  { value: 'planning', label: 'Kick Off' },
+  { value: 'execution', label: 'In Execution' },
+  { value: 'closure', label: 'Completed' },
+];
+
+export const projectStatusToLabel = (s?: string): ProjectStatusLabel =>
+  s === 'closure' ? 'Completed'
+  : s === 'execution' ? 'In Execution'
+  : s === 'planning' ? 'Kick Off'
+  : 'Not Started';
+
+export const projectStatusLabelToValue = (l?: string): string =>
+  l === 'Completed' ? 'closure'
+  : l === 'In Execution' ? 'execution'
+  : l === 'Kick Off' ? 'planning'
+  : 'not_started';
+
 export interface ProjectCardData {
   id: string;
   code: string;
   title: string;
   client: string;
   supervisor: string;
-  status: 'Not Started' | 'In Progress' | 'Completed';
+  status: ProjectStatusLabel;
   members: Array<{ name: string; hours: number }>;
   totalHours: number;
   tasksTotal: number;
@@ -101,8 +123,8 @@ export function ProjectList({
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
-  // Status checkboxes filter state. Default: Not Started & In Progress checked, Completed unchecked
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Not Started', 'In Progress']);
+  // Status checkboxes filter state. Default: all active statuses checked, Completed unchecked
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Not Started', 'Kick Off', 'In Execution']);
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
@@ -140,9 +162,7 @@ export function ProjectList({
         : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
 
-      let status: 'Not Started' | 'In Progress' | 'Completed' = 'Not Started';
-      if (p.status === 'execution') status = 'In Progress';
-      else if (p.status === 'closure') status = 'Completed';
+      const status: ProjectStatusLabel = projectStatusToLabel(p.status);
 
       const pTasks = tasks.filter((t: any) => t.projectId === p.id);
       const pTaskIds = new Set(pTasks.map((t: any) => t.id));
@@ -252,7 +272,7 @@ export function ProjectList({
       });
     }
     return list.filter(
-      (p) => p.status === 'Not Started' || p.status === 'In Progress'
+      (p) => p.status !== 'Completed'
     ).length;
   }, [projectsList, selectedEmployeeId, projects, allocations, tasks]);
 
@@ -357,18 +377,32 @@ export function ProjectList({
   const handleAddTaskSubmit = async (values: Record<string, unknown>) => {
     if (!selectedProject) return;
 
+    // The Assignee select carries the employee id. Passing it through means the
+    // task is assigned to the chosen person — not silently to the creator.
+    const assigneeRaw = (values.assignee as string) || '';
+    const assigneeId = assigneeRaw && assigneeRaw !== 'Unassigned' ? assigneeRaw : undefined;
+    const dbProj = projects.find((p: any) => p.id === selectedProject.id);
+    const supervisorId = (dbProj as any)?.supervisorId || user?.id;
+
     const res = await createTask({
       projectId: selectedProject.id as UUID,
       title: values.title as string,
+      description: (values.description as string) || undefined,
+      assigneeId,
+      supervisorId,
+      dueDate: (values.dueDate as string) || undefined,
       status: 'todo',
       priority: 'medium',
-    });
+    } as any);
 
     if (res.ok) {
+      const pending = (res.value as any)?.approvalStatus === 'pending_assignment_approval';
       toast({
-        variant: 'success',
-        title: 'New Task Created',
-        message: `Task "${values.title}" added to project ${selectedProject.code}.`,
+        variant: pending ? 'warning' : 'success',
+        title: pending ? 'Task Sent for Approval' : 'New Task Created',
+        message: pending
+          ? `Assigning "${values.title}" to another member needs CEO approval — request sent.`
+          : `Task "${values.title}" added to project ${selectedProject.code}.`,
       });
       setAddTaskOpen(false);
     } else {
@@ -581,7 +615,7 @@ export function ProjectList({
       );
     }},
     { key: 'status', header: 'Status', render: (p) => (
-      <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Progress' ? 'progress' : 'info'}>
+      <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Execution' ? 'progress' : p.status === 'Kick Off' ? 'info' : 'neutral'}>
         {p.status}
       </Badge>
     )},
@@ -661,7 +695,7 @@ export function ProjectList({
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Status Filter:</span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              {(['Not Started', 'In Progress', 'Completed'] as const).map((status) => (
+              {(['Not Started', 'Kick Off', 'In Execution', 'Completed'] as const).map((status) => (
                 <label
                   key={status}
                   style={{
@@ -709,7 +743,7 @@ export function ProjectList({
                       </h3>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Client: {p.client}</div>
                     </div>
-                    <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Progress' ? 'progress' : 'info'}>
+                    <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Execution' ? 'progress' : p.status === 'Kick Off' ? 'info' : 'neutral'}>
                       {p.status}
                     </Badge>
                   </div>
@@ -825,18 +859,19 @@ export function ProjectList({
                 <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ background: 'rgba(255,255,255,0.15)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>{selectedProject.code}</span>
                   <span>Client: <strong>{selectedProject.client}</strong></span>
-                  {selectedProject.supervisor && <span>Manager (Operations): <strong>{selectedProject.supervisor}</strong></span>}
+                  {selectedProject.supervisor && <span>Supervisor: <strong>{selectedProject.supervisor}</strong></span>}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <Button
                   size="sm"
                   style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.18)',
+                    border: '1px solid rgba(255,255,255,0.35)',
                     color: 'white',
                     fontWeight: 600,
-                    fontSize: 12
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
                   }}
                   onClick={() => {
                     setClientNameInput(selectedProject.client);
@@ -848,11 +883,12 @@ export function ProjectList({
                 <Button
                   size="sm"
                   style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.18)',
+                    border: '1px solid rgba(255,255,255,0.35)',
                     color: 'white',
                     fontWeight: 600,
-                    fontSize: 12
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
                   }}
                   onClick={() => setAddTaskOpen(true)}
                 >
@@ -861,10 +897,13 @@ export function ProjectList({
                 {canDeleteProject && (
                   <Button
                     size="sm"
-                    variant="danger"
                     style={{
-                      fontWeight: 600,
-                      fontSize: 12
+                      background: '#ffffff',
+                      border: '1px solid rgba(255,255,255,0.9)',
+                      color: 'var(--status-danger)',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      whiteSpace: 'nowrap',
                     }}
                     onClick={async () => {
                       const ok = await confirm({
@@ -906,7 +945,26 @@ export function ProjectList({
                 ].map((kpi) => (
                   <div key={kpi.label} style={{ background: kpi.bg, borderRadius: 12, padding: '14px 16px', borderLeft: `4px solid ${kpi.border}`, transition: 'transform 0.15s' }}>
                     <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: kpi.color, letterSpacing: 0.8, marginBottom: 6 }}>{kpi.icon} {kpi.label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
+                    {kpi.label === 'Status' ? (
+                      <select
+                        value={projectStatusLabelToValue(selectedProject.status)}
+                        onChange={async (e) => {
+                          const res = await updateProject(selectedProject.id as UUID, { status: e.target.value as any });
+                          if (res.ok) {
+                            toast({ variant: 'success', title: 'Status Updated', message: `Project status set to "${projectStatusToLabel(e.target.value)}".` });
+                          } else {
+                            toast({ variant: 'error', title: 'Update Failed', message: res.error });
+                          }
+                        }}
+                        style={{ fontSize: 15, fontWeight: 800, color: kpi.color, background: 'transparent', border: '1px solid ' + kpi.border, borderRadius: 8, padding: '4px 8px', cursor: 'pointer', width: '100%' }}
+                      >
+                        {PROJECT_STATUS_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value} style={{ color: '#0f172a' }}>{o.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div style={{ fontSize: 18, fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1113,9 +1171,9 @@ export function ProjectList({
             label="Initial Phase *"
             options={[
               { value: 'not_started', label: 'Not Started' },
-              { value: 'planning', label: 'Planning / Kickoff' },
+              { value: 'planning', label: 'Kick Off' },
               { value: 'execution', label: 'In Execution' },
-              { value: 'closure', label: 'Closure' },
+              { value: 'closure', label: 'Completed' },
             ]}
           />
           <DatePickerField name="targetCompletion" label="Target Completion Date" />
@@ -1153,7 +1211,7 @@ export function ProjectList({
             initial={{
               code: selectedProject.code,
               title: selectedProject.title,
-              status: selectedProject.status === 'Completed' ? 'closure' : selectedProject.status === 'In Progress' ? 'execution' : 'not_started',
+              status: projectStatusLabelToValue(selectedProject.status),
               supervisorId: projects.find((p: any) => p.id === selectedProject.id)?.supervisorId || '',
               memberIds: projects.find((p: any) => p.id === selectedProject.id)?.memberIds || [],
             }}
@@ -1201,9 +1259,9 @@ export function ProjectList({
               label="Phase *"
               options={[
                 { value: 'not_started', label: 'Not Started' },
-                { value: 'planning', label: 'Planning / Kickoff' },
+                { value: 'planning', label: 'Kick Off' },
                 { value: 'execution', label: 'In Execution' },
-                { value: 'closure', label: 'Closure' },
+                { value: 'closure', label: 'Completed' },
               ]}
             />
             <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
