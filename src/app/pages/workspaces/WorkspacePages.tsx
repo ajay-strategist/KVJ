@@ -1911,7 +1911,7 @@ export function MyDayPage() {
     if (mapped.length > 0) {
       setTasks(mapped);
     }
-  }, [projectTasks, projects]);
+  }, [projectTasks, projects, employees, user]);
 
   useEffect(() => {
     const unsubscribe = taskTimerStore.subscribe((allTimers) => {
