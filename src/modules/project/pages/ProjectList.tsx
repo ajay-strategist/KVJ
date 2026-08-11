@@ -730,7 +730,11 @@ export function ProjectList({
           {filteredProjects.map((p) => {
             const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
             return (
-              <Card key={p.id} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 18 }}>
+              <Card
+                key={p.id}
+                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+                bodyStyle={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', flex: 1 }}
+              >
                 <div>
                   {/* Top Bar: Code & Status */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -785,7 +789,7 @@ export function ProjectList({
 
                   {/* Progress Bar */}
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ width: '100%', height: 6, background: 'var(--bg-sunken)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: '100%', height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? 'var(--status-success)' : 'var(--brand)', transition: 'width 0.3s ease' }} />
                     </div>
                   </div>
@@ -898,10 +902,10 @@ export function ProjectList({
                   <Button
                     size="sm"
                     style={{
-                      background: '#ffffff',
-                      border: '1px solid rgba(255,255,255,0.9)',
-                      color: 'var(--status-danger)',
-                      fontWeight: 700,
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                      color: '#fee2e2',
+                      fontWeight: 600,
                       fontSize: 12,
                       whiteSpace: 'nowrap',
                     }}
@@ -956,7 +960,25 @@ export function ProjectList({
                             toast({ variant: 'error', title: 'Update Failed', message: res.error });
                           }
                         }}
-                        style={{ fontSize: 15, fontWeight: 800, color: kpi.color, background: 'transparent', border: '1px solid ' + kpi.border, borderRadius: 8, padding: '4px 8px', cursor: 'pointer', width: '100%' }}
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: kpi.color,
+                          background: 'transparent',
+                          border: '1px solid ' + kpi.border,
+                          borderRadius: 8,
+                          padding: '4px 24px 4px 8px',
+                          cursor: 'pointer',
+                          width: '100%',
+                          outline: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none',
+                          appearance: 'none',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '12px',
+                          backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${kpi.border.replace('#', '%23')}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                        }}
                       >
                         {PROJECT_STATUS_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value} style={{ color: '#0f172a' }}>{o.label}</option>
@@ -975,7 +997,7 @@ export function ProjectList({
                   <span>Overall Task Completion</span>
                   <span style={{ color: '#4f46e5' }}>{selectedProject.tasksTotal > 0 ? Math.round((selectedProject.tasksCompleted / selectedProject.tasksTotal) * 100) : 0}%</span>
                 </div>
-                <div style={{ height: 10, background: 'var(--bg-sunken)', borderRadius: 5, overflow: 'hidden' }}>
+                <div style={{ height: 10, background: 'var(--border)', borderRadius: 5, overflow: 'hidden' }}>
                   <div style={{
                     height: '100%',
                     width: `${selectedProject.tasksTotal > 0 ? Math.round((selectedProject.tasksCompleted / selectedProject.tasksTotal) * 100) : 0}%`,
@@ -988,7 +1010,7 @@ export function ProjectList({
               </div>
 
               {/* Two-column: Member panel left, Task table right */}
-              <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr', gap: 20, alignItems: 'start' }}>
+              <div className="project-report-grid">
 
                 {/* Member Hours Panel */}
                 <div style={{ background: 'var(--bg-sunken)', borderRadius: 14, padding: '16px', border: '1px solid var(--border)' }}>
@@ -1019,8 +1041,8 @@ export function ProjectList({
                   <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, color: '#4f46e5', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                     📋 Task Management
                   </div>
-                  <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 550 }}>
                       <thead>
                         <tr style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: 'white', textAlign: 'left' }}>
                           <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Task</th>
@@ -1042,7 +1064,25 @@ export function ProjectList({
                                   await updateTask(t.id, { assigneeId: e.target.value });
                                   toast({ variant: 'success', title: 'Assignee Updated' });
                                 }}
-                                style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer', maxWidth: 110 }}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  padding: '4px 22px 4px 8px',
+                                  borderRadius: 8,
+                                  border: '1px solid var(--border)',
+                                  background: 'var(--bg-card)',
+                                  color: 'var(--text-primary)',
+                                  cursor: 'pointer',
+                                  maxWidth: 120,
+                                  outline: 'none',
+                                  WebkitAppearance: 'none',
+                                  MozAppearance: 'none',
+                                  appearance: 'none',
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundPosition: 'right 6px center',
+                                  backgroundSize: '10px',
+                                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                                }}
                               >
                                 <option value="">Unassigned</option>
                                 {employees.map((emp) => (
@@ -1062,7 +1102,40 @@ export function ProjectList({
                                   }
                                   toast({ variant: 'success', title: 'Status Updated' });
                                 }}
-                                style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: '4px 22px 4px 8px',
+                                  borderRadius: 12,
+                                  cursor: 'pointer',
+                                  outline: 'none',
+                                  border: '1px solid transparent',
+                                  WebkitAppearance: 'none',
+                                  MozAppearance: 'none',
+                                  appearance: 'none',
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundPosition: 'right 6px center',
+                                  backgroundSize: '10px',
+                                  ...(() => {
+                                    const statusVal = t.rawStatus === 'done' || t.rawStatus === 'Completed' ? 'done'
+                                      : t.rawStatus === 'in_progress' || t.rawStatus === 'In Progress' ? 'in_progress'
+                                      : t.rawStatus === 'review' || t.rawStatus === 'Under Review' ? 'review'
+                                      : 'todo';
+                                    const colorMap = {
+                                      done: { bg: 'var(--status-success-bg)', text: 'var(--status-success)', border: 'var(--status-success-border)', stroke: '%2310B981' },
+                                      in_progress: { bg: 'var(--status-progress-bg)', text: 'var(--status-progress)', border: 'var(--status-progress-border)', stroke: '%233B82F6' },
+                                      review: { bg: 'var(--status-purple-bg)', text: 'var(--status-purple)', border: 'var(--status-purple-border)', stroke: '%238B5CF6' },
+                                      todo: { bg: 'var(--status-neutral-bg)', text: 'var(--status-neutral)', border: 'var(--status-neutral-border)', stroke: '%2364748B' },
+                                    };
+                                    const s = colorMap[statusVal];
+                                    return {
+                                      backgroundColor: s.bg,
+                                      color: s.text,
+                                      borderColor: s.border,
+                                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${s.stroke}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                                    };
+                                  })()
+                                }}
                               >
                                 <option value="todo">To Do</option>
                                 <option value="in_progress">In Progress</option>
@@ -1087,7 +1160,20 @@ export function ProjectList({
                                     }
                                   }
                                 }}
-                                style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, transition: 'all 0.15s' }}
+                                style={{
+                                  background: 'var(--status-danger-bg)',
+                                  border: '1px solid var(--status-danger-border)',
+                                  color: 'var(--status-danger)',
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 13,
+                                  transition: 'all 0.15s ease',
+                                }}
                               >🗑️</button>
                             </td>
                           </tr>

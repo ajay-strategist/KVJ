@@ -768,3 +768,16 @@ main {
     overflow-x: hidden;
   }
 }
+
+/* ── Project Report Responsive Grid ── */
+.project-report-grid {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .project-report-grid {
+    grid-template-columns: 1fr;
+  }
+}

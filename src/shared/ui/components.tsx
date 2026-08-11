@@ -76,6 +76,7 @@ export function Card({
   loading,
   children,
   style,
+  bodyStyle,
   className = '',
   onClick,
 }: {
@@ -86,6 +87,7 @@ export function Card({
   loading?: boolean;
   children: ReactNode;
   style?: React.CSSProperties;
+  bodyStyle?: React.CSSProperties;
   className?: string;
   onClick?: () => void;
 }) {
@@ -99,7 +101,7 @@ export function Card({
       style={style}
       onClick={onClick}
     >
-      <div className={bodyClass} style={{ position: 'relative' }}>
+      <div className={bodyClass} style={{ position: 'relative', ...bodyStyle }}>
         {loading && (
           <div className="kvj-loading-overlay" style={{ borderRadius: 'var(--radius-xl)' }}>
             <span className="kvj-spinner" />
