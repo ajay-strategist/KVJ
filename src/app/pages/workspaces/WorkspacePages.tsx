@@ -1100,7 +1100,7 @@ export const TaskWidget = memo(function TaskWidget({
                 {t.isApproved ? (
                   <Badge tone="success">Approved &amp; Completed</Badge>
                 ) : t.underReview ? (
-                  <Badge tone="info">Under Review</Badge>
+                  <Badge tone="info">Pending Approval</Badge>
                 ) : t.isRework ? (
                   <Badge tone="warning">🔄 Rework</Badge>
                 ) : null}
@@ -1138,8 +1138,8 @@ export const TaskWidget = memo(function TaskWidget({
                     ✓ Approved &amp; Completed
                   </span>
                 ) : t.underReview ? (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
-                    ✓ Submitted for Manager Approval
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    📩 Submitted &amp; Requires CEO/Admin/Manager Approval to complete the task (Review and Approve)
                   </span>
                 ) : (
                   <>
@@ -2041,15 +2041,15 @@ export function MyDayPage() {
     toast({
       variant: 'success',
       title: 'Routed to Approvals Queue',
-      message: `Task '${taskTitle}' submitted to Approvals Queue for Manager/Admin review.`,
+      message: `Task '${taskTitle}' submitted and requires CEO/Admin/Manager approval to complete the task (Review and Approve).`,
     });
     addNotification({
       title: 'Task Submitted for Review',
-      message: `'${taskTitle}' routed to Manager for completion approval.`,
+      message: `'${taskTitle}' submitted and requires CEO/Admin/Manager approval to complete the task (Review and Approve).`,
       category: 'task',
       priority: 'high',
     });
-    handleActivityLog(`Submitted for Manager Review: ${taskTitle}`, 'success');
+    handleActivityLog(`Submitted & requires CEO/Admin/Manager Approval: ${taskTitle}`, 'success');
   };
 
   const projectOptions = useMemo(() => {

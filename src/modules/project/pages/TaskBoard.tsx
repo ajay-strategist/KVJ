@@ -387,7 +387,7 @@ export function TaskBoard({
     );
     const res = await submitTask(task.id as UUID, 'Submitted for review');
     if (res.ok) {
-      toast({ variant: 'success', title: 'Task Submitted', message: `Task "${task.name}" is now Under Review.` });
+      toast({ variant: 'success', title: 'Task Submitted', message: `Task "${task.name}" submitted and requires CEO/Admin/Manager approval to complete the task (Review and Approve).` });
     } else {
       toast({ variant: 'error', title: 'Submission Failed', message: res.error });
       setTasksList((prev) =>
@@ -450,7 +450,7 @@ export function TaskBoard({
         toast({
           variant: 'success',
           title: 'Submitted for Review',
-          message: `Task "${task.name}" submitted to Manager/Admin Approval Queue.`,
+          message: `Task "${task.name}" submitted and requires CEO/Admin/Manager approval to complete the task (Review and Approve).`,
         });
       } else {
         toast({ variant: 'error', title: 'Submission Failed', message: res.error });
