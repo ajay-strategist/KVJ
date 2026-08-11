@@ -1854,7 +1854,7 @@ export function MyDayPage() {
             secondsToday = 0;
             active = false;
           } else {
-            secondsToday = stored.secondsToday || 0;
+            secondsToday = Math.max(secondsToday, stored.secondsToday || 0);
             if (stored.active && stored.lastStartTime) {
               // Only add elapsed time if lastStartTime is from today
               const lastStartDate = new Date(stored.lastStartTime);
@@ -1976,18 +1976,48 @@ export function MyDayPage() {
     const now = Date.now();
     let targetTask: any = null;
 
+    // 1. If starting a task, find and pause any other active task in the DB & sessions first
     if (nextActive) {
+      const activeTask = tasks.find((t) => t.active && t.id !== id);
+      if (activeTask) {
+        taskTimerStore.pauseTask(activeTask.id);
+        const activeTimer = taskTimerStore.getTimer(activeTask.id);
+        const activeSecs = activeTimer ? Math.floor(activeTimer.elapsedMs / 1000) : activeTask.secondsToday;
+        
+        updateTask(activeTask.id, {
+          status: 'todo',
+          actualHours: activeSecs / 3600,
+        }).catch((e) => console.warn('Failed to update previously active task in DB:', e));
+        
+        pauseSession(activeTask.id as any);
+        handleActivityLog(`Paused Task: ${activeTask.title}`, 'neutral');
+      }
+      
       taskTimerStore.startTask(id);
     } else {
       taskTimerStore.pauseTask(id);
     }
 
+    // 2. Query the exact correct secondsToday from the store to avoid race conditions
+    const timer = taskTimerStore.getTimer(id);
+    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
+    // 3. Update the tasks list state and save to local storage
     setTasks((prev) => {
       const found = prev.find((t) => t.id === id);
       if (found) targetTask = found;
-      const updated = prev.map((t) =>
-        t.id === id ? { ...t, active: nextActive } : { ...t, active: false }
-      );
+
+      const updated = prev.map((t) => {
+        if (t.id === id) {
+          return { ...t, active: nextActive, secondsToday };
+        } else if (nextActive && t.active) {
+          const tTimer = taskTimerStore.getTimer(t.id);
+          const tSec = tTimer ? Math.floor(tTimer.elapsedMs / 1000) : t.secondsToday;
+          return { ...t, active: false, secondsToday: tSec };
+        }
+        return t;
+      });
+
       const states = getStoredTaskStates();
       const todayDateStr = toLocalISODate(new Date());
       updated.forEach((t) => {
@@ -2003,39 +2033,48 @@ export function MyDayPage() {
       return updated;
     });
 
-    if (targetTask) {
-      updateTask(id, {
-        status: nextActive ? 'in_progress' : 'todo',
-        actualHours: targetTask.secondsToday / 3600,
-      }).catch((e) => console.warn('Failed to update task status in DB:', e));
+    // 4. Update the clicked task in the database and sessions
+    updateTask(id, {
+      status: nextActive ? 'in_progress' : 'todo',
+      actualHours: secondsToday / 3600,
+    }).catch((e) => console.warn('Failed to update task status in DB:', e));
 
-      // Record the real work session interval (Start opens one, Pause closes it).
-      const raw = (projectTasks || []).find((t) => t.id === id);
-      const proj = raw ? (projects || []).find((p) => p.id === raw.projectId) : undefined;
-      if (nextActive) {
-        startSession({
-          taskId: id as any,
-          projectId: raw?.projectId,
-          workTitle: taskTitle,
-          supervisorId: (raw as any)?.supervisorId,
-        });
-      } else {
-        pauseSession(id as any);
-      }
-      void proj;
+    const raw = (projectTasks || []).find((t) => t.id === id);
+    if (nextActive) {
+      startSession({
+        taskId: id as any,
+        projectId: raw?.projectId,
+        workTitle: taskTitle,
+        supervisorId: (raw as any)?.supervisorId,
+      });
+    } else {
+      pauseSession(id as any);
     }
 
     handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
   };
 
   const handleSubmitReview = async (id: string, taskTitle: string) => {
+    // 1. Pause timer in taskTimerStore to capture final time
+    taskTimerStore.pauseTask(id);
+    const timer = taskTimerStore.getTimer(id);
+    const finalSeconds = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
     // Optimistically mark under review.
     const applyUnderReview = (val: boolean) => {
       setTasks((prev) => prev.map((t) =>
-        t.id === id ? { ...t, active: false, underReview: val, isRework: false, reworkNotes: undefined } : t
+        t.id === id ? { 
+          ...t, 
+          active: false, 
+          underReview: val, 
+          isRework: false, 
+          reworkNotes: undefined,
+          secondsToday: finalSeconds
+        } : t
       ));
       const states = getStoredTaskStates();
       if (states[id]) {
+        states[id].secondsToday = finalSeconds;
         states[id].active = false;
         states[id].underReview = val;
         delete states[id].lastStartTime;
@@ -2044,12 +2083,13 @@ export function MyDayPage() {
     };
     applyUnderReview(true);
 
-    // PERSIST to the database. Errors were previously swallowed, so a failed
-    // submit silently reverted the task on the next refresh with no explanation.
-    // Now we surface the real reason and roll back the optimistic change so the
-    // UI reflects the true saved state.
-    // Close any open work session for this task as completed.
-    completeSession(id as any);
+    // Save final actualHours to the DB before submitting
+    try {
+      await updateTask(id as UUID, { actualHours: finalSeconds / 3600 });
+      completeSession(id as any);
+    } catch (e) {
+      console.warn('Failed to update task hours on submit:', e);
+    }
 
     const res = await submitTask(id as any, 'Submitted from Workspace');
     if (!res.ok) {

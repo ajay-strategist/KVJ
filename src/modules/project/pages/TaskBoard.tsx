@@ -22,6 +22,7 @@ import { usePermissions } from '../../../shared/permissions/react';
 import { todayISO, addDaysISO } from '../../../shared/utils/date';
 
 import { useProject } from '../hooks/useProject';
+import { useTaskSessions } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
@@ -90,6 +91,7 @@ export function TaskBoard({
   const [tasksList, setTasksList] = useState<TaskItem[]>([]);
 
   const localProjectData = useProject();
+  const { startSession, pauseSession, completeSession } = useTaskSessions();
   const actualProjectData = projectData || localProjectData;
   const {
     projects,
@@ -364,26 +366,84 @@ export function TaskBoard({
 
   const handleStartTask = async (task: TaskItem) => {
     const updatedAssignee = (task.assignee && task.assignee !== 'Unassigned') ? task.assignee : (user?.fullName || 'Assigned User');
+    
+    // 1. Pause previously active task in DB and sessions
+    const previouslyActive = tasksList.find((x) => x.status === 'In Progress' && x.id !== task.id);
+    if (previouslyActive) {
+      taskTimerStore.pauseTask(previouslyActive.id);
+      const prevTimer = taskTimerStore.getTimer(previouslyActive.id);
+      const prevSecs = prevTimer ? Math.floor(prevTimer.elapsedMs / 1000) : 0;
+      try {
+        await updateTask(previouslyActive.id as UUID, {
+          status: 'todo',
+          actualHours: prevSecs / 3600,
+        });
+        await pauseSession(previouslyActive.id as UUID);
+      } catch (e) {
+        console.warn('Failed to pause previously active task on start:', e);
+      }
+    }
+
     setTasksList((prev) =>
-      prev.map((x) => (x.id === task.id ? { ...x, status: 'In Progress', assignee: updatedAssignee } : x))
+      prev.map((x) => {
+        if (x.id === task.id) {
+          return { ...x, status: 'In Progress', assignee: updatedAssignee };
+        } else if (x.status === 'In Progress') {
+          return { ...x, status: 'To Do' };
+        }
+        return x;
+      })
     );
+
     taskTimerStore.startTask(task.id);
     try {
-      await updateTask(task.id, { status: 'in_progress', approvalStatus: null });
+      await updateTask(task.id as UUID, { status: 'in_progress', approvalStatus: null });
+      
+      const raw = (tasks || []).find((t) => t.id === task.id);
+      await startSession({
+        taskId: task.id as UUID,
+        projectId: raw?.projectId,
+        workTitle: task.name,
+        supervisorId: (raw as any)?.supervisorId,
+      });
     } catch (e) {
       console.warn('Update task error:', e);
     }
     toast({ variant: 'success', title: 'Task Started', message: `Task "${task.name}" is now In Progress.` });
   };
 
-  const handlePauseTask = (taskId: string) => {
+  const handlePauseTask = async (taskId: string) => {
     taskTimerStore.pauseTask(taskId);
+    const timer = taskTimerStore.getTimer(taskId);
+    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
+    setTasksList((prev) =>
+      prev.map((x) => (x.id === taskId ? { ...x, status: 'To Do' } : x))
+    );
+
+    try {
+      await updateTask(taskId as UUID, { status: 'todo', actualHours: secondsToday / 3600 });
+      await pauseSession(taskId as UUID);
+    } catch (e) {
+      console.warn('Pause task error:', e);
+    }
     toast({ variant: 'info', title: 'Task Paused', message: 'Work timer has been paused.' });
   };
 
   const handleSubmitTaskForApproval = async (task: TaskItem) => {
     // Pause timer if running via shared store
     taskTimerStore.pauseTask(task.id);
+    const timer = taskTimerStore.getTimer(task.id);
+    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
+    // Save final actualHours to the DB and complete the work session
+    try {
+      await updateTask(task.id as UUID, { actualHours: secondsToday / 3600 });
+      await completeSession(task.id as UUID);
+    } catch (e) {
+      console.warn('Failed to update task hours on submission:', e);
+    }
+
     setTasksList((prev) =>
       prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))
     );
@@ -433,17 +493,31 @@ export function TaskBoard({
 
   const handleMarkComplete = async (task: TaskItem) => {
     const isApprover = ['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '');
+    
+    // Pause timer and get final hours
+    taskTimerStore.pauseTask(task.id);
+    const timer = taskTimerStore.getTimer(task.id);
+    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
     if (isApprover) {
       setTasksList((prev) =>
         prev.map((x) => (x.id === task.id ? { ...x, status: 'Completed' } : x))
       );
       try {
-        await updateTask(task.id, { status: 'done', approvalStatus: 'approved' });
+        await updateTask(task.id as UUID, { status: 'done', approvalStatus: 'approved', actualHours: secondsToday / 3600 });
+        await completeSession(task.id as UUID);
       } catch (e) {
         console.warn('Update task error:', e);
       }
       toast({ variant: 'success', title: 'Task Completed', message: `Task "${task.name}" marked complete.` });
     } else {
+      try {
+        await updateTask(task.id as UUID, { actualHours: secondsToday / 3600 });
+        await completeSession(task.id as UUID);
+      } catch (e) {
+        console.warn('Failed to update task hours on completion request:', e);
+      }
+
       setTasksList((prev) =>
         prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))
       );

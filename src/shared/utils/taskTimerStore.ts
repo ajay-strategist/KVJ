@@ -52,16 +52,33 @@ function loadTimers(): Record<string, TaskTimerState> {
         if (isStale) return;
 
         if (!result[id]) {
+          const isRunning = !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime));
+          let elapsed = (val.secondsToday || 0) * 1000;
+          if (isRunning && val.lastStartTime) {
+            // Subtract active session duration to prevent double-counting
+            const activeSessionDuration = Date.now() - val.lastStartTime;
+            elapsed = Math.max(0, elapsed - activeSessionDuration);
+          }
           result[id] = {
             taskId: id,
             startTime: val.lastStartTime || Date.now(),
-            elapsedMs: (val.secondsToday || 0) * 1000,
-            isRunning: !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime)),
+            elapsedMs: elapsed,
+            isRunning,
           };
         } else {
-          result[id].isRunning = !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime));
-          if (val.secondsToday && val.secondsToday * 1000 > result[id].elapsedMs) {
-            result[id].elapsedMs = val.secondsToday * 1000;
+          const wasRunning = result[id].isRunning;
+          const isRunning = !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime));
+          result[id].isRunning = isRunning;
+          if (isRunning) {
+            // If the task is running, do NOT overwrite elapsedMs with ticking val.secondsToday
+            if (!wasRunning) {
+              result[id].startTime = val.lastStartTime || Date.now();
+            }
+          } else {
+            // If the task is paused, update elapsedMs from the stored secondsToday
+            if (val.secondsToday && val.secondsToday * 1000 > result[id].elapsedMs) {
+              result[id].elapsedMs = val.secondsToday * 1000;
+            }
           }
         }
       });
@@ -133,10 +150,27 @@ export const taskTimerStore = {
 
   startTask(taskId: string) {
     const current = loadTimers();
+    const now = Date.now();
+
+    // Auto-pause any other running task in the global store to ensure
+    // only one task runs at a time and prevent timesheet corruption
+    Object.keys(current).forEach((id) => {
+      if (id !== taskId && current[id].isRunning) {
+        const existing = current[id];
+        const sessionElapsed = now - existing.startTime;
+        current[id] = {
+          taskId: id,
+          startTime: now,
+          elapsedMs: existing.elapsedMs + Math.max(0, sessionElapsed),
+          isRunning: false,
+        };
+      }
+    });
+
     const existing = current[taskId];
     current[taskId] = {
       taskId,
-      startTime: Date.now(),
+      startTime: now,
       elapsedMs: existing ? existing.elapsedMs : 0,
       isRunning: true,
     };
