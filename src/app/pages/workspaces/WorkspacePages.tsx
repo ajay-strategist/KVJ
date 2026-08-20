@@ -1179,19 +1179,38 @@ export const TaskWidget = memo(function TaskWidget({
                       {isExpanded ? '▼' : '▶'}
                     </button>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{displayTitle}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ marginLeft: 12, fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
                       ⏱ {formatSec(t.secondsToday)}
                     </span>
-                    <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
+                    {t.isRework && <Badge tone="warning">🔄 Rework</Badge>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {t.isApproved ? (
-                      <Badge tone="success">Approved</Badge>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        ✓ Approved &amp; Completed
+                      </span>
                     ) : t.underReview ? (
-                      <Badge tone="info">Pending Approval</Badge>
-                    ) : t.isRework ? (
-                      <Badge tone="warning">🔄 Rework</Badge>
-                    ) : null}
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        📩 Submitted &amp; Requires Approval
+                      </span>
+                    ) : (
+                      <>
+                        <Button
+                          variant={t.active ? 'secondary' : 'primary'}
+                          onClick={() => onToggleTask(t.id, t.title, t.active)}
+                          style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                        >
+                          {t.active ? '⏸ Pause' : '▶ Start'}
+                        </Button>
+
+                        <Button
+                          onClick={() => onSubmitReview(t.id, t.title)}
+                          style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                        >
+                          📩 Submit
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1257,37 +1276,7 @@ export const TaskWidget = memo(function TaskWidget({
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {t.isApproved ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        ✓ Approved &amp; Completed
-                      </span>
-                    ) : t.underReview ? (
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        📩 Submitted &amp; Requires Approval
-                      </span>
-                    ) : (
-                      <>
-                        <Button
-                          variant={t.active ? 'secondary' : 'primary'}
-                          onClick={() => onToggleTask(t.id, t.title, t.active)}
-                          style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
-                        >
-                          {t.active ? '⏸ Pause' : '▶ Start'}
-                        </Button>
 
-                        <Button
-                          onClick={() => onSubmitReview(t.id, t.title)}
-                          style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
-                        >
-                          📩 Submit
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
               </div>
             );
           })
