@@ -522,10 +522,16 @@ export function TaskWorklogView({
                 <tr><td colSpan={8} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
               ) : filteredSessions.map((s) => {
                 const project = (projects || []).find((p: any) => p.id === s.projectId);
+                const task = (tasks || []).find((tk: any) => tk.id === s.taskId);
+                const tSupervisorId = task?.supervisorId || (task as any)?.assignedByEmployeeId;
+                const pSupervisorId = project ? (project as any).supervisorId : null;
+                const resolvedSupervisorId = s.supervisorId || tSupervisorId || pSupervisorId;
+                const resolvedSupervisorName = s.supervisorName || empName(resolvedSupervisorId);
+
                 return (
                   <tr key={s.id} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{empName(s.employeeId)}</td>
-                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.supervisorName || empName(s.supervisorId) || '—'}</td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{resolvedSupervisorName || '—'}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <strong>{project ? `${project.title}: ` : 'Office Task: '}</strong>{s.workTitle}
                     </td>

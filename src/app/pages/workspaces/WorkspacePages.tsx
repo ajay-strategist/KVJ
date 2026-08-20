@@ -2268,11 +2268,16 @@ export function MyDayPage() {
 
     const raw = (projectTasks || []).find((t) => t.id === id);
     if (nextActive) {
+      const project = raw?.projectId ? (projects || []).find((p) => p.id === raw.projectId) : null;
+      const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
+      const pSupervisorId = project ? (project as any).supervisorId : null;
+      const supervisorId = tSupervisorId || pSupervisorId;
+
       startSession({
         taskId: id as any,
         projectId: raw?.projectId,
         workTitle: taskTitle,
-        supervisorId: (raw as any)?.supervisorId,
+        supervisorId,
       });
     } else {
       pauseSession(id as any);
