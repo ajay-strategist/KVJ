@@ -720,14 +720,14 @@ export function ProjectList({
       <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap', alignItems: 'stretch' }}>
         
         {/* Left Side: KPI Cards */}
-        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16, width: 220, flex: '0 0 220px' }}>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
         </Card>
 
-        <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16, width: 220, flex: '0 0 220px' }}>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-success)', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
             {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
           </div>
         </Card>

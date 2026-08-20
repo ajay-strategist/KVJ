@@ -756,19 +756,19 @@ export function TaskBoard({
 
       {/* KPI Stat Cards */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
-        <Card style={{ borderLeft: '4px solid var(--brand)', padding: '12px 16px', width: 220, flex: '0 0 220px' }}>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks Active</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
         </Card>
 
-        <Card style={{ borderLeft: '4px solid var(--status-danger)', padding: '12px 16px', width: 220, flex: '0 0 220px' }}>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-danger)', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due Today</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due Today</div>
         </Card>
 
-        <Card style={{ borderLeft: '4px solid var(--accent)', padding: '12px 16px', width: 220, flex: '0 0 220px' }}>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--accent)', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)} hrs</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)} hrs</div>
         </Card>
       </div>
 
