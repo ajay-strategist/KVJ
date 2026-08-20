@@ -733,9 +733,9 @@ export function ProjectList({
         </Card>
 
         {/* Right Side: Status Filter (Right of Overall Task Completion) */}
-        <Card style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 auto', minWidth: 280 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Status Filter:</span>
+        <Card style={{ borderLeft: '4px solid var(--border)', padding: 16, width: 260, flex: '0 0 260px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Status Filter</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
             <select
               className="kvj-select"
               value={selectedStatus}
@@ -747,7 +747,9 @@ export function ProjectList({
                 border: '1px solid var(--border)', 
                 background: 'var(--bg-panel)', 
                 color: 'var(--text-primary)',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                width: '100%',
+                boxSizing: 'border-box'
               }}
             >
               <option value="All Statuses">All Statuses</option>
@@ -756,9 +758,9 @@ export function ProjectList({
               <option value="Completed">Completed</option>
             </select>
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>
-            Showing {filteredProjects.length}/{projectsList.length}
-          </span>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>
+            Showing {filteredProjects.length} / {projectsList.length} Projects
+          </div>
         </Card>
       </div>
 
