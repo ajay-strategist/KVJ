@@ -172,9 +172,9 @@ export function TaskBoard({
       const project = projects.find((p: any) => p.id === t.projectId);
       const assignee = employees.find((e) => e.id === t.assigneeId);
       
-      const tSupervisorId = t.supervisorId || t.assignedByEmployeeId;
       const pSupervisorId = project ? (project as any).supervisorId : null;
-      const supervisorId = tSupervisorId || pSupervisorId;
+      const tSupervisorId = t.supervisorId || t.assignedByEmployeeId;
+      const supervisorId = pSupervisorId || tSupervisorId;
       const supervisorEmp = supervisorId ? employees.find((e) => e.id === supervisorId) : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : (t.supervisorName || '');
 

@@ -193,7 +193,8 @@ export function TaskWorklogView({
       const t = (tasks || []).find((tk: any) => tk.id === s.taskId);
       const proj = t ? (projects || []).find((p: any) => p.id === t.projectId) : null;
       
-      let supervisorId = s.supervisorId || t?.supervisorId;
+      const pSupervisorId = proj ? (proj as any).supervisorId : null;
+      let supervisorId = pSupervisorId || s.supervisorId || t?.supervisorId;
       let supervisorName = s.supervisorName || t?.supervisorName;
 
       if (!supervisorId) {
@@ -521,11 +522,11 @@ export function TaskWorklogView({
               {filteredSessions.length === 0 ? (
                 <tr><td colSpan={8} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
               ) : filteredSessions.map((s) => {
-                const project = (projects || []).find((p: any) => p.id === s.projectId);
+                const project = s.projectId && s.projectId !== 'OFFICE_TASK' ? (projects || []).find((p: any) => p.id === s.projectId) : null;
                 const task = (tasks || []).find((tk: any) => tk.id === s.taskId);
-                const tSupervisorId = task?.supervisorId || (task as any)?.assignedByEmployeeId;
                 const pSupervisorId = project ? (project as any).supervisorId : null;
-                const resolvedSupervisorId = s.supervisorId || tSupervisorId || pSupervisorId;
+                const tSupervisorId = task?.supervisorId || (task as any)?.assignedByEmployeeId;
+                const resolvedSupervisorId = pSupervisorId || tSupervisorId || s.supervisorId;
                 const resolvedSupervisorName = s.supervisorName || empName(resolvedSupervisorId);
 
                 return (

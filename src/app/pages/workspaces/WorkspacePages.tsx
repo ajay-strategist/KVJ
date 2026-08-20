@@ -1373,10 +1373,14 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
           return false;
         }
 
+        const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
+        const pSupervisorId = projectObj ? (projectObj as any).supervisorId : null;
+        const resolvedSupervisorId = pSupervisorId || t.supervisorId || (t as any).assignedByEmployeeId;
+
         if (!isManagement) {
           // Employees see tasks assigned to them PLUS tasks they supervise.
           const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || ((t as any).assignee && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
-          const iSupervise = t.supervisorId === user?.id || (t as any).assignedByEmployeeId === user?.id;
+          const iSupervise = resolvedSupervisorId === user?.id;
           if (!isMyTask && !iSupervise) return false;
         }
         const taskDate = (t.dueDate || '').slice(0, 10);
@@ -1387,6 +1391,10 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
         }
         return taskDate === isoDate;
       }).map((t) => {
+        const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
+        const pSupervisorId = projectObj ? (projectObj as any).supervisorId : null;
+        const resolvedSupervisorId = pSupervisorId || t.supervisorId || (t as any).assignedByEmployeeId;
+
         const projName = projTitle(t.projectId);
         const displayTitle = projName && projName !== 'Office Task' ? `${projName}: ${t.title}` : `Office Task: ${t.title}`;
         const statusLabel = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval'
@@ -1403,7 +1411,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
           dueDate: (t.dueDate || '').slice(0, 10) || '—',
           timeLeft: timeLeftLabel(t.dueDate, isoDate),
           assignee: empName(t.assigneeId) || 'Unassigned',
-          supervisor: empName(t.supervisorId) || empName((t as any).assignedByEmployeeId) || '—',
+          supervisor: empName(resolvedSupervisorId) || '—',
           status: statusLabel,
           actualHours: t.actualHours || 0,
         };
@@ -2116,7 +2124,9 @@ export function MyDayPage() {
 
         // Resolve UUID IDs to display names using the employees list
         const assigneeEmp = employees?.find((e) => e.id === t.assigneeId);
-        const supervisorEmpId = t.supervisorId || (t as any).assignedByEmployeeId;
+        const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
+        const pSupervisorId = projectObj ? (projectObj as any).supervisorId : null;
+        const supervisorEmpId = pSupervisorId || t.supervisorId || (t as any).assignedByEmployeeId;
         const supervisorEmp = supervisorEmpId ? employees?.find((e) => e.id === supervisorEmpId) : null;
         const assigneeName = assigneeEmp
           ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}`
@@ -2268,10 +2278,10 @@ export function MyDayPage() {
 
     const raw = (projectTasks || []).find((t) => t.id === id);
     if (nextActive) {
-      const project = raw?.projectId ? (projects || []).find((p) => p.id === raw.projectId) : null;
-      const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
+      const project = raw?.projectId && raw.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === raw.projectId) : null;
       const pSupervisorId = project ? (project as any).supervisorId : null;
-      const supervisorId = tSupervisorId || pSupervisorId;
+      const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
+      const supervisorId = pSupervisorId || tSupervisorId;
 
       startSession({
         taskId: id as any,
