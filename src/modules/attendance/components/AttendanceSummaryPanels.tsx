@@ -352,9 +352,9 @@ export function AttendanceSummaryPanels({
                   <td style={{ padding: 8, fontWeight: 600 }}>{c.institution}</td>
                   <td style={{ padding: 8, textAlign: 'center' }}>{c.physicalClasses}</td>
                   <td style={{ padding: 8, textAlign: 'center' }}>{c.onlineClasses}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{c.physicalClassDuration}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>{c.onlineDuration}</td>
-                  <td style={{ padding: 8, textAlign: 'center', fontWeight: 700, color: 'var(--brand)' }}>{c.totalPhysicalDuration} hrs</td>
+                  <td style={{ padding: 8, textAlign: 'center' }}>{c.physicalClassDuration.toFixed(1)}</td>
+                  <td style={{ padding: 8, textAlign: 'center' }}>{c.onlineDuration.toFixed(1)}</td>
+                  <td style={{ padding: 8, textAlign: 'center', fontWeight: 700, color: 'var(--brand)' }}>{c.totalPhysicalDuration.toFixed(1)} hrs</td>
                 </tr>
               ))}
             </tbody>
