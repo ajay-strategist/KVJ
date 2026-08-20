@@ -512,14 +512,14 @@ export function TaskWorklogView({
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
-                {['Employee', 'Supervisor', 'Project / Task', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Duration', 'Status'].map((h) => (
+                {['Employee', 'Supervisor', 'Project / Task', 'Date', 'Start Time', 'End Time', 'Duration', 'Status'].map((h) => (
                   <th key={h} style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filteredSessions.length === 0 ? (
-                <tr><td colSpan={9} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
+                <tr><td colSpan={8} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
               ) : filteredSessions.map((s) => {
                 const project = (projects || []).find((p: any) => p.id === s.projectId);
                 return (
@@ -531,7 +531,6 @@ export function TaskWorklogView({
                     </td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.startTime)}</td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{tOnly(s.startTime)}</td>
-                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.endTime)}</td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.endTime ? tOnly(s.endTime) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes)}

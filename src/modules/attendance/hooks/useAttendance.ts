@@ -233,6 +233,19 @@ export function useAttendance() {
     fetchTodayRecord();
   }, [fetchTodayRecord]);
 
+  useEffect(() => {
+    if (loading) return;
+    const isInactive = !record || record.status === 'clocked_out' || record.status === 'on_break';
+    if (isInactive) {
+      const currentTimers = taskTimerStore.getTimers();
+      Object.keys(currentTimers).forEach((id) => {
+        if (currentTimers[id].isRunning) {
+          taskTimerStore.pauseTask(id);
+        }
+      });
+    }
+  }, [record, loading]);
+
   return {
     record,
     monthRecords,
