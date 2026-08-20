@@ -179,7 +179,8 @@ export function TaskBoard({
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : (t.supervisorName || '');
 
       const tTimesheets = timesheets.filter((ts: any) => ts.taskId === t.id);
-      const totalHoursWorked = tTimesheets.reduce((sum: number, ts: any) => sum + ts.hoursLogged, 0);
+      const timesheetHours = tTimesheets.reduce((sum: number, ts: any) => sum + ts.hoursLogged, 0);
+      const totalHoursWorked = t.actualHours && t.actualHours > timesheetHours ? t.actualHours : timesheetHours;
 
       const dailyTimeEntries = tTimesheets.map((ts: any) => {
         const emp = employees.find((e) => e.id === ts.employeeId);
@@ -694,7 +695,7 @@ export function TaskBoard({
   };
 
   const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval' && t.status !== 'Completed' && t.status !== 'Under Review').length;
-  const totalHoursSum = tasksList.reduce((acc, t) => acc + t.totalHoursWorked, 0);
+  const totalHoursSum = tasksList.reduce((acc, t) => acc + Math.max(getTaskDurationHours(t.id), t.totalHoursWorked), 0);
 
   const getWorkflowStep = (status: TaskStatus, approvalStatus?: string | null) => {
     if (approvalStatus === 'pending_assignment_approval') return 'Pending Approval';
@@ -990,7 +991,7 @@ export function TaskBoard({
                           <td style={{ padding: '12px 16px' }}>{formatTableDate((t as any).startDate || t.startDate)}</td>
                           <td style={{ padding: '12px 16px' }}>{formatTableDate(t.dueDate)}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                            ⏱ {t.totalHoursWorked.toFixed(1)} hrs
+                            ⏱ {Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)} hrs
                           </td>
                           <td style={{ padding: '12px 16px' }}>
                             <Badge tone={
