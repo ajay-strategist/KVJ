@@ -85,10 +85,14 @@ export function useAttendance() {
       const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
       const mainTaskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
       const actor = { id: user.id, role: user.role };
-      const page = await taskRepo.findMany({ pageSize: 500 });
-      const running = (page.data || []).filter(
-        (s: TaskWorkSession) => s.employeeId === user.id && (s as any).status === 'running' && !(s as any).deletedAt,
-      );
+      const page = await taskRepo.findMany({
+        filters: [
+          { field: 'employeeId', op: 'eq', value: user.id },
+          { field: 'status', op: 'eq', value: 'running' }
+        ],
+        pageSize: 100
+      });
+      const running = page.data || [];
       for (const s of running) {
         const endTime = new Date();
         const durationMinutes = Math.max(0, Math.round((endTime.getTime() - new Date(s.startTime).getTime()) / 60000));
@@ -142,10 +146,14 @@ export function useAttendance() {
       const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
       const mainTaskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
       const actor = { id: user.id, role: user.role };
-      const page = await taskRepo.findMany({ pageSize: 500 });
-      const running = (page.data || []).filter(
-        (s: TaskWorkSession) => s.employeeId === user.id && (s as any).status === 'running' && !(s as any).deletedAt,
-      );
+      const page = await taskRepo.findMany({
+        filters: [
+          { field: 'employeeId', op: 'eq', value: user.id },
+          { field: 'status', op: 'eq', value: 'running' }
+        ],
+        pageSize: 100
+      });
+      const running = page.data || [];
       const resumeList: Partial<TaskWorkSession>[] = [];
       for (const s of running) {
         const endTime = new Date();
