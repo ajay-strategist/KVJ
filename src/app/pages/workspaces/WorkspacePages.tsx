@@ -1492,9 +1492,10 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
                   flexDirection: 'column', 
                   gap: 8, 
                   padding: '10px 12px', 
-                  background: 'var(--bg-sunken)', 
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border)'
+                  background: 'var(--bg-surface)', 
+                  borderRadius: 10,
+                  border: '1px solid var(--border)',
+                  boxShadow: 'var(--e1)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -1518,8 +1519,15 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
                         {isExpanded ? '▼' : '▶'}
                       </button>
                     )}
-                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.title}>
-                      {e.title}
+                    <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }} title={e.title}>
+                      {isTask ? (
+                        <>
+                          <strong style={{ fontWeight: 700 }}>{(e as any).project && (e as any).project !== 'Office Task' ? (e as any).project : 'Office Task'}:</strong>{' '}
+                          <span style={{ fontWeight: 400 }}>{e.title.includes(': ') ? e.title.split(': ').slice(1).join(': ') : e.title}</span>
+                        </>
+                      ) : (
+                        <span style={{ fontWeight: 600 }}>{e.title}</span>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
