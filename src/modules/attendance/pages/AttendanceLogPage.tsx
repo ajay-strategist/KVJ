@@ -30,7 +30,7 @@ function batchDisplayName(b?: {
   batchNo?: string; trainingName?: string; code?: string;
 } | null): string {
   if (!b) return 'Training Batch';
-  const cleaned = cleanBatchCode(b.code);
+  const cleaned = cleanBatchCode(b.code, b.batchNo);
   if (cleaned) return cleaned;
   const parts = [b.college, b.program, b.academicYear, b.batchNo].filter(Boolean);
   if (parts.length) return parts.join(' - ');
