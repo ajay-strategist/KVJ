@@ -1153,66 +1153,71 @@ export const TaskWidget = memo(function TaskWidget({
                   boxShadow: 'var(--e1)',
                 }}
               >
-                {/* Task Details Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4 }}>⣿</span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleExpand(t.id);
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        fontSize: 11,
-                        padding: 4,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
-                    >
-                      {isExpanded ? '▼' : '▶'}
-                    </button>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{displayTitle}</div>
-                    <span style={{ marginLeft: 12, fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
-                      ⏱ {formatSec(t.secondsToday)}
-                    </span>
-                    {t.isRework && <Badge tone="warning">🔄 Rework</Badge>}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {t.isApproved ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        ✓ Approved &amp; Completed
-                      </span>
-                    ) : t.underReview ? (
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        📩 Submitted &amp; Requires Approval
-                      </span>
-                    ) : (
-                      <>
-                        <Button
-                          variant={t.active ? 'secondary' : 'primary'}
-                          onClick={() => onToggleTask(t.id, t.title, t.active)}
-                          style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
-                        >
-                          {t.active ? '⏸ Pause' : '▶ Start'}
-                        </Button>
+                 {/* Task Details Header */}
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 0 }}>
+                     <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4, flexShrink: 0 }}>⣿</span>
+                     <button
+                       type="button"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         toggleExpand(t.id);
+                       }}
+                       style={{
+                         background: 'transparent',
+                         border: 'none',
+                         color: 'var(--text-muted)',
+                         cursor: 'pointer',
+                         fontSize: 11,
+                         padding: 4,
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         flexShrink: 0
+                       }}
+                       aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                     >
+                       {isExpanded ? '▼' : '▶'}
+                     </button>
+                     <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: '1.4', wordBreak: 'break-word' }}>
+                       <strong style={{ fontWeight: 700 }}>{t.project && t.project !== 'Office Task' ? t.project : 'Office Task'}:</strong> {t.title}
+                     </div>
+                      {t.isRework && <span style={{ flexShrink: 0 }}><Badge tone="warning">🔄 Rework</Badge></span>}
+                   </div>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+                     <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                       ⏱ {formatSec(t.secondsToday)}
+                     </span>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                       {t.isApproved ? (
+                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                           ✓ Approved &amp; Completed
+                         </span>
+                       ) : t.underReview ? (
+                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                           📩 Submitted &amp; Requires Approval
+                         </span>
+                       ) : (
+                         <>
+                           <Button
+                             variant={t.active ? 'secondary' : 'primary'}
+                             onClick={() => onToggleTask(t.id, t.title, t.active)}
+                             style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                           >
+                             {t.active ? '⏸ Pause' : '▶ Start'}
+                           </Button>
 
-                        <Button
-                          onClick={() => onSubmitReview(t.id, t.title)}
-                          style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
-                        >
-                          📩 Submit
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
+                           <Button
+                             onClick={() => onSubmitReview(t.id, t.title)}
+                             style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                           >
+                             📩 Submit
+                           </Button>
+                         </>
+                       )}
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Collapsible Details in 2x2 Grid */}
                 {isExpanded && (
