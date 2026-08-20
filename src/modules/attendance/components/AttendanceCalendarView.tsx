@@ -99,6 +99,18 @@ export function AttendanceCalendarView({
     return mins !== null && mins < 17 * 60; // Early if clock-out is before 05:00 PM
   };
 
+  const parseHoursWorked = (hoursWorkedStr?: string): number => {
+    if (!hoursWorkedStr) return 0;
+    const match = hoursWorkedStr.match(/(\d+)h\s*(\d+)m/);
+    if (match) {
+      const h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      return h + m / 60;
+    }
+    const matchNum = parseFloat(hoursWorkedStr.replace(/[^\d.]/g, ''));
+    return isNaN(matchNum) ? 0 : matchNum;
+  };
+
   // Monthly summary stats calculated dynamically
   const monthlyStats = useMemo(() => {
     const workingDaysInMonth = days.filter((d) => d.dayName !== 'Sun').length;
@@ -117,6 +129,13 @@ export function AttendanceCalendarView({
       return sum + amt;
     }, 0);
 
+    const totalHoursWorked = days.reduce((sum, d) => {
+      if (d.status === 'present') {
+        return sum + parseHoursWorked(d.hoursWorked);
+      }
+      return sum;
+    }, 0);
+
     return {
       workingDaysInMonth,
       daysToBeWorked,
@@ -127,6 +146,7 @@ export function AttendanceCalendarView({
       earlyLeaving,
       totalBreakHrs,
       totalExpenses,
+      totalHoursWorked: Math.round(totalHoursWorked * 10) / 10,
     };
   }, [days]);
 
@@ -147,6 +167,7 @@ export function AttendanceCalendarView({
       earlyLeavingFY: monthlyStats.earlyLeaving,
       totalBreakHrsFY: monthlyStats.totalBreakHrs,
       totalExpensesFY: monthlyStats.totalExpenses,
+      totalHoursWorkedFY: monthlyStats.totalHoursWorked,
     };
   }, [monthlyStats, employees, selectedEmployeeName]);
 
@@ -155,7 +176,7 @@ export function AttendanceCalendarView({
     days.forEach((d) => {
       if (d.status === 'present') {
         const loc = d.location || 'Office';
-        const hrs = parseFloat(d.hoursWorked.replace(/[^\d.]/g, '')) || 0;
+        const hrs = parseHoursWorked(d.hoursWorked);
         if (!orgMap[loc]) orgMap[loc] = { totalHrs: 0, count: 0 };
         orgMap[loc].totalHrs += hrs;
         orgMap[loc].count += 1;
@@ -173,7 +194,7 @@ export function AttendanceCalendarView({
       if (d.status === 'present') {
         const loc = d.location || 'Office';
         if (loc === 'Office') return;
-        const hrs = parseFloat(d.hoursWorked.replace(/[^\d.]/g, '')) || 0;
+        const hrs = parseHoursWorked(d.hoursWorked);
         if (!instMap[loc]) instMap[loc] = { physicalCount: 0, onlineCount: 0, physicalDur: 0, onlineDur: 0 };
 
         const isOnline = d.sessions?.some((s) => s.location.toLowerCase().includes('online')) || false;
@@ -224,6 +245,9 @@ export function AttendanceCalendarView({
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>Total Break:</span> <strong>{monthlyStats.totalBreakHrs} hrs</strong>
             </div>
+            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Total Hours Worked:</span> <strong>{monthlyStats.totalHoursWorked} hrs</strong>
+            </div>
             <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid #22C55E' }}>
               <span style={{ fontWeight: 600 }}>Total Expenses:</span> <strong style={{ color: 'var(--status-success)', fontSize: 14 }}>₹ {monthlyStats.totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
@@ -260,6 +284,9 @@ export function AttendanceCalendarView({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>FY Total Break:</span> <strong>{fyStats.totalBreakHrsFY} hrs</strong>
+            </div>
+            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>FY Total Hours Worked:</span> <strong>{fyStats.totalHoursWorkedFY} hrs</strong>
             </div>
             <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(95, 211, 232, 0.12)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
               <span style={{ fontWeight: 600 }}>FY Total Expenses:</span> <strong style={{ color: 'var(--accent)', fontSize: 14 }}>₹ {fyStats.totalExpensesFY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>

@@ -7,7 +7,8 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useGeolocation } from './useGeolocation';
 import { toLocalISODate } from '../../../shared/utils/date';
 import { hoursThisMonth as calcHoursThisMonth, attendancePercent } from '../../../shared/utils/metrics';
-import { TASK_WORK_SESSION_REPOSITORY_TOKEN, type TaskWorkSession } from '../../project/project.repository';
+import { TASK_WORK_SESSION_REPOSITORY_TOKEN, TASK_REPOSITORY_TOKEN, type TaskWorkSession } from '../../project/project.repository';
+import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
 
 /** localStorage key holding the tasks auto-paused by the current break, per user. */
 const breakPausedKey = (userId: string) => `kvj_break_paused_tasks_${userId}`;
@@ -78,6 +79,36 @@ export function useAttendance() {
     return { ok: false, error: res.error.message };
   }, [service, user, getPosition]);
 
+  const pauseRunningTasks = useCallback(async () => {
+    if (!user) return;
+    try {
+      const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
+      const mainTaskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
+      const actor = { id: user.id, role: user.role };
+      const page = await taskRepo.findMany({ pageSize: 500 });
+      const running = (page.data || []).filter(
+        (s: TaskWorkSession) => s.employeeId === user.id && (s as any).status === 'running' && !(s as any).deletedAt,
+      );
+      for (const s of running) {
+        const endTime = new Date();
+        const durationMinutes = Math.max(0, Math.round((endTime.getTime() - new Date(s.startTime).getTime()) / 60000));
+        await taskRepo.update(s.id, { endTime: endTime.toISOString(), durationMinutes, status: 'paused' } as Partial<TaskWorkSession>, actor);
+
+        if (s.taskId) {
+          taskTimerStore.pauseTask(s.taskId);
+          const timer = taskTimerStore.getTimer(s.taskId);
+          const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+          await mainTaskRepo.update(s.taskId, {
+            status: 'todo',
+            actualHours: secondsToday / 3600,
+          }, actor);
+        }
+      }
+    } catch (e) {
+      console.warn('Auto-pause task failed:', e);
+    }
+  }, [user]);
+
   const clockOut = useCallback(async () => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
@@ -92,10 +123,11 @@ export function useAttendance() {
     setLoading(false);
     if (res.ok) {
       setRecord(res.value);
+      await pauseRunningTasks();
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };
-  }, [service, user, getPosition]);
+  }, [service, user, getPosition, pauseRunningTasks]);
 
   /**
    * Break ⇄ task-session coupling: starting a break pauses whatever task the
@@ -108,6 +140,7 @@ export function useAttendance() {
     if (!user) return;
     try {
       const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
+      const mainTaskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
       const actor = { id: user.id, role: user.role };
       const page = await taskRepo.findMany({ pageSize: 500 });
       const running = (page.data || []).filter(
@@ -118,6 +151,17 @@ export function useAttendance() {
         const endTime = new Date();
         const durationMinutes = Math.max(0, Math.round((endTime.getTime() - new Date(s.startTime).getTime()) / 60000));
         await taskRepo.update(s.id, { endTime: endTime.toISOString(), durationMinutes, status: 'paused' } as Partial<TaskWorkSession>, actor);
+
+        if (s.taskId) {
+          taskTimerStore.pauseTask(s.taskId);
+          const timer = taskTimerStore.getTimer(s.taskId);
+          const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+          await mainTaskRepo.update(s.taskId, {
+            status: 'todo',
+            actualHours: secondsToday / 3600,
+          }, actor);
+        }
+
         resumeList.push({
           taskId: s.taskId, projectId: s.projectId, workTitle: s.workTitle, workCode: s.workCode,
           supervisorId: s.supervisorId, supervisorName: s.supervisorName,
@@ -136,12 +180,20 @@ export function useAttendance() {
       if (!raw) return;
       const list: Partial<TaskWorkSession>[] = JSON.parse(raw) || [];
       const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
+      const mainTaskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
       const actor = { id: user.id, role: user.role };
       for (const t of list) {
         await taskRepo.create(
           { ...t, employeeId: user.id, startTime: new Date().toISOString(), status: 'running' } as Partial<TaskWorkSession>,
           actor,
         );
+
+        if (t.taskId) {
+          taskTimerStore.startTask(t.taskId);
+          await mainTaskRepo.update(t.taskId, {
+            status: 'in_progress',
+          }, actor);
+        }
       }
       localStorage.removeItem(breakPausedKey(user.id));
     } catch (e) {

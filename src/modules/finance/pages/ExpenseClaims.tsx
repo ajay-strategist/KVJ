@@ -1225,7 +1225,7 @@ export function ExpenseClaims() {
                           } else if (r === 'Uploaded Proof') {
                             return <span title="Receipt was uploaded but the direct link is not available" style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'default' }}>📎 Uploaded</span>;
                           } else {
-                            return <span style={{ fontSize: 12, color: 'var(--status-danger)' }}>Missing</span>;
+                            return <span style={{ fontSize: 12, color: 'var(--status-danger)', fontWeight: 600 }}>No Receipt</span>;
                           }
                         })()}
                       </td>

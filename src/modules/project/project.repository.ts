@@ -61,6 +61,7 @@ export interface Task extends Entity {
   priority: TaskPriority;
   status: 'todo' | 'in_progress' | 'review' | 'done';
   dueDate?: string;
+  startDate?: string;
   estimatedHours?: number;
   actualHours?: number;
   checklist?: { item: string; done: boolean }[];

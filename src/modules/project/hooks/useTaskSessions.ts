@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { container } from '../../../core/registry';
 import { useAuth } from '../../auth/AuthProvider';
+import { supabase } from '../../../shared/integration/supabase';
 import {
   TASK_WORK_SESSION_REPOSITORY_TOKEN,
   type TaskWorkSession,
@@ -39,6 +40,37 @@ export function useTaskSessions() {
   const repo = useMemo(() => container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN), []);
   const actor = useMemo(() => (user ? { id: user.id, role: user.role } : null), [user]);
 
+  const closeAllOpenSessionsForEmployee = useCallback(
+    async (status: 'paused' | 'completed') => {
+      if (!user || !actor) return;
+      try {
+        const { data, error } = await supabase
+          .from('flwdsk_task_work_sessions')
+          .select('*')
+          .eq('employee_id', user.id)
+          .is('end_time', null)
+          .is('deleted_at', null);
+        if (!error && data) {
+          const endTime = new Date();
+          for (const s of data) {
+            const durationMinutes = Math.max(
+              0,
+              Math.round((endTime.getTime() - new Date(s.start_time).getTime()) / 60000),
+            );
+            await repo.update(
+              s.id,
+              { endTime: endTime.toISOString(), durationMinutes, status } as Partial<TaskWorkSession>,
+              actor,
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('Could not auto-close other sessions:', e);
+      }
+    },
+    [repo, user, actor]
+  );
+
   /** Close whatever open session exists for this task with the given status. */
   const closeOpen = useCallback(
     async (taskId: UUID | undefined, status: 'paused' | 'completed') => {
@@ -64,7 +96,7 @@ export function useTaskSessions() {
     async (input: StartSessionInput) => {
       if (!user || !actor) return { ok: false as const, error: 'Unauthenticated' };
       try {
-        if (input.taskId) await closeOpen(input.taskId, 'paused');
+        await closeAllOpenSessionsForEmployee('paused');
         await repo.create(
           {
             taskId: input.taskId,
@@ -84,7 +116,7 @@ export function useTaskSessions() {
         return { ok: false as const, error: e?.message ?? 'Failed to start session' };
       }
     },
-    [repo, user, actor, closeOpen],
+    [repo, user, actor, closeAllOpenSessionsForEmployee],
   );
 
   const pauseSession = useCallback(

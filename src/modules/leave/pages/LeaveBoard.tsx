@@ -36,6 +36,39 @@ function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean)
   return `${startFormatted} – ${endFormatted}${halfDay ? ' (Half Day)' : ''}`;
 }
 
+function LeaveStatCard({ label, value, tone = 'progress', icon }: { label: string; value: number; tone?: string; icon: string }) {
+  return (
+    <Card style={{ padding: '14px 18px', width: 220, flex: '0 0 220px' }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+        <span
+          className={`kvj-badge kvj-badge--${tone}`}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 'var(--radius-md)',
+            justifyContent: 'center',
+            padding: 0,
+            flexShrink: 0,
+            fontSize: 16,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          {icon}
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>
+            {value}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+            {label}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function LeaveBoard() {
   const { leaves, allLeaves, applyLeave, approveLeave, rejectLeave, cancelLeave, uploadMedicalCertificate, loading, refreshAll, refreshMyLeaves } = useLeave();
   const { employees } = useEmployee();
@@ -257,7 +290,10 @@ export function LeaveBoard() {
         header: 'Actions',
         render: (r) => {
           const isOwner = r.employeeId === user?.id;
-          const canCancel = (r.status === 'pending' || r.status === 'approved') && (isMgmt || isOwner);
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const targetEndDate = r.endDate || r.startDate || '';
+          const isDatePassed = targetEndDate < todayStr;
+          const canCancel = (r.status === 'pending' || r.status === 'approved') && (isMgmt || (isOwner && !isDatePassed));
 
           const handleCancel = async (e: React.MouseEvent) => {
             e.stopPropagation();
@@ -386,10 +422,10 @@ export function LeaveBoard() {
         actions={<Button onClick={() => setApplyOpen(true)}>Request Leave</Button>}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <StatCard label="Pending Applications" value={pendingCount} tone="warning" icon="⚑" />
-        <StatCard label="Approved Leaves" value={approvedCount} tone="success" icon="✓" />
-        <StatCard label="Total Leaves Taken" value={approvedCount} icon="🗓" />
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+        <LeaveStatCard label="Pending Applications" value={pendingCount} tone="warning" icon="⚑" />
+        <LeaveStatCard label="Approved Leaves" value={approvedCount} tone="success" icon="✓" />
+        <LeaveStatCard label="Total Leaves Taken" value={approvedCount} icon="🗓" />
       </div>
 
       <div

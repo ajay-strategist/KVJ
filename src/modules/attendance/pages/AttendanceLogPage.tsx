@@ -69,17 +69,71 @@ export interface AttendanceLogRow {
 function ConditionalAttendanceFields() {
   const { values } = useForm();
   const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
-  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [assignedBatchIds, setAssignedBatchIds] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
+
+  useEffect(() => {
+    async function fetchAssigned() {
+      if (!values.date || !user?.id) return;
+      try {
+        const { data } = await supabase
+          .from('schedule_sessions')
+          .select('batch_id')
+          .eq('date', values.date);
+        if (data) {
+          setAssignedBatchIds(new Set(data.map((s: any) => s.batch_id).filter(Boolean)));
+        }
+      } catch {}
+    }
+    fetchAssigned();
+  }, [values.date, user?.id]);
+
   if (values.classification === 'Training') {
-    const options = batches.length > 0
-      ? batches.map((b) => ({ value: b.code, label: b.code }))
-      : [{ value: 'No Batches Available', label: 'No Batches Available' }];
+    // 1. Exclude completed batches
+    let filtered = batches.filter((b) => b.phase !== 'Completed');
+
+    // 2. Sort: Position assigned training batches at the top
+    filtered = [...filtered].sort((a, b) => {
+      const aAssigned = assignedBatchIds.has(a.id) || assignedBatchIds.has(a.code);
+      const bAssigned = assignedBatchIds.has(b.id) || assignedBatchIds.has(b.code);
+      if (aAssigned && !bAssigned) return -1;
+      if (!aAssigned && bAssigned) return 1;
+      return 0;
+    });
+
+    // 3. Search query filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(b => 
+        (b.code || '').toLowerCase().includes(q) || 
+        batchDisplayName(b).toLowerCase().includes(q)
+      );
+    }
+
+    const options = filtered.length > 0
+      ? filtered.map((b) => ({ value: b.code, label: batchDisplayName(b) }))
+      : [{ value: '', label: 'No matches found' }];
+
     return (
-      <SelectField
-        name="location"
-        label="Select Training Batch"
-        options={options}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Search Training Batch</label>
+          <input
+            type="text"
+            className="kvj-input"
+            placeholder="Type batch name or code to filter..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%', marginTop: 4, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-panel)', color: 'var(--text-primary)' }}
+          />
+        </div>
+        <SelectField
+          name="location"
+          label="Select Training Batch"
+          options={options}
+        />
+      </div>
     );
   }
 
@@ -543,9 +597,14 @@ export function AttendanceLogPage() {
           b && (
             (b.code && b.code.toLowerCase() === locStr.toLowerCase()) ||
             (b.batchNo && b.batchNo.toLowerCase() === locStr.toLowerCase()) ||
-            (b.college && locStr.toLowerCase().includes(b.college.toLowerCase()))
+            (batchDisplayName(b).toLowerCase() === locStr.toLowerCase())
           )
         );
+        if (!foundBatch) {
+          foundBatch = safeBatches.find((b) =>
+            b && b.college && locStr.toLowerCase().includes(b.college.toLowerCase())
+          );
+        }
       }
     }
 
@@ -571,6 +630,9 @@ export function AttendanceLogPage() {
   }, [batches]);
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+    if (workType === 'Work From Home' || workType === 'Remote') {
+      return 'Remote';
+    }
     const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
       return batchDisplayName(foundBatch);
@@ -644,7 +706,8 @@ export function AttendanceLogPage() {
         const remMins = totalMins % 60;
 
         const isHolType = workType === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday');
-        const isLeaveType = workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave;
+        const hasClockIn = !!record.firstClockIn;
+        const isLeaveType = (workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave) && !hasClockIn;
 
         days.push({
           dateNum: dayNum,
@@ -749,7 +812,8 @@ export function AttendanceLogPage() {
             sIdx > 0;
 
           const isHoliday = workType === 'Holiday' || (s.notes && s.notes.toLowerCase().includes('holiday')) || !!decHoliday;
-          const isLeave = workType === 'Leave' || (s.notes && s.notes.toLowerCase().includes('leave')) || !!activeLeave;
+          const hasClockIn = !!record.firstClockIn;
+          const isLeave = (workType === 'Leave' || (s.notes && s.notes.toLowerCase().includes('leave')) || !!activeLeave) && !hasClockIn;
 
           rows.push({
             date: dateStr.split('-').reverse().join('/'),
@@ -1183,7 +1247,7 @@ export function AttendanceLogPage() {
                           ) : exp.type === 'Self Travel' ? (
                             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>KM Auto-Calc</span>
                           ) : (
-                            <span style={{ fontSize: 12, color: 'var(--status-danger)' }}>Missing</span>
+                            <span style={{ fontSize: 12, color: 'var(--status-danger)', fontWeight: 600 }}>No Receipt</span>
                           )}
                         </td>
                         <td style={{ padding: 10 }}>
@@ -1425,32 +1489,48 @@ export function AttendanceLogPage() {
             notes: '',
           }}
           onSubmit={async (values) => {
-            const locText = values.classification === 'Training' 
-              ? values.location 
-              : values.classification === 'Marketing' 
-              ? `Marketing: ${values.organisationsVisited}` 
-              : 'Office Work';
-            
-            try {
-              const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
-              await attService.requestCorrection(
-                String(Date.now()),
-                'attendance_claim',
-                `${values.date} (${values.startTime} - ${values.endTime})`,
-                `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
-                { id: user?.id || 'emp-user', role: user?.role || 'Employee' }
-              );
-            } catch (e) {
-              console.warn('Attendance correction request notice:', e);
-            }
+             const locText = values.classification === 'Training' 
+               ? values.location 
+               : values.classification === 'Marketing' 
+               ? `Marketing: ${values.organisationsVisited}` 
+               : 'Office Work';
+             
+             const targetEmpId = currentEmployee?.id || user?.id || '';
+             let recordId = String(Date.now());
+             try {
+               const { data } = await supabase
+                 .from('flwdsk_attendance')
+                 .select('id')
+                 .eq('employee_id', targetEmpId)
+                 .eq('work_date', values.date)
+                 .limit(1);
+               if (data && data[0]) {
+                 recordId = data[0].id;
+               }
+             } catch (e) {
+               console.warn('Could not find existing attendance record id:', e);
+             }
 
-            toast({
-              variant: 'success',
-              title: 'Attendance Request Submitted',
-              message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
-            });
-            setSubmitDrawerOpen(false);
-          }}
+             try {
+               const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
+               await attService.requestCorrection(
+                 recordId,
+                 'attendance_claim',
+                 `${values.date} (${values.startTime} - ${values.endTime})`,
+                 `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
+                 { id: targetEmpId, role: 'Employee' }
+               );
+             } catch (e) {
+               console.warn('Attendance correction request notice:', e);
+             }
+
+             toast({
+               variant: 'success',
+               title: 'Attendance Request Submitted',
+               message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
+             });
+             setSubmitDrawerOpen(false);
+           }}
         >
           <TextField name="date" label="Attendance Date" placeholder="YYYY-MM-DD" />
           <SelectField

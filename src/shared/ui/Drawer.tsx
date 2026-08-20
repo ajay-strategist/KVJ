@@ -18,18 +18,12 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
   useEffect(() => {
     if (!open) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-
     document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.body.style.overflow = '';
-      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -43,7 +37,6 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
   return createPortal(
     <div
       className="kvj-drawer-overlay"
-      onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,

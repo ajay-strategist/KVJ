@@ -341,20 +341,6 @@ export function SettingsPage() {
           </Card>
 
           <Card>
-            <SectionHeader title="About KVJ Analytics" />
-            <Row label="Product Name">KVJ Analytics</Row>
-            <Row label="Description">Enterprise Operations Platform</Row>
-            <Row label="Version">Version 1.0</Row>
-            <Row label="Developed by">Developed by KVJ Analytics</Row>
-            <Row label="Tagline">
-              <span style={{ color: 'var(--brand)', fontWeight: 700 }}>Connect. Manage. Transform.</span>
-            </Row>
-            <Row label="Environment">{config.app.environment}</Row>
-            <Row label="Timezone">{config.locale.timezone}</Row>
-            <Row label="Financial year start">{`Month ${config.organization.financialYearStartMonth}`}</Row>
-          </Card>
-
-          <Card>
             <SectionHeader title="Signed-in Profile" />
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
               <Avatar name={user?.fullName ?? ''} src={user?.avatarUrl} size={60} />
@@ -404,11 +390,6 @@ export function SettingsPage() {
 
           {/* User Password Reset Card (Task 11) */}
           <UserPasswordResetCard />
-
-          {/* Admin User Management Panel */}
-          {['ADMIN', 'CEO', 'MANAGER'].includes(user?.role || '') && (
-            <AdminUserManagementCard />
-          )}
 
         </div>
 

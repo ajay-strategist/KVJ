@@ -91,103 +91,137 @@ export function TaskWorklogView({
 
   // ── Build synthetic sessions from localStorage when DB sessions are empty ────
   const sessions: TaskWorkSession[] = useMemo(() => {
-    if (dbSessions.length > 0) return dbSessions;
+    const rawList = dbSessions.length > 0 ? dbSessions : (() => {
+      const timerStates = getTimerStates();
+      const synth: TaskWorkSession[] = [];
 
-    const timerStates = getTimerStates();
-    const synth: TaskWorkSession[] = [];
+      (tasks || []).forEach((t: any) => {
+        const stored = timerStates[t.id];
+        const actualSec = stored?.secondsToday || Math.round((t.actualHours || 0) * 3600);
+        if (actualSec <= 0) return;
 
-    (tasks || []).forEach((t: any) => {
-      const stored = timerStates[t.id];
-      const actualSec = stored?.secondsToday || Math.round((t.actualHours || 0) * 3600);
-      if (actualSec <= 0) return;
+        // Scope: employees only see their own sessions
+        if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
 
-      // Scope: employees only see their own sessions
-      if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
+        const proj = (projects || []).find((p: any) => p.id === t.projectId);
+        const now = Date.now();
+        const isActive = stored?.active;
+        const startMs = stored?.lastStartTime
+          ? stored.lastStartTime - (stored.secondsToday - actualSec) * 1000
+          : now - actualSec * 1000;
+        const startISO = new Date(startMs).toISOString();
+        const endISO = isActive ? undefined : new Date(startMs + actualSec * 1000).toISOString();
+        const supervisorAlloc = proj
+          ? (allocations || []).find(
+              (a: any) =>
+                a.projectId === proj.id &&
+                (a.role?.toLowerCase().includes('lead') || a.role?.toLowerCase().includes('manager')),
+            )
+          : null;
+        const supervisorEmp = supervisorAlloc
+          ? employees.find((e) => e.id === supervisorAlloc.employeeId)
+          : null;
 
-      const proj = (projects || []).find((p: any) => p.id === t.projectId);
-      const now = Date.now();
-      const isActive = stored?.active;
-      const startMs = stored?.lastStartTime
-        ? stored.lastStartTime - (stored.secondsToday - actualSec) * 1000
-        : now - actualSec * 1000;
-      const startISO = new Date(startMs).toISOString();
-      const endISO = isActive ? undefined : new Date(startMs + actualSec * 1000).toISOString();
-      const supervisorAlloc = proj
-        ? (allocations || []).find(
-            (a: any) =>
-              a.projectId === proj.id &&
-              (a.role?.toLowerCase().includes('lead') || a.role?.toLowerCase().includes('manager')),
-          )
-        : null;
-      const supervisorEmp = supervisorAlloc
-        ? employees.find((e) => e.id === supervisorAlloc.employeeId)
-        : null;
+        synth.push({
+          id: `local-${t.id}`,
+          taskId: t.id,
+          projectId: t.projectId,
+          employeeId: t.assigneeId || user?.id,
+          supervisorId: t.supervisorId || supervisorAlloc?.employeeId,
+          supervisorName: supervisorEmp
+            ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}`
+            : undefined,
+          workTitle: t.title,
+          workCode: t.title.split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
+          startTime: startISO,
+          endTime: endISO,
+          durationMinutes: isActive ? undefined : Math.round(actualSec / 60),
+          status:
+            t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval'
+              ? 'completed'
+              : isActive
+              ? 'running'
+              : 'paused',
+          createdAt: startISO,
+          updatedAt: new Date().toISOString(),
+          deletedAt: undefined,
+        } as any);
+      });
 
-      synth.push({
-        id: `local-${t.id}`,
-        taskId: t.id,
-        projectId: t.projectId,
-        employeeId: t.assigneeId || user?.id,
-        supervisorId: t.supervisorId || supervisorAlloc?.employeeId,
-        supervisorName: supervisorEmp
-          ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}`
-          : undefined,
-        workTitle: t.title,
-        workCode: t.title.split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
-        startTime: startISO,
-        endTime: endISO,
-        durationMinutes: isActive ? undefined : Math.round(actualSec / 60),
-        status:
-          t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval'
-            ? 'completed'
-            : isActive
-            ? 'running'
-            : 'paused',
-        createdAt: startISO,
-        updatedAt: new Date().toISOString(),
-        deletedAt: undefined,
-      } as any);
+      // Also pick up in_progress tasks not yet in timerStates
+      (tasks || []).forEach((t: any) => {
+        if (synth.find((s) => s.taskId === t.id)) return;
+        if (t.status !== 'in_progress' && !((t.actualHours || 0) > 0)) return;
+        if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
+        const proj = (projects || []).find((p: any) => p.id === t.projectId);
+        const actualSec = Math.round((t.actualHours || 0) * 3600);
+        if (actualSec <= 0) return;
+        const startISO = new Date(Date.now() - actualSec * 1000).toISOString();
+        const supervisorAlloc = proj
+          ? (allocations || []).find(
+              (a: any) =>
+                a.projectId === proj.id &&
+                (a.role?.toLowerCase().includes('lead') || a.role?.toLowerCase().includes('manager')),
+            )
+          : null;
+        const supervisorEmp = supervisorAlloc
+          ? employees.find((e) => e.id === supervisorAlloc.employeeId)
+          : null;
+        synth.push({
+          id: `local-db-${t.id}`,
+          taskId: t.id,
+          projectId: t.projectId,
+          employeeId: t.assigneeId || user?.id,
+          supervisorId: supervisorAlloc?.employeeId,
+          supervisorName: supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : undefined,
+          workTitle: t.title,
+          workCode: t.title.split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
+          startTime: startISO,
+          endTime: undefined,
+          durationMinutes: Math.round(actualSec / 60),
+          status: t.status === 'in_progress' ? 'running' : 'paused',
+          createdAt: startISO,
+          updatedAt: new Date().toISOString(),
+          deletedAt: undefined,
+        } as any);
+      });
+
+      return synth;
+    })();
+
+    return rawList.map((s: any) => {
+      const t = (tasks || []).find((tk: any) => tk.id === s.taskId);
+      const proj = t ? (projects || []).find((p: any) => p.id === t.projectId) : null;
+      
+      let supervisorId = s.supervisorId || t?.supervisorId;
+      let supervisorName = s.supervisorName || t?.supervisorName;
+
+      if (!supervisorId) {
+        const supervisorAlloc = proj
+          ? (allocations || []).find(
+              (a: any) =>
+                a.projectId === proj.id &&
+                (a.role?.toLowerCase().includes('lead') || a.role?.toLowerCase().includes('manager')),
+            )
+          : null;
+        if (supervisorAlloc) {
+          supervisorId = supervisorAlloc.employeeId;
+        }
+      }
+
+      if (supervisorId && !supervisorName) {
+        const supervisorEmp = employees.find((e) => e.id === supervisorId);
+        if (supervisorEmp) {
+          supervisorName = `${supervisorEmp.firstName} ${supervisorEmp.lastName}`;
+        }
+      }
+
+      return {
+        ...s,
+        supervisorId,
+        supervisorName: supervisorName || '—'
+      };
     });
-
-    // Also pick up in_progress tasks not yet in timerStates
-    (tasks || []).forEach((t: any) => {
-      if (synth.find((s) => s.taskId === t.id)) return;
-      if (t.status !== 'in_progress' && !((t.actualHours || 0) > 0)) return;
-      if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
-      const proj = (projects || []).find((p: any) => p.id === t.projectId);
-      const actualSec = Math.round((t.actualHours || 0) * 3600);
-      if (actualSec <= 0) return;
-      const startISO = new Date(Date.now() - actualSec * 1000).toISOString();
-      const supervisorAlloc = proj
-        ? (allocations || []).find(
-            (a: any) =>
-              a.projectId === proj.id &&
-              (a.role?.toLowerCase().includes('lead') || a.role?.toLowerCase().includes('manager')),
-          )
-        : null;
-      const supervisorEmp = supervisorAlloc
-        ? employees.find((e) => e.id === supervisorAlloc.employeeId)
-        : null;
-      synth.push({
-        id: `local-db-${t.id}`,
-        taskId: t.id,
-        projectId: t.projectId,
-        employeeId: t.assigneeId || user?.id,
-        supervisorId: supervisorAlloc?.employeeId,
-        supervisorName: supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : undefined,
-        workTitle: t.title,
-        workCode: t.title.split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
-        startTime: startISO,
-        endTime: undefined,
-        durationMinutes: Math.round(actualSec / 60),
-        status: t.status === 'in_progress' ? 'running' : 'paused',
-        createdAt: startISO,
-        updatedAt: new Date().toISOString(),
-        deletedAt: undefined,
-      } as any);
-    });
-
-    return synth;
   }, [dbSessions, tasks, projects, employees, allocations, user, isManagement]);
 
   // ── Build worklog from timesheets + synthetic task-hour entries ───────────────
@@ -373,12 +407,19 @@ export function TaskWorklogView({
     const mm = m % 60;
     return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
   };
-  const dOnly = (iso?: string) =>
-    iso
-      ? new Date(iso)
-          .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
-          .replace(/\//g, '-')
-      : '—';
+  const dOnly = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch {
+      return '—';
+    }
+  };
   const tOnly = (iso?: string) =>
     iso
       ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -387,6 +428,9 @@ export function TaskWorklogView({
     st === 'running' ? 'success' : st === 'paused' ? 'warning' : 'neutral';
 
   const filteredSessions = sessions.filter((s) => {
+    if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+      if (s.employeeId !== selectedEmployeeId) return false;
+    }
     const d = (s.startTime || '').slice(0, 10);
     if (sessFrom && d < sessFrom) return false;
     if (sessTo && d > sessTo) return false;
@@ -400,47 +444,106 @@ export function TaskWorklogView({
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
           <SectionHeader title={`Work Sessions (${filteredSessions.length})`} />
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input type="date" className="kvj-input" value={sessFrom} onChange={(e) => setSessFrom(e.target.value)} style={{ maxWidth: 160 }} aria-label="From date" />
-            <input type="date" className="kvj-input" value={sessTo} onChange={(e) => setSessTo(e.target.value)} style={{ maxWidth: 160 }} aria-label="To date" />
-            {(sessFrom || sessTo) && <Button variant="ghost" size="sm" onClick={() => { setSessFrom(''); setSessTo(''); }}>Show All</Button>}
+          <div 
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              background: 'var(--bg-sunken)', 
+              border: '1px solid var(--border)', 
+              borderRadius: 30, 
+              padding: '4px 14px',
+              gap: 8,
+              boxShadow: 'var(--shadow-sm)'
+            }}
+          >
+            <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>📅</span>
+            <input 
+              type="date" 
+              value={sessFrom} 
+              onChange={(e) => setSessFrom(e.target.value)} 
+              style={{ 
+                border: 'none', 
+                background: 'transparent', 
+                outline: 'none', 
+                fontSize: 12.5, 
+                color: 'var(--text-primary)',
+                fontFamily: 'inherit',
+                cursor: 'pointer'
+              }} 
+              aria-label="From date" 
+            />
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>to</span>
+            <input 
+              type="date" 
+              value={sessTo} 
+              onChange={(e) => setSessTo(e.target.value)} 
+              style={{ 
+                border: 'none', 
+                background: 'transparent', 
+                outline: 'none', 
+                fontSize: 12.5, 
+                color: 'var(--text-primary)',
+                fontFamily: 'inherit',
+                cursor: 'pointer'
+              }} 
+              aria-label="To date" 
+            />
+            {(sessFrom || sessTo) && (
+              <button 
+                type="button"
+                onClick={() => { setSessFrom(''); setSessTo(''); }}
+                style={{ 
+                  border: 'none', 
+                  background: 'none', 
+                  color: 'var(--status-danger)', 
+                  cursor: 'pointer', 
+                  fontSize: 12, 
+                  fontWeight: 600,
+                  padding: '0 4px',
+                  marginLeft: 4
+                }}
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
-                {['Employee', 'Supervisor', 'Work Code', 'Work / Project', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Duration', 'Status'].map((h) => (
+                {['Employee', 'Supervisor', 'Project / Task', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Duration', 'Status'].map((h) => (
                   <th key={h} style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filteredSessions.length === 0 ? (
-                <tr><td colSpan={10} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
-              ) : filteredSessions.map((s) => (
-                <tr key={s.id} style={{ borderTop: '1px solid var(--border)' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{empName(s.employeeId)}</td>
-                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.supervisorName || empName(s.supervisorId) || '—'}</td>
-                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.workCode || '—'}</td>
-                  <td style={{ padding: '10px 12px' }}>
-                    {s.workTitle}
-                    {projName(s.projectId) ? <span style={{ color: 'var(--text-muted)' }}> · {projName(s.projectId)}</span> : null}
-                  </td>
-                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.startTime)}</td>
-                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{tOnly(s.startTime)}</td>
-                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.endTime)}</td>
-                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.endTime ? tOnly(s.endTime) : '—'}</td>
-                  <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    {s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes)}
-                  </td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <Badge tone={statusTone(s.status)}>
-                      {(s.status || 'completed').charAt(0).toUpperCase() + (s.status || 'completed').slice(1)}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
+                <tr><td colSpan={9} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
+              ) : filteredSessions.map((s) => {
+                const project = (projects || []).find((p: any) => p.id === s.projectId);
+                return (
+                  <tr key={s.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{empName(s.employeeId)}</td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.supervisorName || empName(s.supervisorId) || '—'}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <strong>{project ? `${project.title}: ` : 'Office Task: '}</strong>{s.workTitle}
+                    </td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.startTime)}</td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{tOnly(s.startTime)}</td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{dOnly(s.endTime)}</td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.endTime ? tOnly(s.endTime) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes)}
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <Badge tone={statusTone(s.status)}>
+                        {(s.status || 'completed').charAt(0).toUpperCase() + (s.status || 'completed').slice(1)}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

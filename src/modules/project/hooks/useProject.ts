@@ -53,18 +53,30 @@ export function useProject() {
       let allTimesheets = Array.isArray(tsPage?.data) ? tsPage.data : [];
 
       if (user && !isFullControl(user.role as any)) {
+        const supervisedProjectIds = new Set(allProjects.filter(p => (p as any).supervisorId === user.id).map(p => p.id));
         const userAllocations = allAllocations.filter(a => a.employeeId === user.id);
         const allocatedProjectIds = new Set(userAllocations.map(a => a.projectId));
         
+        const userAssociatedProjectIds = new Set<string>([
+          ...Array.from(allocatedProjectIds),
+          ...Array.from(supervisedProjectIds),
+        ]);
+        
+        allTasks.forEach(t => {
+          if (t.projectId && (t.assigneeId === user.id || t.assigneeId === user.email || t.supervisorId === user.id)) {
+            userAssociatedProjectIds.add(t.projectId);
+          }
+        });
+
         allTasks = allTasks.filter(t => 
           t.assigneeId === user.id || 
           t.assigneeId === user.email ||
           t.supervisorId === user.id ||
           (t as any).assignedByEmployeeId === user.id ||
           (t as any).supervisorName === user.fullName ||
-          allocatedProjectIds.has(t.projectId)
+          (t.projectId && userAssociatedProjectIds.has(t.projectId))
         );
-        allTimesheets = allTimesheets.filter(t => t.employeeId === user.id || allocatedProjectIds.has(t.projectId));
+        allTimesheets = allTimesheets.filter(t => t.employeeId === user.id || (t.projectId && userAssociatedProjectIds.has(t.projectId)));
       }
 
       setClients(allClients);

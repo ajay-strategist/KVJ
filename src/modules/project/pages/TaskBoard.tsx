@@ -14,7 +14,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { PageHeader, Card, Button, Badge, WorkflowStrip } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, TextAreaField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
@@ -38,6 +38,8 @@ export interface TaskItem {
   supervisorId?: string;
   assignee: string;
   dueDate: string;
+  startDate?: string;
+  description?: string;
   status: TaskStatus;
   totalHoursWorked: number;
   approvedBy?: string;
@@ -76,6 +78,7 @@ export function TaskBoard({
   const canApproveAssignment = ['CEO', 'ADMIN'].includes((user?.role || '').toUpperCase());
 
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Task' | 'Project Task'>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateWindowFilter, setDateWindowFilter] = useState<'next_3_days' | 'today' | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,6 +113,15 @@ export function TaskBoard({
     approveTimesheet,
     refresh,
   } = actualProjectData;
+
+  const activeProjects = useMemo(() => {
+    return (projects || []).filter((p: any) => 
+      p.status !== 'Completed' && 
+      p.status !== 'completed' && 
+      p.status !== 'Closed' && 
+      p.status !== 'closed'
+    );
+  }, [projects]);
 
   // Active timers tracking synced with taskTimerStore
   const [timers, setTimers] = useState<Record<string, { startTime: number; elapsedMs: number; isRunning: boolean }>>(() => {
@@ -209,6 +221,8 @@ export function TaskBoard({
         assigneeId: t.assigneeId,
         assignedByEmployeeId: t.assignedByEmployeeId,
         dueDate: t.dueDate || todayStr,
+        startDate: t.startDate || t.dueDate || todayStr,
+        description: t.description || '',
         status,
         totalHoursWorked,
         dailyTimeEntries,
@@ -221,7 +235,7 @@ export function TaskBoard({
   useEffect(() => {
     setTasksList(mappedTasks);
     // Synchronize global timer store with database actualHours for loaded tasks
-    (tasks || []).forEach((t) => {
+    (tasks || []).forEach((t: any) => {
       taskTimerStore.syncTaskTime(t.id, t.actualHours || 0);
     });
   }, [mappedTasks, tasks]);
@@ -267,6 +281,7 @@ export function TaskBoard({
       }
 
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+      if (statusFilter !== 'all' && t.status !== statusFilter) return false;
       // Date Window Filtering
       if (dateWindowFilter === 'today') {
         if (t.dueDate !== todayStr) return false;
@@ -286,30 +301,39 @@ export function TaskBoard({
     return filtered.sort((a, b) =>
       sortOrder === 'asc' ? a.dueDate.localeCompare(b.dueDate) : b.dueDate.localeCompare(a.dueDate)
     );
-  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
+  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, statusFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
-    // Only link a project when one is explicitly chosen. A task with no project
-    // is an Office Task — it must NOT be forced into the first project.
-    const proj = projects.find((p: any) => p.title === values.projectName || p.id === values.projectId);
-    // Assignee/Supervisor selects carry the employee id as their value (matching
-    // by name silently self-assigned when names didn't line up exactly).
+    const categoryVal = (values.category as string) || 'Office Task';
+    const isOfficeTask = categoryVal === 'Office Task';
+
     const assignee = employees.find((e) => e.id === values.assignee || e.id === values.assigneeId);
     const supervisor = employees.find((e) => e.id === values.supervisor || e.id === values.supervisorId);
 
-    // If supervisor is not explicitly selected, assigning employee is automatically the supervisor
+    if (isOfficeTask && (!supervisor && !values.supervisor)) {
+      toast({
+        variant: 'error',
+        title: 'Validation Error',
+        message: 'Supervisor Name is mandatory for Office Tasks.',
+      });
+      return;
+    }
+
+    const proj = isOfficeTask ? null : projects.find((p: any) => p.id === categoryVal);
     const finalSupervisorId = supervisor ? supervisor.id : user?.id;
 
     const isSelfAssigned = assignee?.id === user?.id || (!assignee && !values.assignee);
     const approvalStatus = (!isSelfAssigned && user?.role?.toUpperCase() !== 'CEO') ? 'pending_assignment_approval' : null;
 
     const res = await createTask({
-      projectId: proj?.id,
+      projectId: proj?.id || null,
       assigneeId: assignee?.id || user?.id,
       supervisorId: finalSupervisorId,
       title: values.name as string,
       status: 'todo',
       dueDate: (values.dueDate as string) || todayStr,
+      startDate: (values.startDate as string) || (values.dueDate as string) || todayStr,
+      description: (values.description as string) || '',
       priority: 'medium',
       approvalStatus,
       assignedByEmployeeId: user?.id,
@@ -328,6 +352,8 @@ export function TaskBoard({
         assigneeId: assignee?.id || user?.id,
         assignedByEmployeeId: user?.id,
         dueDate: res.value.dueDate || todayStr,
+        startDate: res.value.startDate || res.value.dueDate || todayStr,
+        description: res.value.description || '',
         status: statusLabel as any,
         totalHoursWorked: 0,
         dailyTimeEntries: [],
@@ -403,7 +429,7 @@ export function TaskBoard({
     try {
       await updateTask(task.id as UUID, { status: 'in_progress', approvalStatus: null });
       
-      const raw = (tasks || []).find((t) => t.id === task.id);
+      const raw = (tasks || []).find((t: any) => t.id === task.id);
       await startSession({
         taskId: task.id as UUID,
         projectId: raw?.projectId,
@@ -583,8 +609,9 @@ export function TaskBoard({
   const handleUpdateTaskSubmit = async (values: Record<string, unknown>) => {
     if (!editingTask) return;
     const updatedName = (values.name as string) || editingTask.name;
-    const updatedCategory = (values.category as any) || editingTask.category;
-    const updatedProjectName = (values.projectName as string) || editingTask.projectName;
+    const categoryVal = (values.category as string) || 'Office Task';
+    const isOfficeTask = categoryVal === 'Office Task';
+
     // Assignee/Supervisor selects carry employee ids as their value.
     const updatedAssigneeId = (values.assignee as string) ?? editingTask.assigneeId ?? '';
     const updatedSupervisorId = (values.supervisor as string) ?? editingTask.supervisorId ?? '';
@@ -593,6 +620,21 @@ export function TaskBoard({
 
     const assigneeEmp = employees.find((e) => e.id === updatedAssigneeId);
     const supervisorEmp = employees.find((e) => e.id === updatedSupervisorId);
+
+    if (isOfficeTask && (!supervisorEmp && !updatedSupervisorId)) {
+      toast({
+        variant: 'error',
+        title: 'Validation Error',
+        message: 'Supervisor Name is mandatory for Office Tasks.',
+      });
+      return;
+    }
+
+    const proj = isOfficeTask ? null : projects.find((p: any) => p.id === categoryVal);
+    const updatedCategory = proj ? 'Project Task' : 'Office Task';
+    const updatedProjectName = proj ? proj.title : 'Office Task';
+    const updatedProjectId = proj ? proj.id : null;
+
     const updatedAssignee = assigneeEmp ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}` : editingTask.assignee;
     const updatedSupervisor = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : editingTask.supervisor;
 
@@ -602,13 +644,15 @@ export function TaskBoard({
           ? {
               ...t,
               name: updatedName,
-              category: updatedCategory,
+              category: updatedCategory as any,
               projectName: updatedProjectName,
               assignee: updatedAssignee,
               assigneeId: assigneeEmp ? assigneeEmp.id : t.assigneeId,
               supervisor: updatedSupervisor,
               supervisorId: supervisorEmp ? supervisorEmp.id : t.supervisorId,
               dueDate: updatedDueDate,
+              startDate: (values.startDate as string) || (values.dueDate as string) || todayStr,
+              description: (values.description as string) || '',
               status: updatedStatus,
             }
           : t
@@ -626,7 +670,10 @@ export function TaskBoard({
     try {
       const res = await updateTask(editingTask.id, {
         title: updatedName,
+        projectId: updatedProjectId || null,
         dueDate: updatedDueDate,
+        startDate: (values.startDate as string) || (values.dueDate as string) || todayStr,
+        description: (values.description as string) || '',
         assigneeId: assigneeEmp ? assigneeEmp.id : undefined,
         supervisorId: supervisorEmp ? supervisorEmp.id : undefined,
         status: dbStatusMap[updatedStatus] || 'todo',
@@ -708,18 +755,18 @@ export function TaskBoard({
       )}
 
       {/* KPI Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
+        <Card style={{ borderLeft: '4px solid var(--brand)', padding: '12px 16px', width: 220, flex: '0 0 220px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks Active</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
         </Card>
 
-        <Card style={{ borderLeft: '4px solid var(--status-danger)', padding: 16 }}>
+        <Card style={{ borderLeft: '4px solid var(--status-danger)', padding: '12px 16px', width: 220, flex: '0 0 220px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due Today</div>
         </Card>
 
-        <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
+        <Card style={{ borderLeft: '4px solid var(--accent)', padding: '12px 16px', width: 220, flex: '0 0 220px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)} hrs</div>
         </Card>
@@ -795,6 +842,27 @@ export function TaskBoard({
             </select>
 
             <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">⚡ All Statuses</option>
+              <option value="To Do">📝 To Do</option>
+              <option value="In Progress">⚡ In Progress</option>
+              <option value="Under Review">⏳ Under Review</option>
+              <option value="Completed">✅ Completed</option>
+            </select>
+
+            <select
               value={dateWindowFilter}
               onChange={(e) => setDateWindowFilter(e.target.value as any)}
               style={{
@@ -848,234 +916,212 @@ export function TaskBoard({
         </div>
       </Card>
 
-      {/* Task Cards Grid */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {sortedTasks.length === 0 ? (
-          <Card style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-            No active tasks found in the selected filter window.
-          </Card>
-        ) : (
-          sortedTasks.map((t) => {
-            const isAssignee = user?.fullName === t.assignee || !user;
-            return (
-              <Card key={t.id} style={{ padding: 18, borderLeft: `4px solid ${t.dueDate === todayStr ? 'var(--status-danger)' : 'var(--brand)'}` }}>
-                {/* Workflow step pipeline */}
-                <div style={{ marginBottom: 12 }}>
-                  <WorkflowStrip
-                    steps={['Pending Approval', 'Approved (To Do)', 'In Progress', 'Under Review', 'Completed']}
-                    current={getWorkflowStep(t.status, t.approvalStatus)}
-                  />
-                </div>
+      {/* Task List Table View */}
+      {(() => {
+        const formatTableDate = (isoStr?: string) => {
+          if (!isoStr) return '—';
+          try {
+            const d = new Date(isoStr.slice(0, 10));
+            if (isNaN(d.getTime())) return '—';
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}-${month}-${year}`;
+          } catch {
+            return '—';
+          }
+        };
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{t.name}</h3>
-                      <Badge tone={t.category === 'Project Task' ? 'info' : 'neutral'}>{t.category}</Badge>
-                      {t.dueDate === todayStr && <Badge tone="danger">Due Today</Badge>}
-                      {t.approvalStatus === 'rework' && <Badge tone="danger">🔄 Rework</Badge>}
-                      {t.approvalStatus === 'pending_assignment_approval' && <Badge tone="warning">⏳ Pending Assignment Approval</Badge>}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                      Project: <strong>{t.projectName}</strong> · Assignee: <strong>{t.assignee}</strong>{t.supervisor ? <> · Supervisor: <strong>{t.supervisor}</strong></> : null}
-                    </div>
-                    {t.approvedBy && (
-                      <div style={{ fontSize: 12, color: 'var(--status-success)', marginTop: 3 }}>
-                        ✓ Approved by {t.approvedBy} {t.approvedAt && `(${t.approvedAt})`}
-                      </div>
-                    )}
-                    {/* Active Timer Display */}
-                    {t.status === 'In Progress' && (
-                      <div style={{ marginTop: 6, fontSize: 12, color: timers[t.id]?.isRunning ? 'var(--status-success)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-                        <span>⏱️ Active Work Timer:</span>
-                        <span style={{ fontVariantNumeric: 'tabular-nums', background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>{getTaskDurationString(t.id)}</span>
-                        {timers[t.id]?.isRunning ? <span style={{ fontSize: 12 }}>● Running</span> : <span style={{ fontSize: 12 }}>Paused</span>}
-                      </div>
-                    )}
-                    {t.approvalStatus === 'rework' && t.reworkNotes && (
-                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, color: '#991b1b', fontSize: 12, fontWeight: 500 }}>
-                        <strong>🔄 Rework Reason:</strong> {t.reworkNotes}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Action: Approve Assignment */}
-                    {(() => {
-                      if (t.approvalStatus !== 'pending_assignment_approval') return null;
-
-                      // Check if creator is Admin or Manager
-                      const creator = employees.find(e => e.id === t.assignedByEmployeeId);
-                      const creatorRole = ((creator as any)?.role || '').toUpperCase();
-                      const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
-
-                      if (needsCeoOnly) {
-                        if (user?.role?.toUpperCase() === 'CEO') {
-                          return (
-                            <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
-                              ✓ Approve Assignment (CEO)
-                            </Button>
-                          );
-                        } else {
-                          return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Requires CEO Approval</span>;
-                        }
-                      }
-
-                      if (isManagement) {
-                        return (
-                          <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
-                            ✓ Approve Assignment
-                          </Button>
-                        );
-                      }
-
-                      return null;
-                    })()}
-
-                    {/* Action 1: Assign to Me */}
-                    {t.assignee === 'Unassigned' && (
-                      <Button size="sm" variant="secondary" onClick={() => handleAssignToMe(t)}>
-                        👤 Assign to Me
-                      </Button>
-                    )}
-
-                    {/* Assignee-Only Actions: Start / Pause / Resume / Log Time / Submit */}
-                    {(() => {
+        return (
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Project</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Task Title</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Supervisor</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Assignee</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Start Date</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Due Date</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'right' }}>Worked</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Status</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No tasks found in the selected filter window.
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedTasks.map((t) => {
                       const isAssignee =
                         t.assigneeId === user?.id ||
                         t.assigneeId === user?.email ||
                         (t.assignee && user?.fullName && t.assignee.toLowerCase() === user.fullName.toLowerCase());
                       const isPendingAssignment = t.approvalStatus === 'pending_assignment_approval';
 
-                      if (!isAssignee || isPendingAssignment) return null;
-
                       return (
-                        <>
-                          {/* Start / Resume Task */}
-                          {(t.status === 'To Do' || t.approvalStatus === 'rework') && (
-                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
-                              ▶️ {timers[t.id]?.elapsedMs ? 'Resume' : 'Start'} Task
-                            </Button>
-                          )}
+                        <tr key={t.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: 600 }}>{t.projectName}</td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t.name}</div>
+                              {t.approvalStatus === 'rework' && t.reworkNotes && (
+                                <div style={{ marginTop: 4, padding: '4px 8px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6, color: '#991b1b', fontSize: 11 }}>
+                                  <strong>🔄 Rework:</strong> {t.reworkNotes}
+                                </div>
+                              )}
+                              {/* Active Timer Display */}
+                              {t.status === 'In Progress' && (
+                                <div style={{ marginTop: 4, fontSize: 11, color: timers[t.id]?.isRunning ? 'var(--status-success)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                  <span>⏱️ Timer:</span>
+                                  <span style={{ fontVariantNumeric: 'tabular-nums', background: 'var(--bg-sunken)', padding: '1px 4px', borderRadius: 3 }}>{getTaskDurationString(t.id)}</span>
+                                  {timers[t.id]?.isRunning ? <span>● Running</span> : <span>Paused</span>}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>{t.supervisor || '—'}</td>
+                          <td style={{ padding: '12px 16px' }}>{t.assignee || 'Unassigned'}</td>
+                          <td style={{ padding: '12px 16px' }}>{formatTableDate((t as any).startDate || t.startDate)}</td>
+                          <td style={{ padding: '12px 16px' }}>{formatTableDate(t.dueDate)}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                            ⏱ {t.totalHoursWorked.toFixed(1)} hrs
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <Badge tone={
+                              t.status === 'Completed' ? 'success' :
+                              t.status === 'Under Review' ? 'info' :
+                              t.status === 'In Progress' ? 'progress' :
+                              'neutral'
+                            }>
+                              {t.status}
+                            </Badge>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                              {/* Assignment approval for management */}
+                              {t.approvalStatus === 'pending_assignment_approval' && (() => {
+                                const creator = employees.find(e => e.id === t.assignedByEmployeeId);
+                                const creatorRole = ((creator as any)?.role || '').toUpperCase();
+                                const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
+                                if (needsCeoOnly) {
+                                  if (user?.role?.toUpperCase() === 'CEO') {
+                                    return (
+                                      <Button size="xs" variant="success" onClick={() => handleApproveTask(t.id)}>
+                                        Approve Assignment
+                                      </Button>
+                                    );
+                                  }
+                                } else if (isManagement) {
+                                  return (
+                                    <Button size="xs" variant="success" onClick={() => handleApproveTask(t.id)}>
+                                      Approve Assignment
+                                    </Button>
+                                  );
+                                }
+                                return null;
+                              })()}
 
-                          {/* Pause Task */}
-                          {t.status === 'In Progress' && timers[t.id]?.isRunning && (
-                            <Button size="sm" variant="secondary" onClick={() => handlePauseTask(t.id)}>
-                              ⏸️ Pause Task
-                            </Button>
-                          )}
+                              {/* Assignee options */}
+                              {isAssignee && !isPendingAssignment && (
+                                <>
+                                  {(t.status === 'To Do' || t.approvalStatus === 'rework') && (
+                                    <Button size="xs" variant="success" onClick={() => handleStartTask(t)}>
+                                      ▶️ Start
+                                    </Button>
+                                  )}
+                                  {t.status === 'In Progress' && timers[t.id]?.isRunning && (
+                                    <Button size="xs" variant="secondary" onClick={() => handlePauseTask(t.id)}>
+                                      ⏸️ Pause
+                                    </Button>
+                                  )}
+                                  {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
+                                    <Button size="xs" variant="success" onClick={() => handleStartTask(t)}>
+                                      ▶️ Resume
+                                    </Button>
+                                  )}
+                                  {t.status === 'In Progress' && (
+                                    <Button size="xs" onClick={() => { setSelectedTask(t); setTimeEntryOpen(true); }}>
+                                      Log Time
+                                    </Button>
+                                  )}
+                                  {t.status === 'In Progress' && (
+                                    <Button size="xs" variant="primary" onClick={() => handleSubmitTaskForApproval(t)}>
+                                      Submit
+                                    </Button>
+                                  )}
+                                </>
+                              )}
 
-                          {/* Resume Task */}
-                          {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
-                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
-                              ▶️ Resume Task
-                            </Button>
-                          )}
+                              {/* Supervisor/Manager actions for review */}
+                              {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
+                                <>
+                                  <Button size="xs" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
+                                    Approve
+                                  </Button>
+                                  <Button size="xs" variant="danger" onClick={async () => {
+                                    const { ok, reason } = await prompt({
+                                      title: 'Request rework',
+                                      message: 'Enter the reason this task needs rework:',
+                                      variant: 'confirm',
+                                    });
+                                    if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
+                                  }}>
+                                    Rework
+                                  </Button>
+                                </>
+                              )}
 
-                          {/* Log Hours */}
-                          {t.status === 'In Progress' && (
-                            <Button size="sm" onClick={() => { setSelectedTask(t); setTimeEntryOpen(true); }}>
-                              ⏱ Log Time
-                            </Button>
-                          )}
+                              {/* Reopen action */}
+                              {t.status === 'Completed' && (
+                                <Button size="xs" variant="secondary" onClick={() => handleReopenTask(t)}>
+                                  Reopen
+                                </Button>
+                              )}
 
-                          {/* Submit Task for Review */}
-                          {t.status === 'In Progress' && (
-                            <Button size="sm" variant="primary" onClick={() => handleSubmitTaskForApproval(t)}>
-                              🚀 Submit Task
-                            </Button>
-                          )}
-                        </>
+                              {/* Edit task (restricted to Top Management only) */}
+                              {isManagement && (
+                                <Button
+                                  size="xs"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    setEditingTask(t);
+                                    setEditTaskOpen(true);
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       );
-                    })()}
-
-                    {/* Action: Approve Task (Manager / Supervisor) */}
-                    {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
-                      <Button size="sm" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
-                        ✅ Approve
-                      </Button>
-                    )}
-
-                    {/* Action: Rework Task (Manager / Supervisor) */}
-                    {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
-                      <Button size="sm" variant="danger" onClick={async () => {
-                        const { ok, reason } = await prompt({
-                          title: 'Request rework',
-                          message: 'Enter the reason this task needs rework:',
-                          variant: 'confirm',
-                        });
-                        if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
-                      }}>
-                        🔄 Rework
-                      </Button>
-                    )}
-
-                    {/* Action: Reopen Task */}
-                    {t.status === 'Completed' && (
-                      <Button size="sm" variant="secondary" onClick={() => handleReopenTask(t)}>
-                        ↩️ Reopen
-                      </Button>
-                    )}
-
-                    {/* Action: Edit Task */}
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        setEditingTask(t);
-                        setEditTaskOpen(true);
-                      }}
-                    >
-                      ✏️ Edit
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Time log entries summary */}
-                {t.dailyTimeEntries.length > 0 && (
-                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                      Time Log History ({t.totalHoursWorked.toFixed(1)} hrs total):
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {t.dailyTimeEntries.map((e) => (
-                        <div
-                          key={e.id}
-                          style={{
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            fontSize: 12, padding: '4px 8px', background: 'var(--bg-sunken)',
-                            borderRadius: 'var(--radius-xs)',
-                          }}
-                        >
-                          <span>{e.date} · <strong>{e.loggedByName}</strong> ({e.loggedByRole}): {e.description}</span>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{e.durationHrs} hrs</span>
-                            <Badge tone={e.status === 'Approved' ? 'success' : 'warning'}>{e.status}</Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </Card>
-            );
-          })
-        )}
-      </div>
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Create Task Drawer */}
       <Drawer open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Create New Task">
-        <Form initial={{ category: 'Office Task', dueDate: todayStr }} onSubmit={handleCreateTask}>
+        <Form initial={{ category: 'Office Task', dueDate: todayStr, startDate: todayStr, description: '' }} onSubmit={handleCreateTask}>
           <TextField name="name" label="Task Title *" placeholder="e.g. Q3 Power BI Syllabus Audit" />
           <SelectField
             name="category"
-            label="Category *"
+            label="Category (Office Task or Project) *"
             options={[
               { value: 'Office Task', label: 'Office Task' },
-              { value: 'Project Task', label: 'Project Task' },
+              ...activeProjects.map((p: any) => ({ value: p.id, label: `Project: ${p.title}` }))
             ]}
           />
-          <TextField name="projectName" label="Project Name / Department" placeholder="e.g. Academic Training" />
           <SelectField
             name="assignee"
             label="Assignee Name"
@@ -1086,7 +1132,9 @@ export function TaskBoard({
             label="Supervisor Name"
             options={[{ value: '', label: 'None' }, ...employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` }))]}
           />
+          <TextField name="startDate" label="Start Date (YYYY-MM-DD)" placeholder={todayStr} />
           <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
+          <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe the objectives or details of the task..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
             <Button type="submit">Submit Task</Button>
@@ -1109,57 +1157,62 @@ export function TaskBoard({
 
       {/* Edit Task Drawer */}
       <Drawer open={editTaskOpen} onClose={() => { setEditTaskOpen(false); setEditingTask(null); }} title={`Edit Task: ${editingTask?.name ?? ''}`}>
-        {editingTask && (
-          <Form
-            initial={{
-              name: editingTask.name,
-              category: editingTask.category,
-              projectName: editingTask.projectName || '',
-              assignee: editingTask.assigneeId || '',
-              supervisor: editingTask.supervisorId || '',
-              dueDate: editingTask.dueDate || todayStr,
-              status: editingTask.status,
-            }}
-            onSubmit={handleUpdateTaskSubmit}
-          >
-            <TextField name="name" label="Task Title *" placeholder="Task title..." />
-            <SelectField
-              name="category"
-              label="Category *"
-              options={[
-                { value: 'Office Task', label: 'Office Task' },
-                { value: 'Project Task', label: 'Project Task' },
-              ]}
-            />
-            <TextField name="projectName" label="Project Name / Department" placeholder="Project name..." />
-            <SelectField
-              name="assignee"
-              label="Assignee Name"
-              options={[{ value: '', label: 'Unassigned' }, ...(employees.length > 0 ? employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` })) : (editingTask.assigneeId ? [{ value: editingTask.assigneeId, label: editingTask.assignee }] : []))]}
-            />
-            <SelectField
-              name="supervisor"
-              label="Supervisor Name"
-              options={[{ value: '', label: 'None' }, ...(employees.length > 0 ? employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` })) : (editingTask.supervisorId ? [{ value: editingTask.supervisorId, label: editingTask.supervisor }] : []))]}
-            />
-            <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
-            <SelectField
-              name="status"
-              label="Task Status *"
-              options={[
-                { value: 'Pending Approval', label: 'Pending Approval' },
-                { value: 'To Do', label: 'Approved (To Do)' },
-                { value: 'In Progress', label: 'In Progress' },
-                { value: 'Under Review', label: 'Under Review' },
-                { value: 'Completed', label: 'Completed' },
-              ]}
-            />
-            <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <Button variant="secondary" type="button" onClick={() => { setEditTaskOpen(false); setEditingTask(null); }}>Cancel</Button>
-              <Button type="submit">Save Task Changes</Button>
-            </div>
-          </Form>
-        )}
+        {editingTask && (() => {
+          const rawTask = tasks.find((t: any) => t.id === editingTask.id);
+          return (
+            <Form
+              initial={{
+                name: editingTask.name,
+                category: rawTask?.projectId || 'Office Task',
+                assignee: editingTask.assigneeId || '',
+                supervisor: editingTask.supervisorId || '',
+                dueDate: editingTask.dueDate || todayStr,
+                startDate: (editingTask as any).startDate || editingTask.dueDate || todayStr,
+                description: editingTask.description || '',
+                status: editingTask.status,
+              }}
+              onSubmit={handleUpdateTaskSubmit}
+            >
+              <TextField name="name" label="Task Title *" placeholder="Task title..." />
+              <SelectField
+                name="category"
+                label="Category (Office Task or Project) *"
+                options={[
+                  { value: 'Office Task', label: 'Office Task' },
+                  ...activeProjects.map((p: any) => ({ value: p.id, label: `Project: ${p.title}` }))
+                ]}
+              />
+              <SelectField
+                name="assignee"
+                label="Assignee Name"
+                options={[{ value: '', label: 'Unassigned' }, ...(employees.length > 0 ? employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` })) : (editingTask.assigneeId ? [{ value: editingTask.assigneeId, label: editingTask.assignee }] : []))]}
+              />
+              <SelectField
+                name="supervisor"
+                label="Supervisor Name"
+                options={[{ value: '', label: 'None' }, ...(employees.length > 0 ? employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` })) : (editingTask.supervisorId ? [{ value: editingTask.supervisorId, label: editingTask.supervisor }] : []))]}
+              />
+              <TextField name="startDate" label="Start Date (YYYY-MM-DD)" placeholder={todayStr} />
+              <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
+              <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe task details..." />
+              <SelectField
+                name="status"
+                label="Task Status *"
+                options={[
+                  { value: 'Pending Approval', label: 'Pending Approval' },
+                  { value: 'To Do', label: 'Approved (To Do)' },
+                  { value: 'In Progress', label: 'In Progress' },
+                  { value: 'Under Review', label: 'Under Review' },
+                  { value: 'Completed', label: 'Completed' },
+                ]}
+              />
+              <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <Button variant="secondary" type="button" onClick={() => { setEditTaskOpen(false); setEditingTask(null); }}>Cancel</Button>
+                <Button type="submit">Save Task Changes</Button>
+              </div>
+            </Form>
+          );
+        })()}
       </Drawer>
     </div>
   );

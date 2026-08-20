@@ -9,6 +9,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
 
 import { useProject } from '../hooks/useProject';
+import { useTaskSessions } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 
@@ -64,26 +65,25 @@ function ProjectMembersField({ employees }: { employees: Array<{ id: string; fir
   );
 }
 
-export type ProjectStatusLabel = 'Not Started' | 'Kick Off' | 'In Execution' | 'Completed';
+export type ProjectStatusLabel = 'Not Started' | 'In Progress' | 'Completed';
 
-/** The four project statuses (stored value ⇄ display label). */
+/** The three project statuses (stored value ⇄ display label). */
 export const PROJECT_STATUS_OPTIONS: { value: string; label: ProjectStatusLabel }[] = [
   { value: 'not_started', label: 'Not Started' },
-  { value: 'planning', label: 'Kick Off' },
-  { value: 'execution', label: 'In Execution' },
+  { value: 'planning', label: 'In Progress' },
+  { value: 'execution', label: 'In Progress' },
   { value: 'closure', label: 'Completed' },
 ];
 
 export const projectStatusToLabel = (s?: string): ProjectStatusLabel =>
   s === 'closure' ? 'Completed'
-  : s === 'execution' ? 'In Execution'
-  : s === 'planning' ? 'Kick Off'
+  : s === 'execution' ? 'In Progress'
+  : s === 'planning' ? 'In Progress'
   : 'Not Started';
 
 export const projectStatusLabelToValue = (l?: string): string =>
   l === 'Completed' ? 'closure'
-  : l === 'In Execution' ? 'execution'
-  : l === 'Kick Off' ? 'planning'
+  : l === 'In Progress' ? 'execution'
   : 'not_started';
 
 export interface ProjectCardData {
@@ -124,8 +124,8 @@ export function ProjectList({
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
-  // Status checkboxes filter state. Default: all active statuses checked, Completed unchecked
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Not Started', 'Kick Off', 'In Execution']);
+  // Status dropdown filter state. Default: All Statuses
+  const [selectedStatus, setSelectedStatus] = useState<string>('All Statuses');
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
@@ -135,6 +135,52 @@ export function ProjectList({
   const [clientNameInput, setClientNameInput] = useState('');
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
+
+  const { listSessions } = useTaskSessions();
+  const [allSessions, setAllSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (reportOpen && selectedProject) {
+      listSessions().then((data) => {
+        setAllSessions(data || []);
+      });
+    }
+  }, [reportOpen, selectedProject, listSessions]);
+
+  const projectSessions = useMemo(() => {
+    if (!selectedProject) return [];
+    return allSessions.filter((s: any) => s.projectId === selectedProject.id);
+  }, [allSessions, selectedProject]);
+
+  const formatSessionDate = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch {
+      return '—';
+    }
+  };
+
+  const formatSessionTime = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+      return '—';
+    }
+  };
+
+  const formatSessionDuration = (m?: number) => {
+    if (m == null) return '—';
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
+  };
 
   const localProjectData = useProject();
   const actualProjectData = projectData || localProjectData;
@@ -249,8 +295,11 @@ export function ProjectList({
         return false;
       });
     }
-    return list.filter((p) => selectedStatuses.includes(p.status));
-  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses]);
+    if (selectedStatus && selectedStatus !== 'All Statuses') {
+      list = list.filter((p) => p.status === selectedStatus);
+    }
+    return list;
+  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatus]);
 
   // Count active projects (Not Started + In Progress)
   const activeProjectsCount = useMemo(() => {
@@ -392,6 +441,7 @@ export function ProjectList({
       assigneeId,
       supervisorId,
       dueDate: (values.dueDate as string) || undefined,
+      startDate: (values.startDate as string) || (values.dueDate as string) || undefined,
       status: 'todo',
       priority: 'medium',
     } as any);
@@ -409,12 +459,6 @@ export function ProjectList({
     } else {
       toast({ variant: 'error', title: 'Creation Failed', message: res.error });
     }
-  };
-
-  const toggleStatusFilter = (status: string) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-    );
   };
 
   // PDF Export Logic — full content: KPIs, member hours, all tasks with hours/status
@@ -591,9 +635,8 @@ export function ProjectList({
   };
 
   const tableColumns: Column<ProjectCardData>[] = [
-    { key: 'code', header: 'Project Code', sortable: true, render: (p) => <strong>{p.code}</strong> },
     { key: 'title', header: 'Project Name & Client', sortable: true, render: (p) => <div><div style={{ fontWeight: 600 }}>{p.title}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Client: {p.client}</div></div> },
-    { key: 'supervisor', header: 'Manager (Operations)', render: (p) => p.supervisor ? <span>👤 {p.supervisor}</span> : <span>—</span> },
+    { key: 'supervisor', header: 'Supervisor', render: (p) => p.supervisor ? <span>👤 {p.supervisor}</span> : <span>—</span> },
     { key: 'members', header: 'Assigned Members & Hours', render: (p) => (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {p.members.map((m, idx) => (
@@ -616,7 +659,7 @@ export function ProjectList({
       );
     }},
     { key: 'status', header: 'Status', render: (p) => (
-      <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Execution' ? 'progress' : p.status === 'Kick Off' ? 'info' : 'neutral'}>
+      <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Progress' ? 'progress' : 'neutral'}>
         {p.status}
       </Badge>
     )},
@@ -674,50 +717,44 @@ export function ProjectList({
       </div>
 
       {/* Top Row: KPI Cards Left & Status Filter Right */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap', alignItems: 'stretch' }}>
         
         {/* Left Side: KPI Cards */}
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', flex: '1 1 auto' }}>
-          <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16, minWidth: 200, flex: 1 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
-          </Card>
+        <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16, width: 220, flex: '0 0 220px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
+        </Card>
 
-          <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16, minWidth: 200, flex: 1 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
-              {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
-            </div>
-          </Card>
-        </div>
+        <Card style={{ borderLeft: '4px solid var(--status-success)', padding: 16, width: 220, flex: '0 0 220px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
+            {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
+          </div>
+        </Card>
 
         {/* Right Side: Status Filter (Right of Overall Task Completion) */}
-        <Card style={{ padding: 16, minWidth: 420, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <Card style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 auto', minWidth: 280 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Status Filter:</span>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              {(['Not Started', 'Kick Off', 'In Execution', 'Completed'] as const).map((status) => (
-                <label
-                  key={status}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedStatuses.includes(status)}
-                    onChange={() => toggleStatusFilter(status)}
-                  />
-                  {status}
-                </label>
-              ))}
-            </div>
+            <select
+              className="kvj-select"
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              style={{ 
+                padding: '6px 12px', 
+                fontSize: 13, 
+                borderRadius: 8, 
+                border: '1px solid var(--border)', 
+                background: 'var(--bg-panel)', 
+                color: 'var(--text-primary)',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="All Statuses">All Statuses</option>
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
           </div>
           <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>
             Showing {filteredProjects.length}/{projectsList.length}
@@ -748,7 +785,7 @@ export function ProjectList({
                       </h3>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Client: {p.client}</div>
                     </div>
-                    <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Execution' ? 'progress' : p.status === 'Kick Off' ? 'info' : 'neutral'}>
+                    <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Progress' ? 'progress' : 'neutral'}>
                       {p.status}
                     </Badge>
                   </div>
@@ -1030,7 +1067,7 @@ export function ProjectList({
                             </span>
                             <span style={{ fontSize: 12, fontWeight: 600 }}>{m.name || '—'}</span>
                           </div>
-                          <span style={{ fontSize: 13, fontWeight: 800, color: '#4f46e5', background: '#ede9fe', padding: '2px 8px', borderRadius: 6 }}>{m.hours}h</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: '#4f46e5', background: '#ede9fe', padding: '2px 8px', borderRadius: 6 }}>{m.hours === 0 ? '0 hr' : `${m.hours}h`}</span>
                         </div>
                       ))}
                     </div>
@@ -1191,6 +1228,50 @@ export function ProjectList({
                   </div>
                 </div>
               </div>
+
+              {/* Task Work Log Section */}
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, color: '#4f46e5', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ⏰ Task Work Log
+                </div>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 650 }}>
+                    <thead>
+                      <tr style={{ background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: 'white', textAlign: 'left' }}>
+                        <th style={{ padding: '10px 12px', fontWeight: 700 }}>Date</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 700 }}>Task</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 700 }}>Start Time</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 700 }}>End Time</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right' }}>Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projectSessions.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            No work sessions logged for this project's tasks yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        projectSessions.map((s, idx) => {
+                          const task = tasks.find((t: any) => t.id === s.taskId);
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-sunken)' }}>
+                              <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatSessionDate(s.startTime)}</td>
+                              <td style={{ padding: '10px 12px' }}>{task ? task.title : s.workTitle}</td>
+                              <td style={{ padding: '10px 12px' }}>{formatSessionTime(s.startTime)}</td>
+                              <td style={{ padding: '10px 12px' }}>{s.endTime ? formatSessionTime(s.endTime) : 'Running…'}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>
+                                {s.status === 'running' ? 'Running…' : formatSessionDuration(s.durationMinutes)}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             {/* ── Footer ── */}
@@ -1283,6 +1364,7 @@ export function ProjectList({
               label="Assignee"
               options={assigneeOptions}
             />
+            <DatePickerField name="startDate" label="Start Date" />
             <DatePickerField name="dueDate" label="Due Date" />
             <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button variant="secondary" type="button" onClick={() => setAddTaskOpen(false)}>Cancel</Button>

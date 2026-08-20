@@ -338,12 +338,13 @@ export class SupabaseAuthService implements IAuthService {
         body: JSON.stringify({ refresh_token: rt }),
       });
       if (!res.ok) {
-        this.clearJwtLocal();
+        if (res.status === 400 || res.status === 401 || res.status === 403) {
+          this.clearJwtLocal();
+        }
         return null;
       }
       return this.applyJwtTokens(await res.json(), this.currentRememberMe());
     } catch {
-      this.clearJwtLocal();
       return null;
     }
   }

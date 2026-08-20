@@ -245,6 +245,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   // GPS & Location state
   const [locationStr, setLocationStr] = useState<string>('Detecting location...');
+  const [placeName, setPlaceName] = useState<string>('Detecting location...');
 
   useEffect(() => {
     if ('geolocation' in navigator) {
@@ -259,6 +260,45 @@ export const AttendancePanel = memo(function AttendancePanel({
       setLocationStr('Office / GPS N/A');
     }
   }, []);
+
+  useEffect(() => {
+    if (!locationStr || locationStr.includes('Detecting') || locationStr.includes('N/A')) {
+      setPlaceName(locationStr);
+      return;
+    }
+    if (locationStr.includes('Office') || locationStr.includes('9.98')) {
+      setPlaceName('KVJ Kochi HQ Workspace');
+      return;
+    }
+    const cleanCoords = locationStr.replace(/[^\d.,-]/g, '');
+    const parts = cleanCoords.split(',');
+    if (parts.length === 2) {
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+          headers: { 'User-Agent': 'KVJAnalyticsApp/1.0' }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.display_name) {
+              const addr = data.address;
+              const shortName = addr ? (addr.road || addr.suburb || addr.neighbourhood || addr.city || addr.town || data.display_name) : data.display_name;
+              setPlaceName(shortName);
+            } else {
+              setPlaceName(locationStr);
+            }
+          })
+          .catch(() => {
+            setPlaceName(locationStr);
+          });
+      } else {
+        setPlaceName(locationStr);
+      }
+    } else {
+      setPlaceName(locationStr);
+    }
+  }, [locationStr]);
 
   const currentStatus = (record?.status ?? 'clocked_out') as keyof typeof statusMap;
   const [now, setNow] = useState(() => Date.now());
@@ -316,9 +356,10 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   const totalWorkMs = Math.max(0, completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs);
   const totalBreakMs = Math.max(0, completedBreakMs + activeBreakMs);
+  const grossDurationMs = completedSessionMs + activeSessionMs;
 
   const handleCustomClockInSubmit = useCallback(async () => {
-    const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : 'Office';
+    const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : selectedMode === 'Remote' ? 'Work From Home' : 'Office';
     const res = await clockIn(type as any);
     if (res.ok) {
       toast({ variant: 'success', title: 'Clocked In', message: `Clocked in for ${type} (${locationStr})` });
@@ -417,8 +458,8 @@ export const AttendancePanel = memo(function AttendancePanel({
             <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               GPS LOCATION
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#6366f1', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-              📍 {resolveLocationName(locationStr)}
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#6366f1', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={placeName}>
+              📍 {placeName}
             </span>
           </div>
 
@@ -432,13 +473,13 @@ export const AttendancePanel = memo(function AttendancePanel({
             </span>
           </div>
 
-          {/* DURATION TODAY */}
+          {/* TOTAL DURATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
-              DURATION TODAY
+              Total Duration (Today)
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
-              {formatDuration(totalWorkMs)}
+              {formatDuration(grossDurationMs)}
             </span>
           </div>
 
@@ -449,6 +490,16 @@ export const AttendancePanel = memo(function AttendancePanel({
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(totalBreakMs)}
+            </span>
+          </div>
+
+          {/* HOURS WORKED */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+              Hours Worked
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+              {formatDuration(totalWorkMs)}
             </span>
           </div>
         </div>
@@ -906,6 +957,15 @@ export const TaskWidget = memo(function TaskWidget({
 }) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+  const [showSubmitted, setShowSubmitted] = useState(false);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (taskId: string) => {
+    setExpandedTaskIds((prev) => ({
+      ...prev,
+      [taskId]: !prev[taskId],
+    }));
+  };
 
   useEffect(() => {
     // The running-task clock advances once a MINUTE (adds 60s), not every second,
@@ -1012,12 +1072,32 @@ export const TaskWidget = memo(function TaskWidget({
   };
 
   const activeTasks = useMemo(() => {
-    return tasks.filter((t) => !t.isApproved);
-  }, [tasks]);
+    let list = tasks.filter((t) => !t.isApproved);
+    if (!showSubmitted) {
+      list = list.filter((t) => !t.underReview);
+    }
+    return [...list].sort((a, b) => {
+      if (a.active && !b.active) return -1;
+      if (!a.active && b.active) return 1;
+      return 0;
+    });
+  }, [tasks, showSubmitted]);
 
   return (
     <Card>
-      <SectionHeader title="Today's Tasks (Drag & Drop Reorder)" />
+      <SectionHeader 
+        title="Today's Tasks (Drag & Drop Reorder)" 
+        action={
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowSubmitted(!showSubmitted)}
+            style={{ fontSize: 11.5 }}
+          >
+            {showSubmitted ? '🙈 Hide Submitted' : '👁️ Show Submitted'}
+          </Button>
+        }
+      />
       <style>{`
         .task-card-hover {
           transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
@@ -1041,132 +1121,177 @@ export const TaskWidget = memo(function TaskWidget({
             📋 No pending or active tasks for today. Click <strong>Add Task</strong> to create a new task.
           </div>
         ) : (
-          activeTasks.map((t) => (
-          <div
-            key={t.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, t.id)}
-            onDragOver={(e) => handleDragOver(e, t.id)}
-            onDrop={(e) => handleDrop(e, t.id)}
-            onDragEnd={() => {
-              setDraggedTaskId(null);
-              setDragOverTaskId(null);
-            }}
-            onDragLeave={(e) => {
-              if (dragOverTaskId === t.id) {
-                setDragOverTaskId(null);
-              }
-            }}
-            className={`task-card-hover ${draggedTaskId === t.id ? 'task-card-dragging' : ''} ${dragOverTaskId === t.id && draggedTaskId !== t.id ? 'task-card-drop-target' : ''}`}
-            style={{
-              padding: 16,
-              border: '1px solid var(--border)',
-              background: 'var(--bg-surface)',
-              borderRadius: 10,
-              cursor: 'grab',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              boxShadow: 'var(--e1)',
-            }}
-          >
-            {/* Task Details Header — No blue progress bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab' }}>⣿</span>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>{t.title}</div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📁 Project: <strong style={{ color: 'var(--text-primary)' }}>{t.project}</strong></span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>• 📅 Due: <strong style={{ color: 'var(--brand)' }}>{t.due}</strong></span>
-                    {(() => {
-                      const info = getTimeLeftInfo(t.due);
-                      return (
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                          • ⏳ Time Left:{' '}
+          activeTasks.map((t) => {
+            const isExpanded = !!expandedTaskIds[t.id];
+            const displayTitle = t.project && t.project !== 'Office Task' ? `${t.project}: ${t.title}` : `Office Task: ${t.title}`;
+            return (
+              <div
+                key={t.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, t.id)}
+                onDragOver={(e) => handleDragOver(e, t.id)}
+                onDrop={(e) => handleDrop(e, t.id)}
+                onDragEnd={() => {
+                  setDraggedTaskId(null);
+                  setDragOverTaskId(null);
+                }}
+                onDragLeave={(e) => {
+                  if (dragOverTaskId === t.id) {
+                    setDragOverTaskId(null);
+                  }
+                }}
+                className={`task-card-hover ${draggedTaskId === t.id ? 'task-card-dragging' : ''} ${dragOverTaskId === t.id && draggedTaskId !== t.id ? 'task-card-drop-target' : ''}`}
+                style={{
+                  padding: 16,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  borderRadius: 10,
+                  cursor: 'grab',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  boxShadow: 'var(--e1)',
+                }}
+              >
+                {/* Task Details Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4 }}>⣿</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(t.id);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        padding: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                    >
+                      {isExpanded ? '▼' : '▶'}
+                    </button>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{displayTitle}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+                      ⏱ {formatSec(t.secondsToday)}
+                    </span>
+                    <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
+                    {t.isApproved ? (
+                      <Badge tone="success">Approved</Badge>
+                    ) : t.underReview ? (
+                      <Badge tone="info">Pending Approval</Badge>
+                    ) : t.isRework ? (
+                      <Badge tone="warning">🔄 Rework</Badge>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Collapsible Details in 2x2 Grid */}
+                {isExpanded && (
+                  <div 
+                    style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '8px 16px', 
+                      padding: '10px 14px', 
+                      background: 'var(--bg-sunken)', 
+                      borderRadius: 8, 
+                      fontSize: 12.5,
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>📁 Project:</span>{' '}
+                      <strong style={{ color: 'var(--text-primary)' }}>{t.project || 'Office Task'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>📅 Due:</span>{' '}
+                      <strong style={{ color: 'var(--brand)' }}>{t.due}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>⏳ Time Left:</span>{' '}
+                      {(() => {
+                        const info = getTimeLeftInfo(t.due);
+                        return (
                           <strong style={{ color: info.tone === 'danger' ? 'var(--status-danger)' : info.tone === 'warning' ? 'var(--status-warning)' : 'var(--brand)' }}>
                             {info.label}
                           </strong>
-                        </span>
-                      );
-                    })()}
-                    {t.assignee && (
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>• 👤 Assignee: <strong style={{ color: 'var(--text-primary)' }}>{t.assignee}</strong></span>
-                    )}
-                    {t.supervisor && (
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>• 🧑‍💼 Supervisor: <strong style={{ color: 'var(--text-primary)' }}>{t.supervisor}</strong></span>
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>👤 Assignee:</span>{' '}
+                      <strong style={{ color: 'var(--text-primary)' }}>{t.assignee || 'Unassigned'}</strong>
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>🧑‍💼 Supervisor:</span>{' '}
+                      <strong style={{ color: 'var(--text-primary)' }}>{t.supervisor || 'None'}</strong>
+                    </div>
+                  </div>
+                )}
+
+                {/* Rework reason alert box */}
+                {t.isRework && t.reworkNotes && (
+                  <div style={{
+                    fontSize: 12,
+                    color: '#b45309',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: 8,
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>🔄</span>
+                    <span><strong>Rework Reason:</strong> {t.reworkNotes}</span>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {t.isApproved ? (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        ✓ Approved &amp; Completed
+                      </span>
+                    ) : t.underReview ? (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        📩 Submitted &amp; Requires Approval
+                      </span>
+                    ) : (
+                      <>
+                        <Button
+                          variant={t.active ? 'secondary' : 'primary'}
+                          onClick={() => onToggleTask(t.id, t.title, t.active)}
+                          style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                        >
+                          {t.active ? '⏸ Pause' : '▶ Start'}
+                        </Button>
+
+                        <Button
+                          onClick={() => onSubmitReview(t.id, t.title)}
+                          style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                        >
+                          📩 Submit
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Badge tone={t.priority === 'Critical' ? 'danger' : t.priority === 'High' ? 'warning' : 'neutral'}>{t.priority}</Badge>
-                {t.isApproved ? (
-                  <Badge tone="success">Approved &amp; Completed</Badge>
-                ) : t.underReview ? (
-                  <Badge tone="info">Pending Approval</Badge>
-                ) : t.isRework ? (
-                  <Badge tone="warning">🔄 Rework</Badge>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Rework reason alert box */}
-            {t.isRework && t.reworkNotes && (
-              <div style={{
-                fontSize: 12,
-                color: '#b45309',
-                background: 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-                borderRadius: 8,
-                padding: '8px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}>
-                <span>🔄</span>
-                <span><strong>Rework Reason:</strong> {t.reworkNotes}</span>
-              </div>
-            )}
-
-            {/* Display "Hours " instead of Total Hours Worked & progress bar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
-                ⏱ Hours: {formatSec(t.secondsToday)}
-              </span>
-
-              {/* Action Buttons: Single Toggle Button (Start / Pause) & Submit */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                {t.isApproved ? (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    ✓ Approved &amp; Completed
-                  </span>
-                ) : t.underReview ? (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    📩 Submitted &amp; Requires CEO/Admin/Manager Approval to complete the task (Review and Approve)
-                  </span>
-                ) : (
-                  <>
-                    <Button
-                      variant={t.active ? 'secondary' : 'primary'}
-                      onClick={() => onToggleTask(t.id, t.title, t.active)}
-                      style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
-                    >
-                      {t.active ? '⏸ Pause' : '▶ Start'}
-                    </Button>
-
-                    <Button
-                      onClick={() => onSubmitReview(t.id, t.title)}
-                      style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
-                    >
-                      📩 Submit
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )))}
+            );
+          })
+        )}
       </div>
     </Card>
   );
@@ -1178,6 +1303,14 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
   const { tasks, projects } = useProject();
   const { employees } = useEmployee();
   const [dbSchedules, setDbSchedules] = useState<any[]>([]);
+  const [expandedUpcomingTaskIds, setExpandedUpcomingTaskIds] = useState<Record<string, boolean>>({});
+
+  const toggleUpcomingExpand = (id: string) => {
+    setExpandedUpcomingTaskIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
 
   const empName = useCallback((id?: string) => {
     if (!id) return '';
@@ -1259,17 +1392,28 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
           return taskDate <= isoDate;
         }
         return taskDate === isoDate;
-      }).map((t) => ({
-        id: `task-${t.id}`,
-        time: (t.dueDate || '').slice(0, 10) < isoDate ? 'Overdue' : 'Due Today',
-        title: `Task: ${t.title}`,
-        type: 'Projects' as const,
-        project: projTitle(t.projectId),
-        dueDate: (t.dueDate || '').slice(0, 10) || '—',
-        timeLeft: timeLeftLabel(t.dueDate, isoDate),
-        assignee: empName(t.assigneeId) || 'Unassigned',
-        supervisor: empName(t.supervisorId) || empName((t as any).assignedByEmployeeId) || '—',
-      }));
+      }).map((t) => {
+        const projName = projTitle(t.projectId);
+        const displayTitle = projName && projName !== 'Office Task' ? `${projName}: ${t.title}` : `Office Task: ${t.title}`;
+        const statusLabel = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval'
+          ? 'Under Review'
+          : t.status === 'in_progress'
+          ? 'In Progress'
+          : 'To Do';
+        return {
+          id: `task-${t.id}`,
+          time: (t.dueDate || '').slice(0, 10) < isoDate ? 'Overdue' : 'Due Today',
+          title: displayTitle,
+          type: 'Projects' as const,
+          project: projName,
+          dueDate: (t.dueDate || '').slice(0, 10) || '—',
+          timeLeft: timeLeftLabel(t.dueDate, isoDate),
+          assignee: empName(t.assigneeId) || 'Unassigned',
+          supervisor: empName(t.supervisorId) || empName((t as any).assignedByEmployeeId) || '—',
+          status: statusLabel,
+          actualHours: t.actualHours || 0,
+        };
+      });
 
       // 2. Gather training schedules on this date
       const daySchedules = (dbSchedules || []).filter((s) => s.date === isoDate).map((s) => ({
@@ -1335,25 +1479,104 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
             No scheduled events or tasks due on this day.
           </div>
         ) : (
-          currentDayEvents.map((e) => (
-            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}</div>
-                {e.type === 'Projects' ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 14px', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
-                    <span>📁 Project: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).project}</strong></span>
-                    <span>📅 Due: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).dueDate}</strong></span>
-                    <span>⏳ <strong style={{ color: (e as any).timeLeft?.startsWith('Overdue') ? 'var(--status-danger)' : 'var(--text-secondary)' }}>{(e as any).timeLeft}</strong></span>
-                    <span>👤 Assignee: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).assignee}</strong></span>
-                    <span>🧑‍💼 Supervisor: <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).supervisor}</strong></span>
+          currentDayEvents.map((e) => {
+            const isTask = e.type === 'Projects';
+            const isExpanded = !!expandedUpcomingTaskIds[e.id];
+            return (
+              <div 
+                key={e.id} 
+                style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: 8, 
+                  padding: '10px 12px', 
+                  background: 'var(--bg-sunken)', 
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+                    {isTask && (
+                      <button
+                        type="button"
+                        onClick={() => toggleUpcomingExpand(e.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          fontSize: 11,
+                          padding: 4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        {isExpanded ? '▼' : '▶'}
+                      </button>
+                    )}
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.title}>
+                      {e.title}
+                    </div>
                   </div>
-                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {isTask && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
+                        ⏱ {((e as any).actualHours || 0).toFixed(1)} hrs
+                      </span>
+                    )}
+                    <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Projects' ? 'progress' : 'neutral'}>
+                      {isTask ? (e as any).status : e.type}
+                    </Badge>
+                  </div>
+                </div>
+                
+                {isTask && isExpanded && (
+                  <div 
+                    style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '6px 12px', 
+                      padding: '8px 10px', 
+                      background: 'var(--bg-surface)', 
+                      borderRadius: 6, 
+                      fontSize: 12,
+                      border: '1px solid var(--border)',
+                      marginTop: 4
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>📁 Project:</span>{' '}
+                      <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).project}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>📅 Due:</span>{' '}
+                      <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).dueDate}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>⏳ Time Left:</span>{' '}
+                      <strong style={{ color: (e as any).timeLeft?.startsWith('Overdue') ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
+                        {(e as any).timeLeft}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>👤 Assignee:</span>{' '}
+                      <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).assignee}</strong>
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>🧑‍💼 Supervisor:</span>{' '}
+                      <strong style={{ color: 'var(--text-secondary)' }}>{(e as any).supervisor}</strong>
+                    </div>
+                  </div>
+                )}
+
+                {!isTask && (
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>🕒 {e.time}</div>
                 )}
               </div>
-              <Badge tone={e.type === 'Training' ? 'info' : e.type === 'Projects' ? 'progress' : 'neutral'}>{e.type}</Badge>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </Card>
@@ -1830,8 +2053,11 @@ export function MyDayPage() {
           ((t as any).assignee && myName && (t as any).assignee.toLowerCase() === myName);
         if (!isMyTask) return false;
 
-        const d = (t.dueDate || '').slice(0, 10);
-        return d === todayStr || d < todayStr || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || (t as any).approvalStatus === 'rework' || storedStates[t.id];
+        const sd = (t.startDate || '').slice(0, 10);
+        const dd = (t.dueDate || '').slice(0, 10);
+        const effectiveStartDate = sd || dd;
+        const isScheduled = effectiveStartDate && todayStr >= effectiveStartDate;
+        return isScheduled || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || (t as any).approvalStatus === 'rework' || storedStates[t.id];
       })
       .map((t) => {
         const proj = (projects || []).find((p) => p.id === t.projectId);
@@ -1910,6 +2136,7 @@ export function MyDayPage() {
           title: t.title,
           project: proj ? proj.title : 'Office Task',
           due: (t.dueDate || '').slice(0, 10) || todayStr,
+          startDate: t.startDate ? t.startDate.slice(0, 10) : undefined,
           priority: t.priority === 'high' ? 'High' : 'Normal',
           active,
           underReview,
@@ -2091,7 +2318,7 @@ export function MyDayPage() {
 
     // Save final actualHours to the DB before submitting
     try {
-      await updateTask(id as UUID, { actualHours: finalSeconds / 3600 });
+      await updateTask(id as any, { actualHours: finalSeconds / 3600 });
       completeSession(id as any);
     } catch (e) {
       console.warn('Failed to update task hours on submit:', e);
@@ -2123,10 +2350,12 @@ export function MyDayPage() {
   };
 
   const projectOptions = useMemo(() => {
-    const list = (projects || []).map((p) => ({
-      value: p.id,
-      label: p.title,
-    }));
+    const list = (projects || [])
+      .filter((p) => p.status !== 'closure' && p.status !== 'suspended')
+      .map((p) => ({
+        value: p.id,
+        label: p.title,
+      }));
     return [
       { value: 'OFFICE_TASK', label: 'None (Office Task)' },
       ...list,
@@ -2168,12 +2397,17 @@ export function MyDayPage() {
       targetProjectId = undefined;
     }
 
+    const dueDateVal = (values.dueDate as string) || todayStr;
+    const startDateVal = (values.startDate as string) || dueDateVal;
+
     const res = await createTask({
       projectId: targetProjectId,
       title,
+      description: values.description as string || '',
       supervisorId: user?.id,
       assignedByEmployeeId: user?.id,
-      dueDate: todayStr,
+      startDate: startDateVal,
+      dueDate: dueDateVal,
       status: 'todo',
       priority: 'medium',
     });
@@ -2183,7 +2417,7 @@ export function MyDayPage() {
       id: taskId,
       title,
       project: projName,
-      due: todayStr,
+      due: dueDateVal,
       priority: 'Normal',
       active: false,
       secondsToday: 0,
@@ -2227,12 +2461,6 @@ export function MyDayPage() {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <ResizedStatPill
-          label="TODAY ATTENDANCE"
-          value={record?.firstClockIn ? `Logged: ${record.firstClockIn}` : 'Not Clocked In'}
-          tone={record?.firstClockIn ? 'success' : 'warning'}
-          icon="🕒"
-        />
         <ResizedStatPill
           label="MONTH ATTENDANCE RATE"
           value={`${monthAttendancePct}%`}
@@ -2288,9 +2516,12 @@ export function MyDayPage() {
 
       {/* Create Task Drawer */}
       <Drawer open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Create New Task">
-        <Form initial={{ projectId: 'OFFICE_TASK' }} onSubmit={handleCreateTaskSubmit}>
+        <Form initial={{ projectId: 'OFFICE_TASK', dueDate: toLocalISODate(new Date()), startDate: toLocalISODate(new Date()), description: '' }} onSubmit={handleCreateTaskSubmit}>
           <TextField name="name" label="Task Title *" placeholder="e.g. Cross check each features" />
           <TaskProjectFields projectOptions={projectOptions} />
+          <DatePickerField name="startDate" label="Start Date" />
+          <DatePickerField name="dueDate" label="Due Date" />
+          <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe the objectives or details of the task..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
             <Button type="submit">Create Task</Button>
