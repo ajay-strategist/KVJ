@@ -221,23 +221,59 @@ export function ProjectList({
       const pAllocations = allocations.filter((a: any) => a.projectId === p.id);
       const membersMap = new Map<string, { name: string; hours: number }>();
 
-      // Add allocated employees
+      // 1. Add Project Supervisor
+      const superId = p.supervisorId;
+      if (superId) {
+        const emp = employees.find((e) => e.id === superId);
+        if (emp) {
+          const name = `${emp.firstName} ${emp.lastName}`;
+          const empHours = pTimesheets
+            .filter((ts: any) => ts.employeeId === superId)
+            .reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
+          membersMap.set(name, { name, hours: empHours });
+        }
+      }
+
+      // 2. Add allocated employees
       pAllocations.forEach((a: any) => {
         const emp = employees.find((e) => e.id === a.employeeId);
-        const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
-        const empHours = pTimesheets
-          .filter((ts: any) => ts.employeeId === a.employeeId)
-          .reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
-        membersMap.set(name, { name, hours: empHours });
+        if (emp) {
+          const name = `${emp.firstName} ${emp.lastName}`;
+          const empHours = pTimesheets
+            .filter((ts: any) => ts.employeeId === a.employeeId)
+            .reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
+          const existing = membersMap.get(name);
+          if (!existing) {
+            membersMap.set(name, { name, hours: empHours });
+          }
+        }
       });
 
-      // Add task assignees and timesheet loggers
+      // 3. Add task assignees and timesheet loggers
       pTasks.forEach((t: any) => {
-        const emp = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
-        const name = emp ? `${emp.firstName} ${emp.lastName}` : (t.assigneeId || 'Team Member');
-        const taskHours = Number(t.actualHours || 0);
-        const existing = membersMap.get(name) || { name, hours: 0 };
-        membersMap.set(name, { name, hours: Math.round((existing.hours + taskHours) * 10) / 10 });
+        if (t.assigneeId) {
+          const emp = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
+          const name = emp ? `${emp.firstName} ${emp.lastName}` : t.assigneeId;
+          const taskHours = Number(t.actualHours || 0);
+          const existing = membersMap.get(name) || { name, hours: 0 };
+          membersMap.set(name, { name, hours: Math.round((existing.hours + taskHours) * 10) / 10 });
+        }
+      });
+
+      // 4. Add timesheet loggers
+      pTimesheets.forEach((ts: any) => {
+        if (ts.employeeId) {
+          const emp = employees.find((e) => e.id === ts.employeeId);
+          if (emp) {
+            const name = `${emp.firstName} ${emp.lastName}`;
+            if (!membersMap.has(name)) {
+              const empHours = pTimesheets
+                .filter((item: any) => item.employeeId === ts.employeeId)
+                .reduce((sum: number, item: any) => sum + Number(item.hoursLogged || 0), 0);
+              membersMap.set(name, { name, hours: empHours });
+            }
+          }
+        }
       });
 
       const members = Array.from(membersMap.values());
