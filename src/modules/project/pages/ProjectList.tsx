@@ -1385,7 +1385,7 @@ export function ProjectList({
               title: selectedProject.title,
               status: projectStatusLabelToValue(selectedProject.status),
               supervisorId: projects.find((p: any) => p.id === selectedProject.id)?.supervisorId || '',
-              memberIds: projects.find((p: any) => p.id === selectedProject.id)?.memberIds || [],
+              memberIds: allocations.filter((a: any) => a.projectId === selectedProject.id).map((a: any) => a.employeeId),
             }}
             onSubmit={handleEditProject}
           >

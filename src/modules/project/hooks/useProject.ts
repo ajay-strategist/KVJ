@@ -105,21 +105,21 @@ export function useProject() {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.createProject(data, { id: user.id, role: user.role });
     if (res.ok) {
-      setProjects((prev) => [res.value, ...prev]);
+      await fetchAll();
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };
-  }, [service, user]);
+  }, [service, user, fetchAll]);
 
   const updateProject = useCallback(async (projectId: UUID, data: Partial<Project>): Promise<CallbackResult<Project>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     const res = await service.updateProject(projectId, data, { id: user.id, role: user.role });
     if (res.ok) {
-      setProjects((prev) => prev.map((p) => (p.id === projectId ? res.value : p)));
+      await fetchAll();
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };
-  }, [service, user]);
+  }, [service, user, fetchAll]);
 
   const addMilestone = useCallback(async (projectId: UUID, title: string, dueDate: string): Promise<CallbackResult<Milestone>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };

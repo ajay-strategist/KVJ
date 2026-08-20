@@ -63,7 +63,23 @@ export class ProjectService implements IProjectService {
 
   async createProject(data: Partial<Project>, actor: Actor): Promise<Result<Project>> {
     try {
-      const project = await this.projectRepo.create(data, actor);
+      const memberIds = data.memberIds;
+      const { memberIds: _, ...dbData } = data as any;
+      const project = await this.projectRepo.create(dbData, actor);
+      
+      if (Array.isArray(memberIds)) {
+        for (const empId of memberIds) {
+          await this.allocationRepo.create({
+            projectId: project.id,
+            employeeId: empId,
+            role: 'Team Member',
+            capacityPercentage: 100,
+            status: 'active',
+            startDate: new Date().toISOString().slice(0, 10),
+          }, actor);
+        }
+      }
+
       await this.activity.log('project', project.id, actor, 'create', `Created project code ${project.code} - ${project.title}`);
       await this.audit.log(actor, 'create', 'projects', project.id, { newValues: project });
       return Ok(project);
@@ -74,7 +90,41 @@ export class ProjectService implements IProjectService {
 
   async updateProject(projectId: UUID, patch: Partial<Project>, actor: Actor): Promise<Result<Project>> {
     try {
-      const project = await this.projectRepo.update(projectId, patch, actor);
+      const memberIds = patch.memberIds;
+      const { memberIds: _, ...dbData } = patch as any;
+      const project = await this.projectRepo.update(projectId, dbData, actor);
+
+      if (Array.isArray(memberIds)) {
+        // Fetch existing allocations
+        const page = await this.allocationRepo.findMany({
+          filters: [
+            { field: 'projectId', op: 'eq', value: projectId }
+          ],
+          pageSize: 500
+        });
+        const existing = page.data || [];
+
+        // Find allocations to delete (existing but not in new list)
+        const toDelete = existing.filter(a => !memberIds.includes(a.employeeId));
+        for (const a of toDelete) {
+          await this.allocationRepo.hardDelete(a.id);
+        }
+
+        // Find employeeIds to add (new list but not existing)
+        const existingEmpIds = existing.map(a => a.employeeId);
+        const toAdd = memberIds.filter(empId => !existingEmpIds.includes(empId));
+        for (const empId of toAdd) {
+          await this.allocationRepo.create({
+            projectId: projectId,
+            employeeId: empId,
+            role: 'Team Member',
+            capacityPercentage: 100,
+            status: 'active',
+            startDate: new Date().toISOString().slice(0, 10),
+          }, actor);
+        }
+      }
+
       await this.activity.log('project', project.id, actor, 'update', `Updated project code ${project.code} - ${project.title}`);
       await this.audit.log(actor, 'update', 'projects', project.id, { newValues: project });
       return Ok(project);
