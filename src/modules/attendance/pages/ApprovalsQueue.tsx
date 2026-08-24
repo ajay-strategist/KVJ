@@ -19,7 +19,7 @@ import { useAuth } from '../../auth/AuthProvider';
 export function ApprovalsQueue() {
   const { user } = useAuth();
   const { pendingApprovals, approveLeave, rejectLeave, refreshPending } = useLeave();
-  const { tasks, approveTaskSubmission, requestRework, approveTaskAssignment, refresh: refreshProjects } = useProject();
+  const { tasks, projects, approveTaskSubmission, requestRework, approveTaskAssignment, refresh: refreshProjects } = useProject();
   const [reworkTask, setReworkTask] = useState<any | null>(null);
   const [reworkNotes, setReworkNotes] = useState('');
   const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
@@ -222,9 +222,11 @@ export function ApprovalsQueue() {
 
   
   const handleApproveAssignmentInline = async (task: any) => {
+    const proj = projects.find((p) => p.id === task.projectId);
+    const projTitle = proj ? proj.title : 'Office Task';
     const ok = await confirm({
       title: 'Approve Assignment?',
-      message: `Confirm assigning task "${task.title}"?`,
+      message: `Confirm assigning task "${projTitle}: ${task.title}"?`,
     });
     if (!ok) return;
 
@@ -238,9 +240,11 @@ export function ApprovalsQueue() {
   };
 
   const handleApproveTaskInline = async (task: any) => {
+    const proj = projects.find((p) => p.id === task.projectId);
+    const projTitle = proj ? proj.title : 'Office Task';
     const ok = await confirm({
       title: 'Approve Task Completion?',
-      message: `Approve completed work for task "${task.title}"?`,
+      message: `Approve completed work for task "${projTitle}: ${task.title}"?`,
     });
     if (!ok) return;
 
@@ -276,6 +280,15 @@ export function ApprovalsQueue() {
       key: 'task',
       header: 'Task Name',
       accessor: (r) => r.title,
+      render: (r) => {
+        const proj = projects.find((p) => p.id === r.projectId);
+        const projTitle = proj ? proj.title : 'Office Task';
+        return (
+          <span>
+            <strong>{projTitle}</strong>: {r.title}
+          </span>
+        );
+      },
     },
     {
       key: 'assignee',
@@ -582,7 +595,9 @@ export function ApprovalsQueue() {
         {reworkTask && (
           <div>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{reworkTask.title}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                <strong>{projects.find((p) => p.id === reworkTask.projectId)?.title || 'Office Task'}</strong>: {reworkTask.title}
+              </div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Enter notes and instructions for rework:</span>
             </div>
             <div style={{ marginBottom: 20 }}>
