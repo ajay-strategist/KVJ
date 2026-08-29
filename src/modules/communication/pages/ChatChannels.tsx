@@ -53,8 +53,7 @@ export function ChatChannels() {
   const [leftPanelState, setLeftPanelState] = useState<LeftPanelState>(() => {
     try {
       const saved = localStorage.getItem('kvj_chat_left_panel_state_v2');
-      if (saved === 'expanded' || saved === 'slim' || saved === 'hidden') return saved;
-      // Legacy fallback
+      if (saved === 'expanded' || saved === 'slim') return saved;
       const old = localStorage.getItem('kvj_chat_left_panel_open');
       return old !== null && !JSON.parse(old) ? 'slim' : 'expanded';
     } catch {
@@ -79,17 +78,18 @@ export function ChatChannels() {
 
   const [activeCategory, setActiveCategory] = useState<ChannelCategory>('department');
 
-  // Toggle Left Panel Mode (Expanded ↔ Slim ↔ Hidden)
-  const cycleLeftPanelMode = () => {
+  // Toggle Left Panel Mode (Expanded ↔ Slim Rail)
+  const toggleLeftPanelMode = () => {
     setLeftPanelState((prev) => {
-      let next: LeftPanelState = 'expanded';
-      if (prev === 'expanded') next = 'slim';
-      else if (prev === 'slim') next = 'hidden';
-      else next = 'expanded';
-
+      const next: LeftPanelState = prev === 'expanded' ? 'slim' : 'expanded';
       try { localStorage.setItem('kvj_chat_left_panel_state_v2', next); } catch {}
       return next;
     });
+  };
+
+  const forceExpandLeftPanel = () => {
+    setLeftPanelState('expanded');
+    try { localStorage.setItem('kvj_chat_left_panel_state_v2', 'expanded'); } catch {}
   };
 
   const toggleRightPanel = () => {
@@ -875,8 +875,8 @@ export function ChatChannels() {
               {/* Left Panel Collapse Toggle Button */}
               <button
                 type="button"
-                onClick={cycleLeftPanelMode}
-                title={`Left Panel: ${leftPanelState.toUpperCase()} (Click to cycle)`}
+                onClick={toggleLeftPanelMode}
+                title={leftPanelState === 'expanded' ? "Switch to Slim Rail" : "Expand Channels Sidebar"}
                 style={{
                   background: 'var(--bg-surface)',
                   border: '1px solid var(--border)',
@@ -891,7 +891,7 @@ export function ChatChannels() {
                   gap: 4,
                 }}
               >
-                {leftPanelState === 'expanded' ? '◀ Collapse' : leftPanelState === 'slim' ? '█ Slim' : '▶ Channels'}
+                {leftPanelState === 'expanded' ? '◀ Slim View' : '▶ Expand Channels'}
               </button>
 
               {/* Focus Mode Button */}
@@ -1088,6 +1088,25 @@ export function ChatChannels() {
               </Button>
             </div>
           </div>
+
+          {/* Fallback Banner when Left Panel is Hidden */}
+          {leftPanelState === 'hidden' && (
+            <div style={{
+              padding: '8px 16px',
+              background: 'var(--brand-muted)',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: 12,
+              color: 'var(--brand)',
+            }}>
+              <span>📁 Channels sidebar is currently hidden (Full Screen Mode).</span>
+              <Button size="xs" onClick={forceExpandLeftPanel}>
+                ▶ Restore Channels Sidebar
+              </Button>
+            </div>
+          )}
 
           {/* Pinned Message Alert Bar */}
           {pinnedMessage && (
