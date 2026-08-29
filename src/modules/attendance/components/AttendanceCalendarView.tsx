@@ -257,7 +257,7 @@ export function AttendanceCalendarView({
         {/* Accumulated Expenses & Metrics (Financial Year) */}
         <Card>
           <SectionHeader
-            title="Accumulated Expenses (Financial Year)"
+            title="Accumulated Expenses"
             action={
               <select
                 className="kvj-select"
