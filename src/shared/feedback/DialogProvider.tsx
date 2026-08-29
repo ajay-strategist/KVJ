@@ -64,7 +64,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 1250,
+            zIndex: 9999,
             display: 'grid',
             placeItems: 'center',
             background: 'var(--bg-overlay)',

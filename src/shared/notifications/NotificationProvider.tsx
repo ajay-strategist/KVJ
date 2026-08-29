@@ -60,6 +60,25 @@ const uid = () => Math.random().toString(36).slice(2);
 
 const defaultNotificationService = new MockNotificationService();
 
+export function playNotificationSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch {}
+}
+
 export function NotificationProvider({ children, service = defaultNotificationService }: { children: ReactNode; service?: INotificationService }) {
   const { user } = useAuth();
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -104,6 +123,7 @@ export function NotificationProvider({ children, service = defaultNotificationSe
       createdAt: Date.now(),
     };
     setItems((prev) => [newItem, ...prev]);
+    playNotificationSound();
   }, []);
 
   const dismissToast = useCallback((id: string) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
@@ -111,6 +131,9 @@ export function NotificationProvider({ children, service = defaultNotificationSe
     const item: Toast = { id: uid(), durationMs: 4000, ...t };
     setToasts((prev) => [...prev, item]);
     if (item.durationMs) setTimeout(() => dismissToast(item.id), item.durationMs);
+    if (t.variant === 'info' || t.variant === 'success') {
+      playNotificationSound();
+    }
   }, [dismissToast]);
 
   const value = useMemo<NotificationContextValue>(() => {

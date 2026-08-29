@@ -139,20 +139,30 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       return `📝 ${matchingTask.title}`;
     }
 
-    // 3. Fallback: check DB active tasks — but only if timer is also running
+    // 3. Fallback: check DB active tasks (for other employees where local timer store is unavailable)
     const dbTask = activeTasks.find((t: any) => {
-      const isTimerRunning = runningTaskIds.has(t.id);
-      if (!isTimerRunning) return false; // paused → skip
-      return (
+      const isForThisEmp =
         t.assignee_id === empId ||
         (t.assignee_id && empEmail && t.assignee_id.toLowerCase() === empEmail) ||
-        (user && user.email?.toLowerCase() === empEmail && t.assignee_id === user.id) ||
-        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName)
-      );
+        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName);
+      return isForThisEmp;
     });
 
     if (dbTask) {
       return `📝 ${dbTask.title}`;
+    }
+
+    const memoryTask = (tasks || []).find((t: any) => {
+      if (t.status !== 'in_progress' && (t.status as any) !== 'In Progress') return false;
+      const isForThisEmp =
+        t.assigneeId === empId ||
+        (t.assigneeId && empEmail && t.assigneeId.toLowerCase() === empEmail) ||
+        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName);
+      return isForThisEmp;
+    });
+
+    if (memoryTask) {
+      return `📝 ${memoryTask.title}`;
     }
 
     return 'No active task in progress';

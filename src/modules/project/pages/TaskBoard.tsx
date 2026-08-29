@@ -19,7 +19,8 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
-import { todayISO, addDaysISO } from '../../../shared/utils/date';
+import { todayISO, addDaysISO, formatDisplayDate } from '../../../shared/utils/date';
+import { exportToExcel } from '../../../shared/utils/exportToExcel';
 
 import { useProject } from '../hooks/useProject';
 import { useTaskSessions } from '../hooks/useTaskSessions';
@@ -40,6 +41,7 @@ export interface TaskItem {
   dueDate: string;
   startDate?: string;
   description?: string;
+  proposedHours?: number;
   status: TaskStatus;
   totalHoursWorked: number;
   approvedBy?: string;
@@ -694,8 +696,8 @@ export function TaskBoard({
     setEditingTask(null);
   };
 
-  const dueTodayCount = tasksList.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval' && t.status !== 'Completed' && t.status !== 'Under Review').length;
-  const totalHoursSum = tasksList.reduce((acc, t) => acc + Math.max(getTaskDurationHours(t.id), t.totalHoursWorked), 0);
+  const dueTodayCount = sortedTasks.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval' && t.status !== 'Completed' && t.status !== 'Under Review').length;
+  const totalHoursSum = sortedTasks.reduce((acc, t) => acc + Math.max(getTaskDurationHours(t.id), t.totalHoursWorked), 0);
 
   const getWorkflowStep = (status: TaskStatus, approvalStatus?: string | null) => {
     if (approvalStatus === 'pending_assignment_approval') return 'Pending Approval';
@@ -709,9 +711,43 @@ export function TaskBoard({
     }
   };
 
+  const handleExportTasksToExcel = () => {
+    const headers = [
+      'Task Title',
+      'Category / Project',
+      'Assignee',
+      'Supervisor',
+      'Status',
+      'Start Date',
+      'Due Date',
+      'Proposed Time',
+      'Total Hours Logged',
+      'Description',
+    ];
+
+    const rows = sortedTasks.map((t) => [
+      t.name,
+      t.projectName || t.category,
+      t.assignee,
+      t.supervisor,
+      t.status,
+      formatDisplayDate(t.startDate),
+      formatDisplayDate(t.dueDate),
+      t.proposedHours ? `${t.proposedHours} hrs` : '—',
+      `${Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)} hrs`,
+      t.description || '',
+    ]);
+
+    exportToExcel(`Tasks_Board_${todayISO()}`, headers, rows);
+    toast({ variant: 'success', title: 'Export Complete', message: 'Tasks exported to Excel successfully.' });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+        <Button variant="secondary" onClick={handleExportTasksToExcel}>
+          📥 Export Tasks to Excel
+        </Button>
         <Button onClick={() => setCreateTaskOpen(true)}>➕ Create Task</Button>
       </div>
 

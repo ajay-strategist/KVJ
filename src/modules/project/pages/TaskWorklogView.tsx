@@ -10,6 +10,8 @@ import { useTaskSessions } from '../hooks/useTaskSessions';
 import type { TaskWorkSession } from '../project.repository';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
+import { exportToExcel } from '../../../shared/utils/exportToExcel';
+import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
 
 // ── localStorage key used by the My Day task timer ────────────────────────────
 const TASK_TIMER_KEY = 'kvj_task_timer_state_v1';
@@ -438,13 +440,52 @@ export function TaskWorklogView({
     return true;
   });
 
+  const handleExportWorklogsToExcel = () => {
+    const headers = [
+      'Date',
+      'Employee',
+      'Supervisor',
+      'Task / Work Title',
+      'Duration (Hours)',
+      'Status',
+      'Notes',
+    ];
+
+    const rows = filteredSessions.map((s) => {
+      const durHrs = s.durationMinutes ? (s.durationMinutes / 60).toFixed(2) : '0.00';
+      const empObj = employees.find((e) => e.id === s.employeeId);
+      const empName = empObj ? `${empObj.firstName} ${empObj.lastName}` : (s.employeeId || 'Employee');
+      const supObj = employees.find((e) => e.id === s.supervisorId);
+      const supName = supObj ? `${supObj.firstName} ${supObj.lastName}` : (s.supervisorName || '—');
+      return [
+        formatDisplayDate(s.startTime?.slice(0, 10)),
+        empName,
+        supName,
+        s.workTitle || 'Work Session',
+        `${durHrs} hrs`,
+        s.status || 'completed',
+        (s as any).notes || (s as any).description || '',
+      ];
+    });
+
+    exportToExcel(`Worklog_Sessions_${todayISO()}`, headers, rows);
+    toast({ variant: 'success', title: 'Export Complete', message: 'Worklog sessions exported to Excel successfully.' });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* ── Work Sessions timeline ── */}
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-          <SectionHeader title={`Work Sessions (${filteredSessions.length})`} />
+          <SectionHeader
+            title={`Work Sessions (${filteredSessions.length})`}
+            action={
+              <Button size="sm" variant="secondary" onClick={handleExportWorklogsToExcel}>
+                📥 Export Worklogs to Excel
+              </Button>
+            }
+          />
           <div 
             style={{ 
               display: 'inline-flex', 

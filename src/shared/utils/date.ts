@@ -25,3 +25,23 @@ export function todayISO(): string {
 export function addDaysISO(days: number, from: Date = new Date()): string {
   return toLocalISODate(new Date(from.getFullYear(), from.getMonth(), from.getDate() + days));
 }
+
+/** Standardize any Date or date string to DD-MM-YYYY format for UI rendering. */
+export function formatDisplayDate(val?: string | Date | null): string {
+  if (!val) return '—';
+  if (val === '—') return '—';
+  
+  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim())) {
+    const [y, m, d] = val.trim().split('-');
+    return `${d}-${m}-${y}`;
+  }
+
+  const dt = typeof val === 'string' ? new Date(val) : val;
+  if (isNaN(dt.getTime())) return String(val);
+
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${day}-${m}-${y}`;
+}
+

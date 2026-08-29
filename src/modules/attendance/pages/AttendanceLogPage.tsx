@@ -780,7 +780,8 @@ export function AttendanceLogPage() {
         const resolvedEmpName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : empName;
         const totalMins = record.totalWorkingMinutes || 0;
         const breakMins = record.totalBreakMinutes || 0;
-        const duration = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+        const grossMins = totalMins + breakMins;
+        const duration = `${Math.floor(grossMins / 60)}h ${grossMins % 60}m`;
         const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
 
         const sessionsList = record.sessions && record.sessions.length > 0
@@ -987,7 +988,6 @@ export function AttendanceLogPage() {
               <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: '#0F4C81', color: 'white' }}>
-                    <th style={{ padding: '8px 10px', width: 40 }}>Tasks</th>
                     <th style={{ padding: '8px 10px' }}>Date</th>
                     <th style={{ padding: '8px 10px' }}>Name</th>
                     <th style={{ padding: '8px 10px' }}>Holiday</th>
@@ -998,7 +998,6 @@ export function AttendanceLogPage() {
                     <th style={{ padding: '8px 10px' }}>Start Time</th>
                     <th style={{ padding: '8px 10px' }}>End Time</th>
                     <th style={{ padding: '8px 10px' }}>Duration</th>
-                    <th style={{ padding: '8px 10px' }}>Other Expenses</th>
                     <th style={{ padding: '8px 10px' }}>Note</th>
                     <th style={{ padding: '8px 10px' }}>Break</th>
                   </tr>
@@ -1042,8 +1041,6 @@ export function AttendanceLogPage() {
                       ? '#d97706'
                       : 'inherit';
 
-                    const isExpanded = !!expandedRows[i];
-
                     return (
                       <tr
                         key={i}
@@ -1055,21 +1052,8 @@ export function AttendanceLogPage() {
                           transition: 'background 140ms ease',
                         }}
                       >
-                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                          {r.tasks && r.tasks.length > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => toggleRowExpand(i)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--brand)' }}
-                            >
-                              {isExpanded ? '▼' : '▶'}
-                            </button>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>-</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.date}</td>
-                        <td style={{ padding: '8px 10px' }}>{r.name}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.date}</td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{r.name}</td>
                         <td style={{ padding: '8px 10px', color: isHoliday ? 'var(--status-danger)' : 'inherit', fontWeight: isHoliday ? 700 : 400 }}>
                           {r.holiday || '—'}
                         </td>
@@ -1104,7 +1088,6 @@ export function AttendanceLogPage() {
                         <td style={{ padding: '8px 10px' }}>{r.start}</td>
                         <td style={{ padding: '8px 10px' }}>{r.end}</td>
                         <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
-                        <td style={{ padding: '8px 10px' }}>{r.expenses}</td>
                         <td style={{
                           padding: '8px 10px',
                           color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--text-secondary)',

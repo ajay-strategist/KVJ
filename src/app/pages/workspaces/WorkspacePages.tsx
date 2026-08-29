@@ -336,27 +336,33 @@ export const AttendancePanel = memo(function AttendancePanel({
   }, []);
 
   const completedBreakMs = (record?.breaks ?? []).reduce((sum: number, b: any) => {
-    if (b.endTime) return sum + (new Date(b.endTime).getTime() - new Date(b.startTime).getTime());
+    const sTime = b.startTime || b.start_time;
+    const eTime = b.endTime || b.end_time;
+    if (eTime && sTime) return sum + (new Date(eTime).getTime() - new Date(sTime).getTime());
     return sum;
   }, 0);
 
   const completedSessionMs = (record?.sessions ?? []).reduce((sum: number, s: any) => {
-    if (s.clockOut) return sum + (new Date(s.clockOut).getTime() - new Date(s.clockIn).getTime());
+    const cIn = s.clockIn || s.clock_in;
+    const cOut = s.clockOut || s.clock_out;
+    if (cOut && cIn) return sum + (new Date(cOut).getTime() - new Date(cIn).getTime());
     return sum;
   }, 0);
 
-  const activeSession = record?.sessions?.find((s: any) => !s.clockOut);
-  const startTimeStr = activeSession?.clockIn || record?.firstClockIn;
+  const activeSession = record?.sessions?.find((s: any) => !(s.clockOut || s.clock_out));
+  const startTimeStr = activeSession?.clockIn || (activeSession as any)?.clock_in || record?.firstClockIn;
   const activeSessionMs = (record?.status === 'present' || record?.status === 'on_break') && startTimeStr
     ? Math.max(0, nowMs - new Date(startTimeStr).getTime())
     : 0;
 
-  const activeBreak = record?.breaks?.find((b: any) => !b.endTime);
-  const activeBreakMs = activeBreak ? Math.max(0, nowMs - new Date(activeBreak.startTime).getTime()) : 0;
+  const activeBreak = record?.breaks?.find((b: any) => !(b.endTime || b.end_time));
+  const activeBreakStart = activeBreak ? (activeBreak.startTime || (activeBreak as any)?.start_time) : null;
+  const activeBreakMs = activeBreakStart ? Math.max(0, nowMs - new Date(activeBreakStart).getTime()) : 0;
 
-  const totalWorkMs = Math.max(0, completedSessionMs + activeSessionMs - completedBreakMs - activeBreakMs);
-  const totalBreakMs = Math.max(0, completedBreakMs + activeBreakMs);
+  const dbBreakMs = ((record?.totalBreakMinutes || (record as any)?.total_break_minutes || 0) * 60000);
+  const totalBreakMs = Math.max(completedBreakMs, dbBreakMs) + activeBreakMs;
   const grossDurationMs = completedSessionMs + activeSessionMs;
+  const totalWorkMs = Math.max(0, grossDurationMs - totalBreakMs);
 
   const handleCustomClockInSubmit = useCallback(async () => {
     const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : selectedMode === 'Remote' ? 'Work From Home' : 'Office';
@@ -2507,8 +2513,8 @@ export function MyDayPage() {
         onActivityLog={handleActivityLog}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: 16, marginTop: 16 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           <TaskWidget
             tasks={tasks}
             setTasks={setTasks}
@@ -2520,7 +2526,7 @@ export function MyDayPage() {
           <UpcomingEventsWidget />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           <AnnouncementWidget />
           <TimelineWidget
             entries={timelineEntries}
@@ -2536,6 +2542,7 @@ export function MyDayPage() {
         <Form initial={{ projectId: 'OFFICE_TASK', dueDate: toLocalISODate(new Date()), startDate: toLocalISODate(new Date()), description: '' }} onSubmit={handleCreateTaskSubmit}>
           <TextField name="name" label="Task Title *" placeholder="e.g. Cross check each features" />
           <TaskProjectFields projectOptions={projectOptions} />
+          <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 4.0" />
           <DatePickerField name="startDate" label="Start Date" />
           <DatePickerField name="dueDate" label="Due Date" />
           <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe the objectives or details of the task..." />

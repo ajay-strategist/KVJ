@@ -34,8 +34,39 @@ export function ChatChannels() {
   // channel. (Was 'c-general' — a dead id that pointed at no real channel, so
   // messages never loaded and sends failed.)
   const [activeChannelId, setActiveChannelId] = useState<string>('');
-  const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
+  const [showLeftPanel, setShowLeftPanel] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('kvj_chat_left_panel_open');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [showRightPanel, setShowRightPanel] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('kvj_chat_right_panel_open');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   const [activeCategory, setActiveCategory] = useState<ChannelCategory>('department');
+
+  const toggleLeftPanel = () => {
+    setShowLeftPanel((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('kvj_chat_left_panel_open', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const toggleRightPanel = () => {
+    setShowRightPanel((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('kvj_chat_right_panel_open', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   // Input composer state
   const [text, setText] = useState('');
@@ -428,7 +459,7 @@ export function ChatChannels() {
       {/* ── Slack/Teams Workspace Outer Grid Layout ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '300px 1fr' + (showRightPanel ? ' 320px' : ''),
+        gridTemplateColumns: (showLeftPanel ? '300px ' : '') + '1fr' + (showRightPanel ? ' 320px' : ''),
         gap: 16,
         height: 'calc(100vh - 180px)',
         minHeight: 600,
@@ -436,6 +467,7 @@ export function ChatChannels() {
       }}>
 
         {/* ── Left Sidebar (Channel Navigation) ── */}
+        {showLeftPanel && (
         <div style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border)',
@@ -539,6 +571,7 @@ export function ChatChannels() {
             })}
           </div>
         </div>
+        )}
 
         {/* ── Center Chat Panel (Feed & Input Composer) ── */}
         <div style={{
@@ -563,6 +596,14 @@ export function ChatChannels() {
           }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={toggleLeftPanel}
+                  title={showLeftPanel ? "Hide Channels List" : "Show Channels List"}
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '3px 7px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)' }}
+                >
+                  {showLeftPanel ? '◀ Channels' : '▶ Channels'}
+                </button>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>
                   {activeChannel.type === 'direct' ? '👤' : '#'} {activeChannel.name}
                 </h3>
@@ -601,9 +642,9 @@ export function ChatChannels() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setShowRightPanel(!showRightPanel)}
+                onClick={toggleRightPanel}
               >
-                {showRightPanel ? 'Hide Details' : 'Show Details'}
+                {showRightPanel ? 'Hide Details ◀' : 'Show Details ▶'}
               </Button>
             </div>
           </div>

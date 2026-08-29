@@ -16,7 +16,7 @@ import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
-import { todayISO } from '../../../shared/utils/date';
+import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
 import {
   fetchScheduleRange, detectConflicts, eachDate, presetRange, PRESETS, CONFLICT_META,
   type ScheduleRangeResult, type ScheduleSession, type ScheduleConflict,
@@ -500,7 +500,7 @@ export function TrainingCalendar() {
       endTime: '12:00',
       venue: firstPreset?.venue || 'Lab 1',
       mode: firstPreset?.mode || 'Offline',
-      studentCount: firstPreset?.studentCount || 20,
+      studentCount: firstPreset?.studentCount || 0,
     });
     setIsAssignDrawerOpen(true);
   };
@@ -575,7 +575,7 @@ export function TrainingCalendar() {
       endTime: assignForm.endTime,
       venue: assignForm.venue,
       mode: assignForm.mode,
-      studentCount: Number(assignForm.studentCount) || 20,
+      studentCount: Number(assignForm.studentCount) || 0,
       status: 'Scheduled',
       color: 'var(--brand)',
     };
@@ -663,6 +663,46 @@ export function TrainingCalendar() {
       setSubmittingSession(false);
     }
   };
+
+  const handleMoveSession = useCallback(async (sessionId: string, newDate: string, newTrainerId: string) => {
+    const target = customSessions.find((s) => s.id === sessionId) || combinedSessions.find((s) => s.id === sessionId);
+    if (!target) return;
+    if (target.date === newDate && target.trainerId === newTrainerId) return;
+
+    const oldDate = target.date;
+    const oldTrainerId = target.trainerId;
+
+    // Optimistically update local custom sessions state
+    setCustomSessions((prev) => {
+      const exists = prev.some((s) => s.id === sessionId);
+      if (exists) {
+        return prev.map((s) => (s.id === sessionId ? { ...s, date: newDate, trainerId: newTrainerId } : s));
+      }
+      return [...prev, { ...target, date: newDate, trainerId: newTrainerId }];
+    });
+
+    try {
+      if (UUID_RE.test(sessionId)) {
+        const validTrainerId = toValidUuid(newTrainerId) || (toValidUuid(user?.id) ?? null);
+        await supabase
+          .from('flwdsk_calendar_sessions')
+          .update({ date: newDate, trainer_id: validTrainerId })
+          .eq('id', sessionId);
+      }
+
+      toast({
+        variant: 'success',
+        title: 'Schedule Moved',
+        message: `Schedule moved to ${formatDisplayDate(newDate)}${newTrainerId !== oldTrainerId ? ` (${trainerName(newTrainerId)})` : ''}.`,
+      });
+    } catch (err: any) {
+      console.warn('Failed to move calendar session date:', err);
+      setCustomSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, date: oldDate, trainerId: oldTrainerId } : s))
+      );
+      toast({ variant: 'error', title: 'Move Failed', message: 'Could not update session date.' });
+    }
+  }, [customSessions, combinedSessions, user?.id, trainerName, toast]);
 
   const resetFilters = () => {
     setFilters(EMPTY_FILTERS);
@@ -1069,6 +1109,7 @@ export function TrainingCalendar() {
                         expanded={isOpen}
                         onOpen={handleEditSchedule}
                         onAssignCell={handleOpenCellAssign}
+                        onMoveSession={handleMoveSession}
                       />
                     );
                   })}
@@ -1369,15 +1410,18 @@ function MiniBtn({ onClick, children }: { onClick: () => void; children: React.R
   );
 }
 
-/** One trainer/day cell with strict overflow clipping */
-const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sessions, leave, expanded, onOpen, onAssignCell }: {
+/** One trainer/day cell with strict overflow clipping and drag & drop date move support */
+const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sessions, leave, expanded, onOpen, onAssignCell, onMoveSession }: {
   left: number; width: number; date: string; trainerId: string;
   sessions: ScheduleSession[];
   leave?: { duration: string; type: string; status: string };
   expanded: boolean;
   onOpen: (s: ScheduleSession) => void;
   onAssignCell: (date: string, trainerId: string) => void;
+  onMoveSession: (sessionId: string, newDate: string, newTrainerId: string) => void;
 }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
   return (
     <div
       onClick={(e) => {
@@ -1385,12 +1429,37 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
         if ((e.target as HTMLElement).closest('button')) return;
         if (!leave) onAssignCell(date, trainerId);
       }}
+      onDragOver={(e) => {
+        if (leave) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        setIsDragOver(false);
+        if (leave) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          const raw = e.dataTransfer.getData('text/plain');
+          if (!raw) return;
+          const data = JSON.parse(raw);
+          if (data && data.sessionId) {
+            onMoveSession(data.sessionId, date, trainerId);
+          }
+        } catch (err) {
+          console.warn('Drop error:', err);
+        }
+      }}
       style={{
         position: 'absolute', left, width, top: 0, height: '100%',
         borderRight: '1px solid var(--border)', padding: 6,
         display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box',
         cursor: !leave ? 'pointer' : 'default',
         overflow: 'hidden',
+        background: isDragOver ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+        transition: 'background 0.15s ease',
       }}
     >
       {leave && (
@@ -1415,7 +1484,13 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
           <button
             key={s.id}
             type="button"
-            title={`${batchDisplay} (${timeDisplay})`}
+            draggable
+            onDragStart={(e) => {
+              e.stopPropagation();
+              e.dataTransfer.setData('text/plain', JSON.stringify({ sessionId: s.id, fromDate: s.date, fromTrainerId: s.trainerId }));
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            title={`Drag to move date or reassign trainer · ${batchDisplay} (${timeDisplay})`}
             onClick={(e) => {
               e.stopPropagation();
               onOpen(s);
@@ -1427,7 +1502,7 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
               border: '1px solid var(--border)',
               borderRadius: 6,
               padding: '6px 8px',
-              cursor: 'pointer',
+              cursor: 'grab',
               fontSize: 12,
               color: 'var(--text-primary)',
               overflow: 'hidden',
@@ -1466,7 +1541,7 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
             </div>
             {expanded && (
               <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
-                📍 {s.venue} · {s.mode} · 👥 {s.studentCount}<br />🏛️ {s.college} · 👤 {s.coordinator}
+                📍 {s.venue} · {s.mode} {s.studentCount ? `· 👥 ${s.studentCount}` : ''}<br />🏛️ {s.college} · 👤 {s.coordinator}
               </div>
             )}
           </button>

@@ -374,13 +374,17 @@ export class SupabaseAuthService implements IAuthService {
   ): Promise<Session> {
     const user = await this.loadProfile(userId, email);
     const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
-    return {
+    const session: Session = {
       user,
       token: accessToken,
       issuedAt: Date.now(),
       expiresAt: expiresAtSeconds ? expiresAtSeconds * 1000 : Date.now() + fallbackTtlMs,
       rememberMe,
     };
+    try {
+      localStorage.setItem('kvj_app_session', JSON.stringify(session));
+    } catch (_) {}
+    return session;
   }
 
   /**

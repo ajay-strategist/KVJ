@@ -245,29 +245,31 @@ export function AttendanceCalendarView({
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>Total Break:</span> <strong>{monthlyStats.totalBreakHrs} hrs</strong>
             </div>
-            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>Total Hours Worked:</span> <strong>{monthlyStats.totalHoursWorked} hrs</strong>
             </div>
-            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid #22C55E' }}>
-              <span style={{ fontWeight: 600 }}>Total Expenses:</span> <strong style={{ color: 'var(--status-success)', fontSize: 14 }}>₹ {monthlyStats.totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid #22C55E' }}>
+              <span style={{ fontWeight: 600 }}>Total Expenses:</span> <strong style={{ color: 'var(--status-success)', fontSize: 13 }}>₹ {monthlyStats.totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>
         </Card>
 
         {/* Accumulated Expenses & Metrics (Financial Year) */}
         <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <SectionHeader title="Accumulated Expenses (Financial Year)" />
-            <select
-              className="kvj-select"
-              value={selectedFY}
-              onChange={(e) => setSelectedFY(e.target.value)}
-              style={{ padding: '2px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)' }}
-            >
-              <option value="FY 2026-27">FY 2026-27 (Apr 1 - Mar 31)</option>
-              <option value="FY 2025-26">FY 2025-26 (Apr 1 - Mar 31)</option>
-            </select>
-          </div>
+          <SectionHeader
+            title="Accumulated Expenses (Financial Year)"
+            action={
+              <select
+                className="kvj-select"
+                value={selectedFY}
+                onChange={(e) => setSelectedFY(e.target.value)}
+                style={{ padding: '3px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)' }}
+              >
+                <option value="FY 2026-27">FY 2026-27 (Apr 1 - Mar 31)</option>
+                <option value="FY 2025-26">FY 2025-26 (Apr 1 - Mar 31)</option>
+              </select>
+            }
+          />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
             <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
@@ -285,11 +287,11 @@ export function AttendanceCalendarView({
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>FY Total Break:</span> <strong>{fyStats.totalBreakHrsFY} hrs</strong>
             </div>
-            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>FY Total Hours Worked:</span> <strong>{fyStats.totalHoursWorkedFY} hrs</strong>
             </div>
-            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(95, 211, 232, 0.12)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
-              <span style={{ fontWeight: 600 }}>FY Total Expenses:</span> <strong style={{ color: 'var(--accent)', fontSize: 14 }}>₹ {fyStats.totalExpensesFY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(95, 211, 232, 0.12)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
+              <span style={{ fontWeight: 600 }}>FY Total Expenses:</span> <strong style={{ color: 'var(--accent)', fontSize: 13 }}>₹ {fyStats.totalExpensesFY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>
         </Card>

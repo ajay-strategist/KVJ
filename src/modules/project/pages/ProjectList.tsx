@@ -12,6 +12,8 @@ import { useProject } from '../hooks/useProject';
 import { useTaskSessions } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
+import { exportToExcel } from '../../../shared/utils/exportToExcel';
+import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
 
 /**
  * Multi-select of project members, bound to the shared Form's `memberIds` value.
@@ -711,10 +713,44 @@ export function ProjectList({
     )},
   ];
 
+  const handleExportProjectsToExcel = () => {
+    const headers = [
+      'Project Code',
+      'Project Name',
+      'Client',
+      'Supervisor',
+      'Status',
+      'Total Hours Worked',
+      'Tasks Completed',
+      'Total Tasks',
+      'Completion %',
+      'Assigned Members',
+    ];
+
+    const rows = filteredProjects.map((p) => {
+      const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
+      const memberStr = p.members.map((m) => `${m.name} (${m.hours} hrs)`).join('; ');
+      return [
+        p.code,
+        p.title,
+        p.client,
+        p.supervisor || '—',
+        p.status,
+        p.totalHours,
+        p.tasksCompleted,
+        p.tasksTotal,
+        `${pct}%`,
+        memberStr || 'None',
+      ];
+    });
+
+    exportToExcel(`Projects_Report_${todayISO()}`, headers, rows);
+    toast({ variant: 'success', title: 'Export Complete', message: 'Projects report exported to Excel successfully.' });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Action Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         {/* View Mode Toggle: Card View vs Table View */}
         <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
           <button
@@ -749,7 +785,12 @@ export function ProjectList({
           </button>
         </div>
 
-        <Button onClick={() => setCreateProjectOpen(true)}>Create Master Project</Button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Button variant="secondary" onClick={handleExportProjectsToExcel}>
+            📥 Export Projects to Excel
+          </Button>
+          <Button onClick={() => setCreateProjectOpen(true)}>Create Master Project</Button>
+        </div>
       </div>
 
       {/* Top Row: KPI Cards Left & Status Filter Right */}

@@ -63,6 +63,7 @@ export interface Task extends Entity {
   dueDate?: string;
   startDate?: string;
   estimatedHours?: number;
+  proposedHours?: number;
   actualHours?: number;
   checklist?: { item: string; done: boolean }[];
   // Approval workflow extensions
