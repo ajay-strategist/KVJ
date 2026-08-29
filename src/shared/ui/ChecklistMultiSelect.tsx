@@ -35,14 +35,21 @@ export function ChecklistMultiSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const allSelected = selectedValues.length === 0 || selectedValues.length === options.length;
+  const isAllSelected = (selectedValues.length === 0 || (selectedValues.length === options.length && !selectedValues.includes('__none__'))) && !selectedValues.includes('__none__');
 
   const toggleOption = (val: string) => {
-    if (selectedValues.includes(val)) {
-      const next = selectedValues.filter((v) => v !== val);
-      onChange(next);
+    // Determine effective selected list
+    const currentList = isAllSelected
+      ? options.map((o) => o.value)
+      : selectedValues.filter((v) => v !== '__none__');
+
+    if (currentList.includes(val)) {
+      // Unchecking this option
+      const next = currentList.filter((v) => v !== val);
+      onChange(next.length === 0 ? ['__none__'] : next);
     } else {
-      const next = [...selectedValues, val];
+      // Checking this option
+      const next = [...currentList, val];
       onChange(next.length === options.length ? [] : next);
     }
   };
@@ -52,13 +59,12 @@ export function ChecklistMultiSelect({
   };
 
   const handleClearAll = () => {
-    // Select none (or first)
     onChange(['__none__']);
   };
 
   const getButtonText = () => {
-    if (allSelected || selectedValues.includes('all')) return 'All Statuses';
-    if (selectedValues.length === 0 || selectedValues.includes('__none__')) return 'None Selected';
+    if (selectedValues.includes('__none__')) return 'None Selected';
+    if (isAllSelected || selectedValues.includes('all')) return 'All Statuses';
     if (selectedValues.length === 1) {
       const found = options.find((o) => o.value === selectedValues[0]);
       return found ? found.label : selectedValues[0];
@@ -155,7 +161,7 @@ export function ChecklistMultiSelect({
           {/* Checklist Items */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
             {options.map((opt) => {
-              const isChecked = allSelected || selectedValues.includes(opt.value);
+              const isChecked = !selectedValues.includes('__none__') && (isAllSelected || selectedValues.includes(opt.value));
               return (
                 <label
                   key={opt.value}
