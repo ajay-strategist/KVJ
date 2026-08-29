@@ -129,6 +129,9 @@ export function ProjectList({
   
   // Status checklist filter state. Default: [] (All Statuses)
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
+  const [selectedSupervisor, setSelectedSupervisor] = useState<string>('all');
+  const [selectedClient, setSelectedClient] = useState<string>('all');
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
@@ -334,6 +337,18 @@ export function ProjectList({
         return false;
       });
     }
+
+    if (selectedProjectFilter !== 'all') {
+      list = list.filter((p) => p.id === selectedProjectFilter);
+    }
+    if (selectedSupervisor !== 'all') {
+      const supEmp = employees.find((e) => e.id === selectedSupervisor);
+      const supName = supEmp ? `${supEmp.firstName} ${supEmp.lastName}` : '';
+      list = list.filter((p: any) => p.supervisorId === selectedSupervisor || (supName && p.supervisor === supName));
+    }
+    if (selectedClient !== 'all') {
+      list = list.filter((p) => p.client === selectedClient);
+    }
     if (selectedStatuses.length > 0) {
       if (selectedStatuses.includes('__none__')) {
         list = [];
@@ -342,7 +357,13 @@ export function ProjectList({
       }
     }
     return list;
-  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses]);
+  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses, selectedProjectFilter, selectedSupervisor, selectedClient, employees]);
+
+  const totalTasksCount = useMemo(() => filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0), [filteredProjects]);
+  const completedTasksCount = useMemo(() => filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0), [filteredProjects]);
+  const inProgressTasksCount = useMemo(() => Math.max(0, totalTasksCount - completedTasksCount), [totalTasksCount, completedTasksCount]);
+  const pctCompleted = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
+  const pctInProgress = totalTasksCount > 0 ? Math.round((inProgressTasksCount / totalTasksCount) * 100) : 0;
 
   // Count active projects (Not Started + In Progress)
   const activeProjectsCount = useMemo(() => {
@@ -755,72 +776,48 @@ export function ProjectList({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-        {/* View Mode Toggle: Card View vs Table View */}
-        <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
-          <button
-            type="button"
-            onClick={() => setViewMode('card')}
-            style={{
-              padding: '6px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              border: 'none',
-              background: viewMode === 'card' ? 'var(--brand)' : 'var(--bg-surface)',
-              color: viewMode === 'card' ? 'white' : 'var(--text-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            🎴 Card View
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('table')}
-            style={{
-              padding: '6px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              border: 'none',
-              background: viewMode === 'table' ? 'var(--brand)' : 'var(--bg-surface)',
-              color: viewMode === 'table' ? 'white' : 'var(--text-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            📊 Table View
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Button variant="secondary" onClick={handleExportProjectsToExcel}>
-            📥 Export Projects to Excel
-          </Button>
-          <Button onClick={() => setCreateProjectOpen(true)}>Create Master Project</Button>
-        </div>
+      {/* Top Header Actions (Right Aligned) */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+        <Button variant="secondary" onClick={handleExportProjectsToExcel}>
+          📥 Export Projects to Excel
+        </Button>
+        <Button onClick={() => setCreateProjectOpen(true)}>+ Create Master Project</Button>
       </div>
 
-      {/* Top Row: KPI Cards Left & Status Filter Right */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap', alignItems: 'stretch' }}>
-        
-        {/* Left Side: KPI Cards */}
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)', width: 200, flex: '0 0 200px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Active Projects</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount} Projects</div>
-        </Card>
-
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-success)', width: 200, flex: '0 0 200px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Overall Task Completion</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>
-            {filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0)} / {filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0)} Tasks
+      {/* Full Horizontal Filter Bar (5 Slicers + Clear Action) */}
+      <Card style={{ padding: '14px 18px', overflow: 'visible', position: 'relative', zIndex: 40 }} bodyStyle={{ overflow: 'visible' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Project Name Slicer */}
+          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Project Name</label>
+            <select
+              className="kvj-select"
+              value={selectedProjectFilter}
+              onChange={(e) => setSelectedProjectFilter(e.target.value)}
+              style={{ width: '100%', padding: '6px 10px', fontSize: 12.5, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
+            >
+              <option value="all">All Projects</option>
+              {projectsList.map((p) => <option key={p.id} value={p.id}>{p.code} - {p.title}</option>)}
+            </select>
           </div>
-        </Card>
 
-        {/* Right Side: Status Filter (Right of Overall Task Completion) */}
-        <Card
-          style={{ borderLeft: '4px solid var(--border)', padding: 16, width: 260, flex: '0 0 260px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'visible', position: 'relative', zIndex: 30 }}
-          bodyStyle={{ overflow: 'visible' }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Status Filter</div>
-          <div style={{ marginTop: 2 }}>
+          {/* Supervisor Slicer */}
+          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Supervisor</label>
+            <select
+              className="kvj-select"
+              value={selectedSupervisor}
+              onChange={(e) => setSelectedSupervisor(e.target.value)}
+              style={{ width: '100%', padding: '6px 10px', fontSize: 12.5, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
+            >
+              <option value="all">All Supervisors</option>
+              {employees.map((e) => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+            </select>
+          </div>
+
+          {/* Status Checklist Slicer */}
+          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Status</label>
             <ChecklistMultiSelect
               options={[
                 { value: 'Not Started', label: 'Not Started' },
@@ -831,10 +828,97 @@ export function ProjectList({
               onChange={setSelectedStatuses}
             />
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>
-            Showing {filteredProjects.length} / {projectsList.length} Projects
+
+          {/* Client Slicer */}
+          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Client</label>
+            <select
+              className="kvj-select"
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              style={{ width: '100%', padding: '6px 10px', fontSize: 12.5, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
+            >
+              <option value="all">All Clients</option>
+              {clients.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
           </div>
+
+          {/* Clear Filters Action */}
+          {(selectedSupervisor !== 'all' || selectedStatuses.length > 0 || selectedClient !== 'all' || selectedProjectFilter !== 'all') && (
+            <Button size="sm" variant="ghost" onClick={() => { setSelectedSupervisor('all'); setSelectedStatuses([]); setSelectedClient('all'); setSelectedProjectFilter('all'); }} style={{ alignSelf: 'flex-end', marginBottom: 2 }}>
+              ✕ Clear Filters
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      {/* 4 KPI Summary Cards Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 4 }}>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>ACTIVE PROJECTS</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Total Projects</div>
         </Card>
+
+        <Card padding="compact" style={{ borderLeft: '4px solid #2563eb' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>TOTAL TASKS</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#2563eb', marginTop: 4 }}>{totalTasksCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>All Tasks</div>
+        </Card>
+
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-success)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>COMPLETED TASKS</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>{completedTasksCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pctCompleted}% of Total</div>
+        </Card>
+
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-warning)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>IN PROGRESS TASKS</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-warning)', marginTop: 4 }}>{inProgressTasksCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pctInProgress}% of Total</div>
+        </Card>
+      </div>
+
+      {/* Grid Toolbar / View Toggle Line (Directly above Cards Grid) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
+          Showing {filteredProjects.length} Projects
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('card')}
+              style={{
+                padding: '6px 14px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                border: 'none',
+                background: viewMode === 'card' ? 'var(--brand)' : 'var(--bg-surface)',
+                color: viewMode === 'card' ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              🎴 Card View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              style={{
+                padding: '6px 14px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                border: 'none',
+                background: viewMode === 'table' ? 'var(--brand)' : 'var(--bg-surface)',
+                color: viewMode === 'table' ? 'white' : 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              📊 Table View
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Main View Display: Card View OR Table View */}

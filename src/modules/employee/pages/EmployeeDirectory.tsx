@@ -52,6 +52,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
+  const [activeWorkSessions, setActiveWorkSessions] = useState<any[]>([]);
   const [leaveToday, setLeaveToday] = useState<any[]>([]);
 
   useEffect(() => {
@@ -74,6 +75,17 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           .is('deleted_at', null);
         if (taskData) {
           setActiveTasks(taskData);
+        }
+
+        // Fetch active running task work sessions from DB so live status reflects across all machines
+        const { data: sessData } = await supabase
+          .from('flwdsk_task_work_sessions')
+          .select('*')
+          .eq('status', 'running')
+          .is('end_time', null)
+          .is('deleted_at', null);
+        if (sessData) {
+          setActiveWorkSessions(sessData);
         }
 
         // Approved leaves that cover today (start <= today <= end).
@@ -101,8 +113,21 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     const empFullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim().toLowerCase();
     const isCurrentUser = Boolean(user && (user.id === empId || user.email?.toLowerCase() === empEmail));
 
-    // 1. Read actively RUNNING timers from taskTimerStore (kvj_task_timers)
-    //    A paused or stopped task has isRunning=false/active=false and must NOT appear.
+    // 1. Check real-time database work sessions (status = 'running' & end_time is null)
+    const dbSession = activeWorkSessions.find((s: any) => {
+      const isForThisEmp =
+        s.employee_id === empId ||
+        (s.employee_id && empEmail && s.employee_id.toLowerCase() === empEmail) ||
+        (s.employee_name && empFullName && s.employee_name.toLowerCase() === empFullName) ||
+        (isCurrentUser && user && (s.employee_id === user.id || s.employee_id?.toLowerCase() === user.email?.toLowerCase()));
+      return isForThisEmp;
+    });
+
+    if (dbSession) {
+      return `📝 ${dbSession.work_title || dbSession.workTitle}`;
+    }
+
+    // 2. Read actively RUNNING timers from taskTimerStore (kvj_task_timers)
     const runningTaskIds = new Set<string>();
     try {
       const rawTimers = localStorage.getItem('kvj_task_timers');
@@ -112,7 +137,6 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           if (s?.isRunning === true) runningTaskIds.add(tId);
         }
       }
-      // Also check MyDay legacy key
       const rawMyDay = localStorage.getItem('kvj_task_timer_state_v1');
       if (rawMyDay) {
         const parsed: Record<string, { active: boolean }> = JSON.parse(rawMyDay);
@@ -122,7 +146,6 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       }
     } catch {}
 
-    // 2. Check if a task timer is ACTIVELY running right now for this employee
     const runningTask = (tasks || []).find((t: any) => {
       if (!runningTaskIds.has(t.id)) return false;
 
