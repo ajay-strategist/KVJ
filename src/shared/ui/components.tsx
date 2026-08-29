@@ -255,7 +255,7 @@ export function SectionHeader({
   subtitle?: string;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: subtitle ? 'flex-start' : 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
       <div>
         <h2
           style={{
@@ -264,6 +264,7 @@ export function SectionHeader({
             fontWeight: 'var(--font-weight-semibold)',
             color: 'var(--text-primary)',
             letterSpacing: 'var(--letter-spacing-tight)',
+            whiteSpace: 'nowrap',
           }}
         >
           {title}

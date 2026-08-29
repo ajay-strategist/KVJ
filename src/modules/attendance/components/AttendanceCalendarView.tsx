@@ -263,10 +263,10 @@ export function AttendanceCalendarView({
                 className="kvj-select"
                 value={selectedFY}
                 onChange={(e) => setSelectedFY(e.target.value)}
-                style={{ padding: '3px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)' }}
+                style={{ padding: '4px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)', width: 175, maxWidth: '100%', flexShrink: 0 }}
               >
-                <option value="FY 2026-27">FY 2026-27 (Apr 1 - Mar 31)</option>
-                <option value="FY 2025-26">FY 2025-26 (Apr 1 - Mar 31)</option>
+                <option value="FY 2026-27">FY 2026-27 (Apr–Mar)</option>
+                <option value="FY 2025-26">FY 2025-26 (Apr–Mar)</option>
               </select>
             }
           />
