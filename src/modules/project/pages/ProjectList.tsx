@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { PageHeader, Button, Card, SectionHeader, Badge } from '../../../shared/ui/components';
+import { PageHeader, Button, Card, SectionHeader, Badge, Avatar } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField, useForm } from '../../../shared/forms/form';
@@ -95,8 +95,9 @@ export interface ProjectCardData {
   title: string;
   client: string;
   supervisor: string;
+  supervisorAvatarUrl?: string;
   status: ProjectStatusLabel;
-  members: Array<{ name: string; hours: number }>;
+  members: Array<{ name: string; hours: number; avatarUrl?: string }>;
   totalHours: number;
   tasksTotal: number;
   tasksCompleted: number;
@@ -225,7 +226,7 @@ export function ProjectList({
         pTasks.reduce((sum: number, t: any) => sum + Number(t.actualHours || 0), 0);
 
       const pAllocations = allocations.filter((a: any) => a.projectId === p.id);
-      const membersMap = new Map<string, { name: string; hours: number }>();
+      const membersMap = new Map<string, { name: string; hours: number; avatarUrl?: string }>();
 
       // 1. Add Project Supervisor
       const superId = p.supervisorId;
@@ -236,7 +237,7 @@ export function ProjectList({
           const empHours = pTimesheets
             .filter((ts: any) => ts.employeeId === superId)
             .reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
-          membersMap.set(name, { name, hours: empHours });
+          membersMap.set(name, { name, hours: empHours, avatarUrl: emp.avatarUrl });
         }
       }
 
@@ -250,7 +251,7 @@ export function ProjectList({
             .reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
           const existing = membersMap.get(name);
           if (!existing) {
-            membersMap.set(name, { name, hours: empHours });
+            membersMap.set(name, { name, hours: empHours, avatarUrl: emp.avatarUrl });
           }
         }
       });
@@ -260,9 +261,10 @@ export function ProjectList({
         if (t.assigneeId) {
           const emp = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
           const name = emp ? `${emp.firstName} ${emp.lastName}` : t.assigneeId;
+          const avatarUrl = emp?.avatarUrl;
           const taskHours = Number(t.actualHours || 0);
-          const existing = membersMap.get(name) || { name, hours: 0 };
-          membersMap.set(name, { name, hours: Math.round((existing.hours + taskHours) * 10) / 10 });
+          const existing = membersMap.get(name) || { name, hours: 0, avatarUrl };
+          membersMap.set(name, { name, hours: Math.round((existing.hours + taskHours) * 10) / 10, avatarUrl: existing.avatarUrl || avatarUrl });
         }
       });
 
@@ -276,7 +278,7 @@ export function ProjectList({
               const empHours = pTimesheets
                 .filter((item: any) => item.employeeId === ts.employeeId)
                 .reduce((sum: number, item: any) => sum + Number(item.hoursLogged || 0), 0);
-              membersMap.set(name, { name, hours: empHours });
+              membersMap.set(name, { name, hours: empHours, avatarUrl: emp.avatarUrl });
             }
           }
         }
@@ -292,6 +294,7 @@ export function ProjectList({
         title: p.title,
         client: client ? client.name : 'Independent',
         supervisor: supervisorName,
+        supervisorAvatarUrl: supervisorEmp?.avatarUrl,
         status,
         members,
         totalHours: Math.round(totalProjectHours * 10) / 10,
@@ -577,7 +580,8 @@ export function ProjectList({
             th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
             td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
             tr:nth-child(even) td { background: #f8fafc; }
-            .avatar { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#7c3aed); color: white; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; margin-right: 6px; }
+            .avatar-img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px; }
+            .avatar-initial { display: inline-flex; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#7c3aed); color: white; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; margin-right: 6px; vertical-align: middle; }
             .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; }
             @media print { body { padding: 20px; } }
           </style>
@@ -643,7 +647,10 @@ export function ProjectList({
             <tbody>
               ${p.members.length > 0 ? p.members.map(m => `
                 <tr>
-                  <td><span class="avatar">${(m.name || '?').charAt(0)}</span>${m.name || '—'}</td>
+                  <td>
+                    ${m.avatarUrl ? `<img src="${m.avatarUrl}" class="avatar-img" />` : `<span class="avatar-initial">${(m.name || '?').charAt(0)}</span>`}
+                    <strong>${m.name || '—'}</strong>
+                  </td>
                   <td style="text-align:right;font-weight:700;color:#6366f1;">${m.hours} hrs</td>
                 </tr>
               `).join('') : '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No members assigned.</td></tr>'}
@@ -667,13 +674,17 @@ export function ProjectList({
               ${pTasks.length > 0 ? pTasks.map((t: any, i: number) => {
                 const assignee = employees.find((e) => e.id === t.assigneeId);
                 const assigneeName = assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned';
+                const assigneeAvatar = assignee?.avatarUrl;
                 const pTs = timesheets.filter((ts: any) => ts.taskId === t.id);
                 const hrs = pTs.reduce((sum: number, ts: any) => sum + (ts.hoursLogged || 0), 0);
                 return `
                   <tr>
                     <td style="color:#94a3b8;">${i + 1}</td>
                     <td style="font-weight:600;">${t.title}</td>
-                    <td>${assigneeName}</td>
+                    <td>
+                      ${assigneeAvatar ? `<img src="${assigneeAvatar}" class="avatar-img" />` : `<span class="avatar-initial" style="width:20px;height:20px;font-size:10px;">${(assigneeName || '?').charAt(0)}</span>`}
+                      ${assigneeName}
+                    </td>
                     <td>${statusBadge(t.status || 'todo')}</td>
                     <td style="text-align:right;font-weight:700;color:#6366f1;">${Math.round(hrs * 10) / 10} hrs</td>
                     <td style="color:#64748b;">${t.dueDate || '—'}</td>
@@ -951,8 +962,10 @@ export function ProjectList({
 
                   {/* Supervisor */}
                   {p.supervisor ? (
-                    <div style={{ fontSize: 12, marginBottom: 12, padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Supervisor:</span> <strong>👤 {p.supervisor}</strong>
+                    <div style={{ fontSize: 12, marginBottom: 12, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Supervisor:</span>
+                      <Avatar name={p.supervisor} src={p.supervisorAvatarUrl} size={20} />
+                      <strong>{p.supervisor}</strong>
                     </div>
                   ) : null}
 
@@ -963,8 +976,9 @@ export function ProjectList({
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {p.members.map((m, idx) => (
-                        <div key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)', padding: '4px 8px', borderRadius: 4 }}>
-                          👤 {m.name}: <strong style={{ color: 'var(--brand)' }}>{m.hours} hrs</strong>
+                        <div key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <Avatar name={m.name} src={m.avatarUrl} size={20} />
+                          <span>{m.name}: <strong style={{ color: 'var(--brand)' }}>{m.hours} hrs</strong></span>
                         </div>
                       ))}
                     </div>
@@ -1219,12 +1233,10 @@ export function ProjectList({
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {selectedProject.members.map((m, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ width: 30, height: 30, borderRadius: '50%', background: `hsl(${(idx * 67 + 240) % 360},60%,55%)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                              {(m.name || '?').charAt(0)}
-                            </span>
-                            <span style={{ fontSize: 12, fontWeight: 600 }}>{m.name || '—'}</span>
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Avatar name={m.name} src={m.avatarUrl} size={30} />
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>{m.name || '—'}</span>
                           </div>
                           <span style={{ fontSize: 13, fontWeight: 800, color: '#4f46e5', background: '#ede9fe', padding: '2px 8px', borderRadius: 6 }}>{m.hours === 0 ? '0 hr' : `${m.hours}h`}</span>
                         </div>
