@@ -79,12 +79,22 @@ export class CommunicationService implements ICommunicationService {
       }
 
       const msg = await this.msgRepo.create(data, actor);
-      await this.notification.send({
-        recipientId: msg.senderId,
-        title: 'New Chat Message',
-        body: msg.text,
-        channels: ['in_app']
-      });
+
+      // Send in-app notifications only to recipient members (excluding the sender)
+      if (data.channelId) {
+        const channel = await this.channelRepo.findById(data.channelId);
+        if (channel && Array.isArray(channel.members)) {
+          const recipientIds = channel.members.filter((mId) => mId !== actor.id && mId !== msg.senderId);
+          for (const recipientId of recipientIds) {
+            await this.notification.send({
+              recipientId,
+              title: `New Chat Message`,
+              body: msg.text || 'Attached file',
+              channels: ['in_app'],
+            });
+          }
+        }
+      }
       return Ok(msg);
     } catch (e: any) {
       return Err(AppError.internal(e.message));

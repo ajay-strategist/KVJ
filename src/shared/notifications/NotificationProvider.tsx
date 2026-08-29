@@ -61,21 +61,38 @@ const uid = () => Math.random().toString(36).slice(2);
 const defaultNotificationService = new MockNotificationService();
 
 export function playNotificationSound() {
+  playChatNotificationSound();
+}
+
+export function playChatNotificationSound() {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.25);
+    
+    // First note (E5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, ctx.currentTime);
+    gain1.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+
+    // Second note (B5)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(987.77, ctx.currentTime + 0.1);
+    gain2.gain.setValueAtTime(0.12, ctx.currentTime + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.1);
+    osc2.stop(ctx.currentTime + 0.3);
   } catch {}
 }
 
@@ -104,6 +121,7 @@ export function NotificationProvider({ children, service = defaultNotificationSe
         },
         ...prev,
       ]);
+      playChatNotificationSound();
     });
     return off;
   }, [user]);
@@ -113,6 +131,9 @@ export function NotificationProvider({ children, service = defaultNotificationSe
   const dismissNotification = useCallback((id: string) => setItems((prev) => prev.filter((n) => n.id !== id)), []);
 
   const addNotification = useCallback((n: { title: string; message?: string; category: NotificationCategory; priority?: NotificationPriority; recipientUserId?: string }) => {
+    // Skip if targeted recipient is not current user
+    if (n.recipientUserId && user?.id && n.recipientUserId !== user.id) return;
+
     const newItem: NotificationItem = {
       id: uid(),
       title: n.title,
@@ -123,17 +144,17 @@ export function NotificationProvider({ children, service = defaultNotificationSe
       createdAt: Date.now(),
     };
     setItems((prev) => [newItem, ...prev]);
-    playNotificationSound();
-  }, []);
+    if (n.category === 'chat' || n.priority === 'urgent') {
+      playChatNotificationSound();
+    }
+  }, [user]);
 
   const dismissToast = useCallback((id: string) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
   const toast = useCallback((t: Omit<Toast, 'id'>) => {
     const item: Toast = { id: uid(), durationMs: 4000, ...t };
     setToasts((prev) => [...prev, item]);
     if (item.durationMs) setTimeout(() => dismissToast(item.id), item.durationMs);
-    if (t.variant === 'info' || t.variant === 'success') {
-      playNotificationSound();
-    }
+    // Button click / toast feedback does NOT play sound
   }, [dismissToast]);
 
   const value = useMemo<NotificationContextValue>(() => {
