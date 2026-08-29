@@ -191,8 +191,13 @@ export function ProjectList({
 
   const localProjectData = useProject();
   const actualProjectData = projectData || localProjectData;
-  const { projects, clients, tasks, allocations, timesheets, createProject, updateProject, createTask, updateTask, submitTask, deleteTask, deleteProject } = actualProjectData;
-  const { employees } = useEmployee();
+  const projects = actualProjectData?.projects || [];
+  const clients = actualProjectData?.clients || [];
+  const tasks = actualProjectData?.tasks || [];
+  const allocations = actualProjectData?.allocations || [];
+  const timesheets = actualProjectData?.timesheets || [];
+  const { createProject, updateProject, createTask, updateTask, submitTask, deleteTask, deleteProject } = actualProjectData || {};
+  const { employees = [] } = useEmployee() || {};
 
   const assigneeOptions = useMemo(() => {
     if (employees.length > 0) {

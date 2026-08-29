@@ -8,22 +8,28 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { ServerError } from './pages/errors/ErrorPages';
 import { logger } from '../shared/logging/logger';
 
-interface State { hasError: boolean }
+interface State { hasError: boolean; error: Error | null }
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
-  state: State = { hasError: false };
+  state: State = { hasError: false, error: null };
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Centralized logging (Prompt 11). Phase 2: forwards to an external provider.
-    logger.error(error.message, 'ErrorBoundary', info.componentStack);
+    console.error('ErrorBoundary caught exception:', error, info);
+    logger.error(error?.message || 'ErrorBoundary Exception', 'ErrorBoundary', info.componentStack);
   }
 
   render() {
-    if (this.state.hasError) return <ServerError onRetry={() => this.setState({ hasError: false })} />;
+    if (this.state.hasError) {
+      return (
+        <ServerError
+          onRetry={() => this.setState({ hasError: false, error: null })}
+        />
+      );
+    }
     return this.props.children;
   }
 }

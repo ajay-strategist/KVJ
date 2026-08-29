@@ -88,8 +88,12 @@ export function TaskWorklogView({
 
   const localProjectData = useProject();
   const actualProjectData = projectData || localProjectData;
-  const { projects, tasks, allocations, timesheets, approveTimesheet } = actualProjectData;
-  const { employees } = useEmployee();
+  const projects = actualProjectData?.projects || [];
+  const tasks = actualProjectData?.tasks || [];
+  const allocations = actualProjectData?.allocations || [];
+  const timesheets = actualProjectData?.timesheets || [];
+  const { approveTimesheet } = actualProjectData || {};
+  const { employees = [] } = useEmployee() || {};
 
   // ── Build synthetic sessions from localStorage when DB sessions are empty ────
   const sessions: TaskWorkSession[] = useMemo(() => {
@@ -176,8 +180,8 @@ export function TaskWorklogView({
           employeeId: t.assigneeId || user?.id,
           supervisorId: supervisorAlloc?.employeeId,
           supervisorName: supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : undefined,
-          workTitle: t.title,
-          workCode: t.title.split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
+          workTitle: t.title || t.name || 'Task',
+          workCode: ((t.title || t.name || 'TASK') as string).split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
           startTime: startISO,
           endTime: undefined,
           durationMinutes: Math.round(actualSec / 60),

@@ -99,11 +99,11 @@ export function TaskBoard({
   const localProjectData = useProject();
   const { startSession, pauseSession, completeSession } = useTaskSessions();
   const actualProjectData = projectData || localProjectData;
+  const projects = actualProjectData?.projects || [];
+  const tasks = actualProjectData?.tasks || [];
+  const allocations = actualProjectData?.allocations || [];
+  const timesheets = actualProjectData?.timesheets || [];
   const {
-    projects,
-    tasks,
-    allocations,
-    timesheets,
     createTask,
     updateTask,
     deleteTask,
@@ -115,7 +115,7 @@ export function TaskBoard({
     logTimesheet,
     approveTimesheet,
     refresh,
-  } = actualProjectData;
+  } = actualProjectData || {};
 
   const activeProjects = useMemo(() => {
     return (projects || []).filter((p: any) => 
@@ -168,7 +168,7 @@ export function TaskBoard({
     }
     return Math.round((totalMs / 3600000) * 10) / 10;
   };
-  const { employees } = useEmployee();
+  const { employees = [] } = useEmployee() || {};
 
   const mappedTasks = useMemo(() => {
     return tasks.map((t: any) => {
@@ -188,7 +188,8 @@ export function TaskBoard({
       const dailyTimeEntries = tTimesheets.map((ts: any) => {
         const emp = employees.find((e) => e.id === ts.employeeId);
         const name = emp ? `${emp.firstName} ${emp.lastName}` : 'Team Member';
-        const isSuper = emp ? (emp.designation.toLowerCase().includes('manager') || emp.designation.toLowerCase().includes('ceo') || emp.designation.toLowerCase().includes('lead')) : false;
+        const des = emp?.designation ? emp.designation.toLowerCase() : '';
+        const isSuper = des.includes('manager') || des.includes('ceo') || des.includes('lead');
         return {
           id: ts.id,
           date: ts.workDate,
