@@ -99,9 +99,10 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     const empId = emp.id;
     const empEmail = emp.email?.toLowerCase();
     const empFullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim().toLowerCase();
+    const isCurrentUser = Boolean(user && (user.id === empId || user.email?.toLowerCase() === empEmail));
 
     // 1. Read actively RUNNING timers from taskTimerStore (kvj_task_timers)
-    //    A paused task has isRunning=false and must NOT appear here.
+    //    A paused or stopped task has isRunning=false/active=false and must NOT appear.
     const runningTaskIds = new Set<string>();
     try {
       const rawTimers = localStorage.getItem('kvj_task_timers');
@@ -121,50 +122,24 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       }
     } catch {}
 
-    // 2. Only consider tasks whose timer is ACTIVELY running right now
-    const matchingTask = (tasks || []).find((t: any) => {
-      if (!runningTaskIds.has(t.id)) return false; // not running → skip (covers paused)
+    // 2. Check if a task timer is ACTIVELY running right now for this employee
+    const runningTask = (tasks || []).find((t: any) => {
+      if (!runningTaskIds.has(t.id)) return false;
 
       const isForThisEmp =
         t.assigneeId === empId ||
         (t.assigneeId && empEmail && t.assigneeId.toLowerCase() === empEmail) ||
         (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName) ||
-        (user && user.email?.toLowerCase() === empEmail &&
-          (t.assigneeId === user.id || (t.assignee && t.assignee.toLowerCase() === user.fullName?.toLowerCase())));
+        (isCurrentUser && (t.assigneeId === user?.id || (t.assignee && t.assignee.toLowerCase() === user?.fullName?.toLowerCase())));
 
       return isForThisEmp;
     });
 
-    if (matchingTask) {
-      return `📝 ${matchingTask.title}`;
+    if (runningTask) {
+      return `📝 ${runningTask.title || (runningTask as any).name}`;
     }
 
-    // 3. Fallback: check DB active tasks (for other employees where local timer store is unavailable)
-    const dbTask = activeTasks.find((t: any) => {
-      const isForThisEmp =
-        t.assignee_id === empId ||
-        (t.assignee_id && empEmail && t.assignee_id.toLowerCase() === empEmail) ||
-        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName);
-      return isForThisEmp;
-    });
-
-    if (dbTask) {
-      return `📝 ${dbTask.title}`;
-    }
-
-    const memoryTask = (tasks || []).find((t: any) => {
-      if (t.status !== 'in_progress' && (t.status as any) !== 'In Progress') return false;
-      const isForThisEmp =
-        t.assigneeId === empId ||
-        (t.assigneeId && empEmail && t.assigneeId.toLowerCase() === empEmail) ||
-        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName);
-      return isForThisEmp;
-    });
-
-    if (memoryTask) {
-      return `📝 ${memoryTask.title}`;
-    }
-
+    // If no timer is actively running, display 'No active task in progress'
     return 'No active task in progress';
   };
 
