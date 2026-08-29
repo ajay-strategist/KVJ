@@ -14,6 +14,7 @@ import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { exportToExcel } from '../../../shared/utils/exportToExcel';
 import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
+import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
 
 /**
  * Multi-select of project members, bound to the shared Form's `memberIds` value.
@@ -126,8 +127,8 @@ export function ProjectList({
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
-  // Status dropdown filter state. Default: All Statuses
-  const [selectedStatus, setSelectedStatus] = useState<string>('All Statuses');
+  // Status checklist filter state. Default: [] (All Statuses)
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
@@ -333,11 +334,15 @@ export function ProjectList({
         return false;
       });
     }
-    if (selectedStatus && selectedStatus !== 'All Statuses') {
-      list = list.filter((p) => p.status === selectedStatus);
+    if (selectedStatuses.length > 0) {
+      if (selectedStatuses.includes('__none__')) {
+        list = [];
+      } else {
+        list = list.filter((p) => selectedStatuses.includes(p.status));
+      }
     }
     return list;
-  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatus]);
+  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses]);
 
   // Count active projects (Not Started + In Progress)
   const activeProjectsCount = useMemo(() => {
@@ -812,28 +817,16 @@ export function ProjectList({
         {/* Right Side: Status Filter (Right of Overall Task Completion) */}
         <Card style={{ borderLeft: '4px solid var(--border)', padding: 16, width: 260, flex: '0 0 260px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Status Filter</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-            <select
-              className="kvj-select"
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              style={{ 
-                padding: '6px 12px', 
-                fontSize: 13, 
-                borderRadius: 8, 
-                border: '1px solid var(--border)', 
-                background: 'var(--bg-panel)', 
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                width: '100%',
-                boxSizing: 'border-box'
-              }}
-            >
-              <option value="All Statuses">All Statuses</option>
-              <option value="Not Started">Not Started</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-            </select>
+          <div style={{ marginTop: 2 }}>
+            <ChecklistMultiSelect
+              options={[
+                { value: 'Not Started', label: 'Not Started' },
+                { value: 'In Progress', label: 'In Progress' },
+                { value: 'Completed', label: 'Completed' },
+              ]}
+              selectedValues={selectedStatuses}
+              onChange={setSelectedStatuses}
+            />
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>
             Showing {filteredProjects.length} / {projectsList.length} Projects

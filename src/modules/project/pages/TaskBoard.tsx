@@ -21,6 +21,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
 import { todayISO, addDaysISO, formatDisplayDate } from '../../../shared/utils/date';
 import { exportToExcel } from '../../../shared/utils/exportToExcel';
+import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
 
 import { useProject } from '../hooks/useProject';
 import { useTaskSessions } from '../hooks/useTaskSessions';
@@ -80,7 +81,7 @@ export function TaskBoard({
   const canApproveAssignment = ['CEO', 'ADMIN'].includes((user?.role || '').toUpperCase());
 
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Task' | 'Project Task'>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [dateWindowFilter, setDateWindowFilter] = useState<'next_3_days' | 'today' | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -284,7 +285,10 @@ export function TaskBoard({
       }
 
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
-      if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+      if (statusFilters.length > 0) {
+        if (statusFilters.includes('__none__')) return false;
+        if (!statusFilters.includes('all') && !statusFilters.includes(t.status)) return false;
+      }
       // Date Window Filtering
       if (dateWindowFilter === 'today') {
         if (t.dueDate !== todayStr) return false;
@@ -304,7 +308,7 @@ export function TaskBoard({
     return filtered.sort((a, b) =>
       sortOrder === 'asc' ? a.dueDate.localeCompare(b.dueDate) : b.dueDate.localeCompare(a.dueDate)
     );
-  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, statusFilter, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
+  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, statusFilters, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
     const categoryVal = (values.category as string) || 'Office Task';
@@ -878,26 +882,18 @@ export function TaskBoard({
               <option value="Project Task">🚀 Project Task</option>
             </select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">⚡ All Statuses</option>
-              <option value="To Do">📝 To Do</option>
-              <option value="In Progress">⚡ In Progress</option>
-              <option value="Under Review">⏳ Under Review</option>
-              <option value="Completed">✅ Completed</option>
-            </select>
+            <ChecklistMultiSelect
+              options={[
+                { value: 'Pending Approval', label: '⚡ Pending Approval' },
+                { value: 'To Do', label: '📝 To Do' },
+                { value: 'In Progress', label: '⚙️ In Progress' },
+                { value: 'Under Review', label: '🔍 Under Review' },
+                { value: 'Completed', label: '✅ Completed' },
+              ]}
+              selectedValues={statusFilters}
+              onChange={setStatusFilters}
+              style={{ width: 175 }}
+            />
 
             <select
               value={dateWindowFilter}
