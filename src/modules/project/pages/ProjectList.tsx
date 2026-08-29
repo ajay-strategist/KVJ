@@ -815,7 +815,10 @@ export function ProjectList({
         </Card>
 
         {/* Right Side: Status Filter (Right of Overall Task Completion) */}
-        <Card style={{ borderLeft: '4px solid var(--border)', padding: 16, width: 260, flex: '0 0 260px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
+        <Card
+          style={{ borderLeft: '4px solid var(--border)', padding: 16, width: 260, flex: '0 0 260px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', overflow: 'visible', position: 'relative', zIndex: 30 }}
+          bodyStyle={{ overflow: 'visible' }}
+        >
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Status Filter</div>
           <div style={{ marginTop: 2 }}>
             <ChecklistMultiSelect

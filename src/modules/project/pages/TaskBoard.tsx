@@ -814,7 +814,7 @@ export function TaskBoard({
       </div>
 
       {/* Filters Bar */}
-      <Card style={{ padding: '14px 18px', background: 'var(--bg-surface)' }}>
+      <Card style={{ padding: '14px 18px', background: 'var(--bg-surface)', overflow: 'visible', position: 'relative', zIndex: 30 }} bodyStyle={{ overflow: 'visible' }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <div style={{ flex: '1 1 240px', minWidth: 200 }}>
             <input
