@@ -29,6 +29,33 @@ export function useCommunication(activeChannelId?: UUID) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({}); // userId -> name
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('kvj_chat_unread_counts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const markChannelAsRead = useCallback((channelId: string) => {
+    if (!channelId) return;
+    setUnreadCounts((prev) => {
+      const next = { ...prev, [channelId]: 0 };
+      try { localStorage.setItem('kvj_chat_unread_counts', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  const incrementUnreadCount = useCallback((channelId: string) => {
+    if (!channelId) return;
+    setUnreadCounts((prev) => {
+      const current = prev[channelId] || 0;
+      const next = { ...prev, [channelId]: current + 1 };
+      try { localStorage.setItem('kvj_chat_unread_counts', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   const fetchChannels = useCallback(async () => {
     try {
@@ -356,6 +383,9 @@ export function useCommunication(activeChannelId?: UUID) {
     loading,
     error,
     typingUsers,
+    unreadCounts,
+    markChannelAsRead,
+    incrementUnreadCount,
     createChannel,
     sendMessage,
     editMessage,
