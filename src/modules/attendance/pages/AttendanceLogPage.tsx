@@ -780,8 +780,7 @@ export function AttendanceLogPage() {
         const resolvedEmpName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : empName;
         const totalMins = record.totalWorkingMinutes || 0;
         const breakMins = record.totalBreakMinutes || 0;
-        const grossMins = totalMins + breakMins;
-        const duration = `${Math.floor(grossMins / 60)}h ${grossMins % 60}m`;
+        const duration = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
         const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
 
         const sessionsList = record.sessions && record.sessions.length > 0
