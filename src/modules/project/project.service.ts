@@ -372,6 +372,7 @@ export class ProjectService implements IProjectService {
         assigneeId,
         approvalStatus: 'pending_assignment_approval',
         assignedByEmployeeId,
+        submittedAt: new Date().toISOString(),
       } as any, actor);
       await this.activity.log('project', updated.projectId, actor, 'assign', `Assignment pending approval: ${updated.title}`);
       return Ok(updated);

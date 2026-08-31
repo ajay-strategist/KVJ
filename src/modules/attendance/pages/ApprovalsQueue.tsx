@@ -15,6 +15,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { formatDateTime } from '../../../shared/utils/date';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
@@ -321,6 +322,15 @@ export function ApprovalsQueue() {
       }
     },
     {
+      key: 'submittedAt',
+      header: 'Submitted Date & Time',
+      render: (r) => (
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {formatDateTime(r.submittedAt || r.createdAt || r.updatedAt)}
+        </span>
+      ),
+    },
+    {
       key: 'actions',
       header: 'Action',
       render: (r) => {
@@ -382,6 +392,15 @@ export function ApprovalsQueue() {
       accessor: (r) => r.reason,
     },
     {
+      key: 'submittedAt',
+      header: 'Submitted Date & Time',
+      render: (r) => (
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {formatDateTime(r.createdAt || r.updatedAt)}
+        </span>
+      ),
+    },
+    {
       key: 'actions',
       header: 'Action',
       render: (r) => {
@@ -428,6 +447,15 @@ export function ApprovalsQueue() {
       key: 'reason',
       header: 'Reason',
       accessor: (r) => r.reason,
+    },
+    {
+      key: 'submittedAt',
+      header: 'Submitted Date & Time',
+      render: (r) => (
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {formatDateTime(r.createdAt || r.created_at || r.updatedAt || r.requestedDate)}
+        </span>
+      ),
     },
     {
       key: 'actions',
@@ -547,6 +575,12 @@ export function ApprovalsQueue() {
                   {selectedLeave.reason}
                 </div>
               </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Submitted for Approval</span>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {formatDateTime(selectedLeave.createdAt || selectedLeave.updatedAt)}
+                </div>
+              </div>
               {selectedLeave.medicalCertUrl && (
                 <div>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Medical Certificate</span>
@@ -595,8 +629,11 @@ export function ApprovalsQueue() {
         {reworkTask && (
           <div>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
                 <strong>{projects.find((p) => p.id === reworkTask.projectId)?.title || 'Office Task'}</strong>: {reworkTask.title}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                Submitted for Approval: {formatDateTime(reworkTask.submittedAt || reworkTask.createdAt || reworkTask.updatedAt)}
               </div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Enter notes and instructions for rework:</span>
             </div>
@@ -650,6 +687,12 @@ export function ApprovalsQueue() {
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Reason for claim</span>
                 <div style={{ fontSize: 13, background: 'var(--bg-sunken)', padding: 10, borderRadius: 8, marginTop: 4 }}>
                   {selectedCorrection.reason}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Submitted for Approval</span>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {formatDateTime(selectedCorrection.createdAt || selectedCorrection.created_at || selectedCorrection.updatedAt || selectedCorrection.requestedDate)}
                 </div>
               </div>
             </div>

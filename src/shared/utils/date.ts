@@ -45,3 +45,26 @@ export function formatDisplayDate(val?: string | Date | null): string {
   return `${day}-${m}-${y}`;
 }
 
+/** Standardize any Date or date string to DD-MM-YYYY hh:mm AM/PM format for UI rendering. */
+export function formatDateTime(val?: string | Date | null): string {
+  if (!val) return '—';
+  if (val === '—') return '—';
+
+  const dt = typeof val === 'string' ? new Date(val) : val;
+  if (isNaN(dt.getTime())) return String(val);
+
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+
+  let hours = dt.getHours();
+  const minutes = String(dt.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const formattedHours = String(hours).padStart(2, '0');
+
+  return `${day}-${m}-${y} ${formattedHours}:${minutes} ${ampm}`;
+}
+
+
