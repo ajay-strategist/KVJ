@@ -16,9 +16,15 @@ import heroBg from '../../../assets/hero.png';
 type View = 'login' | 'forgot' | 'first_time_reset';
 
 export function LoginPage() {
-  const { login, requestPasswordReset, updateUserPassword, hasUsers } = useAuth();
+  const { login, requestPasswordReset, updateUserPassword, hasUsers, status } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      navigate('/app', { replace: true });
+    }
+  }, [status, navigate]);
 
   const [bootstrapNeeded, setBootstrapNeeded] = useState(false);
   const [checkingBootstrap, setCheckingBootstrap] = useState(true);

@@ -359,10 +359,21 @@ export class SupabaseAuthService implements IAuthService {
       appSession = null;
     }
     if (!appSession) return null;
-    if (getSupabaseAccessToken() && appSession.expiresAt > Date.now() + 60_000) {
+    const isRemember = appSession.rememberMe !== false;
+    if (appSession.expiresAt > Date.now()) {
+      appSession.expiresAt = this.calculateSessionExpiry(isRemember);
+      try { localStorage.setItem('kvj_app_session', JSON.stringify(appSession)); } catch (_) {}
       return appSession;
     }
     return this.refreshJwtSession();
+  }
+
+  private calculateSessionExpiry(rememberMe: boolean): number {
+    const days = businessRules.auth.rememberMeDays || 30;
+    const ttlMs = rememberMe
+      ? days * 24 * 60 * 60 * 1000
+      : 24 * 60 * 60 * 1000;
+    return Date.now() + ttlMs;
   }
 
   private async buildSession(
@@ -373,12 +384,14 @@ export class SupabaseAuthService implements IAuthService {
     rememberMe: boolean,
   ): Promise<Session> {
     const user = await this.loadProfile(userId, email);
-    const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
+    const sessionExpiryMs = expiresAtSeconds && expiresAtSeconds * 1000 > Date.now()
+      ? expiresAtSeconds * 1000
+      : this.calculateSessionExpiry(rememberMe);
     const session: Session = {
       user,
       token: accessToken,
       issuedAt: Date.now(),
-      expiresAt: expiresAtSeconds ? expiresAtSeconds * 1000 : Date.now() + fallbackTtlMs,
+      expiresAt: sessionExpiryMs,
       rememberMe,
     };
     try {
@@ -439,13 +452,13 @@ export class SupabaseAuthService implements IAuthService {
           // Non-blocking — failures are silently ignored.
           this.syncSupabaseAuth(email, pwd, fullName, role);
 
-          const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
+          const isRemember = credentials.rememberMe !== false;
           const appSession: Session = {
             user: authUser,
             token: `app_${Date.now()}`,
             issuedAt: Date.now(),
-            expiresAt: Date.now() + fallbackTtlMs,
-            rememberMe: !!credentials.rememberMe,
+            expiresAt: this.calculateSessionExpiry(isRemember),
+            rememberMe: isRemember,
           };
           // Persist for getSession() on page reload
           try {
@@ -531,13 +544,13 @@ export class SupabaseAuthService implements IAuthService {
         // Supabase Auth session unavailable but employee exists in DB.
         // Return an app-level session using the real employees.id UUID.
         const authUser = toAuthUser(empRow as unknown as EmployeeProfileRow, email);
-        const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
+        const isRemember = credentials.rememberMe !== false;
         const appSession: Session = {
           user: authUser,
           token: `app_${Date.now()}`,
           issuedAt: Date.now(),
-          expiresAt: Date.now() + fallbackTtlMs,
-          rememberMe: !!credentials.rememberMe,
+          expiresAt: this.calculateSessionExpiry(isRemember),
+          rememberMe: isRemember,
         };
         try { localStorage.setItem('kvj_app_session', JSON.stringify(appSession)); } catch (_) {}
         return appSession;
@@ -585,10 +598,17 @@ export class SupabaseAuthService implements IAuthService {
       const stored = localStorage.getItem('kvj_app_session');
       if (stored) {
         const appSession = JSON.parse(stored) as Session;
-        if (appSession && appSession.expiresAt > Date.now()) {
-          return appSession;
-        } else {
-          localStorage.removeItem('kvj_app_session');
+        if (appSession && appSession.user && appSession.user.id) {
+          const isRemember = appSession.rememberMe !== false;
+          if (!appSession.expiresAt || appSession.expiresAt > Date.now()) {
+            appSession.expiresAt = this.calculateSessionExpiry(isRemember);
+            try {
+              localStorage.setItem('kvj_app_session', JSON.stringify(appSession));
+            } catch (_) {}
+            return appSession;
+          } else {
+            localStorage.removeItem('kvj_app_session');
+          }
         }
       }
     } catch (_) {}
@@ -606,9 +626,6 @@ export class SupabaseAuthService implements IAuthService {
         true,
       );
     } catch {
-      // A valid credential with no linked employee row must not strand the app
-      // on a permanent loading state.
-      await supabase.auth.signOut();
       return null;
     }
   }
@@ -619,9 +636,9 @@ export class SupabaseAuthService implements IAuthService {
       const stored = localStorage.getItem('kvj_app_session');
       if (stored) {
         const appSession = JSON.parse(stored) as Session;
-        if (appSession) {
-          const fallbackTtlMs = businessRules.auth.sessionTimeoutMinutes * 60 * 1000;
-          appSession.expiresAt = Date.now() + fallbackTtlMs;
+        if (appSession && appSession.user) {
+          const isRemember = appSession.rememberMe !== false;
+          appSession.expiresAt = this.calculateSessionExpiry(isRemember);
           try { localStorage.setItem('kvj_app_session', JSON.stringify(appSession)); } catch (_) {}
           return appSession;
         }
