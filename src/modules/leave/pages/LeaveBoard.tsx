@@ -512,7 +512,14 @@ export function LeaveBoard() {
         )}
       </div>
 
-      <DataTable columns={columns} rows={filteredLeaves} rowKey={(r) => r.id} loading={loading} />
+      <DataTable
+        columns={columns}
+        rows={filteredLeaves}
+        rowKey={(r) => r.id}
+        loading={loading}
+        maxHeight={380}
+        pageSize={20}
+      />
 
       {/* Apply Leave Drawer */}
       <Drawer open={applyOpen} onClose={() => setApplyOpen(false)} title="Apply for Leave">

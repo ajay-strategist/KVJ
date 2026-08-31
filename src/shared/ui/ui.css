@@ -429,6 +429,25 @@ main {
 }
 
 /* ── Tables ── */
+.kvj-table-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand, #2563eb) var(--bg-sunken);
+}
+.kvj-table-scroll-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.kvj-table-scroll-container::-webkit-scrollbar-track {
+  background: var(--bg-sunken);
+  border-radius: 4px;
+}
+.kvj-table-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--brand, #2563eb);
+  border-radius: 4px;
+}
+.kvj-table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent, #1d4ed8);
+}
 .kvj-table {
   width: 100%;
   border-collapse: separate;

@@ -30,11 +30,13 @@ export interface DataTableProps<T> {
   emptyTitle?: string;
   emptyMessage?: string;
   onRowClick?: (row: T) => void;
+  maxHeight?: number | string;
+  containerStyle?: React.CSSProperties;
 }
 
 export function DataTable<T>({
   columns, rows, rowKey, loading, pageSize = 10, selectable, onSelectionChange,
-  emptyTitle = 'Nothing here yet', emptyMessage, onRowClick,
+  emptyTitle = 'Nothing here yet', emptyMessage, onRowClick, maxHeight, containerStyle,
 }: DataTableProps<T>) {
   const device = useDevice();
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
@@ -142,7 +144,15 @@ export function DataTable<T>({
 
   return (
     <div className="kvj-card" style={{ overflow: 'hidden' }}>
-      <div style={{ overflowX: 'auto', maxHeight: 520 }}>
+      <div
+        className="kvj-table-scroll-container"
+        style={{
+          overflowX: 'auto',
+          overflowY: 'auto',
+          maxHeight: maxHeight ?? 520,
+          ...containerStyle,
+        }}
+      >
         <table className="kvj-table">
           <thead>
             <tr>
