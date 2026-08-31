@@ -128,8 +128,8 @@ export function ProjectList({
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
-  // Status checklist filter state. Default: [] (All Statuses)
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  // Status checklist filter state. Default: ['Not Started', 'In Progress'] (Completed unchecked)
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Not Started', 'In Progress']);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [selectedSupervisor, setSelectedSupervisor] = useState<string>('all');
   const [selectedClient, setSelectedClient] = useState<string>('all');
@@ -860,8 +860,8 @@ export function ProjectList({
           </div>
 
           {/* Clear Filters Action */}
-          {(selectedSupervisor !== 'all' || selectedStatuses.length > 0 || selectedClient !== 'all' || selectedProjectFilter !== 'all') && (
-            <Button size="sm" variant="ghost" onClick={() => { setSelectedSupervisor('all'); setSelectedStatuses([]); setSelectedClient('all'); setSelectedProjectFilter('all'); }} style={{ alignSelf: 'flex-end', marginBottom: 2 }}>
+          {(selectedSupervisor !== 'all' || selectedClient !== 'all' || selectedProjectFilter !== 'all' || !(selectedStatuses.length === 2 && selectedStatuses.includes('Not Started') && selectedStatuses.includes('In Progress'))) && (
+            <Button size="sm" variant="ghost" onClick={() => { setSelectedSupervisor('all'); setSelectedStatuses(['Not Started', 'In Progress']); setSelectedClient('all'); setSelectedProjectFilter('all'); }} style={{ alignSelf: 'flex-end', marginBottom: 2 }}>
               ✕ Clear Filters
             </Button>
           )}

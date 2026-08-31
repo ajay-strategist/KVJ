@@ -69,6 +69,12 @@ export function ChecklistMultiSelect({
       const found = options.find((o) => o.value === selectedValues[0]);
       return found ? found.label : selectedValues[0];
     }
+    const selectedLabels = options
+      .filter((o) => selectedValues.includes(o.value))
+      .map((o) => o.label);
+    if (selectedLabels.length > 0) {
+      return selectedLabels.join(', ');
+    }
     const firstFound = options.find((o) => o.value === selectedValues[0]);
     const firstLabel = firstFound ? firstFound.label : selectedValues[0];
     return `${firstLabel} (+${selectedValues.length - 1} more)`;
