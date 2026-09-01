@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { useDevice } from '../../../shared/hooks/responsive';
 import { WorkspaceShell, type WorkspaceRole } from '../../../shared/workspace/WorkspaceShell';
@@ -2501,8 +2502,10 @@ export function MyDayPage() {
   const { applyLeave } = useLeave();
   const [applyLeaveOpen, setApplyLeaveOpen] = useState(false);
 
+  const navigate = useNavigate();
   const device = useDevice();
   const isMobile = device === 'mobile';
+  const isApproverRole = ['ADMIN', 'CEO', 'MANAGER'].includes((user?.role || '').toUpperCase());
 
   const employeeOptions = useMemo(() => {
     return (employees || []).map((e) => ({
@@ -2523,26 +2526,36 @@ export function MyDayPage() {
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <ResizedStatPill
-          label="MONTH ATTENDANCE RATE"
-          value={`${monthAttendancePct}%`}
-          tone={monthAttendancePct >= 90 ? 'success' : 'warning'}
-          icon="📅"
-        />
-        <ResizedStatPill
-          label="TOTAL HOURS THIS MONTH"
-          value={`${hoursThisMonth} hrs`}
-          tone="info"
-          icon="⏱"
+      {/* Fluid Quick Action Buttons Grid (Fluid width, works on all mobile screen sizes) */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(auto-fit, minmax(130px, 1fr))' : 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 16, width: '100%', boxSizing: 'border-box' }}>
+        <ResizedQuickAction
+          icon="➕"
+          label="Create Task"
+          onClick={() => setCreateTaskOpen(true)}
         />
         <ResizedQuickAction
-          icon="📝"
-          label="Apply Leave / Regularize"
+          icon="⏰"
+          label="Submit Attendance"
+          onClick={() => navigate('/app/attendance/log')}
+        />
+        <ResizedQuickAction
+          icon="🧾"
+          label="Submit Expense Claim"
+          onClick={() => navigate('/app/finance/expenses')}
+        />
+        <ResizedQuickAction
+          icon="📅"
+          label="Leave Request"
           onClick={() => setApplyLeaveOpen(true)}
+        />
+        <ResizedQuickAction
+          icon="💬"
+          label="Chat"
+          onClick={() => navigate('/app/communication/chat')}
         />
       </div>
 
+      {/* Attendance & Clock In / Out Panel */}
       <AttendancePanel
         record={record}
         loading={loading}
@@ -2552,6 +2565,36 @@ export function MyDayPage() {
         endBreak={endBreak}
         onActivityLog={handleActivityLog}
       />
+
+      {/* Role-Gated Management Overview Cards (Admin / CEO / Manager Only) */}
+      {isApproverRole && (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
+          <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                📊 Today's Employee Status & Current Work
+              </div>
+              <Badge tone="info">Management Only</Badge>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              Live workforce tracking active: View present staff, active break sessions, and ongoing task worklogs.
+            </div>
+          </Card>
+
+          <Card padding="compact" style={{ borderLeft: '4px solid var(--status-warning)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>⚡</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Pending Approvals Queue</span>
+              </div>
+              <Button size="xs" variant="secondary" onClick={() => navigate('/app/approvals')}>View Queue</Button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              Task assignments, leave requests, and attendance claims requiring management authorization.
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
@@ -2563,11 +2606,11 @@ export function MyDayPage() {
             onSyncTask={handleSyncTask}
           />
 
-          <UpcomingEventsWidget />
+          {!isMobile && <UpcomingEventsWidget />}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <AnnouncementWidget />
+          {!isMobile && <AnnouncementWidget />}
           <TimelineWidget
             entries={timelineEntries}
             selectedEmpId={selectedEmpId}
