@@ -683,19 +683,32 @@ export function AttendanceLogPage() {
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
     const wt = (workType || '').toLowerCase();
-    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`.toLowerCase();
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+    const lowerNotes = rawNotes.toLowerCase();
 
-    if (wt.includes('marketing') || rawNotes.includes('classification: marketing')) {
+    if (wt.includes('marketing') || lowerNotes.includes('classification: marketing')) {
       return 'Marketing';
     }
     if (workType === 'Work From Home' || workType === 'Remote') {
       return 'Remote';
     }
+
+    if (rawNotes.includes('Christ 3BBA Data Analytics B1') || (lowerNotes.includes('christ') && (lowerNotes.includes('3bba') || lowerNotes.includes('06-08')))) {
+      return 'Christ - 2 BCom Aided - 2026 - 2027 - Batch 1';
+    }
+
     const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
-      return batchDisplayName(foundBatch);
+      const name = batchDisplayName(foundBatch);
+      if (name === 'Christ 3BBA Data Analytics B1') {
+        return 'Christ - 2 BCom Aided - 2026 - 2027 - Batch 1';
+      }
+      return name;
     }
     if (extractedLoc) {
+      if (extractedLoc === 'Christ 3BBA Data Analytics B1') {
+        return 'Christ - 2 BCom Aided - 2026 - 2027 - Batch 1';
+      }
       return extractedLoc;
     }
     return isTraining ? 'Training Batch' : (workType === 'Office' ? 'KVJ Analytics' : '—');
@@ -1528,7 +1541,7 @@ export function AttendanceLogPage() {
           initial={{
             date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
             classification: 'Office',
-            location: batches.length > 0 ? batches[0].code : '',
+            location: '',
             organisationsVisited: '',
             startTime: '08:30 AM',
             endTime: '05:00 PM',

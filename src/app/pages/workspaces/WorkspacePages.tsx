@@ -801,7 +801,7 @@ export const AttendancePanel = memo(function AttendancePanel({
           initial={{
             date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
             classification: 'Office',
-            location: 'Christ 3BBA Data Analytics B1',
+            location: '',
             organisationsVisited: '',
             startTime: '08:30 AM',
             endTime: '05:00 PM',
