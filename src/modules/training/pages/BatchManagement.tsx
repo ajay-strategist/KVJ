@@ -663,7 +663,7 @@ export function BatchManagement() {
           setDbColleges(p.data);
         }
       });
-    } catch {}
+    } catch (e) { void e; }
   }, []);
 
   const [examScheduleDates, setExamScheduleDates] = useState<Record<string, string>>({

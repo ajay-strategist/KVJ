@@ -189,7 +189,7 @@ export const AttendancePanel = memo(function AttendancePanel({
         } else {
           setAssignedTodayBatchIds(new Set());
         }
-      } catch (e) {}
+      } catch (e) { void e; }
     }
     loadAssignedSessions();
   }, [user, currentEmployee]);
@@ -889,7 +889,7 @@ const getStoredTaskStates = (): Record<string, StoredTaskState> => {
 const saveStoredTaskStates = (states: Record<string, StoredTaskState>) => {
   try {
     localStorage.setItem(TASK_TIMER_STORAGE_KEY, JSON.stringify(states));
-  } catch {}
+  } catch (e) { void e; }
 };
 
 export interface TaskItem {
@@ -946,7 +946,7 @@ const getStoredTaskOrder = (): string[] => {
 const saveStoredTaskOrder = (order: string[]) => {
   try {
     localStorage.setItem(TASK_ORDER_STORAGE_KEY, JSON.stringify(order));
-  } catch {}
+  } catch (e) { void e; }
 };
 
 export const TaskWidget = memo(function TaskWidget({
@@ -1352,7 +1352,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
             }))
           );
         }
-      } catch (e) {}
+      } catch (e) { void e; }
     }
     loadSchedules();
   }, []);
@@ -1682,7 +1682,7 @@ export const TimelineWidget = memo(function TimelineWidget({
         </div>
 
         {/* User Level Employee Filter Dropdown for Executive Roles */}
-        {false && isExecutive && employeeList.length > 0 && onEmpIdChange && (
+        {isExecutive && employeeList.length > 0 && onEmpIdChange && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-sunken)', padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>👤 Filter Timeline:</span>
             <select
@@ -1837,7 +1837,7 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
       const next = [...prev, id];
       try {
         localStorage.setItem('kvj_dismissed_announcements', JSON.stringify(next));
-      } catch {}
+      } catch (e) { void e; }
       return next;
     });
   };
@@ -2218,7 +2218,7 @@ export function MyDayPage() {
       const next = [...prev, newEntry];
       try {
         localStorage.setItem(userTimelineKey, JSON.stringify(next));
-      } catch {}
+      } catch (e) { void e; }
       return next;
     });
   };
@@ -2786,7 +2786,7 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
             person = parsed.personName || person;
             type = parsed.expenseType || type;
             userNotes = parsed.userNotes || '';
-          } catch (e) {}
+          } catch (e) { void e; }
         }
 
         return [

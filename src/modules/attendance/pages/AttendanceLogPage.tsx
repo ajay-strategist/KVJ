@@ -50,7 +50,7 @@ function safeFormatTime(raw?: string): string {
         const mm = String(d.getMinutes()).padStart(2, '0');
         return `${hh}:${mm}`;
       }
-    } catch {}
+    } catch (e) { void e; }
   }
 
   const match = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
@@ -72,7 +72,7 @@ function safeFormatTime(raw?: string): string {
       const mm = String(d.getMinutes()).padStart(2, '0');
       return `${hh}:${mm}`;
     }
-  } catch {}
+  } catch (e) { void e; }
 
   return '—';
 }
@@ -153,7 +153,7 @@ function ConditionalAttendanceFields() {
         if (data) {
           setAssignedBatchIds(new Set(data.map((s: any) => s.batch_id).filter(Boolean)));
         }
-      } catch {}
+      } catch (e) { void e; }
     }
     fetchAssigned();
   }, [values.date, user?.id]);
@@ -532,7 +532,7 @@ export function AttendanceLogPage() {
             type = parsed.expenseType || 'Misc';
             batchRoute = parsed.batchRoute || parsed.location || 'General / Office';
             uNotes = parsed.userNotes || '';
-          } catch {}
+          } catch (e) { void e; }
         }
         return { person, type, batchRoute, uNotes };
       };
@@ -557,7 +557,7 @@ export function AttendanceLogPage() {
         'Accumulated Expenses',
       ];
 
-      let sumDaysCount = 23;
+      const sumDaysCount = 23;
       let totalSumLeaves = 0;
       let totalSumWorkDays = 0;
       let totalSumHolWorked = 0;
@@ -579,7 +579,7 @@ export function AttendanceLogPage() {
           (e: any) => e && e.employeeId === empId && e.status !== 'rejected'
         );
 
-        let leavesCount = empLeaves.reduce((acc: number, l: any) => {
+        const leavesCount = empLeaves.reduce((acc: number, l: any) => {
           if (!l.startDate || !l.endDate) return acc + 1;
           const s = new Date(l.startDate).getTime();
           const e = new Date(l.endDate).getTime();
@@ -1300,7 +1300,7 @@ export function AttendanceLogPage() {
           vehicle = parsed.vehicle || undefined;
           km = parsed.km || undefined;
           userNotes = parsed.userNotes || '';
-        } catch (e) {}
+        } catch (e) { void e; }
       }
 
       return {
