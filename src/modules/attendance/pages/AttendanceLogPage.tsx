@@ -884,8 +884,8 @@ export function AttendanceLogPage() {
         const hasMultipleSessions = sessionsList.length > 1;
 
         sessionsList.forEach((s, sIdx) => {
-          const startT = safeFormatTime(s.clockIn || record.firstClockIn);
-          const endT = safeFormatTime(s.clockOut || record.lastClockOut);
+          const startT = safeFormatTime(record.firstClockIn || s.clockIn);
+          const endT = safeFormatTime(record.lastClockOut || s.clockOut);
 
           const workType = s.workType || 'Office';
           const batchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
