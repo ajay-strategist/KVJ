@@ -666,39 +666,15 @@ export function AttendanceLogPage() {
       );
     }
 
-    // 3. Match extracted Location string against database batches
+    // 3. Match extracted Location string ONLY IF IT IS AN EXACT MATCH for batch code or full display name
     if (!foundBatch && extractedLoc) {
       const lowerLoc = extractedLoc.toLowerCase();
       foundBatch = safeBatches.find((b) => {
         if (!b) return false;
         const disp = batchDisplayName(b).toLowerCase();
-        if (disp === lowerLoc || disp.includes(lowerLoc) || lowerLoc.includes(disp)) return true;
-        if (b.code && (b.code.toLowerCase() === lowerLoc || lowerLoc.includes(b.code.toLowerCase()))) return true;
-        if (b.program && lowerLoc.includes(b.program.toLowerCase())) {
-          if (!b.batchNo || lowerLoc.includes(b.batchNo.toLowerCase())) return true;
-        }
+        if (disp === lowerLoc) return true;
+        if (b.code && b.code.toLowerCase() === lowerLoc) return true;
         return false;
-      });
-
-      if (!foundBatch) {
-        foundBatch = safeBatches.find((b) =>
-          b && (
-            (b.program && lowerLoc.includes(b.program.toLowerCase())) ||
-            (b.trainingName && lowerLoc.includes(b.trainingName.toLowerCase()))
-          )
-        );
-      }
-    }
-
-    // 4. Search raw notes for specific batch details
-    const lower = rawNotes.toLowerCase();
-    if (!foundBatch && lower.trim()) {
-      foundBatch = safeBatches.find((b) => {
-        if (!b) return false;
-        const codeMatch = b.code && lower.includes(b.code.toLowerCase());
-        const progMatch = b.program && lower.includes(b.program.toLowerCase());
-        const nameMatch = b.trainingName && lower.includes(b.trainingName.toLowerCase());
-        return Boolean(codeMatch || (progMatch && b.batchNo && lower.includes(b.batchNo.toLowerCase())) || nameMatch);
       });
     }
 
