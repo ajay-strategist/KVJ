@@ -531,15 +531,42 @@ export function ExpenseClaims() {
     if (submittingClaim) return;
     setSubmittingClaim(true);
     try {
+      // 1. Normalize expense date FIRST so it is available for Google Drive folder and DB timestamps
+      const rawDate = (values.expenseDate as string) || new Date().toISOString().slice(0, 10);
+      let safeIsoDate = new Date().toISOString();
+      let normalizedYMD = rawDate;
+      let dateFmtGB = rawDate;
+
+      if (rawDate) {
+        let yyyy = '', mm = '', dd = '';
+        if (rawDate.includes('-')) {
+          const p = rawDate.split('-');
+          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
+          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
+        } else if (rawDate.includes('/')) {
+          const p = rawDate.split('/');
+          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
+          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
+        }
+
+        if (yyyy && mm && dd) {
+          normalizedYMD = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+          dateFmtGB = `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`;
+          const dObj = new Date(`${normalizedYMD}T12:00:00.000Z`);
+          if (!isNaN(dObj.getTime())) {
+            safeIsoDate = dObj.toISOString();
+          }
+        }
+      }
+
       const isSelfTravel = values.expenseType === 'Self Travel';
       const km = Number(values.km || 0);
       const vehicle = (values.vehicle || 'Bike') as 'Bike' | 'Car';
       const rate = vehicle === 'Car' ? carRate : bikeRate;
       const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
+      const expType = values.expenseType === '__NEW_TYPE__' ? (values.newTypeInput as string) : (values.expenseType as string) || 'Miscellaneous';
 
-      const isUUID = (str?: string) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-      const validEmpId = isUUID(user?.id) ? user?.id : null;
-
+      // 2. Receipt file upload using the target Expense Date for Google Drive monthly folder
       let receiptLink: string =
         (typeof values.receiptPreview === 'string' && values.receiptPreview)
           ? values.receiptPreview
@@ -566,11 +593,11 @@ export function ExpenseClaims() {
           } catch (e) { void e; }
 
           const driveRes = await googleIntegration.uploadReceiptWithMetadata({
-            date: new Date().toISOString().split('T')[0],
+            date: normalizedYMD, // Target the chosen expense date's month folder (e.g. 2026-08-12 -> 2026-August)
             personName: user?.fullName || 'Employee',
             isOfficeExpense: values.categoryType === 'Office Expense',
             batchName: (values.batch as string) || undefined,
-            expenseType: (values.expenseType as string) || 'Expense',
+            expenseType: expType,
             amount,
             originalFileName: fileObj.name,
             mimeType: fileObj.type || 'image/png',
@@ -585,45 +612,66 @@ export function ExpenseClaims() {
         }
       }
 
-      const expType = values.expenseType === '__NEW_TYPE__' ? (values.newTypeInput as string) : (values.expenseType as string) || 'Miscellaneous';
-      
-      const assocBatch = batches.find((b: any) =>
-        b.id === values.batch ||
-        b.name === values.batch ||
-        b.batchCode === values.batch ||
-        b.code === values.batch
-      );
-      const validBatchId = assocBatch && isUUID(assocBatch.id) ? assocBatch.id : null;
+      // 3. Serialize notes JSON with chosen expense date
+      const notesJson = JSON.stringify({
+        personName: user?.fullName || 'Employee',
+        expenseType: expType,
+        expenseDate: normalizedYMD,
+        batchName: values.batch as string || null,
+        route: values.route as string || null,
+        vehicle: isSelfTravel ? vehicle : null,
+        km: isSelfTravel ? km : null,
+        rate: isSelfTravel ? rate : null,
+        userNotes: (values.notes as string) || (values.route as string) || '',
+      });
 
-      const chosenDate = (values.expenseDate as string) || new Date().toISOString().slice(0, 10);
-      let safeIsoDate = new Date().toISOString();
-      let normalizedYMD = chosenDate;
-      let dateFmtGB = chosenDate;
+      // 4. Save to Supabase DB with safe fallback
+      const claimId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
 
-      if (chosenDate) {
-        let yyyy = '', mm = '', dd = '';
-        if (chosenDate.includes('-')) {
-          const p = chosenDate.split('-');
-          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
-          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
-        } else if (chosenDate.includes('/')) {
-          const p = chosenDate.split('/');
-          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
-          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
-        }
+      const insertPayload: Record<string, any> = {
+        ...(claimId ? { id: claimId } : {}),
+        amount,
+        category: values.categoryType || 'Office Expense',
+        receipt_url: receiptLink,
+        status: 'submitted',
+        created_at: safeIsoDate,
+        notes: notesJson,
+      };
 
-        if (yyyy && mm && dd) {
-          normalizedYMD = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-          dateFmtGB = `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`;
-          const dObj = new Date(`${normalizedYMD}T12:00:00.000Z`);
-          if (!isNaN(dObj.getTime())) {
-            safeIsoDate = dObj.toISOString();
+      if (user?.id) {
+        insertPayload.employee_id = user.id;
+      }
+
+      try {
+        const { error } = await supabase.from('flwdsk_expense_claims').insert(insertPayload);
+
+        if (error) {
+          console.warn('Supabase expense claims primary insert error, trying fallback:', error);
+          const fallbackPayload = { ...insertPayload };
+          delete fallbackPayload.employee_id;
+          const { error: err2 } = await supabase.from('flwdsk_expense_claims').insert(fallbackPayload);
+
+          if (err2) {
+            toast({
+              variant: 'error',
+              title: 'Submission Failed',
+              message: `Could not save claim to database: ${err2.message || error.message}`,
+            });
+            return;
           }
         }
+      } catch (e: any) {
+        console.warn('Supabase expense submit catch warning:', e);
+        toast({
+          variant: 'error',
+          title: 'Submission Failed',
+          message: e.message || 'An unexpected database error occurred.',
+        });
+        return;
       }
 
       const newRecord: ExpenseRecord = {
-        id: `exp-${Date.now()}`,
+        id: claimId || `exp-${Date.now()}`,
         date: dateFmtGB,
         person: user?.fullName || 'Employee',
         category: (values.categoryType as any) || 'Office Expense',
@@ -639,64 +687,14 @@ export function ExpenseClaims() {
         status: 'submitted',
       };
 
-      try {
-        const notesJson = JSON.stringify({
-          personName: user?.fullName || 'Employee',
-          expenseType: expType,
-          expenseDate: normalizedYMD,
-          batchName: values.batch as string || null,
-          route: values.route as string || null,
-          vehicle: isSelfTravel ? vehicle : null,
-          km: isSelfTravel ? km : null,
-          rate: isSelfTravel ? rate : null,
-          userNotes: (values.notes as string) || (values.route as string) || '',
-        });
-
-        // Idempotency key: a client-generated primary key means a replayed /
-        // retried identical submit collides on the PK instead of creating a
-        // duplicate claim (DB-level backstop to the submittingClaim UX lock).
-        const claimId =
-          typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
-
-        const insertPayload: Record<string, any> = {
-          ...(claimId ? { id: claimId } : {}),
-          amount,
-          category: values.categoryType || 'Office Expense',
-          receipt_url: receiptLink,
-          status: 'submitted',
-          created_at: safeIsoDate,
-          notes: notesJson,
-        };
-
-        if (validEmpId) {
-          insertPayload.employee_id = validEmpId;
-        }
-
-        const { error } = await supabase.from('flwdsk_expense_claims').insert(insertPayload);
-
-        if (error) {
-          console.warn('Supabase expense claims insert error:', error);
-          toast({
-            variant: 'error',
-            title: 'Submission Failed',
-            message: `Could not save claim to database: ${error.message}`,
-          });
-          return;
-        }
-      } catch (e: any) {
-        console.warn('Supabase expense submit catch warning:', e);
-        toast({
-          variant: 'error',
-          title: 'Submission Failed',
-          message: e.message || 'An unexpected database error occurred.',
-        });
-        return;
-      }
-
       setExpenses((prev) => [newRecord, ...(Array.isArray(prev) ? prev : [])]);
       loadClaims();
-      const todayStr = new Date().toISOString().split('T')[0];
-      const monthFolder = `${todayStr.slice(0, 4)}-${['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(todayStr.slice(5, 7), 10) - 1]}`;
+
+      const parts = normalizedYMD.split('-');
+      const mIndex = parseInt(parts[1] || '1', 10) - 1;
+      const mName = ['January','February','March','April','May','June','July','August','September','October','November','December'][mIndex] || 'August';
+      const monthFolder = `${parts[0]}-${mName}`;
+
       toast({
         variant: 'success',
         title: 'Claim Filed & Saved',
