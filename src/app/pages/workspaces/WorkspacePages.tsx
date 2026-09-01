@@ -2526,185 +2526,19 @@ export function MyDayPage() {
         }
       />
 
-      {isMobile ? (
-        /* Mobile-Native Single-Column Vertical Experience (Zero side scrolling, 100% vertical flow) */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', boxSizing: 'border-box' }}>
-          
-          {/* 1. Mobile Quick Actions Vertical Stack */}
-          <Card padding="compact" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>🚀</span> Quick Actions
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-              <button
-                type="button"
-                onClick={() => setCreateTaskOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-sunken)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>➕</span>
-                  <span>Create Task</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)' }}>→</span>
-              </button>
+      {/* Attendance & Clock In / Out Panel */}
+      <AttendancePanel
+        record={record}
+        loading={loading}
+        clockIn={clockIn}
+        clockOut={clockOut}
+        startBreak={startBreak}
+        endBreak={endBreak}
+        onActivityLog={handleActivityLog}
+      />
 
-              <button
-                type="button"
-                onClick={() => navigate('/app/attendance/log')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-sunken)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>⏰</span>
-                  <span>Submit Attendance</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)' }}>→</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/app/finance/expenses')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-sunken)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>🧾</span>
-                  <span>Submit Expense Claim</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)' }}>→</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setApplyLeaveOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-sunken)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>📅</span>
-                  <span>Leave Request</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)' }}>→</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/app/communication/chat')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-sunken)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>💬</span>
-                  <span>Chat</span>
-                </div>
-                <span style={{ color: 'var(--text-muted)' }}>→</span>
-              </button>
-            </div>
-          </Card>
-
-          {/* 2. Clock In / Out Panel */}
-          <AttendancePanel
-            record={record}
-            loading={loading}
-            clockIn={clockIn}
-            clockOut={clockOut}
-            startBreak={startBreak}
-            endBreak={endBreak}
-            onActivityLog={handleActivityLog}
-          />
-
-          {/* 3. Role-Gated Management Cards (Admin / CEO / Manager Only) */}
-          {isApproverRole && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', boxSizing: 'border-box' }}>
-              <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>
-                    📊 Today's Employee Status & Current Work
-                  </div>
-                  <Badge tone="info">Management Only</Badge>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Live workforce tracking active: View present staff, active break sessions, and ongoing task worklogs.
-                </div>
-              </Card>
-
-              <Card padding="compact" style={{ borderLeft: '4px solid var(--status-warning)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 14 }}>⚡</span>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>Pending Approvals Queue</span>
-                  </div>
-                  <Button size="xs" variant="secondary" onClick={() => navigate('/app/approvals')}>View Queue</Button>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Task assignments, leave requests, and attendance claims requiring management authorization.
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* 4. Task Widget */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           <TaskWidget
             tasks={tasks}
             setTasks={setTasks}
@@ -2712,101 +2546,19 @@ export function MyDayPage() {
             onSubmitReview={handleSubmitReview}
             onSyncTask={handleSyncTask}
           />
+          {!isMobile && <UpcomingEventsWidget />}
         </div>
-      ) : (
-        /* Desktop View */
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 16, width: '100%', boxSizing: 'border-box' }}>
-            <ResizedQuickAction
-              icon="➕"
-              label="Create Task"
-              onClick={() => setCreateTaskOpen(true)}
-            />
-            <ResizedQuickAction
-              icon="⏰"
-              label="Submit Attendance"
-              onClick={() => navigate('/app/attendance/log')}
-            />
-            <ResizedQuickAction
-              icon="🧾"
-              label="Submit Expense Claim"
-              onClick={() => navigate('/app/finance/expenses')}
-            />
-            <ResizedQuickAction
-              icon="📅"
-              label="Leave Request"
-              onClick={() => setApplyLeaveOpen(true)}
-            />
-            <ResizedQuickAction
-              icon="💬"
-              label="Chat"
-              onClick={() => navigate('/app/communication/chat')}
-            />
-          </div>
 
-          <AttendancePanel
-            record={record}
-            loading={loading}
-            clockIn={clockIn}
-            clockOut={clockOut}
-            startBreak={startBreak}
-            endBreak={endBreak}
-            onActivityLog={handleActivityLog}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          {!isMobile && <AnnouncementWidget />}
+          <TimelineWidget
+            entries={timelineEntries}
+            selectedEmpId={selectedEmpId}
+            onEmpIdChange={setSelectedEmpId}
+            employeeList={employeeOptions}
           />
-
-          {isApproverRole && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
-              <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
-                    📊 Today's Employee Status & Current Work
-                  </div>
-                  <Badge tone="info">Management Only</Badge>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Live workforce tracking active: View present staff, active break sessions, and ongoing task worklogs.
-                </div>
-              </Card>
-
-              <Card padding="compact" style={{ borderLeft: '4px solid var(--status-warning)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 14 }}>⚡</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Pending Approvals Queue</span>
-                  </div>
-                  <Button size="xs" variant="secondary" onClick={() => navigate('/app/approvals')}>View Queue</Button>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Task assignments, leave requests, and attendance claims requiring management authorization.
-                </div>
-              </Card>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-              <TaskWidget
-                tasks={tasks}
-                setTasks={setTasks}
-                onToggleTask={handleToggleTask}
-                onSubmitReview={handleSubmitReview}
-                onSyncTask={handleSyncTask}
-              />
-              <UpcomingEventsWidget />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-              <AnnouncementWidget />
-              <TimelineWidget
-                entries={timelineEntries}
-                selectedEmpId={selectedEmpId}
-                onEmpIdChange={setSelectedEmpId}
-                employeeList={employeeOptions}
-              />
-            </div>
-          </div>
-        </>
-      )}
+        </div>
+      </div>
 
       {/* Create Task Modal */}
       <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} />
