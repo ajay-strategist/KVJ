@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
-import { DatePickerField } from '../../../shared/forms/form';
+import { useDevice } from '../../../shared/hooks/responsive';
 import { container } from '../../../core/registry';
 import { PROJECT_REPOSITORY_TOKEN, TASK_REPOSITORY_TOKEN } from '../project.repository';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../../employee/employee.repository';
@@ -23,6 +23,8 @@ export function CreateTaskModal({
   defaultAssigneeId,
 }: CreateTaskModalProps) {
   const { user } = useAuth();
+  const device = useDevice();
+  const isMobile = device === 'mobile';
   const { toast } = useNotifications();
 
   const [projects, setProjects] = useState<any[]>([]);
@@ -244,7 +246,7 @@ export function CreateTaskModal({
           </div>
 
           {/* Assignee & Supervisor Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)' }}>
                 Assignee Name
@@ -285,7 +287,7 @@ export function CreateTaskModal({
           </div>
 
           {/* Start Date & Due Date Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)' }}>
                 Start Date
