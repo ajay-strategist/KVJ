@@ -176,13 +176,128 @@ export function DatePickerField({ name, label, rules }: { name: string; label?: 
   );
 }
 
+function format12HourTime(rawStr: string): string {
+  if (!rawStr) return '';
+  const str = rawStr.trim();
+
+  const match12 = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (match12) {
+    let h = parseInt(match12[1], 10);
+    const m = match12[2];
+    let ampm = match12[3]?.toUpperCase();
+
+    if (!ampm) {
+      ampm = h >= 12 ? 'PM' : 'AM';
+      if (h > 12) h -= 12;
+      if (h === 0) h = 12;
+    } else {
+      if (h > 12) h -= 12;
+      if (h === 0) h = 12;
+    }
+
+    const hh = String(h).padStart(2, '0');
+    return `${hh}:${m} ${ampm}`;
+  }
+
+  return str;
+}
+
+function time12To24(time12: string): string {
+  if (!time12) return '';
+  const match = time12.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return '';
+  let h = parseInt(match[1], 10);
+  const m = match[2];
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${m}`;
+}
+
 export function TimePickerField({ name, label, rules }: { name: string; label?: string; rules?: Validator<never>[] }) {
   return (
     <Field name={name} label={label} rules={rules}>
-      {({ value, onChange, onBlur, invalid }) => (
-        <input id={name} className="kvj-input" type="time" aria-invalid={invalid}
-          value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
-      )}
+      {({ value, onChange, onBlur, invalid }) => {
+        const currentVal = (value as string) || '';
+        const formattedVal = format12HourTime(currentVal);
+        const time24Val = time12To24(formattedVal);
+
+        const handle24Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const val24 = e.target.value;
+          if (!val24) return;
+          const [hStr, mStr] = val24.split(':');
+          let h = parseInt(hStr, 10);
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          if (h > 12) h -= 12;
+          if (h === 0) h = 12;
+          const hh = String(h).padStart(2, '0');
+          onChange(`${hh}:${mStr} ${ampm}`);
+        };
+
+        const handleTextBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+          const formatted = format12HourTime(e.target.value);
+          if (formatted !== e.target.value) {
+            onChange(formatted);
+          }
+          onBlur();
+        };
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+              <input
+                id={name}
+                className="kvj-input"
+                style={{ paddingRight: 40, fontFamily: 'inherit', letterSpacing: '0.02em' }}
+                placeholder="hh:mm AM/PM (e.g. 08:30 AM)"
+                aria-invalid={invalid}
+                value={currentVal}
+                onChange={(e) => onChange(e.target.value)}
+                onBlur={handleTextBlur}
+              />
+              <div style={{ position: 'absolute', right: 10, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                <span style={{ fontSize: 16 }}>🕒</span>
+              </div>
+              <input
+                type="time"
+                value={time24Val}
+                onChange={handle24Change}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  opacity: 0,
+                  width: 28,
+                  height: 28,
+                  cursor: 'pointer'
+                }}
+                title="Select time from clock picker"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['08:30 AM', '09:30 AM', '05:00 PM', '05:30 PM'].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onChange(p)}
+                  style={{
+                    border: '1px solid var(--border)',
+                    background: currentVal === p ? 'var(--brand)' : 'var(--bg-sunken)',
+                    color: currentVal === p ? '#fff' : 'var(--text-secondary)',
+                    borderRadius: 12,
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      }}
     </Field>
   );
 }

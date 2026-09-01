@@ -6,7 +6,7 @@ import { AttendanceCalendarView, type CalendarDayDetail } from '../components/At
 import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, useForm } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, DatePickerField, TimePickerField, useForm } from '../../../shared/forms/form';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { ATTENDANCE_REPOSITORY_TOKEN, type AttendanceRecord, type WorkSessionType } from '../attendance.repository';
@@ -1602,7 +1602,7 @@ export function AttendanceLogPage() {
              setSubmitDrawerOpen(false);
            }}
         >
-          <TextField name="date" label="Attendance Date" placeholder="YYYY-MM-DD" />
+          <DatePickerField name="date" label="Attendance Date" />
           <SelectField
             name="classification"
             label="Attendance Type"
@@ -1613,8 +1613,8 @@ export function AttendanceLogPage() {
             ]}
           />
           <ConditionalAttendanceFields />
-          <TextField name="startTime" label="Start Time" placeholder="08:30 AM" />
-          <TextField name="endTime" label="End Time" placeholder="05:00 PM" />
+          <TimePickerField name="startTime" label="Start Time" />
+          <TimePickerField name="endTime" label="End Time" />
           <TextField name="notes" label="Reason / Notes (Optional)" placeholder="Emergency, system delay, or missed clock-in..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setSubmitDrawerOpen(false)}>Cancel</Button>
