@@ -816,7 +816,7 @@ export function AttendanceLogPage() {
           const isLeave = (workType === 'Leave' || (s.notes && s.notes.toLowerCase().includes('leave')) || !!activeLeave) && !hasClockIn;
 
           rows.push({
-            date: dateStr.split('-').reverse().join('/'),
+            date: dateStr.split('-').reverse().join('-'),
             name: resolvedEmpName,
             holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
             org: orgVal,
@@ -839,7 +839,7 @@ export function AttendanceLogPage() {
         const isLeave = !!activeLeave;
 
         rows.push({
-          date: dateStr.split('-').reverse().join('/'),
+          date: dateStr.split('-').reverse().join('-'),
           name: empName,
           holiday: decHoliday ? decHoliday.name : isSunday ? 'Sunday' : '',
           org: '—',

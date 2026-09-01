@@ -227,8 +227,9 @@ export function ProjectList({
       const pTaskIds = new Set(pTasks.map((t: any) => t.id));
       const pTimesheets = timesheets.filter((ts: any) => ts.taskId && pTaskIds.has(ts.taskId));
 
-      const totalProjectHours = pTimesheets.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0) ||
-        pTasks.reduce((sum: number, t: any) => sum + Number(t.actualHours || 0), 0);
+      const totalTaskActualHours = pTasks.reduce((sum: number, t: any) => sum + Number(t.actualHours || 0), 0);
+      const totalTimesheetHours = pTimesheets.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
+      const totalProjectHours = Math.round((Math.max(totalTaskActualHours, totalTimesheetHours) || (totalTaskActualHours + totalTimesheetHours)) * 10) / 10;
 
       const pAllocations = allocations.filter((a: any) => a.projectId === p.id);
       const membersMap = new Map<string, { name: string; hours: number; avatarUrl?: string }>();

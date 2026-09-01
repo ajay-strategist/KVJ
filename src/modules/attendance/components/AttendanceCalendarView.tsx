@@ -89,9 +89,11 @@ export function AttendanceCalendarView({
     return null;
   };
 
-  const isLate = (timeStr?: string) => {
+  const isLate = (timeStr?: string, workType?: string) => {
+    const isOffice = !workType || workType.toLowerCase() === 'office' || workType.toLowerCase() === 'work';
+    if (!isOffice) return false;
     const mins = parseTime(timeStr);
-    return mins !== null && mins > 9 * 60; // Late if clock-in is after 09:00 AM
+    return mins !== null && mins >= (9 * 60 + 31); // Late ONLY if clock-in is 09:31 AM or later for Office
   };
 
   const isEarly = (timeStr?: string) => {
@@ -118,7 +120,7 @@ export function AttendanceCalendarView({
     const noOfLeaves = days.filter((d) => d.status === 'leave').length;
     const holidayWorked = days.filter((d) => d.status === 'present' && d.dayName === 'Sun').length;
     const workingDays = days.filter((d) => d.status === 'present').length;
-    const lateReporting = days.filter((d) => d.status === 'present' && isLate(d.startTime)).length;
+    const lateReporting = days.filter((d) => d.status === 'present' && isLate(d.startTime, (d as any).workType)).length;
     const earlyLeaving = days.filter((d) => d.status === 'present' && isEarly(d.endTime)).length;
 
     const totalBreakMins = days.reduce((sum, d) => sum + (d.breakMinutes || 0), 0);

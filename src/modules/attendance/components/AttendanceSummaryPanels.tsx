@@ -103,10 +103,10 @@ export function AttendanceSummaryPanels({
   };
 
   const isLate = (timeStr?: string, workType?: string) => {
-    const isOffice = !workType || workType === 'Office' || workType === 'Work';
+    const isOffice = !workType || workType.toLowerCase() === 'office' || workType.toLowerCase() === 'work';
     if (!isOffice) return false;
     const mins = parseTime(timeStr);
-    return mins !== null && mins > (9 * 60 + 30); // > 9:30 AM
+    return mins !== null && mins >= (9 * 60 + 31); // Late ONLY if clock-in is 09:31 AM or later for Office
   };
 
   const isEarly = (timeStr?: string) => {

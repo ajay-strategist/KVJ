@@ -2222,7 +2222,46 @@ export function MyDayPage() {
     });
   };
 
+  const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [pauseTargetTaskId, setPauseTargetTaskId] = useState<string | null>(null);
+  const [pauseWorkNote, setPauseWorkNote] = useState('');
+
+  const handleConfirmPauseTask = async () => {
+    if (!pauseTargetTaskId) return;
+    const taskId = pauseTargetTaskId;
+    const note = pauseWorkNote.trim() || 'Work session paused';
+
+    taskTimerStore.pauseTask(taskId);
+    const timer = taskTimerStore.getTimer(taskId);
+    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, active: false, secondsToday } : t))
+    );
+
+    try {
+      await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600 });
+      await pauseSession(taskId as any, note);
+      handleActivityLog(`Paused Task: ${taskId}`, 'neutral');
+    } catch (e) {
+      console.warn('Pause task error in workspace:', e);
+    }
+
+    setPauseModalOpen(false);
+    setPauseTargetTaskId(null);
+    setPauseWorkNote('');
+    toast({ variant: 'info', title: 'Task Paused', message: 'Work progress saved and timer paused.' });
+  };
+
   const handleToggleTask = (id: string, taskTitle: string, currentActive: boolean) => {
+    // If active and user clicks pause, open mandatory work progress modal
+    if (currentActive) {
+      setPauseTargetTaskId(id);
+      setPauseWorkNote('');
+      setPauseModalOpen(true);
+      return;
+    }
+
     const nextActive = !currentActive;
     const now = Date.now();
     let targetTask: any = null;
@@ -2586,14 +2625,58 @@ export function MyDayPage() {
           <DatePickerField name="startDate" label="Start Date *" />
           <DatePickerField name="endDate" label="End Date *" />
           <CheckboxField name="halfDay" label="Apply for Half Day" />
-          <FileUploadField name="medCert" label="Medical Certificate (Optional upfront; can be uploaded after leave)" accept=".pdf,.png,.jpg" />
           <TextAreaField name="reason" label="Reason for Leave" />
-
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setApplyLeaveOpen(false)}>Cancel</Button>
             <Button type="submit">Submit Leave Request</Button>
           </div>
         </Form>
+      </Drawer>
+
+      {/* Pause Task Work Progress Drawer */}
+      <Drawer
+        open={pauseModalOpen}
+        onClose={() => setPauseModalOpen(false)}
+        title="Update Work Progress (Mandatory)"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: 'var(--bg-sunken)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+            <strong>📌 Management Note:</strong> Please describe what work was done during this session. This note will be recorded in the <strong>Task Worklog</strong> under the <strong>Update</strong> column for CEO/Manager review.
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+              Work Progress Summary *
+            </label>
+            <textarea
+              value={pauseWorkNote}
+              onChange={(e) => setPauseWorkNote(e.target.value)}
+              placeholder="Describe the work completed before pausing (e.g. Reviewed API specs, fixed UI styling...)"
+              rows={4}
+              style={{
+                width: '100%',
+                padding: 10,
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+            <Button variant="ghost" type="button" onClick={() => setPauseModalOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleConfirmPauseTask}
+              disabled={!pauseWorkNote.trim()}
+            >
+              ⏸ Save Progress & Pause Timer
+            </Button>
+          </div>
+        </div>
       </Drawer>
     </AppShell>
   );
