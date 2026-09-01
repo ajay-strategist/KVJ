@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge, EmptyState } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, FileUploadField, useForm } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, FileUploadField, DatePickerField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTraining } from '../../training/hooks/useTraining';
@@ -175,6 +175,8 @@ function DynamicExpenseForm({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <DatePickerField name="expenseDate" label="Expense Date *" />
+
       <SelectField
         name="categoryType"
         label="Expense Classification *"
@@ -360,6 +362,7 @@ export function ExpenseClaims() {
           let km = undefined;
           let rate = undefined;
           let userNotes = r.notes || '';
+          let expDateVal = '';
 
           if (r.notes && r.notes.trim().startsWith('{')) {
             try {
@@ -372,14 +375,27 @@ export function ExpenseClaims() {
               km = parsed.km || undefined;
               rate = parsed.rate || undefined;
               userNotes = parsed.userNotes || '';
+              expDateVal = parsed.expenseDate || '';
             } catch (e) {
-              // fallback if parsing fails
+              void e;
+            }
+          }
+
+          let dateFmt = '—';
+          const targetDateStr = expDateVal || r.created_at || '';
+          if (targetDateStr) {
+            const cleanStr = targetDateStr.slice(0, 10);
+            const parts = cleanStr.split('-');
+            if (parts.length === 3) {
+              dateFmt = `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+            } else {
+              dateFmt = new Date(targetDateStr).toLocaleDateString('en-GB');
             }
           }
 
           return {
             id: r.id,
-            date: new Date(r.created_at).toLocaleDateString('en-GB'),
+            date: dateFmt,
             person,
             category: r.category || 'Office Expense',
             type,
@@ -547,7 +563,7 @@ export function ExpenseClaims() {
               reader.onerror = () => resolve('');
               reader.readAsDataURL(fileObj);
             });
-          } catch (e) {}
+          } catch (e) { void e; }
 
           const driveRes = await googleIntegration.uploadReceiptWithMetadata({
             date: new Date().toISOString().split('T')[0],
@@ -579,9 +595,13 @@ export function ExpenseClaims() {
       );
       const validBatchId = assocBatch && isUUID(assocBatch.id) ? assocBatch.id : null;
 
+      const chosenDate = (values.expenseDate as string) || new Date().toISOString().slice(0, 10);
+      const dateParts = chosenDate.split('-');
+      const dateFmtGB = dateParts.length === 3 ? `${dateParts[2].padStart(2, '0')}/${dateParts[1].padStart(2, '0')}/${dateParts[0]}` : chosenDate;
+
       const newRecord: ExpenseRecord = {
         id: `exp-${Date.now()}`,
-        date: new Date().toLocaleDateString('en-GB'),
+        date: dateFmtGB,
         person: user?.fullName || 'Employee',
         category: (values.categoryType as any) || 'Office Expense',
         type: expType,
@@ -600,6 +620,7 @@ export function ExpenseClaims() {
         const notesJson = JSON.stringify({
           personName: user?.fullName || 'Employee',
           expenseType: expType,
+          expenseDate: chosenDate,
           batchName: values.batch as string || null,
           route: values.route as string || null,
           vehicle: isSelfTravel ? vehicle : null,
@@ -614,6 +635,8 @@ export function ExpenseClaims() {
         const claimId =
           typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
 
+        const createdIso = new Date(chosenDate + 'T12:00:00.000Z').toISOString();
+
         const { error } = await supabase.from('flwdsk_expense_claims').insert({
           ...(claimId ? { id: claimId } : {}),
           employee_id: validEmpId,
@@ -623,6 +646,7 @@ export function ExpenseClaims() {
           category: values.categoryType || 'Office Expense',
           receipt_url: receiptLink,
           status: 'submitted',
+          created_at: createdIso,
           notes: notesJson,
           batch_id: validBatchId,
           batch_name: (assocBatch as any)?.name || (values.batch as string) || null,
@@ -1282,7 +1306,7 @@ export function ExpenseClaims() {
 
       {/* Submit Expense Drawer */}
       <Drawer open={expenseOpen} onClose={() => setExpenseOpen(false)} title="Submit Expense Claim">
-        <Form initial={{ categoryType: 'Office Expense', expenseType: 'Self Travel', vehicle: 'Bike', km: '', route: '', amount: '' }} onSubmit={handleExpenseSubmit}>
+        <Form initial={{ categoryType: 'Office Expense', expenseDate: new Date().toISOString().slice(0, 10), expenseType: 'Self Travel', vehicle: 'Bike', km: '', route: '', amount: '' }} onSubmit={handleExpenseSubmit}>
           <DynamicExpenseForm
             bikeRate={bikeRate}
             carRate={carRate}
