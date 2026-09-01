@@ -706,6 +706,12 @@ export function AttendanceLogPage() {
   }, [batches]);
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+    const wt = (workType || '').toLowerCase();
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`.toLowerCase();
+
+    if (wt.includes('marketing') || rawNotes.includes('classification: marketing')) {
+      return 'Marketing';
+    }
     if (workType === 'Work From Home' || workType === 'Remote') {
       return 'Remote';
     }
