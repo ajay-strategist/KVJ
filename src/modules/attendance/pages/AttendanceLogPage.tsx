@@ -693,22 +693,11 @@ export function AttendanceLogPage() {
       return 'Remote';
     }
 
-    if (rawNotes.includes('Christ 3BBA Data Analytics B1') || (lowerNotes.includes('christ') && (lowerNotes.includes('3bba') || lowerNotes.includes('06-08')))) {
-      return 'Christ - 2 BCom Aided - 2026 - 2027 - Batch 1';
-    }
-
     const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
-      const name = batchDisplayName(foundBatch);
-      if (name === 'Christ 3BBA Data Analytics B1') {
-        return 'Christ - 2 BCom Aided - 2026 - 2027 - Batch 1';
-      }
-      return name;
+      return batchDisplayName(foundBatch);
     }
     if (extractedLoc) {
-      if (extractedLoc === 'Christ 3BBA Data Analytics B1') {
-        return 'Christ - 2 BCom Aided - 2026 - 2027 - Batch 1';
-      }
       return extractedLoc;
     }
     return isTraining ? 'Training Batch' : (workType === 'Office' ? 'KVJ Analytics' : '—');
