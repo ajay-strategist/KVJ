@@ -597,6 +597,16 @@ export function AttendanceLogPage() {
     const isTraining = wt.startsWith('Training:') || wt === 'Training' || (sessionNotes || '').toLowerCase().includes('training') || (recordNotes || '').toLowerCase().includes('training');
 
     let foundBatch: any = null;
+    let extractedLoc: string | null = null;
+
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+    const locMatch = rawNotes.match(/Location:\s*([^\n,]+)/i);
+    if (locMatch && locMatch[1].trim()) {
+      const parsedLoc = locMatch[1].trim().replace(/\.$/, '').trim();
+      if (parsedLoc.toLowerCase() !== 'office work' && parsedLoc.toLowerCase() !== 'office') {
+        extractedLoc = parsedLoc;
+      }
+    }
 
     // 1. Direct recordBatchId lookup
     if (recordBatchId) {
@@ -616,63 +626,66 @@ export function AttendanceLogPage() {
       );
     }
 
-    // 3. Parse Location from notes
-    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
-    const locMatch = rawNotes.match(/Location:\s*([^\n,]+)/i);
-    if (!foundBatch && locMatch && locMatch[1].trim()) {
-      const locStr = locMatch[1].trim().replace(/\.$/, '').trim();
-      if (locStr.toLowerCase() !== 'office work' && locStr.toLowerCase() !== 'office') {
+    // 3. Match extracted Location string against database batches
+    if (!foundBatch && extractedLoc) {
+      const lowerLoc = extractedLoc.toLowerCase();
+      foundBatch = safeBatches.find((b) => {
+        if (!b) return false;
+        const disp = batchDisplayName(b).toLowerCase();
+        if (disp === lowerLoc || disp.includes(lowerLoc) || lowerLoc.includes(disp)) return true;
+        if (b.code && (b.code.toLowerCase() === lowerLoc || lowerLoc.includes(b.code.toLowerCase()))) return true;
+        if (b.program && lowerLoc.includes(b.program.toLowerCase())) {
+          if (!b.batchNo || lowerLoc.includes(b.batchNo.toLowerCase())) return true;
+        }
+        return false;
+      });
+
+      if (!foundBatch) {
         foundBatch = safeBatches.find((b) =>
           b && (
-            (b.code && b.code.toLowerCase() === locStr.toLowerCase()) ||
-            (b.batchNo && b.batchNo.toLowerCase() === locStr.toLowerCase()) ||
-            (batchDisplayName(b).toLowerCase() === locStr.toLowerCase())
+            (b.program && lowerLoc.includes(b.program.toLowerCase())) ||
+            (b.trainingName && lowerLoc.includes(b.trainingName.toLowerCase()))
           )
         );
-        if (!foundBatch) {
-          foundBatch = safeBatches.find((b) =>
-            b && b.college && locStr.toLowerCase().includes(b.college.toLowerCase())
-          );
-        }
       }
     }
 
-    // 4. Search notes for batch details
+    // 4. Search raw notes for specific batch details
     const lower = rawNotes.toLowerCase();
     if (!foundBatch && lower.trim()) {
-      foundBatch = safeBatches.find((b) =>
-        b && (
-          (b.batchNo && lower.includes(b.batchNo.toLowerCase())) ||
-          (b.code && lower.includes(b.code.toLowerCase())) ||
-          (b.college && lower.includes(b.college.toLowerCase())) ||
-          (b.trainingName && lower.includes(b.trainingName.toLowerCase()))
-        )
-      );
+      foundBatch = safeBatches.find((b) => {
+        if (!b) return false;
+        const codeMatch = b.code && lower.includes(b.code.toLowerCase());
+        const progMatch = b.program && lower.includes(b.program.toLowerCase());
+        const nameMatch = b.trainingName && lower.includes(b.trainingName.toLowerCase());
+        return Boolean(codeMatch || (progMatch && b.batchNo && lower.includes(b.batchNo.toLowerCase())) || nameMatch);
+      });
     }
 
-    // 5. Fallback if training but no batch matched
-    if (!foundBatch && isTraining && safeBatches.length > 0) {
-      foundBatch = safeBatches[0];
-    }
-
-    return { foundBatch, isTraining };
+    return { foundBatch, extractedLoc, isTraining };
   }, [batches]);
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
     if (workType === 'Work From Home' || workType === 'Remote') {
       return 'Remote';
     }
-    const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
       return batchDisplayName(foundBatch);
+    }
+    if (extractedLoc) {
+      return extractedLoc;
     }
     return isTraining ? 'Training Batch' : (workType === 'Office' ? 'KVJ Analytics' : '—');
   }, [resolveBatchHelper]);
 
   const resolveLocationValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
-    const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
       return foundBatch.venue || foundBatch.college || 'Offline';
+    }
+    if (extractedLoc) {
+      return 'Offline';
     }
     return isTraining ? 'Offline' : (workType === 'Office' ? 'Office' : workType || '—');
   }, [resolveBatchHelper]);
