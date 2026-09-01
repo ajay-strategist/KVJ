@@ -596,8 +596,31 @@ export function ExpenseClaims() {
       const validBatchId = assocBatch && isUUID(assocBatch.id) ? assocBatch.id : null;
 
       const chosenDate = (values.expenseDate as string) || new Date().toISOString().slice(0, 10);
-      const dateParts = chosenDate.split('-');
-      const dateFmtGB = dateParts.length === 3 ? `${dateParts[2].padStart(2, '0')}/${dateParts[1].padStart(2, '0')}/${dateParts[0]}` : chosenDate;
+      let safeIsoDate = new Date().toISOString();
+      let normalizedYMD = chosenDate;
+      let dateFmtGB = chosenDate;
+
+      if (chosenDate) {
+        let yyyy = '', mm = '', dd = '';
+        if (chosenDate.includes('-')) {
+          const p = chosenDate.split('-');
+          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
+          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
+        } else if (chosenDate.includes('/')) {
+          const p = chosenDate.split('/');
+          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
+          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
+        }
+
+        if (yyyy && mm && dd) {
+          normalizedYMD = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+          dateFmtGB = `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`;
+          const dObj = new Date(`${normalizedYMD}T12:00:00.000Z`);
+          if (!isNaN(dObj.getTime())) {
+            safeIsoDate = dObj.toISOString();
+          }
+        }
+      }
 
       const newRecord: ExpenseRecord = {
         id: `exp-${Date.now()}`,
@@ -620,7 +643,7 @@ export function ExpenseClaims() {
         const notesJson = JSON.stringify({
           personName: user?.fullName || 'Employee',
           expenseType: expType,
-          expenseDate: chosenDate,
+          expenseDate: normalizedYMD,
           batchName: values.batch as string || null,
           route: values.route as string || null,
           vehicle: isSelfTravel ? vehicle : null,
@@ -635,8 +658,6 @@ export function ExpenseClaims() {
         const claimId =
           typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
 
-        const createdIso = new Date(chosenDate + 'T12:00:00.000Z').toISOString();
-
         const { error } = await supabase.from('flwdsk_expense_claims').insert({
           ...(claimId ? { id: claimId } : {}),
           employee_id: validEmpId,
@@ -646,7 +667,7 @@ export function ExpenseClaims() {
           category: values.categoryType || 'Office Expense',
           receipt_url: receiptLink,
           status: 'submitted',
-          created_at: createdIso,
+          created_at: safeIsoDate,
           notes: notesJson,
           batch_id: validBatchId,
           batch_name: (assocBatch as any)?.name || (values.batch as string) || null,
@@ -655,6 +676,7 @@ export function ExpenseClaims() {
         });
 
         if (error) {
+          console.warn('Supabase expense claims insert error:', error);
           toast({
             variant: 'error',
             title: 'Submission Failed',
@@ -673,11 +695,12 @@ export function ExpenseClaims() {
       }
 
       setExpenses((prev) => [newRecord, ...(Array.isArray(prev) ? prev : [])]);
+      loadClaims();
       const todayStr = new Date().toISOString().split('T')[0];
       const monthFolder = `${todayStr.slice(0, 4)}-${['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(todayStr.slice(5, 7), 10) - 1]}`;
       toast({
         variant: 'success',
-        title: 'Claim Filed & Receipt Uploaded',
+        title: 'Claim Filed & Saved',
         message: values.receiptFile
           ? `Submitted ₹${amount.toFixed(2)} claim. Receipt saved in Google Drive: Office/Flow Desk/Receipt/${monthFolder}.`
           : `Submitted ₹${amount.toFixed(2)} expense claim for review.`,
