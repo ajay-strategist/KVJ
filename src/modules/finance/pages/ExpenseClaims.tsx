@@ -666,7 +666,6 @@ export function ExpenseClaims() {
           status: 'submitted',
           created_at: safeIsoDate,
           notes: notesJson,
-          description: (values.notes as string) || (values.route as string) || expType,
         };
 
         if (validEmpId) {
