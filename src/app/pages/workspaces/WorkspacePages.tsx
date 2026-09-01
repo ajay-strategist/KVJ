@@ -2567,7 +2567,7 @@ export function MyDayPage() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-sm)',
                   background: 'var(--bg-sunken)',
@@ -2592,7 +2592,7 @@ export function MyDayPage() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-sm)',
                   background: 'var(--bg-sunken)',
@@ -2617,7 +2617,7 @@ export function MyDayPage() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-sm)',
                   background: 'var(--bg-sunken)',
@@ -2642,7 +2642,7 @@ export function MyDayPage() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-sm)',
                   background: 'var(--bg-sunken)',
