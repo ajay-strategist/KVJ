@@ -510,6 +510,7 @@ export function ProjectList({
       projectId: selectedProject.id as UUID,
       title: values.title as string,
       description: (values.description as string) || undefined,
+      proposedHours: values.proposedHours ? Number(values.proposedHours) : undefined,
       assigneeId,
       supervisorId,
       dueDate: (values.dueDate as string) || undefined,
@@ -1262,6 +1263,7 @@ export function ProjectList({
                           <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Task</th>
                           <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Assignee</th>
                           <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</th>
+                          <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Proposed</th>
                           <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Hrs</th>
                           <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Due</th>
                           <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 12 }}>Del</th>
@@ -1356,6 +1358,9 @@ export function ProjectList({
                                 <option value="review">Under Review</option>
                                 <option value="done">Completed</option>
                               </select>
+                            </td>
+                            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#8b5cf6' }}>
+                              {t.proposedHours || t.estimatedHours ? `${t.proposedHours || t.estimatedHours} hrs` : '—'}
                             </td>
                             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged} hrs</td>
                             <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{t.dueDate}</td>
@@ -1532,7 +1537,7 @@ export function ProjectList({
       {/* Add New Task inside Card Modal */}
       {selectedProject && (
         <Drawer open={addTaskOpen} onClose={() => setAddTaskOpen(false)} title={`Add New Task — ${selectedProject.code}`}>
-          <Form initial={{ priority: 'Medium', status: 'To Do' }} onSubmit={handleAddTaskSubmit}>
+          <Form initial={{ priority: 'Medium', status: 'To Do', proposedHours: '' }} onSubmit={handleAddTaskSubmit}>
             <TextField name="title" label="Task Title" placeholder="e.g. Implement API Endpoint" />
             <TextAreaField name="description" label="Task Description" placeholder="Detailed requirements..." />
             <SelectField
@@ -1542,6 +1547,7 @@ export function ProjectList({
             />
             <DatePickerField name="startDate" label="Start Date" />
             <DatePickerField name="dueDate" label="Due Date" />
+            <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 8 (or 4.5)" type="number" />
             <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button variant="secondary" type="button" onClick={() => setAddTaskOpen(false)}>Cancel</Button>
               <Button type="submit">Add Task to Project</Button>

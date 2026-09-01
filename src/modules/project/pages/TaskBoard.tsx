@@ -228,6 +228,7 @@ export function TaskBoard({
         dueDate: t.dueDate || todayStr,
         startDate: t.startDate || t.dueDate || todayStr,
         description: t.description || '',
+        proposedHours: Number(t.proposedHours || t.estimatedHours || 0),
         status,
         totalHoursWorked,
         dailyTimeEntries,
@@ -342,6 +343,7 @@ export function TaskBoard({
       dueDate: (values.dueDate as string) || todayStr,
       startDate: (values.startDate as string) || (values.dueDate as string) || todayStr,
       description: (values.description as string) || '',
+      proposedHours: values.proposedHours ? Number(values.proposedHours) : undefined,
       priority: 'medium',
       approvalStatus,
       assignedByEmployeeId: user?.id,
@@ -362,6 +364,7 @@ export function TaskBoard({
         dueDate: res.value.dueDate || todayStr,
         startDate: res.value.startDate || res.value.dueDate || todayStr,
         description: res.value.description || '',
+        proposedHours: Number(values.proposedHours || res.value.proposedHours || 0),
         status: statusLabel as any,
         totalHoursWorked: 0,
         dailyTimeEntries: [],
@@ -624,6 +627,7 @@ export function TaskBoard({
     const updatedAssigneeId = (values.assignee as string) ?? editingTask.assigneeId ?? '';
     const updatedSupervisorId = (values.supervisor as string) ?? editingTask.supervisorId ?? '';
     const updatedDueDate = (values.dueDate as string) || editingTask.dueDate;
+    const updatedProposedHours = values.proposedHours !== undefined && values.proposedHours !== '' ? Number(values.proposedHours) : editingTask.proposedHours;
     const updatedStatus = (values.status as TaskStatus) || editingTask.status;
 
     const assigneeEmp = employees.find((e) => e.id === updatedAssigneeId);
@@ -661,6 +665,7 @@ export function TaskBoard({
               dueDate: updatedDueDate,
               startDate: (values.startDate as string) || (values.dueDate as string) || todayStr,
               description: (values.description as string) || '',
+              proposedHours: updatedProposedHours,
               status: updatedStatus,
             }
           : t
@@ -682,6 +687,7 @@ export function TaskBoard({
         dueDate: updatedDueDate,
         startDate: (values.startDate as string) || (values.dueDate as string) || todayStr,
         description: (values.description as string) || '',
+        proposedHours: updatedProposedHours,
         assigneeId: assigneeEmp ? assigneeEmp.id : undefined,
         supervisorId: supervisorEmp ? supervisorEmp.id : undefined,
         status: dbStatusMap[updatedStatus] || 'todo',
@@ -703,6 +709,7 @@ export function TaskBoard({
 
   const dueTodayCount = sortedTasks.filter((t) => t.dueDate === todayStr && t.status !== 'Pending Approval' && t.status !== 'Completed' && t.status !== 'Under Review').length;
   const totalHoursSum = sortedTasks.reduce((acc, t) => acc + Math.max(getTaskDurationHours(t.id), t.totalHoursWorked), 0);
+  const totalProposedHoursSum = sortedTasks.reduce((acc, t) => acc + (t.proposedHours || 0), 0);
 
   const getWorkflowStep = (status: TaskStatus, approvalStatus?: string | null) => {
     if (approvalStatus === 'pending_assignment_approval') return 'Pending Approval';
@@ -783,7 +790,7 @@ export function TaskBoard({
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{pt.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Assigned to: <strong>{pt.assignee}</strong> · Category: {pt.category} · Due: {pt.dueDate}
+                    Assigned to: <strong>{pt.assignee}</strong> · Category: {pt.category} · Due: {pt.dueDate}{pt.proposedHours ? ` · Proposed: ${pt.proposedHours} hrs` : ''}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -806,6 +813,11 @@ export function TaskBoard({
         <Card padding="compact" style={{ borderLeft: '4px solid var(--status-danger)', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due Today</div>
+        </Card>
+
+        <Card padding="compact" style={{ borderLeft: '4px solid #8b5cf6', width: 200, flex: '0 0 200px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Proposed Hours</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#8b5cf6', marginTop: 4 }}>📋 {totalProposedHoursSum.toFixed(1)} hrs</div>
         </Card>
 
         <Card padding="compact" style={{ borderLeft: '4px solid var(--accent)', width: 200, flex: '0 0 200px' }}>
@@ -978,6 +990,7 @@ export function TaskBoard({
                     <th style={{ padding: '12px 16px', fontWeight: 700 }}>Assignee</th>
                     <th style={{ padding: '12px 16px', fontWeight: 700 }}>Start Date</th>
                     <th style={{ padding: '12px 16px', fontWeight: 700 }}>Due Date</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'right' }}>Proposed</th>
                     <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'right' }}>Worked</th>
                     <th style={{ padding: '12px 16px', fontWeight: 700 }}>Status</th>
                     <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'center' }}>Actions</th>
@@ -986,7 +999,7 @@ export function TaskBoard({
                 <tbody>
                   {sortedTasks.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <td colSpan={10} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
                         No tasks found in the selected filter window.
                       </td>
                     </tr>
@@ -1023,6 +1036,9 @@ export function TaskBoard({
                           <td style={{ padding: '12px 16px' }}>{t.assignee || 'Unassigned'}</td>
                           <td style={{ padding: '12px 16px' }}>{formatTableDate((t as any).startDate || t.startDate)}</td>
                           <td style={{ padding: '12px 16px' }}>{formatTableDate(t.dueDate)}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--brand)' }}>
+                            {t.proposedHours ? `${t.proposedHours} hrs` : '—'}
+                          </td>
                           <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                             ⏱ {Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)} hrs
                           </td>
@@ -1146,7 +1162,7 @@ export function TaskBoard({
 
       {/* Create Task Drawer */}
       <Drawer open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Create New Task">
-        <Form initial={{ category: 'Office Task', dueDate: todayStr, startDate: todayStr, description: '' }} onSubmit={handleCreateTask}>
+        <Form initial={{ category: 'Office Task', dueDate: todayStr, startDate: todayStr, description: '', proposedHours: '' }} onSubmit={handleCreateTask}>
           <TextField name="name" label="Task Title *" placeholder="e.g. Q3 Power BI Syllabus Audit" />
           <SelectField
             name="category"
@@ -1168,6 +1184,7 @@ export function TaskBoard({
           />
           <TextField name="startDate" label="Start Date (YYYY-MM-DD)" placeholder={todayStr} />
           <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
+          <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 8 (or 4.5)" type="number" />
           <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe the objectives or details of the task..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
@@ -1202,6 +1219,7 @@ export function TaskBoard({
                 supervisor: editingTask.supervisorId || '',
                 dueDate: editingTask.dueDate || todayStr,
                 startDate: (editingTask as any).startDate || editingTask.dueDate || todayStr,
+                proposedHours: editingTask.proposedHours || '',
                 description: editingTask.description || '',
                 status: editingTask.status,
               }}
@@ -1228,6 +1246,7 @@ export function TaskBoard({
               />
               <TextField name="startDate" label="Start Date (YYYY-MM-DD)" placeholder={todayStr} />
               <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
+              <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 8 (or 4.5)" type="number" />
               <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe task details..." />
               <SelectField
                 name="status"
