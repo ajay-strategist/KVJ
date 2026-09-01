@@ -658,22 +658,22 @@ export function ExpenseClaims() {
         const claimId =
           typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
 
-        const { error } = await supabase.from('flwdsk_expense_claims').insert({
+        const insertPayload: Record<string, any> = {
           ...(claimId ? { id: claimId } : {}),
-          employee_id: validEmpId,
-          person_name: user?.fullName || 'Employee',
-          expense_type: expType,
           amount,
           category: values.categoryType || 'Office Expense',
           receipt_url: receiptLink,
           status: 'submitted',
           created_at: safeIsoDate,
           notes: notesJson,
-          batch_id: validBatchId,
-          batch_name: (assocBatch as any)?.name || (values.batch as string) || null,
-          is_office_expense: values.categoryType === 'Office Expense',
           description: (values.notes as string) || (values.route as string) || expType,
-        });
+        };
+
+        if (validEmpId) {
+          insertPayload.employee_id = validEmpId;
+        }
+
+        const { error } = await supabase.from('flwdsk_expense_claims').insert(insertPayload);
 
         if (error) {
           console.warn('Supabase expense claims insert error:', error);
