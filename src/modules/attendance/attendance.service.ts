@@ -359,31 +359,53 @@ export class AttendanceService implements IAttendanceService {
       const corr = corrData ? toCamelCaseObject(corrData) : this.corrections.get(correctionId);
       if (!corr) return Err(AppError.notFound('Correction request not found.'));
 
-      const parseTimeStr = (date: string, tStr: string): string | undefined => {
+      const parseTimeStr = (dateStr: string, tStr: string): string | undefined => {
         if (!tStr) return undefined;
-        if (tStr.includes('T') && tStr.includes('Z')) return tStr;
         const t = tStr.trim();
-        const match = t.match(/^(\d+)(?::(\d+))?(?::(\d+))?\s*(AM|PM)?$/i);
-        if (!match) return undefined;
-        
-        let hours = parseInt(match[1], 10);
-        const minutes = match[2] ? parseInt(match[2], 10) : 0;
-        const seconds = match[3] ? parseInt(match[3], 10) : 0;
-        const ampm = match[4]?.toUpperCase();
+        if (t.includes('T') && (t.includes('Z') || t.includes('+') || t.includes('-'))) return t;
+
+        const matchTime = t.match(/^(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?\s*(AM|PM)?$/i);
+        if (!matchTime) return undefined;
+
+        let hours = parseInt(matchTime[1], 10);
+        const minutes = matchTime[2] ? parseInt(matchTime[2], 10) : 0;
+        const seconds = matchTime[3] ? parseInt(matchTime[3], 10) : 0;
+        const ampm = matchTime[4]?.toUpperCase();
 
         if (ampm) {
           if (ampm === 'PM' && hours < 12) hours += 12;
           if (ampm === 'AM' && hours === 12) hours = 0;
         }
 
-        const dateParts = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (!dateParts) return undefined;
-        const y = parseInt(dateParts[1], 10);
-        const m = parseInt(dateParts[2], 10);
-        const d = parseInt(dateParts[3], 10);
+        let y: number, m: number, d: number;
+        if (!dateStr) {
+          const now = new Date();
+          y = now.getFullYear();
+          m = now.getMonth() + 1;
+          d = now.getDate();
+        } else {
+          const matchYMD = dateStr.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+          const matchDMY = dateStr.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+          if (matchYMD) {
+            y = parseInt(matchYMD[1], 10);
+            m = parseInt(matchYMD[2], 10);
+            d = parseInt(matchYMD[3], 10);
+          } else if (matchDMY) {
+            d = parseInt(matchDMY[1], 10);
+            m = parseInt(matchDMY[2], 10);
+            y = parseInt(matchDMY[3], 10);
+          } else {
+            const parsed = new Date(dateStr);
+            if (isNaN(parsed.getTime())) return undefined;
+            y = parsed.getFullYear();
+            m = parsed.getMonth() + 1;
+            d = parsed.getDate();
+          }
+        }
 
         try {
           const localDate = new Date(y, m - 1, d, hours, minutes, seconds);
+          if (isNaN(localDate.getTime())) return undefined;
           return localDate.toISOString();
         } catch {
           return undefined;
