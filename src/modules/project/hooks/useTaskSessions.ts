@@ -26,6 +26,7 @@ export interface StartSessionInput {
   workCode?: string;
   supervisorId?: UUID;
   supervisorName?: string;
+  notes?: string;
 }
 
 /**
@@ -73,7 +74,7 @@ export function useTaskSessions() {
 
   /** Close whatever open session exists for this task with the given status. */
   const closeOpen = useCallback(
-    async (taskId: UUID | undefined, status: 'paused' | 'completed') => {
+    async (taskId: UUID | undefined, status: 'paused' | 'completed', notes?: string) => {
       if (!user || !taskId || !actor) return;
       const open = await repo.findOpenSession(user.id, taskId);
       if (!open) return;
@@ -82,9 +83,11 @@ export function useTaskSessions() {
         0,
         Math.round((endTime.getTime() - new Date(open.startTime).getTime()) / 60000),
       );
+      const updates: any = { endTime: endTime.toISOString(), durationMinutes, status };
+      if (notes) updates.notes = notes;
       await repo.update(
         open.id,
-        { endTime: endTime.toISOString(), durationMinutes, status } as Partial<TaskWorkSession>,
+        updates as Partial<TaskWorkSession>,
         actor,
       );
     },
@@ -108,21 +111,22 @@ export function useTaskSessions() {
             workCode: input.workCode || deriveWorkCode(input.workTitle),
             startTime: new Date().toISOString(),
             status: 'running',
-          } as Partial<TaskWorkSession>,
+            notes: input.notes,
+          } as any,
           actor,
         );
         return { ok: true as const };
       } catch (e: any) {
-        return { ok: false as const, error: e?.message ?? 'Failed to start session' };
+        return { ok: false as const, error: e?.message || 'Failed to start task session' };
       }
     },
-    [repo, user, actor, closeAllOpenSessionsForEmployee],
+    [user, actor, repo, closeAllOpenSessionsForEmployee],
   );
 
   const pauseSession = useCallback(
-    async (taskId: UUID) => {
+    async (taskId: UUID | undefined, notes?: string) => {
       try {
-        await closeOpen(taskId, 'paused');
+        await closeOpen(taskId, 'paused', notes);
         return { ok: true as const };
       } catch (e: any) {
         return { ok: false as const, error: e?.message ?? 'Failed to pause session' };

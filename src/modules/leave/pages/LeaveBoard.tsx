@@ -17,23 +17,24 @@ function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean)
   if (!startDate) return '—';
   
   const formatDate = (dateStr: string) => {
-    try {
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-      }
-    } catch (e) {}
+    if (!dateStr) return '—';
+    const parts = dateStr.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
     return dateStr;
   };
 
   const startFormatted = formatDate(startDate);
   const endFormatted = formatDate(endDate);
 
-  if (startDate === endDate || !endDate) {
-    return `${startFormatted}${halfDay ? ' (Half Day)' : ''}`;
+  if (halfDay) {
+    return `${startFormatted} (Half Day)`;
   }
-  return `${startFormatted} – ${endFormatted}${halfDay ? ' (Half Day)' : ''}`;
+  if (!endDate || startDate === endDate) {
+    return startFormatted;
+  }
+  return `${startFormatted} to ${endFormatted}`;
 }
 
 function LeaveStatCard({ label, value, tone = 'progress', icon }: { label: string; value: number; tone?: string; icon: string }) {
@@ -407,7 +408,7 @@ export function LeaveBoard() {
     if (statusFilter !== 'all') {
       base = base.filter((l) => l.status === statusFilter);
     }
-    return base;
+    return base.slice().sort((a, b) => (b.startDate || b.createdAt || '').localeCompare(a.startDate || a.createdAt || ''));
   }, [leaves, allLeaves, selectedEmployee, isMgmt, statusFilter]);
 
   const safeLeavesListForStats = isMgmt ? (Array.isArray(allLeaves) ? allLeaves : []) : (Array.isArray(leaves) ? leaves : []);

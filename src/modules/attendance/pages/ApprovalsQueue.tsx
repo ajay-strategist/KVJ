@@ -15,7 +15,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
-import { formatDateTime } from '../../../shared/utils/date';
+import { formatDateTime, formatDisplayDate } from '../../../shared/utils/date';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
@@ -279,7 +279,7 @@ export function ApprovalsQueue() {
   const taskApprovalColumns: Column<any>[] = [
     {
       key: 'task',
-      header: 'Task Name',
+      header: 'Project: Task',
       accessor: (r) => r.title,
       render: (r) => {
         const proj = projects.find((p) => p.id === r.projectId);
@@ -308,6 +308,36 @@ export function ApprovalsQueue() {
         }
         return <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>Task Completion</span>;
       }
+    },
+    {
+      key: 'startDate',
+      header: 'Start Date',
+      render: (r) => (
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {formatDisplayDate(r.startDate || r.createdAt)}
+        </span>
+      ),
+    },
+    {
+      key: 'endDate',
+      header: 'End Date',
+      render: (r) => (
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {formatDisplayDate(r.dueDate || r.endDate)}
+        </span>
+      ),
+    },
+    {
+      key: 'duration',
+      header: 'Total Duration',
+      render: (r) => {
+        const hrs = r.actualHours || r.totalHoursWorked || r.proposedHours || 0;
+        return (
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
+            {Number(hrs).toFixed(1)} hrs
+          </span>
+        );
+      },
     },
     {
       key: 'requestedBy',

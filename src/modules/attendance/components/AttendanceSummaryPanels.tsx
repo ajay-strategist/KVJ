@@ -10,6 +10,7 @@ import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import type { AttendanceRecord } from '../attendance.repository';
 import type { ExpenseClaim } from '../../finance/finance.repository';
+import { supabase } from '../../../shared/integration/supabase';
 
 export interface AttendanceSummaryPanelsProps {
   startDate: string;
@@ -40,6 +41,7 @@ export function AttendanceSummaryPanels({
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [declaredHolidays, setDeclaredHolidays] = useState<string[]>([]);
 
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
@@ -73,6 +75,14 @@ export function AttendanceSummaryPanels({
         }
         setAttendanceRecords(records);
         setExpenseClaims(claims);
+
+        const { data: hData } = await supabase
+          .from('flwdsk_declared_holidays')
+          .select('*')
+          .is('deleted_at', null);
+        if (hData) {
+          setDeclaredHolidays(hData.map((h: any) => h.date || h.holiday_date).filter(Boolean));
+        }
       } catch (e) {
         console.error('Error fetching attendance history:', e);
       }
@@ -92,9 +102,11 @@ export function AttendanceSummaryPanels({
     return h * 60 + m;
   };
 
-  const isLate = (timeStr?: string) => {
+  const isLate = (timeStr?: string, workType?: string) => {
+    const isOffice = !workType || workType === 'Office' || workType === 'Work';
+    if (!isOffice) return false;
     const mins = parseTime(timeStr);
-    return mins !== null && mins > 9 * 60;
+    return mins !== null && mins > (9 * 60 + 30); // > 9:30 AM
   };
 
   const isEarly = (timeStr?: string) => {
@@ -113,16 +125,26 @@ export function AttendanceSummaryPanels({
   }, [startDate, endDate]);
 
   const stats = useMemo(() => {
-    const workingDaysInMonth = dateList.filter(d => new Date(d).getDay() !== 0).length;
+    const holidayDatesSet = new Set(declaredHolidays);
+    const workingDaysInMonth = dateList.filter(d => {
+      const isSunday = new Date(d).getDay() === 0;
+      const isDeclaredHoliday = holidayDatesSet.has(d);
+      return !isSunday && !isDeclaredHoliday;
+    }).length;
     const daysToBeWorked = workingDaysInMonth;
     
     const presentDates = new Set(attendanceRecords.map(r => r.workDate));
-    const noOfLeaves = dateList.filter(d => new Date(d).getDay() !== 0 && !presentDates.has(d)).length;
+    const noOfLeaves = dateList.filter(d => new Date(d).getDay() !== 0 && !holidayDatesSet.has(d) && !presentDates.has(d)).length;
 
     const workingDays = attendanceRecords.filter(r => r.status === 'present' || r.status === 'clocked_out').length;
-    const holidayWorked = attendanceRecords.filter(r => new Date(r.workDate).getDay() === 0).length;
+    const holidayWorked = attendanceRecords.filter(r => new Date(r.workDate).getDay() === 0 || holidayDatesSet.has(r.workDate)).length;
     
-    const lateReporting = attendanceRecords.filter(r => r.firstClockIn && isLate(new Date(r.firstClockIn).toLocaleTimeString())).length;
+    const lateReporting = attendanceRecords.filter(r => {
+      const wType = r.sessions?.[0]?.workType || (r as any).workType || 'Office';
+      if (!r.firstClockIn) return false;
+      const clockInTimeStr = new Date(r.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return isLate(clockInTimeStr, wType);
+    }).length;
     const earlyLeaving = attendanceRecords.filter(r => r.lastClockOut && isEarly(new Date(r.lastClockOut).toLocaleTimeString())).length;
 
     const totalBreakHrs = attendanceRecords.reduce((sum, r) => sum + (r.totalBreakMinutes || 0), 0) / 60;

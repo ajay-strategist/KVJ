@@ -65,6 +65,7 @@ export function TaskWorklogView({
   const [filterRole, setFilterRole] = useState<'all' | 'Assignee' | 'Supervisor'>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | 'Office Task' | 'Project Task'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'Approved' | 'Pending Review'>('all');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
   // ── Work Sessions: try Supabase first, fall back to localStorage timer state ─
   const { listSessions } = useTaskSessions();
@@ -367,7 +368,7 @@ export function TaskWorklogView({
       const timeB = b.date ? new Date(b.date).getTime() : 0;
       return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
     });
-  }, [timesheets, tasks, projects, employees, allocations, selectedEmployeeId, isSupervisor, user]);
+  }, [timesheets, tasks, projects, employees, allocations, selectedEmployeeId, isSupervisor, user, isManagement]);
 
   useEffect(() => {
     setLogs(mappedLogs);
@@ -408,12 +409,28 @@ export function TaskWorklogView({
     return e ? `${e.firstName} ${e.lastName}` : '—';
   };
   const projName = (id?: string) => (projects || []).find((p: any) => p.id === id)?.title;
-  const fmtDur = (m?: number) => {
-    if (m == null) return '—';
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
+  
+  const fmtDur = (m?: number, startTime?: string, endTime?: string) => {
+    let mins = m;
+    if ((mins == null || mins > 1440) && startTime && endTime) {
+      try {
+        const sDate = new Date(startTime);
+        const eDate = new Date(endTime);
+        if (!isNaN(sDate.getTime()) && !isNaN(eDate.getTime())) {
+          const startMins = sDate.getHours() * 60 + sDate.getMinutes();
+          const endMins = eDate.getHours() * 60 + eDate.getMinutes();
+          let diff = endMins - startMins;
+          if (diff < 0) diff += 1440;
+          mins = diff;
+        }
+      } catch {}
+    }
+    if (mins == null) return '—';
+    const h = Math.floor(mins / 60);
+    const mm = mins % 60;
     return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
   };
+
   const dOnly = (iso?: string) => {
     if (!iso) return '—';
     try {
@@ -438,6 +455,13 @@ export function TaskWorklogView({
     if (selectedEmployeeId && selectedEmployeeId !== 'all') {
       if (s.employeeId !== selectedEmployeeId) return false;
     }
+    if (selectedProjectId !== 'all') {
+      if (selectedProjectId === 'OFFICE_TASK') {
+        if (s.projectId && s.projectId !== 'OFFICE_TASK') return false;
+      } else if (s.projectId !== selectedProjectId) {
+        return false;
+      }
+    }
     const d = (s.startTime || '').slice(0, 10);
     if (sessFrom && d < sessFrom) return false;
     if (sessTo && d > sessTo) return false;
@@ -451,6 +475,7 @@ export function TaskWorklogView({
       'Supervisor',
       'Task / Work Title',
       'Duration (Hours)',
+      'Update',
       'Status',
       'Notes',
     ];
@@ -467,6 +492,7 @@ export function TaskWorklogView({
         supName,
         s.workTitle || 'Work Session',
         `${durHrs} hrs`,
+        (s as any).notes || (s as any).description || '—',
         s.status || 'completed',
         (s as any).notes || (s as any).description || '',
       ];
@@ -490,82 +516,110 @@ export function TaskWorklogView({
               </Button>
             }
           />
-          <div 
-            style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              background: 'var(--bg-sunken)', 
-              border: '1px solid var(--border)', 
-              borderRadius: 30, 
-              padding: '4px 14px',
-              gap: 8,
-              boxShadow: 'var(--shadow-sm)'
-            }}
-          >
-            <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>📅</span>
-            <input 
-              type="date" 
-              value={sessFrom} 
-              onChange={(e) => setSessFrom(e.target.value)} 
-              style={{ 
-                border: 'none', 
-                background: 'transparent', 
-                outline: 'none', 
-                fontSize: 12.5, 
-                color: 'var(--text-primary)',
-                fontFamily: 'inherit',
-                cursor: 'pointer'
-              }} 
-              aria-label="From date" 
-            />
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>to</span>
-            <input 
-              type="date" 
-              value={sessTo} 
-              onChange={(e) => setSessTo(e.target.value)} 
-              style={{ 
-                border: 'none', 
-                background: 'transparent', 
-                outline: 'none', 
-                fontSize: 12.5, 
-                color: 'var(--text-primary)',
-                fontFamily: 'inherit',
-                cursor: 'pointer'
-              }} 
-              aria-label="To date" 
-            />
-            {(sessFrom || sessTo) && (
-              <button 
-                type="button"
-                onClick={() => { setSessFrom(''); setSessTo(''); }}
-                style={{ 
-                  border: 'none', 
-                  background: 'none', 
-                  color: 'var(--status-danger)', 
-                  cursor: 'pointer', 
-                  fontSize: 12, 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>📁 Project:</span>
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                style={{
+                  padding: '5px 12px',
+                  fontSize: 12.5,
                   fontWeight: 600,
-                  padding: '0 4px',
-                  marginLeft: 4
+                  borderRadius: 20,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-sunken)',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  minWidth: 160,
                 }}
               >
-                ✕
-              </button>
-            )}
+                <option value="all">📁 All Projects</option>
+                <option value="OFFICE_TASK">🏢 Office Tasks</option>
+                {(projects || []).map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <div 
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                background: 'var(--bg-sunken)', 
+                border: '1px solid var(--border)', 
+                borderRadius: 30, 
+                padding: '4px 14px',
+                gap: 8,
+                boxShadow: 'var(--shadow-sm)'
+              }}
+            >
+              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>📅</span>
+              <input 
+                type="date" 
+                value={sessFrom} 
+                onChange={(e) => setSessFrom(e.target.value)} 
+                style={{ 
+                  border: 'none', 
+                  background: 'transparent', 
+                  outline: 'none', 
+                  fontSize: 12.5, 
+                  color: 'var(--text-primary)',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer'
+                }} 
+                aria-label="From date" 
+              />
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>to</span>
+              <input 
+                type="date" 
+                value={sessTo} 
+                onChange={(e) => setSessTo(e.target.value)} 
+                style={{ 
+                  border: 'none', 
+                  background: 'transparent', 
+                  outline: 'none', 
+                  fontSize: 12.5, 
+                  color: 'var(--text-primary)',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer'
+                }} 
+                aria-label="To date" 
+              />
+              {(sessFrom || sessTo) && (
+                <button 
+                  type="button"
+                  onClick={() => { setSessFrom(''); setSessTo(''); }}
+                  style={{ 
+                    border: 'none', 
+                    background: 'none', 
+                    color: 'var(--status-danger)', 
+                    cursor: 'pointer', 
+                    fontSize: 12, 
+                    fontWeight: 600,
+                    padding: '0 4px',
+                    marginLeft: 4
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
-                {['Employee', 'Supervisor', 'Project / Task', 'Date', 'Start Time', 'End Time', 'Duration', 'Status'].map((h) => (
+                {['Employee', 'Supervisor', 'Project / Task', 'Date', 'Start Time', 'End Time', 'Duration', 'Update', 'Status'].map((h) => (
                   <th key={h} style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filteredSessions.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
+                <tr><td colSpan={9} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>No work sessions recorded yet.</td></tr>
               ) : filteredSessions.map((s) => {
                 const project = s.projectId && s.projectId !== 'OFFICE_TASK' ? (projects || []).find((p: any) => p.id === s.projectId) : null;
                 const task = (tasks || []).find((tk: any) => tk.id === s.taskId);
@@ -585,7 +639,10 @@ export function TaskWorklogView({
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{tOnly(s.startTime)}</td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{s.endTime ? tOnly(s.endTime) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes)}
+                      {s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes, s.startTime, s.endTime)}
+                    </td>
+                    <td style={{ padding: '10px 12px', fontSize: 12.5, color: 'var(--text-secondary)', maxWidth: 220 }}>
+                      {(s as any).notes || (s as any).description || '—'}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <Badge tone={statusTone(s.status)}>

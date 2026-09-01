@@ -14,7 +14,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { PageHeader, Card, Button, Badge, WorkflowStrip } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, TextAreaField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, TextAreaField, DatePickerField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
@@ -453,7 +453,21 @@ export function TaskBoard({
     toast({ variant: 'success', title: 'Task Started', message: `Task "${task.name}" is now In Progress.` });
   };
 
-  const handlePauseTask = async (taskId: string) => {
+  const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [pauseTargetTaskId, setPauseTargetTaskId] = useState<string | null>(null);
+  const [pauseWorkNote, setPauseWorkNote] = useState('');
+
+  const handlePauseTask = (taskId: string) => {
+    setPauseTargetTaskId(taskId);
+    setPauseWorkNote('');
+    setPauseModalOpen(true);
+  };
+
+  const handleConfirmPause = async () => {
+    if (!pauseTargetTaskId) return;
+    const taskId = pauseTargetTaskId;
+    const note = pauseWorkNote.trim() || 'Work session paused';
+
     taskTimerStore.pauseTask(taskId);
     const timer = taskTimerStore.getTimer(taskId);
     const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
@@ -464,11 +478,14 @@ export function TaskBoard({
 
     try {
       await updateTask(taskId as UUID, { status: 'todo', actualHours: secondsToday / 3600 });
-      await pauseSession(taskId as UUID);
+      await pauseSession(taskId as UUID, note);
     } catch (e) {
       console.warn('Pause task error:', e);
     }
-    toast({ variant: 'info', title: 'Task Paused', message: 'Work timer has been paused.' });
+    setPauseModalOpen(false);
+    setPauseTargetTaskId(null);
+    setPauseWorkNote('');
+    toast({ variant: 'info', title: 'Task Paused', message: 'Work progress saved and timer paused.' });
   };
 
   const handleSubmitTaskForApproval = async (task: TaskItem) => {
@@ -1182,8 +1199,8 @@ export function TaskBoard({
             label="Supervisor Name"
             options={[{ value: '', label: 'None' }, ...employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` }))]}
           />
-          <TextField name="startDate" label="Start Date (YYYY-MM-DD)" placeholder={todayStr} />
-          <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
+          <DatePickerField name="startDate" label="Start Date" />
+          <DatePickerField name="dueDate" label="Due Date" />
           <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 8 (or 4.5)" type="number" />
           <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe the objectives or details of the task..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -1196,7 +1213,7 @@ export function TaskBoard({
       {/* Log Time Drawer */}
       <Drawer open={timeEntryOpen} onClose={() => setTimeEntryOpen(false)} title={`Log Time: ${selectedTask?.name ?? ''}`}>
         <Form initial={{ date: todayStr, durationHrs: '1.0' }} onSubmit={handleLogDailyTime}>
-          <TextField name="date" label="Entry Date" placeholder={todayStr} />
+          <DatePickerField name="date" label="Entry Date" />
           <TextField name="durationHrs" label="Duration (Hours)" placeholder="e.g. 2.5" />
           <TextField name="description" label="Work Progress Description" placeholder="Described completed work..." />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -1244,8 +1261,8 @@ export function TaskBoard({
                 label="Supervisor Name"
                 options={[{ value: '', label: 'None' }, ...(employees.length > 0 ? employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` })) : (editingTask.supervisorId ? [{ value: editingTask.supervisorId, label: editingTask.supervisor }] : []))]}
               />
-              <TextField name="startDate" label="Start Date (YYYY-MM-DD)" placeholder={todayStr} />
-              <TextField name="dueDate" label="Due Date (YYYY-MM-DD)" placeholder={todayStr} />
+              <DatePickerField name="startDate" label="Start Date" />
+              <DatePickerField name="dueDate" label="Due Date" />
               <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 8 (or 4.5)" type="number" />
               <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe task details..." />
               <SelectField
@@ -1266,6 +1283,52 @@ export function TaskBoard({
             </Form>
           );
         })()}
+      </Drawer>
+
+      {/* Pause Task Work Progress Drawer */}
+      <Drawer
+        open={pauseModalOpen}
+        onClose={() => setPauseModalOpen(false)}
+        title="Update Work Progress (Mandatory)"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: 'var(--bg-sunken)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+            <strong>📌 Management Note:</strong> Please describe what work was done during this session. This note will be recorded in the <strong>Task Worklog</strong> under the <strong>Update</strong> column for CEO/Manager review.
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+              Work Progress Summary *
+            </label>
+            <textarea
+              value={pauseWorkNote}
+              onChange={(e) => setPauseWorkNote(e.target.value)}
+              placeholder="Describe the work completed before pausing (e.g. Reviewed API specs, fixed UI styling...)"
+              rows={4}
+              style={{
+                width: '100%',
+                padding: 10,
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+            <Button variant="ghost" type="button" onClick={() => setPauseModalOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleConfirmPause}
+              disabled={!pauseWorkNote.trim()}
+            >
+              ⏸ Save Progress & Pause Timer
+            </Button>
+          </div>
+        </div>
       </Drawer>
     </div>
   );
