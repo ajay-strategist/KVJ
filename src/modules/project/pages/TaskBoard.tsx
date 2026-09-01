@@ -28,6 +28,7 @@ import { useTaskSessions } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
+import { CreateTaskModal } from '../components/CreateTaskModal';
 
 export type TaskStatus = 'Pending Approval' | 'To Do' | 'In Progress' | 'Under Review' | 'Completed';
 
@@ -1177,38 +1178,8 @@ export function TaskBoard({
         );
       })()}
 
-      {/* Create Task Drawer */}
-      <Drawer open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Create New Task">
-        <Form initial={{ category: 'Office Task', dueDate: todayStr, startDate: todayStr, description: '', proposedHours: '' }} onSubmit={handleCreateTask}>
-          <TextField name="name" label="Task Title *" placeholder="e.g. Q3 Power BI Syllabus Audit" />
-          <SelectField
-            name="category"
-            label="Category (Office Task or Project) *"
-            options={[
-              { value: 'Office Task', label: 'Office Task' },
-              ...activeProjects.map((p: any) => ({ value: p.id, label: `Project: ${p.title}` }))
-            ]}
-          />
-          <SelectField
-            name="assignee"
-            label="Assignee Name"
-            options={[{ value: '', label: 'Unassigned' }, ...employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` }))]}
-          />
-          <SelectField
-            name="supervisor"
-            label="Supervisor Name"
-            options={[{ value: '', label: 'None' }, ...employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName}` }))]}
-          />
-          <DatePickerField name="startDate" label="Start Date" />
-          <DatePickerField name="dueDate" label="Due Date" />
-          <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 8 (or 4.5)" type="number" />
-          <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe the objectives or details of the task..." />
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
-            <Button type="submit">Submit Task</Button>
-          </div>
-        </Form>
-      </Drawer>
+      {/* Create Task Modal */}
+      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} />
 
       {/* Log Time Drawer */}
       <Drawer open={timeEntryOpen} onClose={() => setTimeEntryOpen(false)} title={`Log Time: ${selectedTask?.name ?? ''}`}>

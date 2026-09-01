@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, Avatar, Button, Timeline, type TimelineEntry } from '../../../shared/ui/components';
 import { useEmployeeProfile, useEmployee } from '../hooks/useEmployee';
-import { Form, TextField } from '../../../shared/forms/form';
+import { Form, TextField, DatePickerField } from '../../../shared/forms/form';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useState } from 'react';
@@ -194,7 +194,7 @@ export function EmployeeProfile() {
           <TextField name="firstName" label="First Name" />
           <TextField name="lastName" label="Last Name" />
           <TextField name="designation" label="Designation" />
-          <TextField name="dateOfJoining" label="Joining Date (YYYY-MM-DD)" placeholder="YYYY-MM-DD" />
+          <DatePickerField name="dateOfJoining" label="Date of Joining" />
           <TextField name="phone" label="Phone Number" />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setEditOpen(false)}>Cancel</Button>

@@ -28,6 +28,7 @@ import { LEAVE_REPOSITORY_TOKEN } from '../../../modules/leave/leave.repository'
 import { TASK_REPOSITORY_TOKEN } from '../../../modules/project/project.repository';
 import { toLocalISODate } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
+import { CreateTaskModal } from '../../../modules/project/components/CreateTaskModal';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
 
 function Greeting() {
@@ -2576,21 +2577,8 @@ export function MyDayPage() {
         </div>
       </div>
 
-      {/* Create Task Drawer */}
-      <Drawer open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} title="Create New Task">
-        <Form initial={{ projectId: 'OFFICE_TASK', dueDate: toLocalISODate(new Date()), startDate: toLocalISODate(new Date()), description: '' }} onSubmit={handleCreateTaskSubmit}>
-          <TextField name="name" label="Task Title *" placeholder="e.g. Cross check each features" />
-          <TaskProjectFields projectOptions={projectOptions} />
-          <TextField name="proposedHours" label="Proposed Time (Hours)" placeholder="e.g. 4.0" />
-          <DatePickerField name="startDate" label="Start Date" />
-          <DatePickerField name="dueDate" label="Due Date" />
-          <TextAreaField name="description" label="Task Description (Optional)" placeholder="Describe the objectives or details of the task..." />
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
-            <Button type="submit">Create Task</Button>
-          </div>
-        </Form>
-      </Drawer>
+      {/* Create Task Modal */}
+      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} />
 
       {/* Apply Leave Drawer on My Day */}
       <Drawer open={applyLeaveOpen} onClose={() => setApplyLeaveOpen(false)} title="Apply for Leave">

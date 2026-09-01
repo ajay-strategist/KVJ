@@ -9,6 +9,7 @@
  */
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 type DialogVariant = 'confirm' | 'delete' | 'approve' | 'success' | 'error';
 interface DialogRequest {
@@ -59,12 +60,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   return (
     <DialogContext.Provider value={value}>
       {children}
-      {dialog && (
+      {dialog && createPortal(
         <div role="dialog" aria-modal="true" onKeyDown={(e) => e.key === 'Escape' && close({ ok: false })}
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 9999,
+            zIndex: 99999,
             display: 'grid',
             placeItems: 'center',
             background: 'var(--bg-overlay)',
@@ -91,7 +92,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </DialogContext.Provider>
   );

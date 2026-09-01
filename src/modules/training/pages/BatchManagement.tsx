@@ -261,13 +261,14 @@ export function BatchManagement() {
   const handleOpenEditBatch = (id: string) => {
     const target = batches.find((b) => b.id === id);
     setEditingBatchId(id);
+    const resolvedProg = target?.program || (target as any)?.collegeCourse || (target as any)?.program_stream || (target as any)?.trainingName || '';
     setEditForm({
       selectedCourseId: target?.courseId || '',
       trainingName: target?.trainingName || target?.code || '',
       college: target?.college || '',
-      collegeCourse: (target as any)?.collegeCourse || '',
-      program: (target as any)?.program || 'Computer Science & Analytics',
-      batchNo: target?.batchNo || target?.code || '',
+      collegeCourse: (target as any)?.collegeCourse || resolvedProg,
+      program: resolvedProg,
+      batchNo: target?.batchNo || (target?.code?.match(/Batch\s*\d+/i)?.[0]) || 'Batch 1',
       academicYear: target?.academicYear || '2026-2027',
       trainerId: target?.trainerId || '',
       coordinator: target?.coordinator || '',
@@ -284,7 +285,10 @@ export function BatchManagement() {
     if (!editingBatchId) return;
 
     const selectedCourse = courses.find((c) => c.id === editForm.selectedCourseId);
+    const updatedCode = `${editForm.college} - ${editForm.program} - ${editForm.academicYear} - ${editForm.batchNo}`;
+
     const res = await updateBatch(editingBatchId as UUID, {
+      code: updatedCode,
       courseId: editForm.selectedCourseId as UUID || undefined,
       trainingName: editForm.trainingName || selectedCourse?.title,
       college: editForm.college,

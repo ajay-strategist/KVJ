@@ -12,7 +12,7 @@ import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { ATTENDANCE_REPOSITORY_TOKEN, type AttendanceRecord, type WorkSessionType } from '../attendance.repository';
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN, type ExpenseClaim } from '../../finance/finance.repository';
 import { LEAVE_REPOSITORY_TOKEN } from '../../leave/leave.repository';
-import { TASK_REPOSITORY_TOKEN } from '../../project/project.repository';
+import { TASK_REPOSITORY_TOKEN, PROJECT_REPOSITORY_TOKEN } from '../../project/project.repository';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { toLocalISODate, todayISO } from '../../../shared/utils/date';
@@ -480,18 +480,21 @@ export function AttendanceLogPage() {
       const expRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
       const leaveRepo = container.resolve(LEAVE_REPOSITORY_TOKEN);
       const taskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
+      const projRepo = container.resolve(PROJECT_REPOSITORY_TOKEN);
 
-      const [attRes, expRes, leaveRes, taskRes] = await Promise.all([
+      const [attRes, expRes, leaveRes, taskRes, projRes] = await Promise.all([
         attRepo.findMany({ pageSize: 2000 }),
         expRepo.findMany({ pageSize: 2000 }),
         leaveRepo.findMany({ pageSize: 2000 }),
         taskRepo.findMany({ pageSize: 2000 }),
+        projRepo.findMany({ pageSize: 2000 }),
       ]);
 
       const attList = attRes?.data || [];
       const expList = expRes?.data || [];
       const leaveList = leaveRes?.data || [];
       const taskList = taskRes?.data || [];
+      const projects = projRes?.data || [];
       const empList = employees || [];
 
       const buildSheet = (sheetName: string, headers: string[], rows: any[][]) => {
@@ -535,7 +538,7 @@ export function AttendanceLogPage() {
       };
 
       // ==========================================
-      // SHEET 1: Summary Sheet
+      // SHEET 1: Summary Sheet (with Horizontal Accumulated Columns)
       // ==========================================
       const summaryHeaders = [
         'Employee Name',
@@ -548,6 +551,10 @@ export function AttendanceLogPage() {
         'Total Hours Worked',
         'Total Break',
         'Expenses',
+        'Accumulated Days',
+        'Accumulated Hours',
+        'Accumulated Leaves',
+        'Accumulated Expenses',
       ];
 
       let sumDaysCount = 23;
@@ -623,6 +630,12 @@ export function AttendanceLogPage() {
         totalSumBreakMins += breakMins;
         totalSumExpenses += expSum;
 
+        // Accumulated totals for this employee
+        const accumDays = workDays;
+        const accumHoursStr = `${Math.floor(workMins / 60)}h ${workMins % 60}m`;
+        const accumLeaves = leavesCount;
+        const accumExpStr = `₹ ${expSum.toFixed(2)}`;
+
         return [
           empName,
           sumDaysCount,
@@ -634,6 +647,10 @@ export function AttendanceLogPage() {
           `${Math.floor(workMins / 60)}h ${workMins % 60}m`,
           `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`,
           `₹ ${expSum.toFixed(2)}`,
+          accumDays,
+          accumHoursStr,
+          accumLeaves,
+          accumExpStr,
         ];
       });
 
@@ -647,6 +664,10 @@ export function AttendanceLogPage() {
         totalSumEarly,
         `${Math.floor(totalSumWorkMins / 60)}h ${totalSumWorkMins % 60}m`,
         `${Math.floor(totalSumBreakMins / 60)}h ${totalSumBreakMins % 60}m`,
+        `₹ ${totalSumExpenses.toFixed(2)}`,
+        totalSumWorkDays,
+        `${Math.floor(totalSumWorkMins / 60)}h ${totalSumWorkMins % 60}m`,
+        totalSumLeaves,
         `₹ ${totalSumExpenses.toFixed(2)}`,
       ]);
 
@@ -692,38 +713,74 @@ export function AttendanceLogPage() {
         r.expenses,
       ]);
 
-      // ==========================================
-      // SHEET 3: Expense Summary Sheet
-      // ==========================================
-      const expSummaryHeaders = ['Employee Name', 'Batch / Route', 'Total Amount'];
-      const expSummaryMap: Record<string, { empName: string; batchRoute: string; total: number }> = {};
-
-      expList.forEach((ex: any) => {
-        const emp = empList.find((e) => e.id === ex.employeeId);
-        const empName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : 'Employee';
+      // Helper to resolve expense batch name dynamically from attendance date
+      const resolveExpenseBatch = (ex: any) => {
         const { batchRoute } = parseExpNote(ex.notes);
-        const key = `${empName}___${batchRoute}`;
+        if (batchRoute && batchRoute !== 'General / Office') return batchRoute;
 
-        if (!expSummaryMap[key]) {
-          expSummaryMap[key] = { empName, batchRoute, total: 0 };
+        const dateStr = (ex.createdAt || '').slice(0, 10);
+        const attRec = attList.find((a: any) => a && a.employeeId === ex.employeeId && a.workDate === dateStr);
+        if (attRec) {
+          const firstSess = attRec.sessions?.[0] as any;
+          const workType = firstSess?.workType || 'Office';
+          const batchId = firstSess?.batchId || firstSess?.batch_id || (attRec as any).batchId || (attRec as any).batch_id;
+          const resolvedBatch = resolveOrgValue(workType, firstSess?.notes, (attRec as any).notes, batchId);
+          if (resolvedBatch && resolvedBatch !== 'Office' && resolvedBatch !== 'KVJ Analytics') {
+            return resolvedBatch;
+          }
         }
-        expSummaryMap[key].total += ex.amount || 0;
+        return 'General / Office';
+      };
+
+      // Collect unique batch names for Expense Summary matrix
+      const allBatchNamesSet = new Set<string>();
+      expList.forEach((ex: any) => {
+        const bName = resolveExpenseBatch(ex);
+        if (bName) allBatchNamesSet.add(bName);
+      });
+      const batchNameList = Array.from(allBatchNamesSet);
+      if (batchNameList.length === 0) batchNameList.push('General / Office');
+
+      // ==========================================
+      // SHEET 3: Expense Summary Sheet (Matrix Pivot Layout)
+      // ==========================================
+      const expSummaryHeaders = ['Employee Name', 'Total Amount', ...batchNameList];
+      const expEmpMap: Record<string, { empName: string; total: number; batchTotals: Record<string, number> }> = {};
+
+      empList.forEach((emp) => {
+        const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.employeeId;
+        expEmpMap[emp.id] = { empName, total: 0, batchTotals: {} };
       });
 
-      const expSummaryRows = Object.values(expSummaryMap).map((item) => [
-        item.empName,
-        item.batchRoute,
-        Number(item.total.toFixed(2)),
-      ]);
+      expList.forEach((ex: any) => {
+        const empId = ex.employeeId;
+        const bName = resolveExpenseBatch(ex);
+        const amt = ex.amount || 0;
+
+        if (expEmpMap[empId]) {
+          expEmpMap[empId].total += amt;
+          expEmpMap[empId].batchTotals[bName] = (expEmpMap[empId].batchTotals[bName] || 0) + amt;
+        }
+      });
+
+      const expSummaryRows = Object.values(expEmpMap).map((item) => {
+        const row: any[] = [item.empName, Number(item.total.toFixed(2))];
+        batchNameList.forEach((bName) => {
+          const bAmt = item.batchTotals[bName] || 0;
+          row.push(bAmt > 0 ? Number(bAmt.toFixed(2)) : '₹ -');
+        });
+        return row;
+      });
 
       // ==========================================
       // SHEET 4: Expense Details Sheet
       // ==========================================
-      const expDetailsHeaders = ['Date', 'Employee', 'Classification', 'Expense Type', 'Batch / Route', 'Amount'];
+      const expDetailsHeaders = ['Date', 'Employee', 'Classification', 'Expense Type', 'Batch Name', 'Amount'];
       const expDetailsRows = expList.map((ex: any) => {
         const emp = empList.find((e) => e.id === ex.employeeId);
         const empName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : 'Employee';
-        const { type, batchRoute } = parseExpNote(ex.notes);
+        const { type } = parseExpNote(ex.notes);
+        const bName = resolveExpenseBatch(ex);
         const dateFormatted = (ex.createdAt || '').slice(0, 10).split('-').reverse().join('-');
 
         return [
@@ -731,7 +788,7 @@ export function AttendanceLogPage() {
           empName,
           ex.category || 'Office Expense',
           type,
-          batchRoute,
+          bName,
           Number((ex.amount || 0).toFixed(2)),
         ];
       });
@@ -751,8 +808,8 @@ export function AttendanceLogPage() {
       const batchWiseMap: Record<string, { total: number; typeTotals: Record<string, number> }> = {};
 
       expList.forEach((ex: any) => {
-        const { type, batchRoute } = parseExpNote(ex.notes);
-        const batchName = batchRoute || 'General / Office';
+        const { type } = parseExpNote(ex.notes);
+        const batchName = resolveExpenseBatch(ex);
 
         if (!batchWiseMap[batchName]) {
           batchWiseMap[batchName] = { total: 0, typeTotals: {} };
@@ -782,6 +839,87 @@ export function AttendanceLogPage() {
       ];
       batchWiseRows.push(batchWiseTotalRow);
 
+      // ==========================================
+      // SHEET 6: Task Summary Sheet (No UUID Hashes)
+      // ==========================================
+      const taskSummaryHeaders = [
+        'Task Title',
+        'Project Name',
+        'Assigned Person',
+        'Supervisor',
+        'Due Date',
+        'Total Hours Worked',
+        'Office/Remote',
+        'Status',
+        'Priority',
+      ];
+
+      const taskSummaryRows = taskList.map((t: any) => {
+        const proj = (projects || []).find((p: any) => p.id === t.projectId);
+        const assignee = empList.find((e) => e.id === t.assigneeId);
+        const supervisor = empList.find((e) => e.id === t.supervisorId || e.id === t.assignedByEmployeeId);
+
+        const projName = proj ? proj.title : 'Office Task';
+        const assigneeName = assignee ? `${assignee.firstName || ''} ${assignee.lastName || ''}`.trim() : 'Unassigned';
+        const supervisorName = supervisor ? `${supervisor.firstName || ''} ${supervisor.lastName || ''}`.trim() : 'Admin';
+        const dueDateFmt = t.dueDate ? t.dueDate.split('-').reverse().join('-') : '—';
+        const hrsWorkedStr = `${(t.actualHours || t.proposedHours || 0).toFixed(1)} hrs`;
+
+        return [
+          t.title || 'Untitled Task',
+          projName,
+          assigneeName,
+          supervisorName,
+          dueDateFmt,
+          hrsWorkedStr,
+          t.projectId ? 'Project Task' : 'Office Task',
+          t.status || 'todo',
+          t.priority || 'medium',
+        ];
+      });
+
+      // ==========================================
+      // SHEET 7: Task Worklog Sheet
+      // ==========================================
+      const taskWorklogHeaders = [
+        'Date',
+        'Task Title',
+        'Project Name',
+        'Assigned Person',
+        'Supervisor',
+        'Work Progress / Update',
+        'Start Time',
+        'End Time',
+        'Duration',
+        'Office/Remote',
+      ];
+
+      const taskWorklogRows: any[][] = [];
+      taskList.forEach((t: any) => {
+        const proj = (projects || []).find((p: any) => p.id === t.projectId);
+        const assignee = empList.find((e) => e.id === t.assigneeId);
+        const supervisor = empList.find((e) => e.id === t.supervisorId || e.id === t.assignedByEmployeeId);
+
+        const projName = proj ? proj.title : 'Office Task';
+        const assigneeName = assignee ? `${assignee.firstName || ''} ${assignee.lastName || ''}`.trim() : 'Unassigned';
+        const supervisorName = supervisor ? `${supervisor.firstName || ''} ${supervisor.lastName || ''}`.trim() : 'Admin';
+        const workNote = t.description || t.notes || 'Work progress entry';
+        const dateFmt = t.startDate ? t.startDate.split('-').reverse().join('-') : '—';
+
+        taskWorklogRows.push([
+          dateFmt,
+          t.title || 'Untitled Task',
+          projName,
+          assigneeName,
+          supervisorName,
+          workNote,
+          '09:30 AM',
+          '05:30 PM',
+          `${(t.actualHours || t.proposedHours || 1).toFixed(1)} hrs`,
+          t.projectId ? 'Project Task' : 'Office Task',
+        ]);
+      });
+
       // Reference sheets
       const empHeaders = ['ID', 'Employee ID', 'First Name', 'Last Name', 'Email', 'Designation', 'Joining Date'];
       const empRows = empList.map((e) => [
@@ -792,18 +930,6 @@ export function AttendanceLogPage() {
         e.email,
         e.designation,
         e.dateOfJoining,
-      ]);
-
-      const taskHeaders = ['Task ID', 'Title', 'Project ID', 'Assignee ID', 'Supervisor ID', 'Status', 'Priority', 'Due Date'];
-      const taskRows = taskList.map((t: any) => [
-        t.id,
-        t.title,
-        t.projectId || 'Office Task',
-        t.assigneeId || '',
-        t.supervisorId || '',
-        t.status,
-        t.priority,
-        t.dueDate,
       ]);
 
       const leaveHeaders = ['Record ID', 'Employee ID', 'Leave Type', 'Start Date', 'End Date', 'Half Day', 'Status', 'Reason'];
@@ -830,8 +956,9 @@ export function AttendanceLogPage() {
       xml += buildSheet('Expense Summary', expSummaryHeaders, expSummaryRows);
       xml += buildSheet('Expense Details', expDetailsHeaders, expDetailsRows);
       xml += buildSheet('Batch Wise Expense', batchWiseHeaders, batchWiseRows);
+      xml += buildSheet('Task Summary', taskSummaryHeaders, taskSummaryRows);
+      xml += buildSheet('Task Worklog', taskWorklogHeaders, taskWorklogRows);
       xml += buildSheet('Employees', empHeaders, empRows);
-      xml += buildSheet('Tasks', taskHeaders, taskRows);
       xml += buildSheet('Leaves', leaveHeaders, leaveRows);
 
       xml += `</Workbook>\n`;
@@ -846,7 +973,7 @@ export function AttendanceLogPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast({ variant: 'success', title: 'Export Complete', message: 'Master Excel workbook downloaded with all 5 custom sheets.' });
+      toast({ variant: 'success', title: 'Export Complete', message: 'Master Excel workbook downloaded with all custom sheets.' });
     } catch (err: any) {
       console.error('Export error:', err);
       toast({ variant: 'error', title: 'Export Failed', message: err.message || 'Unknown error occurred during export.' });
@@ -1053,7 +1180,7 @@ export function AttendanceLogPage() {
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
       const decHoliday = holList.find((h: any) => h && h.date === dateStr);
       const activeLeave = leaveList.find(l =>
-        (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
+        l && l.employeeId === (record ? record.employeeId : empId) &&
         dateStr >= l.startDate && dateStr <= l.endDate &&
         l.status !== 'rejected' &&
         l.status !== 'cancelled'
@@ -1066,10 +1193,21 @@ export function AttendanceLogPage() {
       if (record) {
         const emp = empList.find(e => e && e.id === record.employeeId);
         const resolvedEmpName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : empName;
-        const totalMins = record.totalWorkingMinutes || 0;
         const breakMins = record.totalBreakMinutes || 0;
-        const duration = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
         const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
+
+        // Calculate actual elapsed span minutes (lastClockOut - firstClockIn)
+        let spanMins = 0;
+        if (record.firstClockIn && record.lastClockOut) {
+          const t1 = new Date(record.firstClockIn).getTime();
+          const t2 = new Date(record.lastClockOut).getTime();
+          if (t2 > t1) {
+            spanMins = Math.max(0, Math.round((t2 - t1) / (1000 * 60)) - breakMins);
+          }
+        }
+        const rawMins = record.totalWorkingMinutes || 0;
+        const cappedMins = spanMins > 0 ? Math.min(rawMins, spanMins) : rawMins;
+        const duration = `${Math.floor(cappedMins / 60)}h ${cappedMins % 60}m`;
 
         const sessionsList = record.sessions && record.sessions.length > 0
           ? record.sessions
@@ -1081,45 +1219,37 @@ export function AttendanceLogPage() {
               notes: (record as any).notes || '',
             }];
 
-        const hasMultipleSessions = sessionsList.length > 1;
+        // Pick primary session to prevent duplicate rows for the same date
+        const primarySession = sessionsList[0];
+        const startT = safeFormatTime(record.firstClockIn || primarySession.clockIn);
+        const endT = safeFormatTime(record.lastClockOut || primarySession.clockOut);
 
-        sessionsList.forEach((s, sIdx) => {
-          const startT = safeFormatTime(record.firstClockIn || s.clockIn);
-          const endT = safeFormatTime(record.lastClockOut || s.clockOut);
+        const workType = primarySession.workType || 'Office';
+        const batchId = (primarySession as any)?.batchId || (primarySession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+        const orgVal = resolveOrgValue(workType, primarySession.notes, (record as any).notes, batchId) || 'Office';
+        const locVal = resolveLocationValue(workType, primarySession.notes, (record as any).notes, batchId) || 'Office';
+        const classOrWorkInfo = resolveClassOrWorkValue(workType, primarySession.notes, (record as any).notes, batchId);
 
-          const workType = s.workType || 'Office';
-          const batchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
-          const orgVal = resolveOrgValue(workType, s.notes, (record as any).notes, batchId) || 'Office';
-          const locVal = resolveLocationValue(workType, s.notes, (record as any).notes, batchId) || 'Office';
-          const classOrWorkInfo = resolveClassOrWorkValue(workType, s.notes, (record as any).notes, batchId);
+        const isHoliday = workType === 'Holiday' || (primarySession.notes && primarySession.notes.toLowerCase().includes('holiday')) || !!decHoliday;
+        // Active leave takes precedence if active leave exists and working duration is 0
+        const isLeave = !!activeLeave && cappedMins === 0;
 
-          const isReapproved = (s as any).isReapproved ||
-            (s as any).status === 'Approved' ||
-            (s as any).status === 'reapproved' ||
-            (s.notes && (s.notes.toLowerCase().includes('approved') || s.notes.toLowerCase().includes('claim') || s.notes.toLowerCase().includes('reapproved'))) ||
-            sIdx > 0;
-
-          const isHoliday = workType === 'Holiday' || (s.notes && s.notes.toLowerCase().includes('holiday')) || !!decHoliday;
-          const hasClockIn = !!record.firstClockIn;
-          const isLeave = (workType === 'Leave' || (s.notes && s.notes.toLowerCase().includes('leave')) || !!activeLeave) && !hasClockIn;
-
-          rows.push({
-            date: dateStr.split('-').reverse().join('-'),
-            name: resolvedEmpName,
-            holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
-            org: orgVal,
-            location: locVal,
-            type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
-            isTraining: classOrWorkInfo.isTraining,
-            mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : isReapproved ? 'Re-Approved' : (hasMultipleSessions ? `Session ${sIdx + 1}` : 'Offline'),
-            start: startT,
-            end: endT,
-            duration: sIdx === 0 ? duration : '—',
-            expenses: sIdx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-            note: formatCleanNote(s.notes || (record as any).notes, workType),
-            break: sIdx === 0 ? breakTime : '0h 0m',
-            tasks: s.notes ? [s.notes] : [],
-          });
+        rows.push({
+          date: dateStr.split('-').reverse().join('-'),
+          name: resolvedEmpName,
+          holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
+          org: isLeave ? '—' : orgVal,
+          location: isLeave ? '—' : locVal,
+          type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
+          isTraining: isLeave ? false : classOrWorkInfo.isTraining,
+          mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : (workType === 'Training' ? 'Training' : 'Offline'),
+          start: isLeave ? '—' : startT,
+          end: isLeave ? '—' : endT,
+          duration: isLeave ? '0h 0m' : duration,
+          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+          note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : formatCleanNote(primarySession.notes || (record as any).notes, workType),
+          break: isLeave ? '0h 0m' : breakTime,
+          tasks: primarySession.notes ? [primarySession.notes] : [],
         });
       } else {
         const isSunday = d.getDay() === 0;

@@ -726,38 +726,42 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                 boxSizing: 'border-box',
               }}
             >
-              {[
-                { to: '/app', label: 'My Day', icon: 'Home' },
-                { to: '/app/employees', label: 'Employees', icon: 'Users' },
-                { to: '/app/training/calendar', label: 'Training', icon: 'CalendarDays' },
-                { to: '/app/project/tasks', label: 'Tasks', icon: 'FolderKanban' },
-                { to: '/app/leave', label: 'Leave', icon: 'Clock' },
-              ].map((item) => {
-                const active = pathname === item.to || (item.to !== '/app' && pathname.startsWith(item.to));
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 3,
-                      flex: 1,
-                      height: '100%',
-                      color: active ? 'var(--brand)' : 'var(--text-secondary)',
-                      textDecoration: 'none',
-                      fontSize: 12,
-                      fontWeight: active ? 700 : 500,
-                      transition: 'color 140ms ease',
-                    }}
-                  >
-                    <Icon name={item.icon} size={18} />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
+              {(() => {
+                const isApproverRole = ['ADMIN', 'CEO', 'MANAGER'].includes((user?.role || '').toUpperCase());
+                const mobileNavItems = [
+                  { to: '/app', label: 'My Day', icon: 'Home' },
+                  ...(isApproverRole ? [{ to: '/app/approvals', label: 'Approvals', icon: 'CheckSquare' }] : []),
+                  { to: '/app/project/tasks', label: 'Tasks', icon: 'FolderKanban' },
+                  { to: '/app/communication/chat', label: 'Chat', icon: 'MessageSquare' },
+                  { to: '/app/leave', label: 'Leave', icon: 'Clock' },
+                ];
+                return mobileNavItems.map((item) => {
+                  const active = pathname === item.to || (item.to !== '/app' && pathname.startsWith(item.to));
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                        flex: 1,
+                        height: '100%',
+                        color: active ? 'var(--brand)' : 'var(--text-secondary)',
+                        textDecoration: 'none',
+                        fontSize: 12,
+                        fontWeight: active ? 700 : 500,
+                        transition: 'color 140ms ease',
+                      }}
+                    >
+                      <Icon name={item.icon} size={18} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                });
+              })()}
             </nav>
           )}
         </div>

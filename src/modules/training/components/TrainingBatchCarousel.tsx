@@ -73,12 +73,9 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
   const rawBatchNo = b.batchNo && b.batchNo !== b.code ? b.batchNo : undefined;
   const batchNo = rawBatchNo || (b.code?.match(/Batch\s*\d+/i)?.[0]) || (b.code && !b.code.includes('-') ? b.code : '—');
 
-  // Format: College-Program-Academic Year-Batch-Course
-  // Example: MIM Kuttikkanam-2 MBA-2026-2027-Batch 1-Excel Expert 365
-  const parts = [college, program, academicYear, batchNo, courseTitle].filter((p) => p && p !== '—');
-  // Canonical batch label used everywhere: the generated code with its batch
-  // number synced to the current Batch-No field (fixes a stale code after edits).
-  const batchCode = cleanBatchCode(b.code, b.batchNo) || (parts.length > 0 ? parts.join('-') : (b.trainingName || 'Batch'));
+  const parts = [college, program, academicYear, batchNo].filter((p) => p && p !== '—');
+  const dynamicCode = parts.length >= 2 ? parts.join(' - ') : undefined;
+  const batchCode = dynamicCode || cleanBatchCode(b.code, b.batchNo) || (b.trainingName || 'Batch');
 
   return {
     id:            b.id,
