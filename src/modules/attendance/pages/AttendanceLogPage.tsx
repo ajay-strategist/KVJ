@@ -77,6 +77,46 @@ function safeFormatTime(raw?: string): string {
   return '—';
 }
 
+function formatCleanNote(rawNote?: string, workType?: string): string {
+  if (!rawNote) return '—';
+  const str = rawNote.trim();
+  if (!str) return '—';
+
+  const lower = str.toLowerCase();
+
+  if (
+    lower.includes('classification: office') ||
+    lower.includes('location: office work') ||
+    lower.startsWith('on leave') ||
+    lower.startsWith('weekend') ||
+    lower.startsWith('declared holiday') ||
+    lower === 'holiday' ||
+    lower === 're-approved session' ||
+    lower === 'not clocked'
+  ) {
+    return '—';
+  }
+
+  const isMarketing = (workType || '').toLowerCase().includes('marketing') || lower.includes('marketing');
+
+  if (isMarketing) {
+    let clean = str;
+    const locMatch = str.match(/Location:\s*(?:Marketing:\s*)?([^\n]+)/i);
+    if (locMatch && locMatch[1].trim()) {
+      clean = locMatch[1].trim();
+    } else {
+      clean = clean
+        .replace(/^Classification:\s*Marketing,?\s*/i, '')
+        .replace(/^Location:\s*/i, '')
+        .replace(/^Marketing:\s*/i, '')
+        .trim();
+    }
+    return clean || '—';
+  }
+
+  return '—';
+}
+
 export interface AttendanceLogRow {
   date: string;
   name: string;
@@ -870,7 +910,7 @@ export function AttendanceLogPage() {
             end: endT,
             duration: sIdx === 0 ? duration : '—',
             expenses: sIdx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-            note: s.notes || (record as any).notes || (isHoliday ? 'Holiday' : isLeave ? `On Leave (${activeLeave?.leaveType || 'Leave'})` : isReapproved ? 'Re-approved session' : ''),
+            note: formatCleanNote(s.notes || (record as any).notes, workType),
             break: sIdx === 0 ? breakTime : '0h 0m',
             tasks: s.notes ? [s.notes] : [],
           });
@@ -892,7 +932,7 @@ export function AttendanceLogPage() {
           end: '—',
           duration: '0h 0m',
           expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-          note: decHoliday ? `Declared Holiday: ${decHoliday.name}` : isSunday ? 'Weekend Off' : isLeave ? `On Leave (${activeLeave?.leaveType || 'Leave'})` : 'Not Clocked',
+          note: '—',
           break: '0h 0m',
           tasks: [],
         });
