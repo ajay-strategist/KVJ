@@ -115,7 +115,7 @@ export function CreateTaskModal({
         status: 'todo',
         priority: 'medium',
         approvalStatus: 'approved',
-      });
+      }, { id: user?.id, role: user?.role || 'employee' } as any);
 
       if (res) {
         toast({ variant: 'success', title: 'Task Created', message: `Task "${form.title}" created successfully.` });
