@@ -474,8 +474,8 @@ export function AttendanceLogPage() {
 
   const handleExportAllData = async () => {
     try {
-      toast({ variant: 'info', title: 'Exporting Data', message: 'Fetching all data tables, please wait...' });
-      
+      toast({ variant: 'info', title: 'Exporting Data', message: 'Generating Excel workbook with all 5 sheets, please wait...' });
+
       const attRepo = container.resolve(ATTENDANCE_REPOSITORY_TOKEN);
       const expRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
       const leaveRepo = container.resolve(LEAVE_REPOSITORY_TOKEN);
@@ -494,17 +494,16 @@ export function AttendanceLogPage() {
       const taskList = taskRes?.data || [];
       const empList = employees || [];
 
-      // Helper to build a table sheet
       const buildSheet = (sheetName: string, headers: string[], rows: any[][]) => {
-        let sheetXml = `  <Worksheet ss:Name="${sheetName}">\n    <Table>\n      <Row>\n`;
-        headers.forEach(h => {
+        let sheetXml = `  <Worksheet ss:Name="${escapeXml(sheetName)}">\n    <Table>\n      <Row>\n`;
+        headers.forEach((h) => {
           sheetXml += `        <Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>\n`;
         });
         sheetXml += `      </Row>\n`;
-        
-        rows.forEach(r => {
+
+        rows.forEach((r) => {
           sheetXml += `      <Row>\n`;
-          r.forEach(v => {
+          r.forEach((v) => {
             const valStr = escapeXml(v);
             const isNum = typeof v === 'number' && !isNaN(v);
             const typeAttr = isNum ? 'Number' : 'String';
@@ -512,82 +511,291 @@ export function AttendanceLogPage() {
           });
           sheetXml += `      </Row>\n`;
         });
-        
+
         sheetXml += `    </Table>\n  </Worksheet>\n`;
         return sheetXml;
       };
 
-      // 1. Employees Sheet
+      const parseExpNote = (rawNotes?: string) => {
+        let person = '';
+        let type = 'Misc';
+        let batchRoute = 'General / Office';
+        let uNotes = rawNotes || '';
+
+        if (rawNotes && rawNotes.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(rawNotes);
+            person = parsed.personName || '';
+            type = parsed.expenseType || 'Misc';
+            batchRoute = parsed.batchRoute || parsed.location || 'General / Office';
+            uNotes = parsed.userNotes || '';
+          } catch {}
+        }
+        return { person, type, batchRoute, uNotes };
+      };
+
+      // ==========================================
+      // SHEET 1: Summary Sheet
+      // ==========================================
+      const summaryHeaders = [
+        'Employee Name',
+        'Days in the Month',
+        'No. of Leaves',
+        'Working Days',
+        'Holiday Worked',
+        'Late',
+        'Early',
+        'Total Hours Worked',
+        'Total Break',
+        'Expenses',
+      ];
+
+      let sumDaysCount = 23;
+      let totalSumLeaves = 0;
+      let totalSumWorkDays = 0;
+      let totalSumHolWorked = 0;
+      let totalSumLate = 0;
+      let totalSumEarly = 0;
+      let totalSumWorkMins = 0;
+      let totalSumBreakMins = 0;
+      let totalSumExpenses = 0;
+
+      const summaryRows: any[][] = empList.map((emp) => {
+        const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.employeeId;
+        const empId = emp.id;
+
+        const empRecords = attList.filter((a: any) => a && a.employeeId === empId);
+        const empLeaves = leaveList.filter(
+          (l: any) => l && l.employeeId === empId && l.status !== 'rejected' && l.status !== 'cancelled'
+        );
+        const empExpenses = expList.filter(
+          (e: any) => e && e.employeeId === empId && e.status !== 'rejected'
+        );
+
+        let leavesCount = empLeaves.reduce((acc: number, l: any) => {
+          if (!l.startDate || !l.endDate) return acc + 1;
+          const s = new Date(l.startDate).getTime();
+          const e = new Date(l.endDate).getTime();
+          const diff = Math.max(1, Math.round((e - s) / 86400000) + 1);
+          return acc + diff;
+        }, 0);
+
+        let workDays = 0;
+        let holWorked = 0;
+        let lateCount = 0;
+        let earlyCount = 0;
+        let workMins = 0;
+        let breakMins = 0;
+
+        empRecords.forEach((r: any) => {
+          if (r.firstClockIn) {
+            workDays++;
+            const dayOfWeek = new Date(r.workDate).getDay();
+            if (dayOfWeek === 0 || r.workType === 'Holiday') {
+              holWorked++;
+            }
+
+            const cInT = safeFormatTime(r.firstClockIn);
+            if (cInT !== '—' && cInT >= '09:31' && (r.workType === 'Office' || !r.workType)) {
+              lateCount++;
+            }
+
+            if (r.lastClockOut) {
+              const cOutT = safeFormatTime(r.lastClockOut);
+              if (cOutT !== '—' && cOutT < '17:30' && (r.workType === 'Office' || !r.workType)) {
+                earlyCount++;
+              }
+            }
+
+            workMins += r.totalWorkingMinutes || 0;
+            breakMins += r.totalBreakMinutes || 0;
+          }
+        });
+
+        const expSum = empExpenses.reduce((acc: number, ex: any) => acc + (ex.amount || 0), 0);
+
+        totalSumLeaves += leavesCount;
+        totalSumWorkDays += workDays;
+        totalSumHolWorked += holWorked;
+        totalSumLate += lateCount;
+        totalSumEarly += earlyCount;
+        totalSumWorkMins += workMins;
+        totalSumBreakMins += breakMins;
+        totalSumExpenses += expSum;
+
+        return [
+          empName,
+          sumDaysCount,
+          leavesCount,
+          workDays,
+          holWorked,
+          lateCount,
+          earlyCount,
+          `${Math.floor(workMins / 60)}h ${workMins % 60}m`,
+          `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`,
+          `₹ ${expSum.toFixed(2)}`,
+        ];
+      });
+
+      summaryRows.push([
+        'Accumulated Total',
+        '—',
+        totalSumLeaves,
+        totalSumWorkDays,
+        totalSumHolWorked,
+        totalSumLate,
+        totalSumEarly,
+        `${Math.floor(totalSumWorkMins / 60)}h ${totalSumWorkMins % 60}m`,
+        `${Math.floor(totalSumBreakMins / 60)}h ${totalSumBreakMins % 60}m`,
+        `₹ ${totalSumExpenses.toFixed(2)}`,
+      ]);
+
+      // ==========================================
+      // SHEET 2: Attendance Details Log Sheet
+      // ==========================================
+      const attDetailsHeaders = [
+        'Date',
+        'Name',
+        'Holiday',
+        'Organisation',
+        'Location',
+        'Class/Work',
+        'Mode',
+        'Start Time',
+        'End Time',
+        'Duration',
+        'Note',
+        'Break',
+        'Expenses',
+      ];
+
+      const sortedLogRows = [...tableRows].sort((a, b) => {
+        const dA = a.date.split('-').reverse().join('-');
+        const dB = b.date.split('-').reverse().join('-');
+        if (dA !== dB) return dA.localeCompare(dB);
+        return a.name.localeCompare(b.name);
+      });
+
+      const attDetailsRows = sortedLogRows.map((r) => [
+        r.date,
+        r.name,
+        r.holiday || '—',
+        r.org,
+        r.location,
+        r.type,
+        r.mode,
+        r.start,
+        r.end,
+        r.duration,
+        r.note,
+        r.break,
+        r.expenses,
+      ]);
+
+      // ==========================================
+      // SHEET 3: Expense Summary Sheet
+      // ==========================================
+      const expSummaryHeaders = ['Employee Name', 'Batch / Route', 'Total Amount'];
+      const expSummaryMap: Record<string, { empName: string; batchRoute: string; total: number }> = {};
+
+      expList.forEach((ex: any) => {
+        const emp = empList.find((e) => e.id === ex.employeeId);
+        const empName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : 'Employee';
+        const { batchRoute } = parseExpNote(ex.notes);
+        const key = `${empName}___${batchRoute}`;
+
+        if (!expSummaryMap[key]) {
+          expSummaryMap[key] = { empName, batchRoute, total: 0 };
+        }
+        expSummaryMap[key].total += ex.amount || 0;
+      });
+
+      const expSummaryRows = Object.values(expSummaryMap).map((item) => [
+        item.empName,
+        item.batchRoute,
+        Number(item.total.toFixed(2)),
+      ]);
+
+      // ==========================================
+      // SHEET 4: Expense Details Sheet
+      // ==========================================
+      const expDetailsHeaders = ['Date', 'Employee', 'Classification', 'Expense Type', 'Batch / Route', 'Amount'];
+      const expDetailsRows = expList.map((ex: any) => {
+        const emp = empList.find((e) => e.id === ex.employeeId);
+        const empName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : 'Employee';
+        const { type, batchRoute } = parseExpNote(ex.notes);
+        const dateFormatted = (ex.createdAt || '').slice(0, 10).split('-').reverse().join('-');
+
+        return [
+          dateFormatted || '—',
+          empName,
+          ex.category || 'Office Expense',
+          type,
+          batchRoute,
+          Number((ex.amount || 0).toFixed(2)),
+        ];
+      });
+
+      // ==========================================
+      // SHEET 5: Batch Wise Expense Sheet
+      // ==========================================
+      const allExpenseTypesSet = new Set<string>();
+      expList.forEach((ex: any) => {
+        const { type } = parseExpNote(ex.notes);
+        if (type) allExpenseTypesSet.add(type);
+      });
+      const expenseTypeList = Array.from(allExpenseTypesSet);
+      if (expenseTypeList.length === 0) expenseTypeList.push('Misc');
+
+      const batchWiseHeaders = ['Batch Name', 'Total Amount', ...expenseTypeList];
+      const batchWiseMap: Record<string, { total: number; typeTotals: Record<string, number> }> = {};
+
+      expList.forEach((ex: any) => {
+        const { type, batchRoute } = parseExpNote(ex.notes);
+        const batchName = batchRoute || 'General / Office';
+
+        if (!batchWiseMap[batchName]) {
+          batchWiseMap[batchName] = { total: 0, typeTotals: {} };
+        }
+        batchWiseMap[batchName].total += ex.amount || 0;
+        batchWiseMap[batchName].typeTotals[type] = (batchWiseMap[batchName].typeTotals[type] || 0) + (ex.amount || 0);
+      });
+
+      let grandBatchTotal = 0;
+      const grandTypeTotals: Record<string, number> = {};
+
+      const batchWiseRows = Object.entries(batchWiseMap).map(([batchName, info]) => {
+        grandBatchTotal += info.total;
+        const row: any[] = [batchName, Number(info.total.toFixed(2))];
+        expenseTypeList.forEach((t) => {
+          const amt = info.typeTotals[t] || 0;
+          grandTypeTotals[t] = (grandTypeTotals[t] || 0) + amt;
+          row.push(Number(amt.toFixed(2)));
+        });
+        return row;
+      });
+
+      const batchWiseTotalRow: any[] = [
+        'Total Summary',
+        Number(grandBatchTotal.toFixed(2)),
+        ...expenseTypeList.map((t) => Number((grandTypeTotals[t] || 0).toFixed(2))),
+      ];
+      batchWiseRows.push(batchWiseTotalRow);
+
+      // Reference sheets
       const empHeaders = ['ID', 'Employee ID', 'First Name', 'Last Name', 'Email', 'Designation', 'Joining Date'];
-      const empRows = empList.map(e => [
+      const empRows = empList.map((e) => [
         e.id,
         e.employeeId,
         e.firstName,
         e.lastName,
         e.email,
         e.designation,
-        e.dateOfJoining
+        e.dateOfJoining,
       ]);
 
-      // 2. Attendance Sheet
-      const attHeaders = ['Record ID', 'Date', 'Employee ID', 'Status', 'Work Type', 'First Clock In', 'Last Clock Out', 'Total Hours'];
-      const attRows = attList.map(a => [
-        a.id,
-        a.workDate,
-        a.employeeId,
-        a.status || 'present',
-        (a as any).workType || 'office',
-        a.firstClockIn || '',
-        a.lastClockOut || '',
-        (a as any).totalHours != null ? Number((a as any).totalHours) : ''
-      ]);
-
-      // 3. Leave Sheet
-      const leaveHeaders = ['Record ID', 'Employee ID', 'Leave Type', 'Start Date', 'End Date', 'Half Day', 'Status', 'Reason', 'Med Certificate'];
-      const leaveRows = leaveList.map(l => [
-        l.id,
-        l.employeeId,
-        l.leaveType,
-        l.startDate,
-        l.endDate,
-        l.halfDay ? 'Yes' : 'No',
-        l.status,
-        l.reason,
-        l.medicalCertUrl || ''
-      ]);
-
-      // 4. Expenses Sheet
-      const expHeaders = ['Claim ID', 'Employee ID', 'Person Name', 'Classification', 'Expense Type', 'Amount (INR)', 'Status', 'Notes', 'Receipt URL'];
-      const expRows = expList.map(ex => {
-        let person = 'Employee';
-        let type = 'Misc';
-        let userNotes = ex.notes || '';
-
-        if (ex.notes && ex.notes.trim().startsWith('{')) {
-          try {
-            const parsed = JSON.parse(ex.notes);
-            person = parsed.personName || person;
-            type = parsed.expenseType || type;
-            userNotes = parsed.userNotes || '';
-          } catch (e) {}
-        }
-
-        return [
-          ex.id,
-          ex.employeeId,
-          person,
-          ex.category || 'Office Expense',
-          type,
-          ex.amount != null ? Number(ex.amount) : 0,
-          ex.status,
-          userNotes,
-          ex.receiptUrl || ''
-        ];
-      });
-
-      // 5. Tasks Sheet
-      const taskHeaders = ['Task ID', 'Title', 'Project ID', 'Assignee ID', 'Supervisor ID', 'Status', 'Priority', 'Due Date', 'Approval Status'];
-      const taskRows = taskList.map(t => [
+      const taskHeaders = ['Task ID', 'Title', 'Project ID', 'Assignee ID', 'Supervisor ID', 'Status', 'Priority', 'Due Date'];
+      const taskRows = taskList.map((t: any) => [
         t.id,
         t.title,
         t.projectId || 'Office Task',
@@ -596,7 +804,18 @@ export function AttendanceLogPage() {
         t.status,
         t.priority,
         t.dueDate,
-        t.approvalStatus || 'approved'
+      ]);
+
+      const leaveHeaders = ['Record ID', 'Employee ID', 'Leave Type', 'Start Date', 'End Date', 'Half Day', 'Status', 'Reason'];
+      const leaveRows = leaveList.map((l: any) => [
+        l.id,
+        l.employeeId,
+        l.leaveType,
+        l.startDate,
+        l.endDate,
+        l.halfDay ? 'Yes' : 'No',
+        l.status,
+        l.reason,
       ]);
 
       let xml = `<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n`;
@@ -606,11 +825,14 @@ export function AttendanceLogPage() {
       xml += ` xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"\n`;
       xml += ` xmlns:html="http://www.w3.org/TR/REC-html40">\n`;
 
+      xml += buildSheet('Summary', summaryHeaders, summaryRows);
+      xml += buildSheet('Attendance Details Log', attDetailsHeaders, attDetailsRows);
+      xml += buildSheet('Expense Summary', expSummaryHeaders, expSummaryRows);
+      xml += buildSheet('Expense Details', expDetailsHeaders, expDetailsRows);
+      xml += buildSheet('Batch Wise Expense', batchWiseHeaders, batchWiseRows);
       xml += buildSheet('Employees', empHeaders, empRows);
-      xml += buildSheet('Attendance', attHeaders, attRows);
-      xml += buildSheet('Leaves', leaveHeaders, leaveRows);
-      xml += buildSheet('Expenses', expHeaders, expRows);
       xml += buildSheet('Tasks', taskHeaders, taskRows);
+      xml += buildSheet('Leaves', leaveHeaders, leaveRows);
 
       xml += `</Workbook>\n`;
 
@@ -618,13 +840,13 @@ export function AttendanceLogPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `KVJ_Analytics_CEO_Report_${new Date().toISOString().split('T')[0]}.xls`;
+      a.download = `KVJ_Analytics_Master_Report_${new Date().toISOString().split('T')[0]}.xls`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast({ variant: 'success', title: 'Export Complete', message: 'Excel workbook downloaded successfully.' });
+      toast({ variant: 'success', title: 'Export Complete', message: 'Master Excel workbook downloaded with all 5 custom sheets.' });
     } catch (err: any) {
       console.error('Export error:', err);
       toast({ variant: 'error', title: 'Export Failed', message: err.message || 'Unknown error occurred during export.' });
