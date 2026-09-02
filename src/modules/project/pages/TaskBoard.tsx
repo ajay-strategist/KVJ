@@ -466,8 +466,12 @@ export function TaskBoard({
 
   const handleConfirmPause = async () => {
     if (!pauseTargetTaskId) return;
+    const note = pauseWorkNote.trim();
+    if (!note) {
+      toast({ variant: 'error', title: 'Work Update Required', message: 'Please enter a work progress update before pausing.' });
+      return;
+    }
     const taskId = pauseTargetTaskId;
-    const note = pauseWorkNote.trim() || 'Work session paused';
 
     taskTimerStore.pauseTask(taskId);
     const timer = taskTimerStore.getTimer(taskId);

@@ -660,6 +660,10 @@ export function TaskWorklogView({
                 const updateVal = savedNote || (s as any).notes || (s as any).description || task?.description || (task as any)?.reworkNotes || '';
                 const updateDisplay = updateVal || '—';
 
+                const isSupervisorOrAdmin = isSupervisor || isManagement;
+                const hasNote = Boolean(updateVal && updateVal !== '—');
+                const canEditNote = !hasNote || isSupervisorOrAdmin;
+
                 return (
                   <tr key={s.id} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{empName(s.employeeId)}</td>
@@ -678,30 +682,34 @@ export function TaskWorklogView({
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={updateDisplay}>
                           {updateDisplay}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTargetSessionId(s.id);
-                            setTargetTaskId(s.taskId);
-                            setNoteInput(updateVal === '—' ? '' : updateVal);
-                            setUpdateModalOpen(true);
-                          }}
-                          style={{
-                            background: 'var(--bg-sunken)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 4,
-                            padding: '2px 6px',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: 'var(--brand)',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                          }}
-                          title="Edit / Add Worklog Update Note"
-                        >
-                          ✏️ Edit
-                        </button>
+                        {canEditNote ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTargetSessionId(s.id);
+                              setTargetTaskId(s.taskId);
+                              setNoteInput(updateVal === '—' ? '' : updateVal);
+                              setUpdateModalOpen(true);
+                            }}
+                            style={{
+                              background: 'var(--bg-sunken)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 4,
+                              padding: '2px 6px',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: 'var(--brand)',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                            }}
+                            title={hasNote ? 'Edit Worklog Update Note (Supervisor/Admin)' : 'Add Worklog Update Note'}
+                          >
+                            {hasNote ? '✏️ Edit' : '➕ Add'}
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }} title="Locked worklog entry (recorded during pause)">🔒</span>
+                        )}
                       </div>
                     </td>
                     <td style={{ padding: '10px 12px' }}>
