@@ -147,14 +147,36 @@ export function useTaskSessions() {
     [closeOpen],
   );
 
-  /** All non-deleted sessions, newest first — for the Work Sessions timeline. */
-  const listSessions = useCallback(async (): Promise<TaskWorkSession[]> => {
-    const page = await repo.findMany({
-      sort: [{ field: 'startTime', dir: 'desc' }],
-      pageSize: 500,
-    });
-    return page.data;
-  }, [repo]);
+  const updateSessionNote = useCallback(
+    async (sessionId: UUID | string, notes: string, taskId?: UUID | string) => {
+      try {
+        if (sessionId.startsWith('local-')) {
+          const tid = taskId || sessionId.replace(/^local-(db-)?/, '');
+          if (tid) {
+            await supabase
+              .from('flwdsk_tasks')
+              .update({ description: notes })
+              .eq('id', tid);
+          }
+        } else {
+          await supabase
+            .from('flwdsk_task_work_sessions')
+            .update({ notes })
+            .eq('id', sessionId);
+          if (taskId) {
+            await supabase
+              .from('flwdsk_tasks')
+              .update({ description: notes })
+              .eq('id', taskId);
+          }
+        }
+        return { ok: true as const };
+      } catch (e: any) {
+        return { ok: false as const, error: e?.message || 'Failed to update session note' };
+      }
+    },
+    []
+  );
 
-  return { startSession, pauseSession, completeSession, listSessions };
+  return { startSession, pauseSession, completeSession, listSessions, updateSessionNote };
 }

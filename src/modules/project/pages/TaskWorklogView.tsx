@@ -68,10 +68,38 @@ export function TaskWorklogView({
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
   // ── Work Sessions: try Supabase first, fall back to localStorage timer state ─
-  const { listSessions } = useTaskSessions();
+  const { listSessions, updateSessionNote } = useTaskSessions();
   const [dbSessions, setDbSessions] = useState<TaskWorkSession[]>([]);
   const [sessFrom, setSessFrom] = useState('');
   const [sessTo, setSessTo] = useState('');
+
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [targetSessionId, setTargetSessionId] = useState<string | null>(null);
+  const [targetTaskId, setTargetTaskId] = useState<string | undefined>(undefined);
+  const [noteInput, setNoteInput] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
+  const handleSaveUpdateNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetSessionId) return;
+    setSavingNote(true);
+    try {
+      const res = await updateSessionNote(targetSessionId, noteInput.trim(), targetTaskId);
+      if (res.ok) {
+        toast({ variant: 'success', title: 'Worklog Update Saved', message: 'Work session update note updated successfully.' });
+        setUpdateModalOpen(false);
+        const updated = await listSessions();
+        setDbSessions(updated);
+        actualProjectData?.refresh?.();
+      } else {
+        toast({ variant: 'error', title: 'Save Failed', message: res.error });
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Save Failed', message: e.message });
+    } finally {
+      setSavingNote(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -627,6 +655,9 @@ export function TaskWorklogView({
                 const resolvedSupervisorId = pSupervisorId || tSupervisorId || s.supervisorId;
                 const resolvedSupervisorName = s.supervisorName || empName(resolvedSupervisorId);
 
+                const updateVal = (s as any).notes || (s as any).description || task?.description || (task as any)?.reworkNotes || '';
+                const updateDisplay = updateVal || '—';
+
                 return (
                   <tr key={s.id} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{empName(s.employeeId)}</td>
@@ -640,8 +671,36 @@ export function TaskWorklogView({
                     <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes, s.startTime, s.endTime)}
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12.5, color: 'var(--text-secondary)', maxWidth: 220 }}>
-                      {(s as any).notes || (s as any).description || '—'}
+                    <td style={{ padding: '10px 12px', fontSize: 12.5, color: 'var(--text-secondary)', maxWidth: 240 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={updateDisplay}>
+                          {updateDisplay}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetSessionId(s.id);
+                            setTargetTaskId(s.taskId);
+                            setNoteInput(updateVal === '—' ? '' : updateVal);
+                            setUpdateModalOpen(true);
+                          }}
+                          style={{
+                            background: 'var(--bg-sunken)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 4,
+                            padding: '2px 6px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: 'var(--brand)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                          title="Edit / Add Worklog Update Note"
+                        >
+                          ✏️ Edit
+                        </button>
+                      </div>
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <Badge tone={statusTone(s.status)}>
@@ -777,6 +836,62 @@ export function TaskWorklogView({
           )}
         </div>
       </Card>
+
+      {/* Edit Worklog Update Modal */}
+      {updateModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'var(--bg-overlay)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => setUpdateModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 480,
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-xl)',
+              padding: 24,
+            }}
+          >
+            <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+              ✏️ Edit Worklog Update Note
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
+              Add or update the work progress details for this work session. This update will be stored in the worklog.
+            </p>
+            <form onSubmit={handleSaveUpdateNote}>
+              <textarea
+                rows={4}
+                className="kvj-input"
+                placeholder="Describe work completed, progress made, or updates..."
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 16 }}
+              />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <Button type="button" variant="secondary" onClick={() => setUpdateModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={savingNote}>
+                  {savingNote ? 'Saving...' : '💾 Save Update'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
