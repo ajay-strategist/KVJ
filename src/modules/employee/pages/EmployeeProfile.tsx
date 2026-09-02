@@ -7,6 +7,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useState } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
+import { formatDisplayDate } from '../../../shared/utils/date';
 
 export function EmployeeProfile() {
   const { id } = useParams<{ id: string }>();
@@ -112,7 +113,7 @@ export function EmployeeProfile() {
               </div>
               <div>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Joined</span>
-                <div style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>{profile.dateOfJoining}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>{formatDisplayDate(profile.dateOfJoining)}</div>
               </div>
               <div>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Status</span>

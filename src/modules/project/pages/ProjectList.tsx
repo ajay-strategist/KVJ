@@ -1364,7 +1364,7 @@ export function ProjectList({
                               {t.proposedHours || t.estimatedHours ? `${t.proposedHours || t.estimatedHours} hrs` : '—'}
                             </td>
                             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged} hrs</td>
-                            <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{t.dueDate}</td>
+                            <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{formatDisplayDate(t.dueDate)}</td>
                             <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                               <button
                                 type="button"

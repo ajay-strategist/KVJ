@@ -13,6 +13,7 @@ import { useProject } from '../../project/hooks/useProject';
 import { supabase } from '../../../shared/integration/supabase';
 import { Authorize } from '../../../shared/permissions/react';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
+import { formatDisplayDate } from '../../../shared/utils/date';
 
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
@@ -437,6 +438,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       header: 'Joining Date',
       sortable: true,
       accessor: (r) => r.dateOfJoining,
+      render: (r) => formatDisplayDate(r.dateOfJoining),
     },
     {
       key: 'status',
