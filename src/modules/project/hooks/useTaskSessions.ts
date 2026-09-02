@@ -147,6 +147,15 @@ export function useTaskSessions() {
     [closeOpen],
   );
 
+  /** All non-deleted sessions, newest first — for the Work Sessions timeline. */
+  const listSessions = useCallback(async (): Promise<TaskWorkSession[]> => {
+    const page = await repo.findMany({
+      sort: [{ field: 'startTime', dir: 'desc' }],
+      pageSize: 500,
+    });
+    return page.data;
+  }, [repo]);
+
   const updateSessionNote = useCallback(
     async (sessionId: UUID | string, notes: string, taskId?: UUID | string) => {
       try {

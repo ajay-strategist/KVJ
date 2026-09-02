@@ -148,7 +148,7 @@ export function ProjectList({
 
   useEffect(() => {
     if (reportOpen && selectedProject) {
-      listSessions().then((data) => {
+      listSessions().then((data: any) => {
         setAllSessions(data || []);
       });
     }

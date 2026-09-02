@@ -105,7 +105,7 @@ export function TaskWorklogView({
     let active = true;
     const load = () => {
       listSessions()
-        .then((s) => { if (active) setDbSessions(s); })
+        .then((s: any) => { if (active) setDbSessions(s); })
         .catch(() => {});
     };
     load();
