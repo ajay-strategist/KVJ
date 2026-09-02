@@ -5,6 +5,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { useDevice } from '../../../shared/hooks/responsive';
 import { container } from '../../../core/registry';
 import { PROJECT_REPOSITORY_TOKEN, TASK_REPOSITORY_TOKEN } from '../project.repository';
+import { PROJECT_SERVICE_TOKEN } from '../project.service';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../../employee/employee.repository';
 
 export interface CreateTaskModalProps {
@@ -97,29 +98,31 @@ export function CreateTaskModal({
 
     setLoading(true);
     try {
-      const taskRepo = container.resolve(TASK_REPOSITORY_TOKEN);
       const isProject = form.category !== 'Office Task' && form.category !== '';
       const projectId = isProject ? form.category : undefined;
 
       const proposedHrs = Number(form.proposedHours) || 0;
 
-      const res = await taskRepo.create({
-        title: form.title.trim(),
-        projectId,
-        assigneeId: form.assigneeId || user?.id,
-        assignedByEmployeeId: user?.id,
-        supervisorId: form.supervisorId || undefined,
-        startDate: form.startDate,
-        dueDate: form.dueDate,
-        description: form.description.trim() || undefined,
-        proposedHours: proposedHrs,
-        estimatedHours: proposedHrs,
-        status: 'todo',
-        priority: 'medium',
-        approvalStatus: 'approved',
-      }, { id: user?.id, role: user?.role || 'employee' } as any);
+      const projectService = container.resolve(PROJECT_SERVICE_TOKEN);
+      const res = await projectService.createTask(
+        {
+          title: form.title.trim(),
+          projectId,
+          assigneeId: form.assigneeId || user?.id,
+          assignedByEmployeeId: user?.id,
+          supervisorId: form.supervisorId || undefined,
+          startDate: form.startDate,
+          dueDate: form.dueDate,
+          description: form.description.trim() || undefined,
+          proposedHours: proposedHrs,
+          estimatedHours: proposedHrs,
+          status: 'todo',
+          priority: 'medium',
+        },
+        { id: user?.id || '', role: user?.role || 'employee' }
+      );
 
-      if (res) {
+      if (res.ok) {
         toast({ variant: 'success', title: 'Task Created', message: `Task "${form.title}" created successfully.` });
         if (onSuccess) onSuccess();
         onClose();
@@ -133,6 +136,8 @@ export function CreateTaskModal({
           proposedHours: '',
           description: '',
         });
+      } else {
+        toast({ variant: 'error', title: 'Creation Failed', message: res.error?.message || 'Could not create task.' });
       }
     } catch (err: any) {
       console.error('Create task error:', err);

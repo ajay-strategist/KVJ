@@ -2009,7 +2009,7 @@ export function MyDayPage() {
   const { employees } = useEmployee();
   const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
   const { toast, addNotification } = useNotifications();
-  const { tasks: projectTasks, projects, createTask, createProject, updateTask, submitTask } = useProject();
+  const { tasks: projectTasks, projects, createTask, createProject, updateTask, submitTask, refresh } = useProject();
   const { startSession, pauseSession, completeSession } = useTaskSessions();
 
   const [selectedEmpId, setSelectedEmpId] = useState('me');
@@ -2068,6 +2068,7 @@ export function MyDayPage() {
           t.assigneeId === myId ||
           t.assigneeId === myEmail ||
           t.supervisorId === myId ||
+          (t as any).assignedByEmployeeId === myId ||
           ((t as any).assignee && myName && (t as any).assignee.toLowerCase() === myName);
         if (!isMyTask) return false;
 
@@ -2086,7 +2087,7 @@ export function MyDayPage() {
         const reworkNotes = (t as any).reworkNotes;
         let underReview = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval';
         const statusStr = (t.status || '') as string;
-        const isApproved = statusStr === 'done' || statusStr === 'completed' || (t as any).approvalStatus === 'approved' || (t as any).isApproved === true;
+        const isApproved = statusStr === 'done' || statusStr === 'completed';
         if (isApproved || isRework) {
           underReview = false;
         }
@@ -2561,7 +2562,7 @@ export function MyDayPage() {
       </div>
 
       {/* Create Task Modal */}
-      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} />
+      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
 
       {/* Apply Leave Drawer on My Day */}
       <Drawer open={applyLeaveOpen} onClose={() => setApplyLeaveOpen(false)} title="Apply for Leave">

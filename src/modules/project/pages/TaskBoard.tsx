@@ -205,7 +205,7 @@ export function TaskBoard({
       let status: TaskStatus = 'To Do';
       if ((t as any).approvalStatus === 'pending_assignment_approval') {
         status = 'Pending Approval';
-      } else if (t.status === 'done' || t.status === 'completed' || (t as any).approvalStatus === 'approved') {
+      } else if (t.status === 'done' || t.status === 'completed') {
         status = 'Completed';
       } else if (t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval') {
         status = 'Under Review';
@@ -1179,7 +1179,7 @@ export function TaskBoard({
       })()}
 
       {/* Create Task Modal */}
-      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} />
+      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
 
       {/* Log Time Drawer */}
       <Drawer open={timeEntryOpen} onClose={() => setTimeEntryOpen(false)} title={`Log Time: ${selectedTask?.name ?? ''}`}>

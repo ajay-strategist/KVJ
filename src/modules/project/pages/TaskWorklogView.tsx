@@ -336,8 +336,7 @@ export function TaskWorklogView({
 
         const isApproved =
           t.status === 'done' ||
-          t.status === 'completed' ||
-          (t as any).approvalStatus === 'approved';
+          t.status === 'completed';
 
         return {
           id: `synth-${t.id}`,
