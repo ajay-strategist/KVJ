@@ -910,7 +910,7 @@ export interface TaskItem {
 }
 
 function getTimeLeftInfo(dueStr: string): { label: string; tone: 'danger' | 'warning' | 'neutral' } {
-  if (!dueStr) return { label: 'No due date', tone: 'neutral' };
+  if (!dueStr || typeof dueStr !== 'string') return { label: 'No due date', tone: 'neutral' };
   const todayStr = toLocalISODate(new Date());
   const due = dueStr.slice(0, 10);
 
@@ -1328,7 +1328,7 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
 
   // Human-readable time remaining until a due date (relative to today).
   const timeLeftLabel = useCallback((due?: string, todayIso?: string) => {
-    if (!due) return 'No due date';
+    if (!due || typeof due !== 'string') return 'No due date';
     const d = due.slice(0, 10);
     const t = todayIso || toLocalISODate(new Date());
     const diff = Math.round((new Date(d + 'T00:00:00').getTime() - new Date(t + 'T00:00:00').getTime()) / 86400000);
@@ -1387,11 +1387,11 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
 
         if (!isManagement) {
           // Employees see tasks assigned to them PLUS tasks they supervise.
-          const isMyTask = t.assigneeId === user?.id || t.assigneeId === user?.email || ((t as any).assignee && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
-          const iSupervise = resolvedSupervisorId === user?.id;
+          const isMyTask = (user?.id && t.assigneeId === user.id) || (user?.email && t.assigneeId === user.email) || (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
+          const iSupervise = user?.id && resolvedSupervisorId === user.id;
           if (!isMyTask && !iSupervise) return false;
         }
-        const taskDate = (t.dueDate || '').slice(0, 10);
+        const taskDate = typeof t.dueDate === 'string' ? t.dueDate.slice(0, 10) : '';
         if (!taskDate) return i === 0;
         if (i === 0) {
           // Day 1 (Today): show tasks due today or active overdue tasks
@@ -2062,18 +2062,18 @@ export function MyDayPage() {
         // Management roles have full visibility in other modules (TaskBoard, etc.)
         // but My Day is personal — it shows tasks where you are the assignee OR supervisor.
         const myId = user?.id;
-        const myEmail = user?.email?.toLowerCase();
-        const myName = (user?.fullName || '').toLowerCase();
+        const myEmail = typeof user?.email === 'string' ? user.email.toLowerCase() : '';
+        const myName = typeof user?.fullName === 'string' ? user.fullName.toLowerCase() : '';
         const isMyTask =
-          t.assigneeId === myId ||
-          t.assigneeId === myEmail ||
-          t.supervisorId === myId ||
-          (t as any).assignedByEmployeeId === myId ||
-          ((t as any).assignee && myName && (t as any).assignee.toLowerCase() === myName);
+          (myId && t.assigneeId === myId) ||
+          (myEmail && t.assigneeId === myEmail) ||
+          (myId && t.supervisorId === myId) ||
+          (myId && (t as any).assignedByEmployeeId === myId) ||
+          (typeof (t as any).assignee === 'string' && myName && (t as any).assignee.toLowerCase() === myName);
         if (!isMyTask) return false;
 
-        const sd = (t.startDate || '').slice(0, 10);
-        const dd = (t.dueDate || '').slice(0, 10);
+        const sd = typeof t.startDate === 'string' ? t.startDate.slice(0, 10) : '';
+        const dd = typeof t.dueDate === 'string' ? t.dueDate.slice(0, 10) : '';
         const effectiveStartDate = sd || dd;
         const isScheduled = effectiveStartDate && todayStr >= effectiveStartDate;
         return isScheduled || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || (t as any).approvalStatus === 'rework' || storedStates[t.id];
@@ -2147,17 +2147,17 @@ export function MyDayPage() {
         const supervisorEmp = supervisorEmpId ? employees?.find((e) => e.id === supervisorEmpId) : null;
         const assigneeName = assigneeEmp
           ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}`
-          : ((t as any).assignee || undefined);
+          : (typeof (t as any).assignee === 'string' ? (t as any).assignee : undefined);
         const supervisorName = supervisorEmp
           ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}`
-          : ((t as any).supervisor || undefined);
+          : (typeof (t as any).supervisor === 'string' ? (t as any).supervisor : undefined);
 
         return {
           id: t.id,
           title: t.title,
           project: proj ? proj.title : 'Office Task',
-          due: (t.dueDate || '').slice(0, 10) || todayStr,
-          startDate: t.startDate ? t.startDate.slice(0, 10) : undefined,
+          due: typeof t.dueDate === 'string' ? t.dueDate.slice(0, 10) : todayStr,
+          startDate: typeof t.startDate === 'string' ? t.startDate.slice(0, 10) : undefined,
           priority: t.priority === 'high' ? 'High' : 'Normal',
           active,
           underReview,
