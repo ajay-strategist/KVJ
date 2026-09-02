@@ -36,6 +36,25 @@ export interface StartSessionInput {
  * Every write is persisted to task_work_sessions in the database — there is no
  * local-only state, so the timeline is accurate across refreshes and users.
  */
+export function saveSessionNote(id: string, notes: string) {
+  if (!id || !notes) return;
+  try {
+    const raw = localStorage.getItem('kvj_session_notes_v1');
+    const map = raw ? JSON.parse(raw) : {};
+    map[id] = notes;
+    localStorage.setItem('kvj_session_notes_v1', JSON.stringify(map));
+  } catch {}
+}
+
+export function getSessionNotesMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem('kvj_session_notes_v1');
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function useTaskSessions() {
   const { user } = useAuth();
   const repo = useMemo(() => container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN), []);
@@ -126,6 +145,15 @@ export function useTaskSessions() {
   const pauseSession = useCallback(
     async (taskId: UUID | undefined, notes?: string) => {
       try {
+        if (taskId && notes) {
+          saveSessionNote(taskId, notes);
+          try {
+            await supabase
+              .from('flwdsk_tasks')
+              .update({ description: notes })
+              .eq('id', taskId);
+          } catch (_) {}
+        }
         await closeOpen(taskId, 'paused', notes);
         return { ok: true as const };
       } catch (e: any) {
@@ -159,26 +187,34 @@ export function useTaskSessions() {
   const updateSessionNote = useCallback(
     async (sessionId: UUID | string, notes: string, taskId?: UUID | string) => {
       try {
-        if (sessionId.startsWith('local-')) {
-          const tid = taskId || sessionId.replace(/^local-(db-)?/, '');
-          if (tid) {
-            await supabase
-              .from('flwdsk_tasks')
-              .update({ description: notes })
-              .eq('id', tid);
-          }
-        } else {
-          await supabase
-            .from('flwdsk_task_work_sessions')
-            .update({ notes })
-            .eq('id', sessionId);
-          if (taskId) {
+        saveSessionNote(sessionId, notes);
+        if (taskId) {
+          saveSessionNote(taskId, notes);
+          try {
             await supabase
               .from('flwdsk_tasks')
               .update({ description: notes })
               .eq('id', taskId);
+          } catch (_) {}
+        } else {
+          const tid = sessionId.replace(/^local-(db-)?/, '');
+          if (tid) {
+            saveSessionNote(tid, notes);
+            try {
+              await supabase
+                .from('flwdsk_tasks')
+                .update({ description: notes })
+                .eq('id', tid);
+            } catch (_) {}
           }
         }
+        try {
+          await supabase
+            .from('flwdsk_task_work_sessions')
+            .update({ notes })
+            .eq('id', sessionId);
+        } catch (_) {}
+
         return { ok: true as const };
       } catch (e: any) {
         return { ok: false as const, error: e?.message || 'Failed to update session note' };

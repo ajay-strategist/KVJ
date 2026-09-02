@@ -17,7 +17,7 @@ import { useLeave } from '../../../modules/leave/hooks/useLeave';
 import { Form, SelectField, TextField, DatePickerField, CheckboxField, FileUploadField, TextAreaField, useForm } from '../../../shared/forms/form';
 
 import { useProject } from '../../../modules/project/hooks/useProject';
-import { useTaskSessions } from '../../../modules/project/hooks/useTaskSessions';
+import { useTaskSessions, saveSessionNote } from '../../../modules/project/hooks/useTaskSessions';
 import { useEmployee } from '../../../modules/employee/hooks/useEmployee';
 import { useTraining } from '../../../modules/training/hooks/useTraining';
 import { cleanBatchCode } from '../../../modules/training/utils/batch-formatter';
@@ -2243,7 +2243,8 @@ export function MyDayPage() {
     );
 
     try {
-      await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600 });
+      saveSessionNote(taskId, note);
+      await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600, description: note });
       await pauseSession(taskId as any, note);
       handleActivityLog(`Paused Task: ${taskId}`, 'neutral');
     } catch (e) {

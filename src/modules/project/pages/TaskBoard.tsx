@@ -24,7 +24,7 @@ import { exportToExcel } from '../../../shared/utils/exportToExcel';
 import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
 
 import { useProject } from '../hooks/useProject';
-import { useTaskSessions } from '../hooks/useTaskSessions';
+import { useTaskSessions, saveSessionNote } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
@@ -478,7 +478,8 @@ export function TaskBoard({
     );
 
     try {
-      await updateTask(taskId as UUID, { status: 'todo', actualHours: secondsToday / 3600 });
+      saveSessionNote(taskId, note);
+      await updateTask(taskId as UUID, { status: 'todo', actualHours: secondsToday / 3600, description: note });
       await pauseSession(taskId as UUID, note);
     } catch (e) {
       console.warn('Pause task error:', e);

@@ -6,7 +6,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { isFullControl } from '../../../shared/permissions/roles';
 
 import { useProject } from '../hooks/useProject';
-import { useTaskSessions } from '../hooks/useTaskSessions';
+import { useTaskSessions, getSessionNotesMap } from '../hooks/useTaskSessions';
 import type { TaskWorkSession } from '../project.repository';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
@@ -655,7 +655,9 @@ export function TaskWorklogView({
                 const resolvedSupervisorId = pSupervisorId || tSupervisorId || s.supervisorId;
                 const resolvedSupervisorName = s.supervisorName || empName(resolvedSupervisorId);
 
-                const updateVal = (s as any).notes || (s as any).description || task?.description || (task as any)?.reworkNotes || '';
+                const sessionNotesMap = getSessionNotesMap();
+                const savedNote = sessionNotesMap[s.id] || (s.taskId ? sessionNotesMap[s.taskId] : '');
+                const updateVal = savedNote || (s as any).notes || (s as any).description || task?.description || (task as any)?.reworkNotes || '';
                 const updateDisplay = updateVal || '—';
 
                 return (
