@@ -117,6 +117,19 @@ function formatCleanNote(rawNote?: string, workType?: string): string {
   return '—';
 }
 
+export interface AttendanceSessionItem {
+  id?: string;
+  start: string;
+  end: string;
+  duration: string;
+  org: string;
+  location: string;
+  type: string;
+  mode: string;
+  isTraining?: boolean;
+  notes?: string;
+}
+
 export interface AttendanceLogRow {
   date: string;
   name: string;
@@ -133,6 +146,7 @@ export interface AttendanceLogRow {
   break: string;
   tasks: string[];
   isTraining?: boolean;
+  sessions?: AttendanceSessionItem[];
 }
 
 function ConditionalAttendanceFields() {
@@ -217,6 +231,325 @@ function ConditionalAttendanceFields() {
   }
 
   return null;
+}
+
+interface SplitSessionInput {
+  id: string;
+  classification: string;
+  location: string;
+  organisationsVisited: string;
+  startTime: string;
+  endTime: string;
+  notes: string;
+}
+
+function SubmitAttendanceDrawerForm({ onClose, currentEmployee, user, toast }: {
+  onClose: () => void;
+  currentEmployee: any;
+  user: any;
+  toast: any;
+}) {
+  const [date, setDate] = useState(new Date(Date.now() - 86400000).toISOString().slice(0, 10));
+  const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
+  const [sessions, setSessions] = useState<SplitSessionInput[]>([
+    {
+      id: 'sess-1',
+      classification: 'Training',
+      location: '',
+      organisationsVisited: '',
+      startTime: '08:35 AM',
+      endTime: '10:35 AM',
+      notes: '',
+    },
+  ]);
+  const [loading, setLoading] = useState(false);
+
+  const addSession = () => {
+    setSessions((prev) => [
+      ...prev,
+      {
+        id: `sess-${Date.now()}-${prev.length + 1}`,
+        classification: 'Office',
+        location: '',
+        organisationsVisited: '',
+        startTime: '11:00 AM',
+        endTime: '02:30 PM',
+        notes: '',
+      },
+    ]);
+  };
+
+  const removeSession = (id: string) => {
+    if (sessions.length === 1) return;
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const updateSession = (id: string, patch: Partial<SplitSessionInput>) => {
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const targetEmpId = currentEmployee?.id || user?.id || '';
+      let recordId = String(Date.now());
+
+      try {
+        const { data } = await supabase
+          .from('flwdsk_attendance')
+          .select('id')
+          .eq('employee_id', targetEmpId)
+          .eq('work_date', date)
+          .limit(1);
+        if (data && data[0]) {
+          recordId = data[0].id;
+        }
+      } catch (err) {
+        console.warn('Could not find existing attendance record id:', err);
+      }
+
+      // Format multi-session payload for the approval parser
+      const sessionParts = sessions.map((s) => {
+        let locText = 'Office Work';
+        if (s.classification === 'Training') {
+          const bObj = batches.find((b) => b.code === s.location || b.id === s.location);
+          locText = bObj ? batchDisplayName(bObj) : s.location || 'Training Session';
+        } else if (s.classification === 'Marketing') {
+          locText = s.organisationsVisited || 'Marketing Visit';
+        } else if (s.classification === 'Work From Home') {
+          locText = 'Remote / WFH';
+        }
+
+        const tag = `[${s.classification}: ${locText}${s.notes ? ` - ${s.notes}` : ''}]`;
+        return `${s.startTime} - ${s.endTime} ${tag}`;
+      });
+
+      const proposedVal = `${date} (${sessionParts.join(', ')})`;
+      const reasonVal = `Split Session Claim (${sessions.length} sessions). Date: ${date}`;
+
+      const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
+      await attService.requestCorrection(
+        recordId,
+        'attendance_claim',
+        proposedVal,
+        reasonVal,
+        { id: targetEmpId, role: 'Employee' }
+      );
+
+      toast({
+        variant: 'success',
+        title: 'Attendance Claim Submitted',
+        message: `Split-session claim (${sessions.length} session(s)) for ${date} sent to Approvals Queue for review.`,
+      });
+      onClose();
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Submission Failed', message: err.message || 'Could not submit claim.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '10px 0' }}>
+      <div>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+          Attendance Date <span style={{ color: 'var(--status-danger)' }}>*</span>
+        </label>
+        <input
+          type="date"
+          required
+          className="kvj-input"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--brand)' }}>
+            Work Sessions ({sessions.length})
+          </span>
+          <button
+            type="button"
+            onClick={addSession}
+            style={{
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--brand)',
+              background: 'var(--brand-muted)',
+              color: 'var(--brand)',
+              cursor: 'pointer',
+            }}
+          >
+            + Add Split Session
+          </button>
+        </div>
+
+        {sessions.map((sess, idx) => (
+          <div
+            key={sess.id}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              padding: 14,
+              background: 'var(--bg-sunken)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)' }}>
+                Session #{idx + 1}
+              </span>
+              {sessions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeSession(sess.id)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--status-danger)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✕ Remove
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Start Time</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 08:35 AM"
+                  className="kvj-input"
+                  value={sess.startTime}
+                  onChange={(e) => updateSession(sess.id, { startTime: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>End Time</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 10:35 AM"
+                  className="kvj-input"
+                  value={sess.endTime}
+                  onChange={(e) => updateSession(sess.id, { endTime: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Session Type</label>
+              <select
+                className="kvj-select"
+                value={sess.classification}
+                onChange={(e) => updateSession(sess.id, { classification: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              >
+                <option value="Training">Training Batch Session</option>
+                <option value="Office">Office Work</option>
+                <option value="Work From Home">Work From Home / Remote</option>
+                <option value="Marketing">Marketing Visit</option>
+              </select>
+            </div>
+
+            {sess.classification === 'Training' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Training Batch</label>
+                <select
+                  className="kvj-select"
+                  value={sess.location}
+                  onChange={(e) => updateSession(sess.id, { location: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                >
+                  <option value="">Select Training Batch...</option>
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.code}>
+                      {batchDisplayName(b)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {sess.classification === 'Marketing' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Organisations Visited</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Christ College"
+                  className="kvj-input"
+                  value={sess.organisationsVisited}
+                  onChange={(e) => updateSession(sess.id, { organisationsVisited: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+            )}
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Notes / Reason</label>
+              <input
+                type="text"
+                placeholder="Optional notes..."
+                className="kvj-input"
+                value={sess.notes}
+                onChange={(e) => updateSession(sess.id, { notes: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 14, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border)',
+            background: 'var(--bg-panel)',
+            color: 'var(--text-primary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: '8px 20px',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: 'var(--brand)',
+            color: '#fff',
+            fontWeight: 700,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? 'Submitting...' : 'Submit Claim'}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 export function AttendanceLogPage() {
@@ -1196,19 +1529,6 @@ export function AttendanceLogPage() {
         const breakMins = record.totalBreakMinutes || 0;
         const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
 
-        // Calculate actual elapsed span minutes (lastClockOut - firstClockIn)
-        let spanMins = 0;
-        if (record.firstClockIn && record.lastClockOut) {
-          const t1 = new Date(record.firstClockIn).getTime();
-          const t2 = new Date(record.lastClockOut).getTime();
-          if (t2 > t1) {
-            spanMins = Math.max(0, Math.round((t2 - t1) / (1000 * 60)) - breakMins);
-          }
-        }
-        const rawMins = record.totalWorkingMinutes || 0;
-        const cappedMins = spanMins > 0 ? Math.min(rawMins, spanMins) : rawMins;
-        const duration = `${Math.floor(cappedMins / 60)}h ${cappedMins % 60}m`;
-
         const sessionsList = record.sessions && record.sessions.length > 0
           ? record.sessions
           : [{
@@ -1219,37 +1539,77 @@ export function AttendanceLogPage() {
               notes: (record as any).notes || '',
             }];
 
-        // Pick primary session to prevent duplicate rows for the same date
-        const primarySession = sessionsList[0];
-        const startT = safeFormatTime(record.firstClockIn || primarySession.clockIn);
-        const endT = safeFormatTime(record.lastClockOut || primarySession.clockOut);
+        // Build individual session items and calculate sum of working minutes
+        let sumSessionMins = 0;
+        const parsedSessions: AttendanceSessionItem[] = [];
 
-        const workType = primarySession.workType || 'Office';
-        const batchId = (primarySession as any)?.batchId || (primarySession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
-        const orgVal = resolveOrgValue(workType, primarySession.notes, (record as any).notes, batchId) || 'Office';
-        const locVal = resolveLocationValue(workType, primarySession.notes, (record as any).notes, batchId) || 'Office';
-        const classOrWorkInfo = resolveClassOrWorkValue(workType, primarySession.notes, (record as any).notes, batchId);
+        for (const s of sessionsList) {
+          let sMins = 0;
+          if (s.clockIn && s.clockOut) {
+            const t1 = new Date(s.clockIn).getTime();
+            const t2 = new Date(s.clockOut).getTime();
+            if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
+              sMins = Math.round((t2 - t1) / (1000 * 60));
+            }
+          }
+          sumSessionMins += sMins;
 
-        const isHoliday = workType === 'Holiday' || (primarySession.notes && primarySession.notes.toLowerCase().includes('holiday')) || !!decHoliday;
-        // Active leave takes precedence if active leave exists and working duration is 0
-        const isLeave = !!activeLeave && cappedMins === 0;
+          const sWorkType = s.workType || 'Office';
+          const sBatchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+          const sOrg = resolveOrgValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
+          const sLoc = resolveLocationValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
+          const sClass = resolveClassOrWorkValue(sWorkType, s.notes, (record as any).notes, sBatchId);
+
+          parsedSessions.push({
+            id: s.id,
+            start: safeFormatTime(s.clockIn),
+            end: safeFormatTime(s.clockOut),
+            duration: `${Math.floor(sMins / 60)}h ${sMins % 60}m`,
+            org: sOrg,
+            location: sLoc,
+            type: sClass.value,
+            mode: sWorkType === 'Training' ? 'Training' : 'Offline',
+            isTraining: sClass.isTraining,
+            notes: formatCleanNote(s.notes || (record as any).notes, sWorkType),
+          });
+        }
+
+        const effectiveMins = sumSessionMins > 0 ? sumSessionMins : (record.totalWorkingMinutes || 0);
+        const totalHrs = Math.floor(effectiveMins / 60);
+        const remMins = effectiveMins % 60;
+        const duration = `${totalHrs}h ${remMins}m`;
+
+        const primarySession = parsedSessions[0] || {
+          start: safeFormatTime(record.firstClockIn),
+          end: safeFormatTime(record.lastClockOut),
+          org: 'Office',
+          location: 'Office',
+          type: 'Office',
+          mode: 'Offline',
+          isTraining: false,
+          notes: '—',
+        };
+
+        const isHoliday = primarySession.type === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday') || !!decHoliday;
+        const isLeave = !!activeLeave && effectiveMins === 0;
 
         rows.push({
           date: dateStr.split('-').reverse().join('-'),
           name: resolvedEmpName,
           holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
-          org: isLeave ? '—' : orgVal,
-          location: isLeave ? '—' : locVal,
-          type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
-          isTraining: isLeave ? false : classOrWorkInfo.isTraining,
-          mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : (workType === 'Training' ? 'Training' : 'Offline'),
-          start: isLeave ? '—' : startT,
-          end: isLeave ? '—' : endT,
+          org: isLeave ? '—' : primarySession.org,
+          location: isLeave ? '—' : primarySession.location,
+          type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : primarySession.type,
+          isTraining: isLeave ? false : primarySession.isTraining,
+          mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : primarySession.mode,
+          start: isLeave ? '—' : safeFormatTime(record.firstClockIn || sessionsList[0]?.clockIn),
+          end: isLeave ? '—' : safeFormatTime(record.lastClockOut || sessionsList[sessionsList.length - 1]?.clockOut),
           duration: isLeave ? '0h 0m' : duration,
           expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-          note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : formatCleanNote(primarySession.notes || (record as any).notes, workType),
+          note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : (primarySession.notes || '—'),
           break: isLeave ? '0h 0m' : breakTime,
-          tasks: primarySession.notes ? [primarySession.notes] : [],
+          tasks: sessionsList.map(s => s.notes).filter(Boolean) as string[],
+          sessions: parsedSessions,
         });
       } else {
         const isSunday = d.getDay() === 0;
@@ -1474,15 +1834,51 @@ export function AttendanceLogPage() {
                         <td style={{ padding: '8px 10px', color: isHoliday ? 'var(--status-danger)' : 'inherit', fontWeight: isHoliday ? 700 : 400 }}>
                           {r.holiday || '—'}
                         </td>
-                        <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.org}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 500 }}>
+                          {r.sessions && r.sessions.length > 1 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {r.sessions.map((s, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--brand-muted)', color: 'var(--brand)', padding: '1px 4px', borderRadius: 3 }}>
+                                    S{idx + 1}
+                                  </span>
+                                  <span>{s.org}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            r.org
+                          )}
+                        </td>
                         <td style={{ padding: '8px 10px', fontWeight: 500, color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--brand)' }}>
-                          {r.location || '-'}
+                          {r.sessions && r.sessions.length > 1 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {r.sessions.map((s, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--bg-sunken)', color: 'var(--text-muted)', padding: '1px 4px', borderRadius: 3 }}>
+                                    S{idx + 1}
+                                  </span>
+                                  <span>{s.location || '-'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            r.location || '-'
+                          )}
                         </td>
                         <td style={{ padding: '8px 10px' }}>
                           {isHoliday ? (
                             <Badge tone="danger">Holiday</Badge>
                           ) : isLeave ? (
                             <Badge tone="warning">On Leave</Badge>
+                          ) : r.sessions && r.sessions.length > 1 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {r.sessions.map((s, idx) => (
+                                <Badge key={idx} tone={s.isTraining ? 'info' : s.type === 'Supervision' ? 'progress' : s.type === 'Marketing' ? 'warning' : 'neutral'}>
+                                  S{idx + 1}: {s.type}
+                                </Badge>
+                              ))}
+                            </div>
                           ) : r.type && r.type !== '—' ? (
                             <Badge tone={r.isTraining ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : 'neutral'}>
                               {r.type}
@@ -1496,21 +1892,66 @@ export function AttendanceLogPage() {
                             <Badge tone="danger">Holiday</Badge>
                           ) : isLeave ? (
                             <Badge tone="warning">On Leave</Badge>
+                          ) : r.sessions && r.sessions.length > 1 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {r.sessions.map((s, idx) => (
+                                <span key={idx} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                  {s.mode}
+                                </span>
+                              ))}
+                            </div>
                           ) : r.mode === 'Re-Approved' || r.mode.includes('Re-Approved') ? (
                             <Badge tone="success">Re-Approved</Badge>
                           ) : (
                             r.mode
                           )}
                         </td>
-                        <td style={{ padding: '8px 10px' }}>{r.start}</td>
-                        <td style={{ padding: '8px 10px' }}>{r.end}</td>
-                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          {r.sessions && r.sessions.length > 1 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {r.sessions.map((s, idx) => (
+                                <span key={idx} style={{ fontSize: 12.5, fontWeight: 600 }}>{s.start}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            r.start
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          {r.sessions && r.sessions.length > 1 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {r.sessions.map((s, idx) => (
+                                <span key={idx} style={{ fontSize: 12.5, fontWeight: 600 }}>{s.end}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            r.end
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>
+                          <div>{r.duration}</div>
+                          {r.sessions && r.sessions.length > 1 && (
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginTop: 2 }}>
+                              ({r.sessions.map(s => s.duration).join(', ')})
+                            </div>
+                          )}
+                        </td>
                         <td style={{
                           padding: '8px 10px',
                           color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--text-secondary)',
                           fontWeight: isHoliday || isLeave ? 700 : 500
                         }}>
-                          {r.note}
+                          {r.sessions && r.sessions.length > 1 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {r.sessions.map((s, idx) => (
+                                <span key={idx} style={{ fontSize: 11.5 }}>
+                                  S{idx + 1}: {s.notes || '—'}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            r.note
+                          )}
                         </td>
                         <td style={{ padding: '8px 10px' }}>{r.break}</td>
                       </tr>
@@ -1878,79 +2319,12 @@ export function AttendanceLogPage() {
       </div>
 
       <Drawer open={submitDrawerOpen} onClose={() => setSubmitDrawerOpen(false)} title="Submit Attendance Request">
-        <Form
-          initial={{
-            date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
-            classification: 'Office',
-            location: '',
-            organisationsVisited: '',
-            startTime: '08:30 AM',
-            endTime: '05:00 PM',
-            notes: '',
-          }}
-          onSubmit={async (values) => {
-             const locText = values.classification === 'Training' 
-               ? values.location 
-               : values.classification === 'Marketing' 
-               ? `Marketing: ${values.organisationsVisited}` 
-               : 'Office Work';
-             
-             const targetEmpId = currentEmployee?.id || user?.id || '';
-             let recordId = String(Date.now());
-             try {
-               const { data } = await supabase
-                 .from('flwdsk_attendance')
-                 .select('id')
-                 .eq('employee_id', targetEmpId)
-                 .eq('work_date', values.date)
-                 .limit(1);
-               if (data && data[0]) {
-                 recordId = data[0].id;
-               }
-             } catch (e) {
-               console.warn('Could not find existing attendance record id:', e);
-             }
-
-             try {
-               const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
-               await attService.requestCorrection(
-                 recordId,
-                 'attendance_claim',
-                 `${values.date} (${values.startTime} - ${values.endTime})`,
-                 `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
-                 { id: targetEmpId, role: 'Employee' }
-               );
-             } catch (e) {
-               console.warn('Attendance correction request notice:', e);
-             }
-
-             toast({
-               variant: 'success',
-               title: 'Attendance Request Submitted',
-               message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
-             });
-             setSubmitDrawerOpen(false);
-           }}
-        >
-          <DatePickerField name="date" label="Attendance Date" />
-          <SelectField
-            name="classification"
-            label="Attendance Type"
-            options={[
-              { value: 'Office', label: 'Office Work' },
-              { value: 'Training', label: 'Training Batch Session' },
-              { value: 'Marketing', label: 'Marketing Visit' },
-            ]}
-          />
-          <ConditionalAttendanceFields />
-          <TimePickerField name="startTime" label="Start Time" />
-          <TimePickerField name="endTime" label="End Time" />
-          <TextField name="notes" label="Reason / Notes (Optional)" placeholder="Emergency, system delay, or missed clock-in..." />
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setSubmitDrawerOpen(false)}>Cancel</Button>
-            <Button type="submit">Submit for Review</Button>
-          </div>
-        </Form>
+        <SubmitAttendanceDrawerForm
+          onClose={() => setSubmitDrawerOpen(false)}
+          currentEmployee={currentEmployee}
+          user={user}
+          toast={toast}
+        />
       </Drawer>
 
       {/* Receipt Preview Modal / Drawer */}

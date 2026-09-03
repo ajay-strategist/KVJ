@@ -412,25 +412,81 @@ export class AttendanceService implements IAttendanceService {
         }
       };
 
-      // Determine workDate, firstClockIn, lastClockOut
+      // Determine workDate, firstClockIn, lastClockOut, and parsedSessions
       let workDate = corr.requestedDate || todayStr();
       let firstClockIn: string | undefined = undefined;
       let lastClockOut: string | undefined = undefined;
+      let parsedSessions: WorkSession[] = [];
+      let totalCalculatedMinutes = 0;
 
       if (corr.fieldToCorrect === 'attendance_claim') {
-        const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\(([^)]+)\)/);
+        const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\((.+)\)$/s);
         if (claimMatch) {
-          workDate = claimMatch[1];
-          const timeRange = claimMatch[2];
-          const times = timeRange.split(/\s*-\s*/);
-          if (times.length === 2) {
-            firstClockIn = parseTimeStr(workDate, times[0]);
-            lastClockOut = parseTimeStr(workDate, times[1]);
+          workDate = claimMatch[1].trim();
+          const content = claimMatch[2].trim();
+
+          // Try parsing split sessions (e.g., "08:35 AM - 10:35 AM [Training: MIM...], 11:00 AM - 02:30 PM [Office...]")
+          const sessionSegments = content.split(/;|\n|,(?=\s*\d{1,2}:\d{2})/);
+
+          for (const seg of sessionSegments) {
+            const trimmed = seg.trim();
+            if (!trimmed) continue;
+
+            const timeMatch = trimmed.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?)\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)(?:\s*\[([^\]]+)\])?/i);
+            if (timeMatch) {
+              const startIso = parseTimeStr(workDate, timeMatch[1]);
+              const endIso = parseTimeStr(workDate, timeMatch[2]);
+              const metaNote = timeMatch[3] || corr.reason || 'Approved Session';
+
+              let segWorkType: WorkSessionType = 'Office';
+              const metaLower = metaNote.toLowerCase();
+              if (metaLower.includes('training')) segWorkType = 'Training';
+              else if (metaLower.includes('marketing')) segWorkType = 'Marketing';
+              else if (metaLower.includes('remote') || metaLower.includes('work from home')) segWorkType = 'Work From Home';
+
+              if (startIso && endIso) {
+                const sMs = new Date(startIso).getTime();
+                const eMs = new Date(endIso).getTime();
+                const durMins = (!isNaN(sMs) && !isNaN(eMs) && eMs > sMs) ? Math.round((eMs - sMs) / (1000 * 60)) : 0;
+                totalCalculatedMinutes += durMins;
+
+                if (!firstClockIn || new Date(startIso) < new Date(firstClockIn)) {
+                  firstClockIn = startIso;
+                }
+                if (!lastClockOut || new Date(endIso) > new Date(lastClockOut)) {
+                  lastClockOut = endIso;
+                }
+
+                parsedSessions.push({
+                  id: this.uuid(),
+                  workType: segWorkType,
+                  clockIn: startIso,
+                  clockOut: endIso,
+                  notes: metaNote,
+                });
+              }
+            }
+          }
+
+          // Fallback if regex split failed but basic single time range exists
+          if (parsedSessions.length === 0) {
+            const times = content.split(/\s*-\s*/);
+            if (times.length === 2) {
+              firstClockIn = parseTimeStr(workDate, times[0]);
+              lastClockOut = parseTimeStr(workDate, times[1]);
+              if (firstClockIn && lastClockOut) {
+                const sMs = new Date(firstClockIn).getTime();
+                const eMs = new Date(lastClockOut).getTime();
+                if (!isNaN(sMs) && !isNaN(eMs) && eMs > sMs) {
+                  totalCalculatedMinutes = Math.round((eMs - sMs) / (1000 * 60));
+                }
+              }
+            }
           }
         }
       }
 
-      // Parse classification & location from corr.reason
+      // Default single workType fallback
       let workType: WorkSessionType = 'Office';
       const reasonStr = corr.reason || '';
       const classMatch = reasonStr.match(/Classification:\s*([^,\n.]+)/i);
@@ -446,6 +502,16 @@ export class AttendanceService implements IAttendanceService {
         workType = 'Training';
       }
 
+      if (parsedSessions.length === 0) {
+        parsedSessions.push({
+          id: this.uuid(),
+          workType,
+          clockIn: firstClockIn || workDate || nowIso(),
+          clockOut: lastClockOut,
+          notes: corr.reason || 'Approved Claim',
+        });
+      }
+
       let record = null;
       if (corr.attendanceRecordId && corr.attendanceRecordId.length === 36) {
         try {
@@ -457,15 +523,7 @@ export class AttendanceService implements IAttendanceService {
         record = await this.repo.findActiveRecord(corr.requestedBy, workDate);
       }
 
-      // Calculate elapsed working minutes
-      let calculatedMins = 480;
-      if (firstClockIn && lastClockOut) {
-        const sMs = new Date(firstClockIn).getTime();
-        const eMs = new Date(lastClockOut).getTime();
-        if (!isNaN(sMs) && !isNaN(eMs) && eMs > sMs) {
-          calculatedMins = Math.round((eMs - sMs) / (1000 * 60));
-        }
-      }
+      const calculatedMins = totalCalculatedMinutes > 0 ? totalCalculatedMinutes : 480;
 
       if (!record) {
         // CREATE NEW ATTENDANCE RECORD
@@ -474,19 +532,11 @@ export class AttendanceService implements IAttendanceService {
           employeeId: corr.requestedBy,
           workDate: workDate || todayStr(),
           status: 'clocked_out',
-          firstClockIn,
-          lastClockOut,
+          firstClockIn: firstClockIn || parsedSessions[0]?.clockIn,
+          lastClockOut: lastClockOut || parsedSessions[parsedSessions.length - 1]?.clockOut,
           totalWorkingMinutes: calculatedMins,
           totalBreakMinutes: 0,
-          sessions: [
-            {
-              id: this.uuid(),
-              workType,
-              clockIn: firstClockIn || workDate || nowIso(),
-              clockOut: lastClockOut,
-              notes: corr.reason || 'Approved Claim',
-            },
-          ],
+          sessions: parsedSessions,
           breaks: [],
           createdAt: nowIso(),
           updatedAt: nowIso(),
@@ -497,48 +547,18 @@ export class AttendanceService implements IAttendanceService {
         };
         await this.repo.create(newRecord, actor);
       } else {
-        // RESUBMISSION / UPDATE EXISTING ATTENDANCE RECORD
+        // UPDATE EXISTING ATTENDANCE RECORD
         const patch: Partial<AttendanceRecord> = {
           status: 'clocked_out',
+          totalWorkingMinutes: calculatedMins,
           updatedAt: nowIso(),
           updatedBy: actor.id,
         };
 
         if (firstClockIn) patch.firstClockIn = firstClockIn;
-        else if (corr.fieldToCorrect === 'firstClockIn') {
-          patch.firstClockIn = parseTimeStr(record.workDate, corr.proposedValue) || corr.proposedValue;
-        }
-
         if (lastClockOut) patch.lastClockOut = lastClockOut;
-        else if (corr.fieldToCorrect === 'lastClockOut') {
-          patch.lastClockOut = parseTimeStr(record.workDate, corr.proposedValue) || corr.proposedValue;
-        }
 
-        const effectiveFirstIn = patch.firstClockIn || record.firstClockIn;
-        const effectiveLastOut = patch.lastClockOut || record.lastClockOut;
-
-        if (effectiveFirstIn && effectiveLastOut) {
-          const sMs = new Date(effectiveFirstIn).getTime();
-          const eMs = new Date(effectiveLastOut).getTime();
-          if (!isNaN(sMs) && !isNaN(eMs) && eMs > sMs) {
-            patch.totalWorkingMinutes = Math.round((eMs - sMs) / (1000 * 60));
-          }
-        }
-        if (!patch.totalWorkingMinutes) {
-          patch.totalWorkingMinutes = record.totalWorkingMinutes || 480;
-        }
-
-        const sessionNotes = corr.reason || (record as any).notes || 'Re-approved session';
-        const updatedSession: WorkSession = {
-          id: record.sessions?.[0]?.id || this.uuid(),
-          workType,
-          clockIn: effectiveFirstIn || record.firstClockIn || record.workDate || nowIso(),
-          clockOut: effectiveLastOut || record.lastClockOut,
-          notes: sessionNotes,
-        };
-        (updatedSession as any).isReapproved = true;
-
-        patch.sessions = [updatedSession, ...(record.sessions?.slice(1) || [])];
+        patch.sessions = parsedSessions;
         await this.repo.update(record.id, patch, actor);
       }
 
