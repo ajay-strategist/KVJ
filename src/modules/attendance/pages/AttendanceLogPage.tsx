@@ -1529,7 +1529,7 @@ export function AttendanceLogPage() {
         const breakMins = record.totalBreakMinutes || 0;
         const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
 
-        const sessionsList = record.sessions && record.sessions.length > 0
+        const rawSessionsList = record.sessions && record.sessions.length > 0
           ? record.sessions
           : [{
               id: record.id,
@@ -1539,78 +1539,89 @@ export function AttendanceLogPage() {
               notes: (record as any).notes || '',
             }];
 
-        // Build individual session items and calculate sum of working minutes
-        let sumSessionMins = 0;
-        const parsedSessions: AttendanceSessionItem[] = [];
+        // Filter out any session with no valid clockIn time ('—' or empty)
+        const validSessions = rawSessionsList.filter(s => {
+          const st = safeFormatTime(s.clockIn);
+          return !!st && st !== '—';
+        });
 
-        for (const s of sessionsList) {
-          let sMins = 0;
-          if (s.clockIn && s.clockOut) {
-            const t1 = new Date(s.clockIn).getTime();
-            const t2 = new Date(s.clockOut).getTime();
-            if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
-              sMins = Math.round((t2 - t1) / (1000 * 60));
-            }
+        // Deduplicate sessions with identical clockIn, clockOut, workType, and notes
+        const uniqueSessions: any[] = [];
+        const seenKeys = new Set<string>();
+        for (const s of validSessions) {
+          const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueSessions.push(s);
           }
-          sumSessionMins += sMins;
-
-          const sWorkType = s.workType || 'Office';
-          const sBatchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
-          const sOrg = resolveOrgValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
-          const sLoc = resolveLocationValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
-          const sClass = resolveClassOrWorkValue(sWorkType, s.notes, (record as any).notes, sBatchId);
-
-          parsedSessions.push({
-            id: s.id,
-            start: safeFormatTime(s.clockIn),
-            end: safeFormatTime(s.clockOut),
-            duration: `${Math.floor(sMins / 60)}h ${sMins % 60}m`,
-            org: sOrg,
-            location: sLoc,
-            type: sClass.value,
-            mode: sWorkType === 'Training' ? 'Training' : 'Offline',
-            isTraining: sClass.isTraining,
-            notes: formatCleanNote(s.notes || (record as any).notes, sWorkType),
-          });
         }
 
-        const effectiveMins = sumSessionMins > 0 ? sumSessionMins : (record.totalWorkingMinutes || 0);
-        const totalHrs = Math.floor(effectiveMins / 60);
-        const remMins = effectiveMins % 60;
-        const duration = `${totalHrs}h ${remMins}m`;
+        const isHoliday = (record as any).notes?.toLowerCase().includes('holiday') || !!decHoliday;
+        const isLeave = !!activeLeave && (record.totalWorkingMinutes || 0) === 0 && uniqueSessions.length === 0;
 
-        const primarySession = parsedSessions[0] || {
-          start: safeFormatTime(record.firstClockIn),
-          end: safeFormatTime(record.lastClockOut),
-          org: 'Office',
-          location: 'Office',
-          type: 'Office',
-          mode: 'Offline',
-          isTraining: false,
-          notes: '—',
-        };
+        if (isLeave || isHoliday || uniqueSessions.length === 0) {
+          const primarySession = rawSessionsList[0];
+          const workType = primarySession?.workType || 'Office';
+          const batchId = (primarySession as any)?.batchId || (primarySession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+          const orgVal = resolveOrgValue(workType, primarySession?.notes, (record as any).notes, batchId) || 'Office';
+          const locVal = resolveLocationValue(workType, primarySession?.notes, (record as any).notes, batchId) || 'Office';
+          const classOrWorkInfo = resolveClassOrWorkValue(workType, primarySession?.notes, (record as any).notes, batchId);
 
-        const isHoliday = primarySession.type === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday') || !!decHoliday;
-        const isLeave = !!activeLeave && effectiveMins === 0;
+          rows.push({
+            date: dateStr.split('-').reverse().join('-'),
+            name: resolvedEmpName,
+            holiday: decHoliday ? (decHoliday as any).name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
+            org: isLeave ? '—' : orgVal,
+            location: isLeave ? '—' : locVal,
+            type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
+            isTraining: isLeave ? false : classOrWorkInfo.isTraining,
+            mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : (workType === 'Training' ? 'Training' : 'Offline'),
+            start: isLeave ? '—' : safeFormatTime(record.firstClockIn || primarySession?.clockIn),
+            end: isLeave ? '—' : safeFormatTime(record.lastClockOut || primarySession?.clockOut),
+            duration: isLeave ? '0h 0m' : '0h 0m',
+            expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+            note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : formatCleanNote(primarySession?.notes || (record as any).notes, workType),
+            break: isLeave ? '0h 0m' : breakTime,
+            tasks: primarySession?.notes ? [primarySession.notes] : [],
+          });
+        } else {
+          // EMIT SEPARATE ROW FOR EACH VALID SESSION
+          uniqueSessions.forEach((s, idx) => {
+            let sMins = 0;
+            if (s.clockIn && s.clockOut) {
+              const t1 = new Date(s.clockIn).getTime();
+              const t2 = new Date(s.clockOut).getTime();
+              if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
+                sMins = Math.round((t2 - t1) / (1000 * 60));
+              }
+            }
+            const sDuration = `${Math.floor(sMins / 60)}h ${sMins % 60}m`;
 
-        rows.push({
-          date: dateStr.split('-').reverse().join('-'),
-          name: resolvedEmpName,
-          holiday: decHoliday ? decHoliday.name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
-          org: isLeave ? '—' : primarySession.org,
-          location: isLeave ? '—' : primarySession.location,
-          type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : primarySession.type,
-          isTraining: isLeave ? false : primarySession.isTraining,
-          mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : primarySession.mode,
-          start: isLeave ? '—' : safeFormatTime(record.firstClockIn || sessionsList[0]?.clockIn),
-          end: isLeave ? '—' : safeFormatTime(record.lastClockOut || sessionsList[sessionsList.length - 1]?.clockOut),
-          duration: isLeave ? '0h 0m' : duration,
-          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-          note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : (primarySession.notes || '—'),
-          break: isLeave ? '0h 0m' : breakTime,
-          tasks: sessionsList.map(s => s.notes).filter(Boolean) as string[],
-          sessions: parsedSessions,
-        });
+            const sWorkType = s.workType || 'Office';
+            const sBatchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+            const sOrg = resolveOrgValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
+            const sLoc = resolveLocationValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
+            const sClass = resolveClassOrWorkValue(sWorkType, s.notes, (record as any).notes, sBatchId);
+
+            rows.push({
+              date: dateStr.split('-').reverse().join('-'),
+              name: resolvedEmpName,
+              holiday: decHoliday ? (decHoliday as any).name : d.getDay() === 0 ? 'Sunday' : '',
+              org: sOrg,
+              location: sLoc,
+              type: sClass.value,
+              isTraining: sClass.isTraining,
+              mode: sWorkType === 'Training' ? 'Training' : (sWorkType === 'Work From Home' || sWorkType === 'Remote' ? 'Remote' : 'Offline'),
+              start: safeFormatTime(s.clockIn),
+              end: safeFormatTime(s.clockOut),
+              duration: sDuration,
+              expenses: idx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+              note: formatCleanNote(s.notes || (record as any).notes, sWorkType),
+              break: idx === 0 ? breakTime : '0h 0m',
+              tasks: s.notes ? [s.notes] : [],
+            });
+          });
+        }
       } else {
         const isSunday = d.getDay() === 0;
         const isHoliday = !!decHoliday || isSunday;
@@ -1834,51 +1845,15 @@ export function AttendanceLogPage() {
                         <td style={{ padding: '8px 10px', color: isHoliday ? 'var(--status-danger)' : 'inherit', fontWeight: isHoliday ? 700 : 400 }}>
                           {r.holiday || '—'}
                         </td>
-                        <td style={{ padding: '8px 10px', fontWeight: 500 }}>
-                          {r.sessions && r.sessions.length > 1 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {r.sessions.map((s, idx) => (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--brand-muted)', color: 'var(--brand)', padding: '1px 4px', borderRadius: 3 }}>
-                                    S{idx + 1}
-                                  </span>
-                                  <span>{s.org}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            r.org
-                          )}
-                        </td>
+                        <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.org}</td>
                         <td style={{ padding: '8px 10px', fontWeight: 500, color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--brand)' }}>
-                          {r.sessions && r.sessions.length > 1 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {r.sessions.map((s, idx) => (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--bg-sunken)', color: 'var(--text-muted)', padding: '1px 4px', borderRadius: 3 }}>
-                                    S{idx + 1}
-                                  </span>
-                                  <span>{s.location || '-'}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            r.location || '-'
-                          )}
+                          {r.location || '-'}
                         </td>
                         <td style={{ padding: '8px 10px' }}>
                           {isHoliday ? (
                             <Badge tone="danger">Holiday</Badge>
                           ) : isLeave ? (
                             <Badge tone="warning">On Leave</Badge>
-                          ) : r.sessions && r.sessions.length > 1 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {r.sessions.map((s, idx) => (
-                                <Badge key={idx} tone={s.isTraining ? 'info' : s.type === 'Supervision' ? 'progress' : s.type === 'Marketing' ? 'warning' : 'neutral'}>
-                                  S{idx + 1}: {s.type}
-                                </Badge>
-                              ))}
-                            </div>
                           ) : r.type && r.type !== '—' ? (
                             <Badge tone={r.isTraining ? 'info' : r.type === 'Supervision' ? 'progress' : r.type === 'Marketing' ? 'warning' : 'neutral'}>
                               {r.type}
@@ -1892,66 +1867,21 @@ export function AttendanceLogPage() {
                             <Badge tone="danger">Holiday</Badge>
                           ) : isLeave ? (
                             <Badge tone="warning">On Leave</Badge>
-                          ) : r.sessions && r.sessions.length > 1 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {r.sessions.map((s, idx) => (
-                                <span key={idx} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                  {s.mode}
-                                </span>
-                              ))}
-                            </div>
                           ) : r.mode === 'Re-Approved' || r.mode.includes('Re-Approved') ? (
                             <Badge tone="success">Re-Approved</Badge>
                           ) : (
                             r.mode
                           )}
                         </td>
-                        <td style={{ padding: '8px 10px' }}>
-                          {r.sessions && r.sessions.length > 1 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {r.sessions.map((s, idx) => (
-                                <span key={idx} style={{ fontSize: 12.5, fontWeight: 600 }}>{s.start}</span>
-                              ))}
-                            </div>
-                          ) : (
-                            r.start
-                          )}
-                        </td>
-                        <td style={{ padding: '8px 10px' }}>
-                          {r.sessions && r.sessions.length > 1 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {r.sessions.map((s, idx) => (
-                                <span key={idx} style={{ fontSize: 12.5, fontWeight: 600 }}>{s.end}</span>
-                              ))}
-                            </div>
-                          ) : (
-                            r.end
-                          )}
-                        </td>
-                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>
-                          <div>{r.duration}</div>
-                          {r.sessions && r.sessions.length > 1 && (
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginTop: 2 }}>
-                              ({r.sessions.map(s => s.duration).join(', ')})
-                            </div>
-                          )}
-                        </td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.start}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.end}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
                         <td style={{
                           padding: '8px 10px',
                           color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--text-secondary)',
                           fontWeight: isHoliday || isLeave ? 700 : 500
                         }}>
-                          {r.sessions && r.sessions.length > 1 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              {r.sessions.map((s, idx) => (
-                                <span key={idx} style={{ fontSize: 11.5 }}>
-                                  S{idx + 1}: {s.notes || '—'}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            r.note
-                          )}
+                          {r.note}
                         </td>
                         <td style={{ padding: '8px 10px' }}>{r.break}</td>
                       </tr>
