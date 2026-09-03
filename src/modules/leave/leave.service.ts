@@ -18,7 +18,8 @@ export interface ILeaveService {
     endDate: string,
     reason: string,
     halfDay?: boolean,
-    medicalCertUrl?: string
+    medicalCertUrl?: string,
+    halfDayShift?: 'Morning' | 'Evening'
   ): Promise<Result<LeaveRecord>>;
   updateMedicalCertificate(leaveId: UUID, medicalCertUrl: string): Promise<Result<LeaveRecord>>;
   listPendingApprovals(): Promise<Result<LeaveRecord[]>>;
@@ -43,7 +44,8 @@ export class LeaveService implements ILeaveService {
     endDate: string,
     reason: string,
     halfDay?: boolean,
-    medicalCertUrl?: string
+    medicalCertUrl?: string,
+    halfDayShift?: 'Morning' | 'Evening'
   ): Promise<Result<LeaveRecord>> {
     try {
       const normalizedType =
@@ -60,6 +62,7 @@ export class LeaveService implements ILeaveService {
           endDate: endDate || startDate || new Date().toISOString().slice(0, 10),
           reason: reason || 'Leave request',
           halfDay: !!halfDay,
+          halfDayShift,
           status: 'pending',
           medicalCertUrl,
           currentStep: 'ReportingManager',
@@ -215,6 +218,37 @@ export class LeaveService implements ILeaveService {
     try {
       const rec = await this.repo.findById(leaveId);
       if (!rec) return Err(AppError.notFound('Leave record not found.'));
+
+      const r = (actor.role || '').toUpperCase();
+      const isMgmt = r === 'ADMIN' || r === 'CEO' || r === 'MANAGER';
+
+      if (!isMgmt) {
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        const startDate = rec.startDate || '';
+
+        if (startDate < todayStr) {
+          return Err(AppError.validation('Past leaves cannot be self-cancelled. Please contact Admin/CEO/Manager.'));
+        }
+
+        if (startDate === todayStr) {
+          const isEvening = rec.halfDay && (rec.halfDayShift === 'Evening' || rec.reason?.toLowerCase().includes('evening'));
+          const currentMins = now.getHours() * 60 + now.getMinutes();
+
+          if (isEvening) {
+            // Cutoff at 3:00 PM (15:00 = 900 minutes)
+            if (currentMins > 15 * 60) {
+              return Err(AppError.validation('Evening Half Day leave self-cancellation closed at 3:00 PM. Please contact Admin/CEO/Manager.'));
+            }
+          } else {
+            // Cutoff at 10:30 AM (630 minutes)
+            if (currentMins > 10 * 60 + 30) {
+              const label = rec.halfDay ? 'Morning Half Day' : 'Full Day';
+              return Err(AppError.validation(`${label} leave self-cancellation closed at 10:30 AM. Please contact Admin/CEO/Manager.`));
+            }
+          }
+        }
+      }
 
       const updated = await this.repo.update(
         leaveId,

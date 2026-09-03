@@ -584,7 +584,7 @@ export function AttendanceLogPage() {
   const [refetchTrigger, setRefetchTrigger] = useState(0);
   const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
   const [declaredHolidays, setDeclaredHolidays] = useState<Array<{ date: string; name: string }>>([]);
-  const [leaveRecords, setLeaveRecords] = useState<Array<{ employeeId: string; startDate: string; endDate: string; leaveType: string; status: string }>>([]);
+  const [leaveRecords, setLeaveRecords] = useState<Array<{ employeeId: string; startDate: string; endDate: string; leaveType: string; status: string; halfDay?: boolean; halfDayShift?: string }>>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -662,6 +662,8 @@ export function AttendanceLogPage() {
               endDate: (l.end_date || l.endDate || '').slice(0, 10),
               leaveType: l.leave_type || l.leaveType || 'Leave',
               status: l.status || 'approved',
+              halfDay: !!(l.half_day || l.halfDay),
+              halfDayShift: l.half_day_shift || l.halfDayShift,
             }))
           );
         }
@@ -1469,8 +1471,7 @@ export function AttendanceLogPage() {
         const remMins = totalMins % 60;
 
         const isHolType = workType === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday');
-        const hasClockIn = !!record.firstClockIn;
-        const isLeaveType = (workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave) && !hasClockIn;
+        const isLeaveType = (workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave);
 
         days.push({
           dateNum: dayNum,
@@ -1572,7 +1573,10 @@ export function AttendanceLogPage() {
         }
 
         const isHoliday = (record as any).notes?.toLowerCase().includes('holiday') || !!decHoliday;
-        const isLeave = !!activeLeave && (record.totalWorkingMinutes || 0) === 0 && uniqueSessions.length === 0;
+        const isLeave = !!activeLeave;
+        const leaveModeLabel = activeLeave?.halfDay
+          ? `On Leave (${activeLeave.halfDayShift || 'Half Day'})`
+          : 'On Leave';
 
         if (isLeave || isHoliday || uniqueSessions.length === 0) {
           const primarySession = rawSessionsList[0];
@@ -1591,7 +1595,7 @@ export function AttendanceLogPage() {
               location: isLeave ? '—' : locVal,
               type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
               isTraining: isLeave ? false : classOrWorkInfo.isTraining,
-              mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : (workType === 'Training' ? 'Training' : isPrimaryRemote ? 'Remote' : 'Offline'),
+              mode: isHoliday ? 'Holiday' : isLeave ? leaveModeLabel : (workType === 'Training' ? 'Training' : isPrimaryRemote ? 'Remote' : 'Offline'),
               start: isLeave ? '—' : safeFormatTime(record.firstClockIn || primarySession?.clockIn),
               end: isLeave ? '—' : safeFormatTime(record.lastClockOut || primarySession?.clockOut),
               duration: isLeave ? '0h 0m' : '0h 0m',

@@ -13,7 +13,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import type { LeaveRecord } from '../leave.repository';
 import { googleIntegration, getMonthlyFolderName } from '../../../shared/integration/google';
 
-function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean): string {
+function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean, halfDayShift?: string): string {
   if (!startDate) return '—';
   
   const formatDate = (dateStr: string) => {
@@ -29,12 +29,70 @@ function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean)
   const endFormatted = formatDate(endDate);
 
   if (halfDay) {
-    return `${startFormatted} (Half Day)`;
+    const shiftLabel = halfDayShift ? ` (${halfDayShift} Half Day)` : ' (Half Day)';
+    return `${startFormatted}${shiftLabel}`;
   }
   if (!endDate || startDate === endDate) {
     return startFormatted;
   }
   return `${startFormatted} to ${endFormatted}`;
+}
+
+function checkLeaveCancellationStatus(r: LeaveRecord, isMgmt: boolean, user: any): { canCancel: boolean; errorReason?: string } {
+  if (r.status !== 'pending' && r.status !== 'approved') {
+    return { canCancel: false };
+  }
+
+  // Management (ADMIN, CEO, MANAGER) can cancel at ANY time
+  if (isMgmt) {
+    return { canCancel: true };
+  }
+
+  // Employee owner check
+  const isOwner = r.employeeId === user?.id;
+  if (!isOwner) {
+    return { canCancel: false, errorReason: 'Only the applicant or Management can cancel this leave request.' };
+  }
+
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const startDate = r.startDate || '';
+
+  if (startDate > todayStr) {
+    return { canCancel: true };
+  }
+
+  if (startDate < todayStr) {
+    return {
+      canCancel: false,
+      errorReason: 'Leave date has passed. Self-cancellation is not permitted for past dates. Please contact Admin, CEO, or Manager to cancel.'
+    };
+  }
+
+  // Same day as leave
+  const isEvening = r.halfDay && (r.halfDayShift === 'Evening' || r.reason?.toLowerCase().includes('evening'));
+  const currentMins = now.getHours() * 60 + now.getMinutes();
+
+  if (isEvening) {
+    // Evening Half Day cutoff is 3:00 PM (15:00 = 900 minutes)
+    if (currentMins > 15 * 60) {
+      return {
+        canCancel: false,
+        errorReason: 'Self-cancellation for Evening Half Day leave closed at 3:00 PM today. Please contact Admin, CEO, or Manager to cancel.'
+      };
+    }
+  } else {
+    // Full Day / Morning Half Day cutoff is 10:30 AM (630 minutes)
+    if (currentMins > 10 * 60 + 30) {
+      const label = r.halfDay ? 'Morning Half Day' : 'Full Day';
+      return {
+        canCancel: false,
+        errorReason: `Self-cancellation for ${label} leave closed at 10:30 AM today. Please contact Admin, CEO, or Manager to cancel.`
+      };
+    }
+  }
+
+  return { canCancel: true };
 }
 
 function LeaveStatCard({ label, value, tone = 'progress', icon }: { label: string; value: number; tone?: string; icon: string }) {
@@ -147,7 +205,8 @@ export function LeaveBoard() {
       end,
       (values.reason as string) || 'Leave application',
       !!values.halfDay,
-      certName
+      certName,
+      values.halfDay ? ((values.halfDayShift as 'Morning' | 'Evening') || 'Morning') : undefined
     );
 
     if (res.ok) {
@@ -194,7 +253,7 @@ export function LeaveBoard() {
         header: 'Duration',
         render: (r) => (
           <div style={{ whiteSpace: 'nowrap', fontWeight: 500, color: 'var(--text-primary)', fontSize: 12.5 }}>
-            🗓️ {formatLeaveDates(r.startDate, r.endDate, r.halfDay)}
+            🗓️ {formatLeaveDates(r.startDate, r.endDate, r.halfDay, r.halfDayShift)}
           </div>
         ),
       },
@@ -290,17 +349,23 @@ export function LeaveBoard() {
         key: 'actions',
         header: 'Actions',
         render: (r) => {
-          const isOwner = r.employeeId === user?.id;
-          const todayStr = new Date().toISOString().slice(0, 10);
-          const targetEndDate = r.endDate || r.startDate || '';
-          const isDatePassed = targetEndDate < todayStr;
-          const canCancel = (r.status === 'pending' || r.status === 'approved') && (isMgmt || (isOwner && !isDatePassed));
+          const cancelCheck = checkLeaveCancellationStatus(r, isMgmt, user);
+          const showCancelBtn = r.status === 'pending' || r.status === 'approved';
 
           const handleCancel = async (e: React.MouseEvent) => {
             e.stopPropagation();
+            if (!cancelCheck.canCancel) {
+              toast({
+                variant: 'error',
+                title: 'Cancellation Window Closed',
+                message: cancelCheck.errorReason || 'You cannot cancel this leave.',
+              });
+              return;
+            }
+
             const ok = await confirm({
               title: 'Cancel Leave Request?',
-              message: 'Are you sure you want to cancel this leave application?',
+              message: 'Are you sure you want to cancel this leave application? Once cancelled, your actual worked hours will be reflected in the attendance log.',
             });
             if (!ok) return;
             const res = await cancelLeave(r.id, 'Cancelled by user');
@@ -308,7 +373,7 @@ export function LeaveBoard() {
               toast({ variant: 'info', title: 'Leave Cancelled', message: `Leave for ${r.startDate} has been cancelled.` });
               refreshAll(); refreshMyLeaves();
             } else {
-              toast({ variant: 'error', title: 'Error', message: 'Could not cancel leave.' });
+              toast({ variant: 'error', title: 'Error', message: res.error || 'Could not cancel leave.' });
             }
           };
 
@@ -370,12 +435,13 @@ export function LeaveBoard() {
                 </span>
               )}
 
-              {canCancel && (
+              {showCancelBtn && (
                 <Button
                   size="xs"
                   variant="secondary"
                   onClick={handleCancel}
-                  style={{ color: '#dc2626' }}
+                  style={{ color: cancelCheck.canCancel ? '#dc2626' : '#9ca3af', opacity: cancelCheck.canCancel ? 1 : 0.6 }}
+                  title={cancelCheck.errorReason}
                 >
                   🚫 Cancel
                 </Button>
@@ -524,11 +590,19 @@ export function LeaveBoard() {
 
       {/* Apply Leave Drawer */}
       <Drawer open={applyOpen} onClose={() => setApplyOpen(false)} title="Apply for Leave">
-        <Form initial={{ leaveType: 'Leave', startDate: '', endDate: '', reason: '', halfDay: false }} onSubmit={handleApplySubmit}>
+        <Form initial={{ leaveType: 'Leave', startDate: '', endDate: '', reason: '', halfDay: false, halfDayShift: 'Morning' }} onSubmit={handleApplySubmit}>
           <SelectField name="leaveType" label="Leave Type" options={leaveTypes} />
           <DatePickerField name="startDate" label="Start Date" />
           <DatePickerField name="endDate" label="End Date" />
           <CheckboxField name="halfDay" label="Apply for Half Day" />
+          <SelectField
+            name="halfDayShift"
+            label="Half Day Shift"
+            options={[
+              { value: 'Morning', label: 'Morning Half Day (Cancel cutoff 10:30 AM)' },
+              { value: 'Evening', label: 'Evening Half Day (Cancel cutoff 3:00 PM)' },
+            ]}
+          />
           <FileUploadField name="medCert" label="Medical Certificate (Optional upfront; can be uploaded after leave)" accept=".pdf,.png,.jpg" />
           <TextAreaField name="reason" label="Reason for Leave" />
           

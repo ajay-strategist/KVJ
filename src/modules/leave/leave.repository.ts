@@ -10,6 +10,7 @@ export interface LeaveRecord extends Entity {
   startDate: string; // 'YYYY-MM-DD'
   endDate: string; // 'YYYY-MM-DD'
   halfDay?: boolean;
+  halfDayShift?: 'Morning' | 'Evening';
   reason: string;
   status: LeaveStatus;
   medicalCertUrl?: string;

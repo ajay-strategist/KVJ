@@ -62,11 +62,12 @@ export function useLeave() {
     end: string,
     reason: string,
     halfDay?: boolean,
-    medUrl?: string
+    medUrl?: string,
+    halfDayShift?: 'Morning' | 'Evening'
   ) => {
     const empId = user?.id || 'emp-user';
     setLoading(true);
-    const res = await service.applyLeave(empId, type, start, end, reason, halfDay, medUrl);
+    const res = await service.applyLeave(empId, type, start, end, reason, halfDay, medUrl, halfDayShift);
     setLoading(false);
     if (res.ok) {
       setLeaves((prev) => [res.value, ...(Array.isArray(prev) ? prev : [])]);
