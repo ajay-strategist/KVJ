@@ -368,22 +368,6 @@ export function ApprovalsQueue() {
           return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required (Admin/CEO/Manager)</span>;
         }
         if (r.approvalStatus === 'pending_assignment_approval') {
-          const creator = Object.values(employees).find(emp => emp.id === r.assignedByEmployeeId);
-          const creatorRole = ((creator as any)?.role || '').toUpperCase();
-          const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
-
-          if (needsCeoOnly) {
-            if (userRole.toUpperCase() === 'CEO') {
-              return (
-                <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
-                  <Button size="sm" onClick={() => handleApproveAssignmentInline(r)}>Approve Assignment (CEO)</Button>
-                </div>
-              );
-            } else {
-              return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>CEO Approval Required</span>;
-            }
-          }
-
           return (
             <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
               <Button size="sm" onClick={() => handleApproveAssignmentInline(r)}>Approve Assignment</Button>

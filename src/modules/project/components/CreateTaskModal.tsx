@@ -123,7 +123,13 @@ export function CreateTaskModal({
       );
 
       if (res.ok) {
-        toast({ variant: 'success', title: 'Task Created', message: `Task "${form.title}" created successfully.` });
+        const isCeo = user?.role?.toUpperCase() === 'CEO';
+        const isColleague = form.assigneeId && form.assigneeId !== user?.id;
+        const msg = !isCeo && isColleague
+          ? `Task "${form.title}" created. Assignment request submitted for Admin/Manager approval.`
+          : `Task "${form.title}" created successfully.`;
+
+        toast({ variant: 'success', title: 'Task Created', message: msg });
         if (onSuccess) onSuccess();
         onClose();
         setForm({

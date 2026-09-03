@@ -203,8 +203,8 @@ export class ProjectService implements IProjectService {
       const finalAssigneeId = data.assigneeId || actor.id;
       // Self-assigned: the assignee IS the actor (same id or no assignee specified)
       const isSelfAssigned = finalAssigneeId === actor.id;
-      // CEO/ADMIN can freely assign without approval; self-assignment never needs approval
-      const needsAssignmentApproval = !isSelfAssigned && roleUpper !== 'CEO' && roleUpper !== 'ADMIN';
+      // Only CEO can assign to colleagues directly without approval; self-assignment never needs approval
+      const needsAssignmentApproval = !isSelfAssigned && roleUpper !== 'CEO';
 
       // Automatically set supervisor to assigning employee (actor.id) if not specified
       const supervisorId = data.supervisorId || actor.id;
@@ -262,14 +262,14 @@ export class ProjectService implements IProjectService {
   async updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
       const roleUpper = (actor.role || '').toUpperCase();
-      const isFullControlRole = roleUpper === 'CEO' || roleUpper === 'ADMIN';
+      const isCeo = roleUpper === 'CEO';
       const existing = await this.taskRepo.findById(taskId);
 
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
         // Self-re-assignment (actor assigns to themselves) never needs approval
         const isSelfAssigned = patch.assigneeId === actor.id;
-        // CEO/ADMIN can assign to anyone without approval gate
-        if (!isSelfAssigned && !isFullControlRole) {
+        // Only CEO can assign to anyone directly without approval gate
+        if (!isSelfAssigned && !isCeo) {
           patch = {
             ...patch,
             approvalStatus: 'pending_assignment_approval',

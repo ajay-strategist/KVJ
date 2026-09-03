@@ -376,7 +376,7 @@ export function TaskBoard({
         variant: approvalStatus ? 'warning' : 'success', 
         title: approvalStatus ? 'Assignment Pending Approval' : 'Task Created', 
         message: approvalStatus
-          ? `Assignment sent to the CEO for approval.`
+          ? `Assignment sent for Admin/Manager approval.`
           : `Task "${values.name}" created successfully.`
       });
       setCreateTaskOpen(false);
