@@ -908,7 +908,7 @@ export function AttendanceLogPage() {
 
         const empRecords = attList.filter((a: any) => a && a.employeeId === empId);
         const empLeaves = leaveList.filter(
-          (l: any) => l && l.employeeId === empId && l.status !== 'rejected' && l.status !== 'cancelled'
+          (l: any) => l && l.employeeId === empId && l.status === 'approved'
         );
         const empExpenses = expList.filter(
           (e: any) => e && e.employeeId === empId && e.status !== 'rejected'
@@ -1448,8 +1448,7 @@ export function AttendanceLogPage() {
       const activeLeave = leaveList.find(l =>
         (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
         dateStr >= l.startDate && dateStr <= l.endDate &&
-        l.status !== 'rejected' &&
-        l.status !== 'cancelled'
+        l.status === 'approved'
       );
 
       if (record) {
@@ -1531,8 +1530,7 @@ export function AttendanceLogPage() {
       const activeLeave = leaveList.find(l =>
         l && l.employeeId === (record ? record.employeeId : empId) &&
         dateStr >= l.startDate && dateStr <= l.endDate &&
-        l.status !== 'rejected' &&
-        l.status !== 'cancelled'
+        l.status === 'approved'
       );
 
       const empName = currentEmployee
@@ -1578,7 +1576,7 @@ export function AttendanceLogPage() {
           ? `On Leave (${activeLeave.halfDayShift || 'Half Day'})`
           : 'On Leave';
 
-        if (isLeave || isHoliday || uniqueSessions.length === 0) {
+        if ((isLeave && uniqueSessions.length === 0) || isHoliday || uniqueSessions.length === 0) {
           const primarySession = rawSessionsList[0];
           const workType = primarySession?.workType || 'Office';
           const batchId = (primarySession as any)?.batchId || (primarySession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
@@ -1738,7 +1736,7 @@ export function AttendanceLogPage() {
       const name = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.email;
       const initials = name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
       const onLeave = leaveList.find(
-        (l) => l.employeeId === empId && today >= l.startDate && today <= l.endDate && l.status !== 'rejected' && l.status !== 'cancelled'
+        (l) => l.employeeId === empId && today >= l.startDate && today <= l.endDate && l.status === 'approved'
       );
       const todayRec = recList.find((r) => r.employeeId === empId && r.workDate === today);
       let status: 'present' | 'leave' | 'holiday' | 'absent' = 'absent';
