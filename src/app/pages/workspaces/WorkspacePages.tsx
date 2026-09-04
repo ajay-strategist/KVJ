@@ -339,56 +339,23 @@ export const AttendancePanel = memo(function AttendancePanel({
     return () => clearInterval(timer);
   }, []);
 
-  const timelineBreakMs = useMemo(() => {
-    if (!timelineEntries || timelineEntries.length === 0) return 0;
-    let sumMs = 0;
-    let breakStartMs: number | null = null;
-
-    const parseTimeToMs = (tStr: string) => {
-      if (!tStr) return null;
-      const clean = tStr.trim();
-      const match = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
-      if (!match) return null;
-      let h = parseInt(match[1], 10);
-      const m = parseInt(match[2], 10);
-      const ampm = match[4]?.toUpperCase();
-      if (ampm === 'PM' && h < 12) h += 12;
-      if (ampm === 'AM' && h === 12) h = 0;
-      const d = new Date();
-      d.setHours(h, m, 0, 0);
-      return d.getTime();
-    };
-
-    for (const entry of timelineEntries) {
-      const titleLower = entry.title?.toLowerCase() || '';
-      const isBreakStart = titleLower.includes('started official break') || titleLower.includes('started break');
-      const isBreakEnd = titleLower.includes('resumed work session') || titleLower.includes('ended break');
-
-      if (isBreakStart) {
-        const tMs = parseTimeToMs(entry.time);
-        if (tMs) breakStartMs = tMs;
-      } else if (isBreakEnd && breakStartMs) {
-        const tMs = parseTimeToMs(entry.time);
-        if (tMs && tMs > breakStartMs) {
-          sumMs += (tMs - breakStartMs);
-        }
-        breakStartMs = null;
-      }
-    }
-    return sumMs;
-  }, [timelineEntries]);
-
   const completedBreakMs = (record?.breaks ?? []).reduce((sum: number, b: any) => {
     const sTime = b.startTime || b.start_time;
     const eTime = b.endTime || b.end_time;
-    if (eTime && sTime) return sum + (new Date(eTime).getTime() - new Date(sTime).getTime());
+    if (eTime && sTime) {
+      const diff = new Date(eTime).getTime() - new Date(sTime).getTime();
+      return sum + (diff > 0 ? diff : 0);
+    }
     return sum;
   }, 0);
 
   const completedSessionMs = (record?.sessions ?? []).reduce((sum: number, s: any) => {
     const cIn = s.clockIn || s.clock_in;
     const cOut = s.clockOut || s.clock_out;
-    if (cOut && cIn) return sum + (new Date(cOut).getTime() - new Date(cIn).getTime());
+    if (cOut && cIn) {
+      const diff = new Date(cOut).getTime() - new Date(cIn).getTime();
+      return sum + (diff > 0 ? diff : 0);
+    }
     return sum;
   }, 0);
 
@@ -403,22 +370,10 @@ export const AttendancePanel = memo(function AttendancePanel({
   const activeBreakMs = activeBreakStart ? Math.max(0, nowMs - new Date(activeBreakStart).getTime()) : 0;
 
   const dbBreakMs = ((record?.totalBreakMinutes || (record as any)?.total_break_minutes || 0) * 60000);
-  const totalBreakMs = Math.max(completedBreakMs, dbBreakMs, timelineBreakMs) + activeBreakMs;
   const grossDurationMs = completedSessionMs + activeSessionMs;
+  const rawBreakMs = Math.max(completedBreakMs, dbBreakMs) + activeBreakMs;
+  const totalBreakMs = Math.min(rawBreakMs, grossDurationMs);
   const totalWorkMs = Math.max(0, grossDurationMs - totalBreakMs);
-
-  useEffect(() => {
-    if (record && timelineBreakMs > 0 && (!record.totalBreakMinutes || record.totalBreakMinutes === 0)) {
-      const calculatedMins = Math.round(timelineBreakMs / 60000);
-      if (calculatedMins > 0) {
-        record.totalBreakMinutes = calculatedMins;
-        const actor = { id: record.employeeId, role: 'Employee' };
-        container.resolve(ATTENDANCE_REPOSITORY_TOKEN).update(record.id, {
-          totalBreakMinutes: calculatedMins
-        }, actor).catch(() => {});
-      }
-    }
-  }, [record, timelineBreakMs]);
 
   const handleCustomClockInSubmit = useCallback(async () => {
     const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : selectedMode === 'Remote' ? 'Work From Home' : 'Office';
