@@ -266,8 +266,8 @@ export function LeaveBoard() {
         key: 'status',
         header: 'Status',
         render: (r) => {
-          const tone = r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : 'danger';
-          const label = r.status === 'approved' ? 'Approved' : r.status === 'pending' ? 'Pending' : 'Rejected';
+          const tone = r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : r.status === 'cancelled' ? 'neutral' : 'danger';
+          const label = r.status === 'approved' ? 'Approved' : r.status === 'pending' ? 'Pending' : r.status === 'cancelled' ? 'Cancelled' : 'Rejected';
           return <Badge tone={tone}>{label}</Badge>;
         },
       },

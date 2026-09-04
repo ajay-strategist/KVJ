@@ -10,6 +10,14 @@ import { googleIntegration } from '../../shared/integration/google';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (val?: string): boolean => !!val && UUID_RE.test(val);
 
+export interface LeaveBalanceInfo {
+  employeeId: string;
+  leaveAllocationPerMonth: number;
+  totalAllocatedDays: number;
+  leavesTakenDays: number;
+  remainingBalanceDays: number;
+}
+
 export interface ILeaveService {
   applyLeave(
     employeeId: UUID,
@@ -28,6 +36,7 @@ export interface ILeaveService {
   cancelLeave(leaveId: UUID, actor: Actor, notes?: string): Promise<Result<LeaveRecord>>;
   getEmployeeLeaves(employeeId: UUID): Promise<Result<LeaveRecord[]>>;
   listAllLeaves(): Promise<Result<LeaveRecord[]>>;
+  getLeaveBalance(employeeId: UUID): Promise<Result<LeaveBalanceInfo>>;
 }
 
 export const LEAVE_SERVICE_TOKEN = createToken<ILeaveService>('LeaveService');
@@ -79,26 +88,7 @@ export class LeaveService implements ILeaveService {
       return Ok(record);
     } catch (err: any) {
       console.error('Error applying leave:', err);
-      const ts = new Date().toISOString();
-      const fallbackRecord: LeaveRecord = {
-        id: `leave-${Date.now()}`,
-        employeeId: employeeId || 'emp-user',
-        leaveType: leaveType || 'Leave',
-        startDate: startDate || ts.slice(0, 10),
-        endDate: endDate || ts.slice(0, 10),
-        reason: reason || 'Leave request',
-        halfDay: !!halfDay,
-        status: 'pending',
-        medicalCertUrl,
-        currentStep: 'ReportingManager',
-        createdAt: ts,
-        updatedAt: ts,
-        createdBy: employeeId || null,
-        updatedBy: employeeId || null,
-        deletedAt: null,
-        deletedBy: null,
-      };
-      return Ok(fallbackRecord);
+      return Err(AppError.internal(err?.message || 'Failed to submit leave. Please try again.'));
     }
   }
 
@@ -282,6 +272,62 @@ export class LeaveService implements ILeaveService {
       return Ok(all.data);
     } catch {
       return Err(AppError.internal());
+    }
+  }
+
+  async getLeaveBalance(employeeId: UUID): Promise<Result<LeaveBalanceInfo>> {
+    try {
+      const empRepo = container.resolve(EMPLOYEE_REPOSITORY_TOKEN);
+      const emp = await empRepo.findById(employeeId);
+      const allocationPerMonth = emp?.leaveAllocationPerMonth ?? 1;
+
+      // Current Financial Year (April 1 to March 31)
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const fyStartYear = now.getMonth() >= 3 ? currentYear : currentYear - 1;
+      const fyStartDate = `${fyStartYear}-04-01`;
+
+      // Months elapsed in current FY (April = month 3 => 1 month, Sept = month 8 => 6 months)
+      const monthsElapsed = now.getMonth() >= 3
+        ? (now.getMonth() - 3 + 1)
+        : (12 - 3 + now.getMonth() + 1);
+
+      const totalAllocatedDays = allocationPerMonth * Math.max(1, monthsElapsed);
+
+      // Fetch all leaves for employee
+      const leaves = await this.repo.findByEmployeeId(employeeId);
+
+      // Filter approved leaves in current FY
+      const approvedLeavesInFY = (leaves || []).filter((r) => {
+        if (r.status !== 'approved') return false;
+        const leaveDate = r.startDate || '';
+        return leaveDate >= fyStartDate;
+      });
+
+      let leavesTakenDays = 0;
+      for (const l of approvedLeavesInFY) {
+        if (l.halfDay) {
+          leavesTakenDays += 0.5;
+        } else {
+          const start = new Date(l.startDate).getTime();
+          const end = new Date(l.endDate || l.startDate).getTime();
+          const diffDays = Math.max(1, Math.round((end - start) / (1000 * 3600 * 24)) + 1);
+          leavesTakenDays += diffDays;
+        }
+      }
+
+      const remainingBalanceDays = Math.max(0, totalAllocatedDays - leavesTakenDays);
+
+      return Ok({
+        employeeId,
+        leaveAllocationPerMonth: allocationPerMonth,
+        totalAllocatedDays,
+        leavesTakenDays,
+        remainingBalanceDays,
+      });
+    } catch (err: any) {
+      console.error('Error calculating leave balance:', err);
+      return Err(AppError.internal(err?.message || 'Failed to calculate leave balance.'));
     }
   }
 }

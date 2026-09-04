@@ -246,20 +246,8 @@ export class AttendanceService implements IAttendanceService {
           b.id === openBreak.id ? { ...b, endTime: ts } : b
         );
       } else {
-        // Self-healing fallback: If the record status is 'on_break' but no unsaved break log
-        // exists in break_records table (e.g. started before the sync fix), heal the state.
-        const fallbackStart = record.updatedAt || record.firstClockIn || ts;
-        const breakMs = new Date(ts).getTime() - new Date(fallbackStart).getTime();
-        breakMins = Math.max(0, Math.floor(breakMs / 60000));
-
-        const fallbackBreak: BreakRecord = {
-          id: this.uuid(),
-          workSessionId: record.sessions?.[record.sessions.length - 1]?.id || this.uuid(),
-          startTime: fallbackStart,
-          endTime: ts,
-          reason: 'Auto-recovery break',
-        };
-        updatedBreaks = [...updatedBreaks, fallbackBreak];
+        // Self-healing: If status is 'on_break' but no open break record exists, heal status only without creating a phantom break.
+        console.warn('endBreak: No open break record found for employee', employeeId, '- healing status to present.');
       }
 
       const patch: Partial<AttendanceRecord> = {

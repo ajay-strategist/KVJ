@@ -100,11 +100,20 @@ export function useAttendance() {
 
         if (s.taskId) {
           taskTimerStore.pauseTask(s.taskId);
-          const timer = taskTimerStore.getTimer(s.taskId);
-          const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+          // Calculate total logged actual hours from DB task sessions
+          const allSessionsPage = await taskRepo.findMany({
+            filters: [
+              { field: 'taskId', op: 'eq', value: s.taskId },
+              { field: 'status', op: 'eq', value: 'paused' }
+            ],
+            pageSize: 1000
+          });
+          const totalPrevMins = (allSessionsPage.data || []).reduce((sum, item) => sum + (item.durationMinutes || 0), 0);
+          const totalActualHours = Number(((totalPrevMins + durationMinutes) / 60).toFixed(2));
+
           await mainTaskRepo.update(s.taskId, {
             status: 'todo',
-            actualHours: secondsToday / 3600,
+            actualHours: totalActualHours,
           }, actor);
         }
       }
@@ -123,11 +132,13 @@ export function useAttendance() {
     } catch {
       console.warn('Geolocation failed. Clocking out without coordinates.');
     }
+    // Auto-pause any running tasks BEFORE clocking out
+    await pauseRunningTasks();
+
     const res = await service.clockOut(user.id, geo);
     setLoading(false);
     if (res.ok) {
       setRecord(res.value);
-      await pauseRunningTasks();
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };
@@ -162,11 +173,19 @@ export function useAttendance() {
 
         if (s.taskId) {
           taskTimerStore.pauseTask(s.taskId);
-          const timer = taskTimerStore.getTimer(s.taskId);
-          const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+          const allSessionsPage = await taskRepo.findMany({
+            filters: [
+              { field: 'taskId', op: 'eq', value: s.taskId },
+              { field: 'status', op: 'eq', value: 'paused' }
+            ],
+            pageSize: 1000
+          });
+          const totalPrevMins = (allSessionsPage.data || []).reduce((sum, item) => sum + (item.durationMinutes || 0), 0);
+          const totalActualHours = Number(((totalPrevMins + durationMinutes) / 60).toFixed(2));
+
           await mainTaskRepo.update(s.taskId, {
             status: 'todo',
-            actualHours: secondsToday / 3600,
+            actualHours: totalActualHours,
           }, actor);
         }
 
@@ -213,11 +232,11 @@ export function useAttendance() {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
     setLoading(true);
+    await pauseRunningTasksForBreak();
     const res = await service.startBreak(user.id, reason);
     setLoading(false);
     if (res.ok) {
       setRecord(res.value);
-      await pauseRunningTasksForBreak();
       return { ok: true, value: res.value };
     }
     return { ok: false, error: res.error.message };

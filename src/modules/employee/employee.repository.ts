@@ -14,6 +14,7 @@ export interface Employee extends Entity {
   dateOfJoining: string;
   avatarUrl?: string;
   googleDriveFolderId?: string;
+  leaveAllocationPerMonth?: number;
 }
 
 export interface IEmployeeRepository extends IRepository<Employee> {

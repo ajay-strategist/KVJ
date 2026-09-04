@@ -23,7 +23,7 @@ export function useLeave() {
       setError(null);
     } else {
       setLeaves([]);
-      setError(res.error.message);
+      setError(res.error?.message || 'Failed to fetch leaves.');
     }
     setLoading(false);
   }, [service, user]);
@@ -37,7 +37,7 @@ export function useLeave() {
       setError(null);
     } else {
       setPendingApprovals([]);
-      setError(res.error.message);
+      setError(res.error?.message || 'Failed to fetch pending approvals.');
     }
     setLoading(false);
   }, [service, principal]);
@@ -51,10 +51,18 @@ export function useLeave() {
       setError(null);
     } else {
       setAllLeaves([]);
-      setError(res.error.message);
+      setError(res.error?.message || 'Failed to fetch all leaves.');
     }
     setLoading(false);
   }, [service, principal]);
+
+  const getLeaveBalance = useCallback(async (employeeId?: string) => {
+    const targetId = employeeId || user?.id;
+    if (!targetId) return null;
+    const res = await service.getLeaveBalance(targetId);
+    if (res.ok) return res.value;
+    return null;
+  }, [service, user]);
 
   const applyLeave = useCallback(async (
     type: string,
@@ -85,7 +93,7 @@ export function useLeave() {
       setPendingApprovals((prev) => prev.filter((l) => l.id !== id));
       return { ok: true, value: res.value };
     }
-    return { ok: false, error: res.error.message };
+    return { ok: false, error: res.error?.message || 'Approval failed.' };
   }, [service, principal]);
 
   const rejectLeave = useCallback(async (id: string, notes?: string) => {
@@ -97,7 +105,7 @@ export function useLeave() {
       setPendingApprovals((prev) => prev.filter((l) => l.id !== id));
       return { ok: true, value: res.value };
     }
-    return { ok: false, error: res.error.message };
+    return { ok: false, error: res.error?.message || 'Rejection failed.' };
   }, [service, principal]);
 
   const cancelLeave = useCallback(async (id: string, notes?: string) => {
@@ -112,7 +120,7 @@ export function useLeave() {
       setPendingApprovals((prev) => prev.filter((l) => l.id !== id));
       return { ok: true, value: res.value };
     }
-    return { ok: false, error: res.error.message };
+    return { ok: false, error: res.error?.message || 'Cancellation failed.' };
   }, [service, user, principal]);
 
   const uploadMedicalCertificate = useCallback(async (leaveId: string, medicalCertUrl: string) => {
@@ -123,7 +131,7 @@ export function useLeave() {
       setLeaves((prev) => prev.map((l) => (l.id === leaveId ? res.value : l)));
       return { ok: true, value: res.value };
     }
-    return { ok: false, error: res.error.message };
+    return { ok: false, error: res.error?.message || 'Upload failed.' };
   }, [service]);
 
   useEffect(() => {
@@ -143,6 +151,7 @@ export function useLeave() {
     approveLeave,
     rejectLeave,
     cancelLeave,
+    getLeaveBalance,
     refreshMyLeaves: fetchMyLeaves,
     refreshPending: fetchPendingApprovals,
     refreshAll: fetchAllLeaves,

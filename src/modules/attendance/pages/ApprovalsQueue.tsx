@@ -19,7 +19,7 @@ import { formatDateTime, formatDisplayDate } from '../../../shared/utils/date';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
-  const { pendingApprovals, approveLeave, rejectLeave, refreshPending } = useLeave();
+  const { pendingApprovals, allLeaves, approveLeave, rejectLeave, refreshPending } = useLeave();
   const { tasks, projects, approveTaskSubmission, requestRework, approveTaskAssignment, refresh: refreshProjects } = useProject();
   const [reworkTask, setReworkTask] = useState<any | null>(null);
   const [reworkNotes, setReworkNotes] = useState('');
@@ -399,6 +399,25 @@ export function ApprovalsQueue() {
       key: 'duration',
       header: 'Duration',
       render: (r) => `${r.startDate} to ${r.endDate}`,
+    },
+    {
+      key: 'balance',
+      header: 'Leave Balance',
+      render: (r: LeaveRecord) => {
+        const empLeaves = (allLeaves || pendingApprovals || []).filter((l: LeaveRecord) => l.employeeId === r.employeeId && l.status === 'approved');
+        const count = empLeaves.reduce((acc: number, l: LeaveRecord) => acc + (l.halfDay ? 0.5 : 1), 0);
+        const empObj = Object.values(employees || {}).find((e: Employee) => e.id === r.employeeId);
+        const alloc = empObj?.leaveAllocationPerMonth ?? 1;
+        const now = new Date();
+        const monthsElapsed = now.getMonth() >= 3 ? (now.getMonth() - 3 + 1) : (12 - 3 + now.getMonth() + 1);
+        const totalAlloc = alloc * monthsElapsed;
+        const rem = Math.max(0, totalAlloc - count);
+        return (
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: rem > 0 ? '#166534' : '#dc2626' }}>
+            {rem} days left ({totalAlloc} alloc)
+          </span>
+        );
+      }
     },
     {
       key: 'reason',
