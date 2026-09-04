@@ -1465,7 +1465,14 @@ export function AttendanceLogPage() {
           tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
         })) || [];
 
-        const totalMins = record.totalWorkingMinutes || 0;
+        let totalMins = record.totalWorkingMinutes || 0;
+        if (record.firstClockIn && record.lastClockOut) {
+          const endTs = new Date(record.lastClockOut).getTime();
+          const startTs = new Date(record.firstClockIn).getTime();
+          if (!isNaN(endTs) && !isNaN(startTs) && endTs > startTs) {
+            totalMins = Math.round((endTs - startTs) / 60000);
+          }
+        }
         const totalHrs = Math.floor(totalMins / 60);
         const remMins = totalMins % 60;
 
@@ -1609,7 +1616,7 @@ export function AttendanceLogPage() {
           if (cInTime) {
             const endMs = cOutTime ? new Date(cOutTime).getTime() : Date.now();
             const grossMs = Math.max(0, endMs - new Date(cInTime).getTime());
-            fallbackMins = Math.max(0, Math.round((grossMs - breakMins * 60000) / 60000));
+            fallbackMins = Math.max(0, Math.round(grossMs / 60000));
           }
           const fallbackDur = `${Math.floor(fallbackMins / 60)}h ${fallbackMins % 60}m`;
 
@@ -1640,7 +1647,7 @@ export function AttendanceLogPage() {
                 const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
                 if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
                   const grossS = Math.round((t2 - t1) / (1000 * 60));
-                  sMins = Math.max(0, grossS - (idx === 0 ? breakMins : 0));
+                  sMins = Math.max(0, grossS);
                 }
               }
               const sDuration = `${Math.floor(sMins / 60)}h ${sMins % 60}m`;

@@ -195,6 +195,25 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
   }
 
   async findActiveRecord(employeeId: UUID, dateStr: string): Promise<AttendanceRecord | null> {
+    // 1. Check for any unclosed session (status IN ('present', 'on_break')) regardless of work_date
+    const { data: openData, error: openError } = await supabase
+      .from(this.tableName)
+      .select()
+      .eq('employee_id', employeeId)
+      .in('status', ['present', 'on_break'])
+      .is('deleted_at', null)
+      .order('work_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!openError && openData) {
+      const rec = toCamelCaseObject(openData) as AttendanceRecord;
+      const attached = await this.attachSessionsToRecords([rec]);
+      const withBreaks = await this.attachBreaksToRecords(attached);
+      return withBreaks[0];
+    }
+
+    // 2. If no open session, query for the record on dateStr
     const { data, error } = await supabase
       .from(this.tableName)
       .select()

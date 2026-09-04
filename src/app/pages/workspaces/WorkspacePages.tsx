@@ -521,6 +521,27 @@ export const AttendancePanel = memo(function AttendancePanel({
           </div>
         </div>
 
+        {/* Unclosed Past Session Warning Banner */}
+        {record && (record.status === 'present' || record.status === 'on_break') && record.workDate && record.workDate < toLocalISODate(new Date()) && (
+          <div
+            style={{
+              background: '#fffbebf0',
+              border: '1px solid #fef08a',
+              borderRadius: 12,
+              padding: '12px 16px',
+              marginBottom: 14,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              color: '#92400e',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            <span>⚠️ <strong>Unclosed Attendance Session:</strong> You have an open attendance session from {record.workDate}. Please click <strong>Clock Out</strong> to complete that record before starting a new work day.</span>
+          </div>
+        )}
+
         {/* Action Controls Bar matching Sample Image */}
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
           {(currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && (
