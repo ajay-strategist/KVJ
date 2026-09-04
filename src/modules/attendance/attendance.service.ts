@@ -161,7 +161,7 @@ export class AttendanceService implements IAttendanceService {
       }
 
       const totalWorkingMins = Math.max(0, Math.floor(totalWorkingMs / 60000));
-      const totalBreakMins = (record.totalBreakMinutes || 0) + Math.floor(extraBreakMs / 60000);
+      const totalBreakMins = (record.totalBreakMinutes || 0) + Math.round(extraBreakMs / 60000);
 
       const patch: Partial<AttendanceRecord> = {
         status: 'clocked_out',
@@ -241,13 +241,27 @@ export class AttendanceService implements IAttendanceService {
 
       if (openBreak) {
         const breakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
-        breakMins = Math.max(0, Math.floor(breakMs / 60000));
+        breakMins = Math.max(0, Math.round(breakMs / 60000));
         updatedBreaks = (record.breaks ?? []).map((b) =>
           b.id === openBreak.id ? { ...b, endTime: ts } : b
         );
       } else {
-        // Self-healing: If status is 'on_break' but no open break record exists, heal status only without creating a phantom break.
-        console.warn('endBreak: No open break record found for employee', employeeId, '- healing status to present.');
+        // Self-healing: If status is 'on_break' but open break record is missing in array,
+        // estimate break time using record.updatedAt timestamp so break duration is not lost.
+        console.warn('endBreak: No open break record found for employee', employeeId, '- creating fallback break record.');
+        const breakStart = record.updatedAt || ts;
+        const breakMs = new Date(ts).getTime() - new Date(breakStart).getTime();
+        breakMins = Math.max(0, Math.round(breakMs / 60000));
+        
+        const activeSession = record.sessions?.find((s) => !s.clockOut) || record.sessions?.[record.sessions.length - 1];
+        const healedBreak: BreakRecord = {
+          id: this.uuid(),
+          workSessionId: activeSession?.id || this.uuid(),
+          startTime: breakStart,
+          endTime: ts,
+          reason: 'Official Break',
+        };
+        updatedBreaks = [...(record.breaks ?? []), healedBreak];
       }
 
       const patch: Partial<AttendanceRecord> = {

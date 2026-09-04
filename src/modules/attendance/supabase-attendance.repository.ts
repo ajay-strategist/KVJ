@@ -13,6 +13,7 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
     try {
       await supabase.from('flwdsk_work_sessions').delete().eq('attendance_record_id', attendanceRecordId);
       const rows = sessions.map((s) => ({
+        ...(s.id && s.id.length === 36 ? { id: s.id } : {}),
         attendance_record_id: attendanceRecordId,
         clock_in: s.clockIn,
         clock_out: s.clockOut || null,
@@ -73,16 +74,20 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       if (sessionIds.length > 0) {
         await supabase.from('flwdsk_break_records').delete().in('work_session_id', sessionIds);
       }
+
+      const fallbackSessionId = sessionIds.length > 0 ? sessionIds[sessionIds.length - 1] : null;
       
       const rows = breaks.map((b) => ({
-        id: b.id,
-        work_session_id: b.workSessionId,
+        ...(b.id && b.id.length === 36 ? { id: b.id } : {}),
+        work_session_id: sessionIds.includes(b.workSessionId) ? b.workSessionId : fallbackSessionId,
         start_time: b.startTime,
         end_time: b.endTime || null,
         reason: b.reason || null,
-      }));
+      })).filter((row) => !!row.work_session_id);
       
-      await supabase.from('flwdsk_break_records').insert(rows);
+      if (rows.length > 0) {
+        await supabase.from('flwdsk_break_records').insert(rows);
+      }
     } catch (e) {
       console.warn('Could not sync break_records to Supabase:', e);
     }
