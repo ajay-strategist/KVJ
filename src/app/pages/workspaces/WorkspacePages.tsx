@@ -96,7 +96,6 @@ const resolveLocationName = (locStr: string) => {
   }
   return locStr;
 };
-
 interface AttendancePanelProps {
   record: AttendanceRecord | null;
   loading: boolean;
@@ -105,6 +104,7 @@ interface AttendancePanelProps {
   startBreak: (reason?: string) => Promise<any>;
   endBreak: () => Promise<any>;
   onActivityLog?: (title: string, tone?: 'success' | 'progress' | 'info' | 'neutral') => void;
+  timelineEntries?: Array<{ title: string; time: string }>;
 }
 
 export const AttendancePanel = memo(function AttendancePanel({
@@ -115,6 +115,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   startBreak,
   endBreak,
   onActivityLog,
+  timelineEntries = [],
 }: AttendancePanelProps) {
   const device = useDevice();
   const isMobile = device === 'mobile';
@@ -277,6 +278,7 @@ export const AttendancePanel = memo(function AttendancePanel({
     if (parts.length === 2) {
       const lat = parseFloat(parts[0]);
       const lng = parseFloat(parts[1]);
+
       if (!isNaN(lat) && !isNaN(lng)) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
           headers: { 'User-Agent': 'KVJAnalyticsApp/1.0' }
@@ -337,6 +339,45 @@ export const AttendancePanel = memo(function AttendancePanel({
     return () => clearInterval(timer);
   }, []);
 
+  const timelineBreakMs = useMemo(() => {
+    if (!timelineEntries || timelineEntries.length === 0) return 0;
+    let sumMs = 0;
+    let breakStartMs: number | null = null;
+
+    const parseTimeToMs = (tStr: string) => {
+      if (!tStr) return null;
+      const clean = tStr.trim();
+      const match = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+      if (!match) return null;
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const ampm = match[4]?.toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      const d = new Date();
+      d.setHours(h, m, 0, 0);
+      return d.getTime();
+    };
+
+    for (const entry of timelineEntries) {
+      const titleLower = entry.title?.toLowerCase() || '';
+      const isBreakStart = titleLower.includes('started official break') || titleLower.includes('started break');
+      const isBreakEnd = titleLower.includes('resumed work session') || titleLower.includes('ended break');
+
+      if (isBreakStart) {
+        const tMs = parseTimeToMs(entry.time);
+        if (tMs) breakStartMs = tMs;
+      } else if (isBreakEnd && breakStartMs) {
+        const tMs = parseTimeToMs(entry.time);
+        if (tMs && tMs > breakStartMs) {
+          sumMs += (tMs - breakStartMs);
+        }
+        breakStartMs = null;
+      }
+    }
+    return sumMs;
+  }, [timelineEntries]);
+
   const completedBreakMs = (record?.breaks ?? []).reduce((sum: number, b: any) => {
     const sTime = b.startTime || b.start_time;
     const eTime = b.endTime || b.end_time;
@@ -362,9 +403,22 @@ export const AttendancePanel = memo(function AttendancePanel({
   const activeBreakMs = activeBreakStart ? Math.max(0, nowMs - new Date(activeBreakStart).getTime()) : 0;
 
   const dbBreakMs = ((record?.totalBreakMinutes || (record as any)?.total_break_minutes || 0) * 60000);
-  const totalBreakMs = Math.max(completedBreakMs, dbBreakMs) + activeBreakMs;
+  const totalBreakMs = Math.max(completedBreakMs, dbBreakMs, timelineBreakMs) + activeBreakMs;
   const grossDurationMs = completedSessionMs + activeSessionMs;
   const totalWorkMs = Math.max(0, grossDurationMs - totalBreakMs);
+
+  useEffect(() => {
+    if (record && timelineBreakMs > 0 && (!record.totalBreakMinutes || record.totalBreakMinutes === 0)) {
+      const calculatedMins = Math.round(timelineBreakMs / 60000);
+      if (calculatedMins > 0) {
+        record.totalBreakMinutes = calculatedMins;
+        const actor = { id: record.employeeId, role: 'Employee' };
+        container.resolve(ATTENDANCE_REPOSITORY_TOKEN).update(record.id, {
+          totalBreakMinutes: calculatedMins
+        }, actor).catch(() => {});
+      }
+    }
+  }, [record, timelineBreakMs]);
 
   const handleCustomClockInSubmit = useCallback(async () => {
     const type = selectedMode === 'Training' ? `Training: ${selectedBatch}` : selectedMode === 'Remote' ? 'Work From Home' : 'Office';
@@ -2541,6 +2595,7 @@ export function MyDayPage() {
         startBreak={startBreak}
         endBreak={endBreak}
         onActivityLog={handleActivityLog}
+        timelineEntries={timelineEntries}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
