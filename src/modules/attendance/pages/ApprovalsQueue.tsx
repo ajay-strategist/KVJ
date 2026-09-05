@@ -111,6 +111,27 @@ export function ApprovalsQueue() {
     return emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
   };
 
+  const getSupervisorName = (t: any) => {
+    const supId = t.supervisorId || t.assignedByEmployeeId || t.assigned_by_employee_id || t.supervisor_id;
+    if (supId && employees[supId]) {
+      const emp = employees[supId];
+      return `${emp.firstName} ${emp.lastName}`;
+    }
+    if (typeof t.supervisor === 'string' && t.supervisor && t.supervisor !== '—' && t.supervisor !== 'None') {
+      return t.supervisor;
+    }
+    if (typeof t.assignedBy === 'string' && t.assignedBy) {
+      return t.assignedBy;
+    }
+    const proj = projects.find((p) => p.id === t.projectId);
+    if (proj && (proj as any).supervisorId && employees[(proj as any).supervisorId]) {
+      const emp = employees[(proj as any).supervisorId];
+      return `${emp.firstName} ${emp.lastName}`;
+    }
+    const fallback = empName(supId);
+    return fallback !== 'Unknown Employee' ? fallback : 'Supervisor';
+  };
+
   const [selectedLeaveIds, setSelectedLeaveIds] = useState<string[]>([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
 
@@ -327,6 +348,11 @@ export function ApprovalsQueue() {
         const emp = Object.values(employees).find(e => e.id === r.assigneeId);
         return emp ? `${emp.firstName} ${emp.lastName}` : 'Unassigned';
       }
+    },
+    {
+      key: 'supervisor',
+      header: 'Supervisor',
+      render: (r) => getSupervisorName(r),
     },
     {
       key: 'type',
@@ -616,7 +642,7 @@ export function ApprovalsQueue() {
                   <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 13 }}>
                       <strong>{projects.find((p) => p.id === t.projectId)?.title || 'Office Task'}:</strong> {t.title}{' '}
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Assigned to: {empName(t.assigneeId)})</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Supervisor: {getSupervisorName(t)} · Assigned to: {empName(t.assigneeId)})</span>
                     </div>
                     {canApprove && (
                       <Button size="sm" onClick={() => handleApproveAssignmentInline(t)}>
