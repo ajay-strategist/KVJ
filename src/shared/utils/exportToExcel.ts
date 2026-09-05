@@ -17,6 +17,9 @@ export function exportToExcel(
   for (const row of rows) {
     const rowString = row
       .map((val) => {
+        if (typeof val === 'number' && !isNaN(val)) {
+          return String(val);
+        }
         const str = val === null || val === undefined ? '' : String(val);
         return `"${str.replace(/"/g, '""')}"`;
       })

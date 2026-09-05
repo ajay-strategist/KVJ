@@ -309,6 +309,9 @@ export function AttendanceSummaryPanels({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Working Days in Month:</span> <strong>{stats.workingDaysInMonth}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Days to be Worked:</span> <strong>{stats.daysToBeWorked}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--brand)', fontWeight: 700 }}>
+              <span>Expected Office Hours (8h/day):</span> <strong>{(stats.workingDays * 8)} hrs</strong>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--status-danger)' }}><span>No. of Leaves:</span> <strong>{stats.noOfLeaves}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--brand)' }}><span>Holiday Worked:</span> <strong>{stats.holidayWorked}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Working Days:</span> <strong>{stats.workingDays}</strong></div>

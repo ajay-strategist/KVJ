@@ -24,6 +24,7 @@ export interface IAttendanceService {
   requestCorrection(recordId: UUID, field: string, proposed: string, reason: string, actor: Actor): Promise<Result<void>>;
   approveCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>>;
   rejectCorrection(correctionId: UUID, actor: Actor, notes?: string): Promise<Result<void>>;
+  forceClockOutSession(recordId: UUID, clockOutTime?: string, notes?: string, actor?: Actor): Promise<Result<void>>;
 }
 
 export const ATTENDANCE_SERVICE_TOKEN = createToken<IAttendanceService>('AttendanceService');
@@ -600,6 +601,56 @@ export class AttendanceService implements IAttendanceService {
       return Ok(undefined);
     } catch (e) {
       console.error('Failed to reject attendance correction:', e);
+      return Err(AppError.internal((e as any)?.message));
+    }
+  }
+
+  async forceClockOutSession(recordId: UUID, clockOutTime?: string, notes?: string, actor?: Actor): Promise<Result<void>> {
+    try {
+      const record = await this.repo.findById(recordId);
+      if (!record) return Err(AppError.notFound('Attendance record not found.'));
+
+      const workDate = record.workDate || todayStr();
+      const outTs = clockOutTime || `${workDate}T17:30:00`;
+
+      let totalMins = record.totalWorkingMinutes || 0;
+      if (record.firstClockIn) {
+        const startMs = new Date(record.firstClockIn).getTime();
+        const endMs = new Date(outTs).getTime();
+        if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+          totalMins = Math.round((endMs - startMs) / 60000) - (record.totalBreakMinutes || 0);
+          totalMins = Math.max(0, totalMins);
+        }
+      }
+
+      const updatedSessions = (record.sessions || []).map((s) => {
+        if (!s.clockOut) {
+          return { ...s, clockOut: outTs, notes: notes ? `${s.notes || ''} [Force Closed: ${notes}]` : s.notes };
+        }
+        return s;
+      });
+
+      const updatedBreaks = (record.breaks || []).map((b) => {
+        if (!b.endTime) {
+          return { ...b, endTime: outTs };
+        }
+        return b;
+      });
+
+      const patch: Partial<AttendanceRecord> = {
+        status: 'clocked_out',
+        lastClockOut: outTs,
+        totalWorkingMinutes: totalMins > 0 ? totalMins : 480,
+        sessions: updatedSessions,
+        breaks: updatedBreaks,
+        updatedAt: nowIso(),
+        updatedBy: actor?.id || record.employeeId,
+      };
+
+      await this.repo.update(record.id, patch, actor || { id: record.employeeId, role: 'Admin' });
+      return Ok(undefined);
+    } catch (e) {
+      console.error('Failed to force clock out session:', e);
       return Err(AppError.internal((e as any)?.message));
     }
   }

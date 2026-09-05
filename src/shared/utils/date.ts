@@ -67,4 +67,40 @@ export function formatDateTime(val?: string | Date | null): string {
   return `${day}-${m}-${y} ${formattedHours}:${minutes} ${ampm}`;
 }
 
+/** Standardize any Date, ISO string, or time string to 12-hour format (hh:mm AM/PM) for UI rendering. */
+export function formatDisplayTime(val?: string | Date | null): string {
+  if (!val) return '—';
+  const str = String(val).trim();
+  if (!str || str === '—') return '—';
 
+  // If already formatted with AM/PM (e.g. "09:04 AM" or "9:04 AM"), return normalized
+  const match12 = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+  if (match12) {
+    const h = String(parseInt(match12[1], 10)).padStart(2, '0');
+    const m = match12[2];
+    const ampm = match12[3].toUpperCase();
+    return `${h}:${m} ${ampm}`;
+  }
+
+  // Parse ISO string or Date object
+  const dt = typeof val === 'string' ? new Date(val) : val;
+  if (!isNaN(dt.getTime())) {
+    let hours = dt.getHours();
+    const minutes = String(dt.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+  }
+
+  // Parse 24-hour HH:mm string (e.g. "16:26" or "09:04")
+  const match24 = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match24) {
+    let h = parseInt(match24[1], 10);
+    const m = match24[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+  }
+
+  return String(val);
+}

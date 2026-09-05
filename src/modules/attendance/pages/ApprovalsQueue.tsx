@@ -16,6 +16,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { formatDateTime, formatDisplayDate } from '../../../shared/utils/date';
+import { supabase } from '../../../shared/integration/supabase';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
@@ -30,6 +31,10 @@ export function ApprovalsQueue() {
 
   const [corrections, setCorrections] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Record<string, Employee>>({});
+  const [unclosedSessions, setUnclosedSessions] = useState<any[]>([]);
+  const [selectedUnclosedRecord, setSelectedUnclosedRecord] = useState<any | null>(null);
+  const [forceClockOutTime, setForceClockOutTime] = useState('17:30');
+  const [forceClockOutNotes, setForceClockOutNotes] = useState('');
   
   const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
   const [selectedCorrection, setSelectedCorrection] = useState<any | null>(null);
@@ -39,6 +44,11 @@ export function ApprovalsQueue() {
   const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole.toUpperCase());
 
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval'>('all');
+
+  const pendingAssignmentTasks = useMemo(() => {
+    const safeTasks = Array.isArray(tasks) ? tasks : [];
+    return safeTasks.filter((t) => !t.deletedAt && t.approvalStatus === 'pending_assignment_approval');
+  }, [tasks]);
 
   const filteredTaskApprovals = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -57,6 +67,23 @@ export function ApprovalsQueue() {
     });
   }, [tasks, taskStatusFilter]);
 
+  const fetchUnclosedSessions = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from('flwdsk_attendance')
+        .select('*')
+        .neq('status', 'clocked_out')
+        .lt('work_date', today)
+        .is('deleted_at', null)
+        .order('work_date', { ascending: false });
+
+      if (data) setUnclosedSessions(data);
+    } catch (e) {
+      console.warn('Error fetching unclosed sessions:', e);
+    }
+  }, []);
+
   const fetchCorrectionsAndEmployees = useCallback(async () => {
     try {
       const cRes = await attService.listPendingCorrections();
@@ -68,16 +95,18 @@ export function ApprovalsQueue() {
         eRes.value.forEach((e) => { if (e && e.id) map[e.id] = e; });
         setEmployees(map);
       }
+      fetchUnclosedSessions();
     } catch (e) {
       console.warn('ApprovalsQueue fetch error:', e);
     }
-  }, [attService, empService]);
+  }, [attService, empService, fetchUnclosedSessions]);
 
   useEffect(() => {
     fetchCorrectionsAndEmployees();
   }, [fetchCorrectionsAndEmployees, pendingApprovals]);
 
-  const empName = (empId: string) => {
+  const empName = (empId?: string) => {
+    if (!empId) return 'Unknown Employee';
     const emp = employees[empId];
     return emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
   };
@@ -507,12 +536,99 @@ export function ApprovalsQueue() {
     },
   ];
 
+  const handleConfirmForceClockOut = async () => {
+    if (!selectedUnclosedRecord) return;
+    const ok = await confirm({
+      title: 'Force Clock Out Session?',
+      message: 'This will close the open attendance session for past date and set status to clocked out.',
+    });
+    if (!ok) return;
+
+    const workDate = selectedUnclosedRecord.work_date || selectedUnclosedRecord.workDate;
+    const outTimeIso = `${workDate}T${forceClockOutTime || '17:30'}:00`;
+    const res = await attService.forceClockOutSession(
+      selectedUnclosedRecord.id,
+      outTimeIso,
+      forceClockOutNotes,
+      { id: user!.id, role: user!.role }
+    );
+
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Session Closed', message: 'Attendance session force clocked out.' });
+      setSelectedUnclosedRecord(null);
+      setForceClockOutNotes('');
+      fetchUnclosedSessions();
+    } else {
+      toast({ variant: 'error', title: 'Force Clock Out Failed', message: res.error.message });
+    }
+  };
+
+  const unclosedColumns: Column<any>[] = [
+    {
+      key: 'workDate',
+      header: 'Date',
+      render: (r) => formatDisplayDate(r.work_date || r.workDate),
+    },
+    {
+      key: 'employee',
+      header: 'Employee Name',
+      render: (r) => empName(r.employee_id || r.employeeId),
+    },
+    {
+      key: 'clockIn',
+      header: 'Clock In Time',
+      render: (r) => formatDateTime(r.first_clock_in || r.firstClockIn),
+    },
+    {
+      key: 'workType',
+      header: 'Work Mode',
+      render: (r) => (r.sessions?.[0]?.workType || r.work_type || 'Office'),
+    },
+    {
+      key: 'actions',
+      header: 'Action',
+      render: (r) => {
+        if (!canApprove) return <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Read Only</span>;
+        return (
+          <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); setSelectedUnclosedRecord(r); }}>
+            🔴 Force Clock Out
+          </Button>
+        );
+      },
+    },
+  ];
+
   const tabs = [
     {
       id: 'tasks',
       label: `Task Approvals (${filteredTaskApprovals.length})`,
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* TASK-014 Banner Card for Pending Task Assignment Approvals */}
+          {pendingAssignmentTasks.length > 0 && (
+            <div style={{ background: 'var(--brand-muted)', border: '1px solid var(--brand)', borderRadius: 'var(--radius-md)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--brand)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>⚡ Pending Task Creation / Assignment Approvals ({pendingAssignmentTasks.length})</span>
+                <span style={{ fontSize: 11.5, fontWeight: 500 }}>Requires Management Approval before starting timer</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {pendingAssignmentTasks.map((t) => (
+                  <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 13 }}>
+                      <strong>{projects.find((p) => p.id === t.projectId)?.title || 'Office Task'}:</strong> {t.title}{' '}
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Assigned to: {empName(t.assigneeId)})</span>
+                    </div>
+                    {canApprove && (
+                      <Button size="sm" onClick={() => handleApproveAssignmentInline(t)}>
+                        Approve Task
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, alignSelf: 'flex-end' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>🔍 Filter Status:</span>
             <select
@@ -569,6 +685,18 @@ export function ApprovalsQueue() {
           rows={corrections}
           rowKey={(r) => r.id}
           onRowClick={(r) => setSelectedCorrection(r)}
+        />
+      ),
+    },
+    {
+      id: 'unclosed',
+      label: `Unclosed Sessions (${unclosedSessions.length})`,
+      content: (
+        <DataTable
+          columns={unclosedColumns}
+          rows={unclosedSessions}
+          rowKey={(r) => r.id}
+          onRowClick={(r) => setSelectedUnclosedRecord(r)}
         />
       ),
     },
@@ -744,6 +872,51 @@ export function ApprovalsQueue() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button variant="danger" onClick={handleRejectCorrection}>Reject</Button>
               <Button onClick={handleApproveCorrection}>Approve & Update</Button>
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* Force Clock Out Drawer */}
+      <Drawer open={!!selectedUnclosedRecord} onClose={() => setSelectedUnclosedRecord(null)} title="Admin Force Clock Out Session">
+        {selectedUnclosedRecord && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: 'var(--bg-sunken)', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}>
+              <div><strong>Employee:</strong> {empName(selectedUnclosedRecord.employee_id || selectedUnclosedRecord.employeeId)}</div>
+              <div><strong>Work Date:</strong> {formatDisplayDate(selectedUnclosedRecord.work_date || selectedUnclosedRecord.workDate)}</div>
+              <div><strong>Clock In Time:</strong> {formatDateTime(selectedUnclosedRecord.first_clock_in || selectedUnclosedRecord.firstClockIn)}</div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+                Clock Out Time (HH:MM) *
+              </label>
+              <input
+                type="time"
+                className="kvj-input"
+                value={forceClockOutTime}
+                onChange={(e) => setForceClockOutTime(e.target.value)}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+                Admin Notes / Reason
+              </label>
+              <textarea
+                className="kvj-textarea"
+                rows={3}
+                placeholder="Reason for force clock-out (e.g. Employee forgot to clock out)..."
+                value={forceClockOutNotes}
+                onChange={(e) => setForceClockOutNotes(e.target.value)}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Button variant="secondary" onClick={() => setSelectedUnclosedRecord(null)}>Cancel</Button>
+              <Button variant="danger" onClick={handleConfirmForceClockOut}>🔴 Confirm Force Clock Out</Button>
             </div>
           </div>
         )}

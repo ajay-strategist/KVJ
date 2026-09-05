@@ -13,7 +13,7 @@ import { useProject } from '../../project/hooks/useProject';
 import { supabase } from '../../../shared/integration/supabase';
 import { Authorize } from '../../../shared/permissions/react';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
-import { formatDisplayDate } from '../../../shared/utils/date';
+import { formatDisplayDate, todayISO } from '../../../shared/utils/date';
 
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   }, [getUsers]);
 
   const getEmployeeUser = (email: string) => {
-    return usersList.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    return usersList.find((u) => u.email?.toLowerCase() === email?.toLowerCase());
   };
 
   const getEmployeeRole = (email: string): string => {
@@ -59,14 +59,25 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   useEffect(() => {
     async function loadStatusInfo() {
       try {
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = todayISO();
         const { data: attData } = await supabase
-          .from('flwdsk_attendance_records')
+          .from('flwdsk_attendance')
           .select('*')
           .eq('work_date', todayStr)
           .is('deleted_at', null);
-        if (attData) {
-          setAttendanceRecords(attData);
+
+        let finalAttData = attData || [];
+        if (!finalAttData.length) {
+          const { data: altAttData } = await supabase
+            .from('flwdsk_attendance_records')
+            .select('*')
+            .eq('work_date', todayStr)
+            .is('deleted_at', null);
+          if (altAttData) finalAttData = altAttData;
+        }
+
+        if (finalAttData) {
+          setAttendanceRecords(finalAttData);
         }
 
         const { data: taskData } = await supabase

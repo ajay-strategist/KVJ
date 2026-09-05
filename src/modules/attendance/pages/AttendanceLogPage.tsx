@@ -15,7 +15,7 @@ import { LEAVE_REPOSITORY_TOKEN } from '../../leave/leave.repository';
 import { TASK_REPOSITORY_TOKEN, PROJECT_REPOSITORY_TOKEN } from '../../project/project.repository';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
-import { toLocalISODate, todayISO } from '../../../shared/utils/date';
+import { toLocalISODate, todayISO, formatDisplayTime } from '../../../shared/utils/date';
 import { useTraining } from '../../training/hooks/useTraining';
 import { cleanBatchCode } from '../../training/utils/batch-formatter';
 import { supabase } from '../../../shared/integration/supabase';
@@ -41,40 +41,7 @@ function safeFormatTime(raw?: string): string {
   if (!raw) return '—';
   const str = String(raw).trim();
   if (!str || str === '—') return '—';
-
-  if (str.includes('T')) {
-    try {
-      const d = new Date(str);
-      if (!isNaN(d.getTime())) {
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mm = String(d.getMinutes()).padStart(2, '0');
-        return `${hh}:${mm}`;
-      }
-    } catch (e) { void e; }
-  }
-
-  const match = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
-  if (match) {
-    let h = parseInt(match[1], 10);
-    const m = match[2];
-    const ampm = match[3]?.toUpperCase();
-    if (ampm) {
-      if (ampm === 'PM' && h < 12) h += 12;
-      if (ampm === 'AM' && h === 12) h = 0;
-    }
-    return `${String(h).padStart(2, '0')}:${m}`;
-  }
-
-  try {
-    const d = new Date(str);
-    if (!isNaN(d.getTime())) {
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      return `${hh}:${mm}`;
-    }
-  } catch (e) { void e; }
-
-  return '—';
+  return formatDisplayTime(raw);
 }
 
 function formatCleanNote(rawNote?: string, workType?: string): string {
@@ -1871,18 +1838,76 @@ export function AttendanceLogPage() {
                         noteLower.includes('on leave')
                       );
 
+                    const isHalfDay = isLeave && (modeLower.includes('half day') || noteLower.includes('half day'));
+
+                    // Parse duration net working minutes
+                    const parseDurMins = (durStr?: string, breakStr?: string): number => {
+                      if (!durStr || durStr === '—') return 0;
+                      const dM = durStr.match(/(?:(\d+)h)?\s*(?:(\d+)m)?/i);
+                      let durM = 0;
+                      if (dM) {
+                        durM += (parseInt(dM[1] || '0', 10) * 60) + parseInt(dM[2] || '0', 10);
+                      }
+                      const bM = (breakStr || '').match(/(?:(\d+)h)?\s*(?:(\d+)m)?/i);
+                      let brkM = 0;
+                      if (bM) {
+                        brkM += (parseInt(bM[1] || '0', 10) * 60) + parseInt(bM[2] || '0', 10);
+                      }
+                      return Math.max(0, durM - brkM);
+                    };
+
+                    const netMins = parseDurMins(r.duration, r.break);
+                    const orgLocLower = `${r.org || ''} ${r.location || ''}`.toLowerCase();
+                    const isOfficeMode = orgLocLower.includes('office') || orgLocLower.includes('kvj') || !r.org || r.org === '—';
+
+                    const isShortDuration =
+                      !isHoliday &&
+                      isOfficeMode &&
+                      r.start !== '—' &&
+                      ((isHalfDay && netMins < 210) || (!isLeave && netMins < 420));
+
+                    const parseTimeToMinutes = (tStr?: string): number | null => {
+                      if (!tStr || tStr === '—') return null;
+                      const m = tStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+                      if (!m) return null;
+                      let h = parseInt(m[1], 10);
+                      const mins = parseInt(m[2], 10);
+                      const ampm = m[3]?.toUpperCase();
+                      if (ampm) {
+                        if (ampm === 'PM' && h < 12) h += 12;
+                        if (ampm === 'AM' && h === 12) h = 0;
+                      }
+                      return h * 60 + mins;
+                    };
+
+                    const startMins = parseTimeToMinutes(r.start);
+                    const endMins = parseTimeToMinutes(r.end);
+                    const isLate = startMins !== null && startMins >= (9 * 60 + 31); // 09:31 AM or later
+                    const isEarly = endMins !== null && endMins <= (17 * 60 + 29); // 05:29 PM or earlier
+
+                    const isLateOrEarly = !isHoliday && !isLeave && !isShortDuration && isOfficeMode && (isLate || isEarly);
+
+                    // 4 Distinct Color Wheel Tints
                     const bg = isHoliday
-                      ? 'rgba(239, 68, 68, 0.12)'
+                      ? '#FEE2E2' // 🔴 Soft Pink/Red
                       : isLeave
-                      ? 'rgba(245, 158, 11, 0.16)'
+                      ? '#FEF9C3' // 🟡 Soft Yellow/Gold
+                      : isShortDuration
+                      ? '#E0F2FE' // 🔵 Soft Sky/Ocean Blue
+                      : isLateOrEarly
+                      ? '#F3E8FF' // 🟣 Soft Lavender/Purple
                       : i % 2 === 0
                       ? 'var(--bg-surface)'
                       : 'var(--bg-sunken)';
 
                     const rowTextColor = isHoliday
-                      ? 'var(--status-danger)'
+                      ? '#DC2626'
                       : isLeave
-                      ? '#d97706'
+                      ? '#B45309'
+                      : isShortDuration
+                      ? '#0369A1'
+                      : isLateOrEarly
+                      ? '#7E22CE'
                       : 'inherit';
 
                     return (

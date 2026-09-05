@@ -243,7 +243,7 @@ function DynamicExpenseForm({
       ) : (
         <>
           <TextField name="amount" label="Expense Amount (₹) *" placeholder="e.g. 150.00" rules={validationRules.amount} />
-          <FileUploadField name="receiptFile" label="Upload Receipt Image / PDF (Stored & Linked to Google Sheet) *" rules={validationRules.receiptFile} accept="image/*,.pdf" />
+          <FileUploadField name="receiptFile" label="Upload Receipt Image / PDF (Optional)" accept="image/*,.pdf" />
         </>
       )}
 

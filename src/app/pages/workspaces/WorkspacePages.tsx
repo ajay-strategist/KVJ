@@ -27,7 +27,7 @@ import { ATTENDANCE_SERVICE_TOKEN } from '../../../modules/attendance/attendance
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
 import { LEAVE_REPOSITORY_TOKEN } from '../../../modules/leave/leave.repository';
 import { TASK_REPOSITORY_TOKEN } from '../../../modules/project/project.repository';
-import { toLocalISODate } from '../../../shared/utils/date';
+import { toLocalISODate, formatDisplayTime } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
 import { CreateTaskModal } from '../../../modules/project/components/CreateTaskModal';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
@@ -993,6 +993,7 @@ export const TaskWidget = memo(function TaskWidget({
   onSubmitReview: (id: string, title: string) => void;
   onSyncTask?: (id: string, secondsToday: number, active: boolean, underReview?: boolean) => void;
 }) {
+  const { user } = useAuth();
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const [showSubmitted, setShowSubmitted] = useState(false);
@@ -1236,23 +1237,40 @@ export const TaskWidget = memo(function TaskWidget({
                            📩 Submitted &amp; Requires Approval
                          </span>
                        ) : (
-                         <>
-                           <Button
-                             variant={t.active ? 'secondary' : 'primary'}
-                             onClick={() => onToggleTask(t.id, t.title, t.active)}
-                             style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
-                           >
-                             {t.active ? '⏸ Pause' : '▶ Start'}
-                           </Button>
+                          (() => {
+                            const isMyAssignee = Boolean(
+                              user?.id && (
+                                (t as any).assigneeId === user.id ||
+                                (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
+                              )
+                            );
+                            if (!isMyAssignee) {
+                              return (
+                                <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                                  👁 Supervisor View
+                                </span>
+                              );
+                            }
+                            return (
+                              <>
+                                <Button
+                                  variant={t.active ? 'secondary' : 'primary'}
+                                  onClick={() => onToggleTask(t.id, t.title, t.active)}
+                                  style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                                >
+                                  {t.active ? '⏸ Pause' : '▶ Start'}
+                                </Button>
 
-                           <Button
-                             onClick={() => onSubmitReview(t.id, t.title)}
-                             style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
-                           >
-                             📩 Submit
-                           </Button>
-                         </>
-                       )}
+                                <Button
+                                  onClick={() => onSubmitReview(t.id, t.title)}
+                                  style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                                >
+                                  📩 Submit
+                                </Button>
+                              </>
+                            );
+                          })()
+                        )}
                      </div>
                    </div>
                  </div>
@@ -1407,7 +1425,14 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
 
       const dayTasks = (tasks || []).filter((t) => {
         const status = (t.status || '').toLowerCase();
-        if (status === 'done' || status.includes('completed') || status.includes('approved')) {
+        const appStatus = (t as any).approvalStatus || '';
+        if (
+          status === 'done' ||
+          status === 'review' ||
+          status.includes('completed') ||
+          status.includes('approved') ||
+          appStatus === 'pending_task_approval'
+        ) {
           return false;
         }
 
@@ -2054,15 +2079,82 @@ export function MyDayPage() {
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(userTimelineKey);
-      const parsed = saved ? JSON.parse(saved) : [];
-      const filtered = parsed.filter((e: any) => !e.title?.includes('System initialized'));
-      setTimelineEntries(filtered);
-    } catch {
-      setTimelineEntries([]);
+    const localEntries = (() => {
+      try {
+        const saved = localStorage.getItem(userTimelineKey);
+        const parsed = saved ? JSON.parse(saved) : [];
+        return parsed.filter((e: any) => !e.title?.includes('System initialized'));
+      } catch {
+        return [];
+      }
+    })();
+
+    // Synthesize database attendance events from `record`
+    const dbEntries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral'; date?: string }> = [];
+
+    if (record) {
+      const recDate = record.workDate || toLocalISODate(new Date());
+
+      // 1. First Clock In Event
+      if (record.firstClockIn) {
+        const formattedTime = formatDisplayTime(record.firstClockIn);
+        const workType = (record.sessions?.[0]?.workType || (record as any).workType || 'Office');
+        dbEntries.push({
+          id: `db-clockin-${record.id || recDate}`,
+          title: `Clocked in for ${workType}`,
+          time: formattedTime,
+          tone: 'success',
+          date: recDate,
+        });
+      }
+
+      // 2. Break Events
+      if (Array.isArray(record.breaks)) {
+        record.breaks.forEach((b: any, idx: number) => {
+          if (b.startTime) {
+            dbEntries.push({
+              id: `db-break-start-${record.id || recDate}-${idx}`,
+              title: `Started Break: ${b.reason || 'Rest Break'}`,
+              time: formatDisplayTime(b.startTime),
+              tone: 'info',
+              date: recDate,
+            });
+          }
+          if (b.endTime) {
+            dbEntries.push({
+              id: `db-break-end-${record.id || recDate}-${idx}`,
+              title: `Ended Break`,
+              time: formatDisplayTime(b.endTime),
+              tone: 'info',
+              date: recDate,
+            });
+          }
+        });
+      }
+
+      // 3. Clock Out Event
+      if (record.lastClockOut) {
+        dbEntries.push({
+          id: `db-clockout-${record.id || recDate}`,
+          title: `Clocked out work session`,
+          time: formatDisplayTime(record.lastClockOut),
+          tone: 'neutral',
+          date: recDate,
+        });
+      }
     }
-  }, [userTimelineKey]);
+
+    // Merge local entries + db entries, deduplicating by title + time
+    const mergedMap = new Map<string, any>();
+    [...dbEntries, ...localEntries].forEach((entry) => {
+      const key = `${entry.date || ''}_${entry.title}_${entry.time}`;
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, entry);
+      }
+    });
+
+    setTimelineEntries(Array.from(mergedMap.values()));
+  }, [userTimelineKey, record]);
 
   const handleSyncTask = useCallback((id: string, secondsToday: number, active: boolean, underReview?: boolean) => {
     updateTask(id, {
@@ -2151,7 +2243,10 @@ export function MyDayPage() {
               active = stored.active;
             }
           }
-          if (stored.underReview !== undefined && !isRework && !isApproved) {
+          const dbUnderReview = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval';
+          if (dbUnderReview) {
+            underReview = true;
+          } else if (stored.underReview !== undefined && !isRework && !isApproved) {
             underReview = stored.underReview;
           }
         }
@@ -2243,7 +2338,7 @@ export function MyDayPage() {
   }, []);
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = formatDisplayTime(new Date());
     const dateStr = toLocalISODate(new Date());
     const newEntry = { id: String(Date.now()), title, time: timeStr, tone, date: dateStr };
     setTimelineEntries((prev) => {
