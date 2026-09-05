@@ -2079,11 +2079,22 @@ export function MyDayPage() {
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
 
   useEffect(() => {
+    const sanitizeTitle = (tStr: string) => {
+      if (!tStr) return tStr;
+      const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+      return tStr.replace(uuidPattern, (m) => {
+        const found = (projectTasks || []).find((t) => t.id === m) || (tasks || []).find((t) => t.id === m);
+        return found?.title || 'Office Task';
+      });
+    };
+
     const localEntries = (() => {
       try {
         const saved = localStorage.getItem(userTimelineKey);
         const parsed = saved ? JSON.parse(saved) : [];
-        return parsed.filter((e: any) => !e.title?.includes('System initialized'));
+        return parsed
+          .filter((e: any) => !e.title?.includes('System initialized'))
+          .map((e: any) => ({ ...e, title: sanitizeTitle(e.title) }));
       } catch {
         return [];
       }
@@ -2375,7 +2386,9 @@ export function MyDayPage() {
       saveSessionNote(taskId, note);
       await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600, description: note });
       await pauseSession(taskId as any, note);
-      handleActivityLog(`Paused Task: ${taskId}`, 'neutral');
+      const targetTask = (projectTasks || []).find((t) => t.id === taskId) || tasks.find((t) => t.id === taskId);
+      const taskTitleText = targetTask?.title || taskId;
+      handleActivityLog(`Paused Task: ${taskTitleText}`, 'neutral');
     } catch (e) {
       console.warn('Pause task error in workspace:', e);
     }
