@@ -2188,28 +2188,67 @@ export function MyDayPage() {
     const mapped: TaskItem[] = (projectTasks || [])
       .filter((t) => {
         if (!t) return false;
+        const appStatus = ((t as any).approvalStatus || '').toLowerCase();
         // Don't show unapproved assignment requests until approved by manager
-        if ((t as any).approvalStatus === 'pending_assignment_approval') return false;
+        if (appStatus === 'pending_assignment_approval') return false;
 
-        // My Day always shows ONLY the current user's own tasks.
-        // Management roles have full visibility in other modules (TaskBoard, etc.)
-        // but My Day is personal — it shows tasks where you are the assignee OR supervisor.
-        const myId = user?.id;
+        const myId = (user?.id || '').toLowerCase();
         const myEmail = typeof user?.email === 'string' ? user.email.toLowerCase() : '';
         const myName = typeof user?.fullName === 'string' ? user.fullName.toLowerCase() : '';
+
+        // Build set of all employee IDs and emails associated with current logged-in user
+        const myIdentifiers = new Set<string>();
+        if (myId) myIdentifiers.add(myId);
+        if (myEmail) myIdentifiers.add(myEmail);
+
+        (employees || []).forEach((e) => {
+          const eFullName = `${e.firstName || ''} ${e.lastName || ''}`.trim().toLowerCase();
+          const eEmail = (e.email || '').trim().toLowerCase();
+          const matches =
+            (e.id && e.id.toLowerCase() === myId) ||
+            (eEmail && myEmail && eEmail === myEmail) ||
+            (eFullName && myName && (eFullName === myName || eFullName.includes(myName) || myName.includes(eFullName)));
+
+          if (matches) {
+            if (e.id) myIdentifiers.add(e.id.toLowerCase());
+            if (eEmail) myIdentifiers.add(eEmail);
+          }
+        });
+
+        const tAssigneeId = (t.assigneeId || '').toLowerCase();
+        const tAssigneeName = (typeof (t as any).assignee === 'string' ? (t as any).assignee : '').toLowerCase();
+        const tSupervisorId = (t.supervisorId || (t as any).assignedByEmployeeId || '').toLowerCase();
+        const tSupervisorName = (typeof (t as any).supervisor === 'string' ? (t as any).supervisor : (t as any).supervisorName || '').toLowerCase();
+
         const isMyTask =
-          (myId && t.assigneeId === myId) ||
-          (myEmail && t.assigneeId === myEmail) ||
-          (myId && t.supervisorId === myId) ||
-          (myId && (t as any).assignedByEmployeeId === myId) ||
-          (typeof (t as any).assignee === 'string' && myName && (t as any).assignee.toLowerCase() === myName);
+          (tAssigneeId && myIdentifiers.has(tAssigneeId)) ||
+          (tSupervisorId && myIdentifiers.has(tSupervisorId)) ||
+          (tAssigneeName && myName && (tAssigneeName === myName || tAssigneeName.includes(myName) || myName.includes(tAssigneeName))) ||
+          (tSupervisorName && myName && (tSupervisorName === myName || tSupervisorName.includes(myName) || myName.includes(tSupervisorName)));
+
         if (!isMyTask) return false;
+
+        const st = (t.status || '').toLowerCase();
+        const isApprovedOrDone = st === 'done' || st === 'completed' || appStatus === 'approved';
+        if (isApprovedOrDone) return false;
 
         const sd = typeof t.startDate === 'string' ? t.startDate.slice(0, 10) : '';
         const dd = typeof t.dueDate === 'string' ? t.dueDate.slice(0, 10) : '';
         const effectiveStartDate = sd || dd;
-        const isScheduled = effectiveStartDate && todayStr >= effectiveStartDate;
-        return isScheduled || t.status === 'in_progress' || t.status === 'todo' || t.status === 'review' || (t as any).approvalStatus === 'rework' || storedStates[t.id];
+        const isScheduledToday = effectiveStartDate ? todayStr >= effectiveStartDate : true;
+
+        const isActiveOrTodo =
+          st === 'todo' ||
+          st === 'to do' ||
+          st === 'in_progress' ||
+          st === 'in progress' ||
+          st === 'review' ||
+          st === 'under review' ||
+          appStatus === 'pending_task_approval' ||
+          appStatus === 'rework' ||
+          !effectiveStartDate;
+
+        return isScheduledToday || isActiveOrTodo || storedStates[t.id];
       })
       .map((t) => {
         const proj = (projects || []).find((p) => p.id === t.projectId);
@@ -2320,9 +2359,7 @@ export function MyDayPage() {
       });
     }
 
-    if (mapped.length > 0) {
-      setTasks(mapped);
-    }
+    setTasks(mapped);
   }, [projectTasks, projects, employees, user]);
 
   useEffect(() => {

@@ -62,20 +62,43 @@ export function useProject() {
           ...Array.from(supervisedProjectIds),
         ]);
         
+        const myId = (user.id || '').toLowerCase();
+        const myEmail = (user.email || '').toLowerCase();
+        const myName = (user.fullName || '').trim().toLowerCase();
+
         allTasks.forEach(t => {
-          if (t.projectId && (t.assigneeId === user.id || t.assigneeId === user.email || t.supervisorId === user.id)) {
+          const aId = (t.assigneeId || '').toLowerCase();
+          const sId = (t.supervisorId || (t as any).assignedByEmployeeId || '').toLowerCase();
+          const aName = (typeof (t as any).assignee === 'string' ? (t as any).assignee : '').toLowerCase();
+          const sName = (typeof (t as any).supervisor === 'string' ? (t as any).supervisor : (t as any).supervisorName || '').toLowerCase();
+
+          const isAssoc =
+            (myId && (aId === myId || sId === myId)) ||
+            (myEmail && (aId === myEmail || sId === myEmail)) ||
+            (myName && (aName === myName || aName.includes(myName) || myName.includes(aName) || sName === myName));
+
+          if (t.projectId && isAssoc) {
             userAssociatedProjectIds.add(t.projectId);
           }
         });
 
-        allTasks = allTasks.filter(t => 
-          t.assigneeId === user.id || 
-          t.assigneeId === user.email ||
-          t.supervisorId === user.id ||
-          (t as any).assignedByEmployeeId === user.id ||
-          (t as any).supervisorName === user.fullName ||
-          (t.projectId && userAssociatedProjectIds.has(t.projectId))
-        );
+        allTasks = allTasks.filter(t => {
+          const aId = (t.assigneeId || '').toLowerCase();
+          const sId = (t.supervisorId || (t as any).assignedByEmployeeId || '').toLowerCase();
+          const aName = (typeof (t as any).assignee === 'string' ? (t as any).assignee : '').toLowerCase();
+          const sName = (typeof (t as any).supervisor === 'string' ? (t as any).supervisor : (t as any).supervisorName || '').toLowerCase();
+
+          const isDirectlyAssociated =
+            (myId && (aId === myId || sId === myId)) ||
+            (myEmail && (aId === myEmail || sId === myEmail)) ||
+            (myName && (aName === myName || aName.includes(myName) || myName.includes(aName) || sName === myName));
+
+          return (
+            isDirectlyAssociated ||
+            (t.projectId && userAssociatedProjectIds.has(t.projectId))
+          );
+        });
+
         allTimesheets = allTimesheets.filter(t => t.employeeId === user.id || (t.projectId && userAssociatedProjectIds.has(t.projectId)));
       }
 
