@@ -71,10 +71,10 @@ export function ApprovalsQueue() {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
-        .from('flwdsk_attendance')
+        .from('flwdsk_attendance_records')
         .select('*')
         .neq('status', 'clocked_out')
-        .lt('work_date', today)
+        .lte('work_date', today)
         .is('deleted_at', null)
         .order('work_date', { ascending: false });
 
