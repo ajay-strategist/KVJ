@@ -523,7 +523,10 @@ export class AttendanceService implements IAttendanceService {
       }
 
       if (!record && workDate) {
-        record = await this.repo.findActiveRecord(corr.requestedBy, workDate);
+        const candidate = await this.repo.findActiveRecord(corr.requestedBy, workDate);
+        if (candidate && candidate.workDate === workDate) {
+          record = candidate;
+        }
       }
 
       const calculatedMins = totalCalculatedMinutes > 0 ? totalCalculatedMinutes : 480;
@@ -553,6 +556,7 @@ export class AttendanceService implements IAttendanceService {
         // UPDATE EXISTING ATTENDANCE RECORD
         const patch: Partial<AttendanceRecord> = {
           status: 'clocked_out',
+          workDate: workDate || record.workDate,
           totalWorkingMinutes: calculatedMins,
           updatedAt: nowIso(),
           updatedBy: actor.id,

@@ -337,13 +337,13 @@ BEGIN
 
         -- 2026-08-01 (2 Sessions)
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-01', '2026-08-01 09:31:00+05:30', '2026-08-02 00:02:00+05:30', 871, 0, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-01', '2026-08-01 09:31:00+05:30', '2026-08-02 00:02:00+05:30', 871, 0, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -354,13 +354,13 @@ BEGIN
 
         -- 2026-08-03
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-03', '2026-08-03 09:30:00+05:30', '2026-08-03 19:50:00+05:30', 609, 11, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-03', '2026-08-03 09:30:00+05:30', '2026-08-03 19:50:00+05:30', 609, 11, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -369,13 +369,13 @@ BEGIN
 
         -- 2026-08-04
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-04', '2026-08-04 10:00:00+05:30', '2026-08-04 23:45:00+05:30', 825, 0, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-04', '2026-08-04 10:00:00+05:30', '2026-08-04 23:45:00+05:30', 825, 0, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -384,13 +384,13 @@ BEGIN
 
         -- 2026-08-05
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-05', '2026-08-05 09:44:00+05:30', '2026-08-05 17:53:00+05:30', 448, 41, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-05', '2026-08-05 09:44:00+05:30', '2026-08-05 17:53:00+05:30', 448, 41, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -399,13 +399,13 @@ BEGIN
 
         -- 2026-08-06
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-06', '2026-08-06 09:25:00+05:30', '2026-08-06 17:37:00+05:30', 404, 88, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-06', '2026-08-06 09:25:00+05:30', '2026-08-06 17:37:00+05:30', 404, 88, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -414,13 +414,13 @@ BEGIN
 
         -- 2026-08-07
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-07', '2026-08-07 09:24:00+05:30', '2026-08-07 17:30:00+05:30', 457, 29, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-07', '2026-08-07 09:24:00+05:30', '2026-08-07 17:30:00+05:30', 457, 29, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -429,13 +429,13 @@ BEGIN
 
         -- 2026-08-08
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-08', '2026-08-08 09:25:00+05:30', '2026-08-08 19:07:00+05:30', 582, 0, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-08', '2026-08-08 09:25:00+05:30', '2026-08-08 19:07:00+05:30', 582, 0, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -444,13 +444,13 @@ BEGIN
 
         -- 2026-08-11
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-11', '2026-08-11 09:32:00+05:30', '2026-08-11 18:00:00+05:30', 488, 20, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-11', '2026-08-11 09:32:00+05:30', '2026-08-11 18:00:00+05:30', 488, 20, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -459,13 +459,13 @@ BEGIN
 
         -- 2026-08-12
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-12', '2026-08-12 09:30:00+05:30', '2026-08-12 17:30:00+05:30', 445, 35, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-12', '2026-08-12 09:30:00+05:30', '2026-08-12 17:30:00+05:30', 445, 35, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -474,13 +474,13 @@ BEGIN
 
         -- 2026-08-13
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-13', '2026-08-13 09:36:00+05:30', '2026-08-13 17:56:00+05:30', 475, 25, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-13', '2026-08-13 09:36:00+05:30', '2026-08-13 17:56:00+05:30', 475, 25, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -489,13 +489,13 @@ BEGIN
 
         -- 2026-08-14
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-14', '2026-08-14 13:41:00+05:30', '2026-08-14 17:30:00+05:30', 206, 23, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-14', '2026-08-14 13:41:00+05:30', '2026-08-14 17:30:00+05:30', 206, 23, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -504,13 +504,13 @@ BEGIN
 
         -- 2026-08-15
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-15', '2026-08-15 09:31:00+05:30', '2026-08-15 17:30:00+05:30', 479, 0, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-15', '2026-08-15 09:31:00+05:30', '2026-08-15 17:30:00+05:30', 479, 0, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -519,13 +519,13 @@ BEGIN
 
         -- 2026-08-17
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-17', '2026-08-17 09:33:00+05:30', '2026-08-17 17:30:00+05:30', 468, 9, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-17', '2026-08-17 09:33:00+05:30', '2026-08-17 17:30:00+05:30', 468, 9, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -534,13 +534,13 @@ BEGIN
 
         -- 2026-08-18
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-18', '2026-08-18 09:30:00+05:30', '2026-08-18 22:22:00+05:30', 737, 35, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-18', '2026-08-18 09:30:00+05:30', '2026-08-18 22:22:00+05:30', 737, 35, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -549,13 +549,13 @@ BEGIN
 
         -- 2026-08-19
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-19', '2026-08-19 09:32:00+05:30', '2026-08-19 17:38:00+05:30', 486, 0, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-19', '2026-08-19 09:32:00+05:30', '2026-08-19 17:38:00+05:30', 486, 0, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -564,13 +564,13 @@ BEGIN
 
         -- 2026-08-20
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-20', '2026-08-20 09:35:00+05:30', '2026-08-20 17:38:00+05:30', 466, 17, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-20', '2026-08-20 09:35:00+05:30', '2026-08-20 17:38:00+05:30', 466, 17, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -579,13 +579,13 @@ BEGIN
 
         -- 2026-08-21 (3 Sessions)
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-21', '2026-08-21 09:37:00+05:30', '2026-08-21 17:38:00+05:30', 313, 77, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-21', '2026-08-21 09:37:00+05:30', '2026-08-21 17:38:00+05:30', 313, 77, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -597,13 +597,13 @@ BEGIN
 
         -- 2026-08-22
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-22', '2026-08-22 09:30:00+05:30', '2026-08-22 19:12:00+05:30', 542, 40, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-22', '2026-08-22 09:30:00+05:30', '2026-08-22 19:12:00+05:30', 542, 40, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -612,13 +612,13 @@ BEGIN
 
         -- 2026-08-24
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-24', '2026-08-24 09:30:00+05:30', '2026-08-24 19:06:00+05:30', 515, 61, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-24', '2026-08-24 09:30:00+05:30', '2026-08-24 19:06:00+05:30', 515, 61, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -627,13 +627,13 @@ BEGIN
 
         -- 2026-08-25
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-25', '2026-08-25 09:29:00+05:30', '2026-08-25 19:13:00+05:30', 543, 41, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-25', '2026-08-25 09:29:00+05:30', '2026-08-25 19:13:00+05:30', 543, 41, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -642,13 +642,13 @@ BEGIN
 
         -- 2026-08-28
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-28', '2026-08-28 09:28:00+05:30', '2026-08-28 17:49:00+05:30', 561, 0, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-28', '2026-08-28 09:28:00+05:30', '2026-08-28 17:49:00+05:30', 561, 0, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 
@@ -657,13 +657,13 @@ BEGIN
 
         -- 2026-08-31
         INSERT INTO flwdsk_attendance_records (id, employee_id, work_date, first_clock_in, last_clock_out, total_working_minutes, total_break_minutes, status, created_at, updated_at)
-        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-31', '2026-08-31 09:31:00+05:30', '2026-08-31 19:57:00+05:30', 616, 10, 'present', NOW(), NOW())
+        VALUES (gen_random_uuid(), v_anjitha_id, '2026-08-31', '2026-08-31 09:31:00+05:30', '2026-08-31 19:57:00+05:30', 616, 10, 'clocked_out', NOW(), NOW())
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
             first_clock_in = EXCLUDED.first_clock_in,
             last_clock_out = EXCLUDED.last_clock_out,
             total_working_minutes = EXCLUDED.total_working_minutes,
             total_break_minutes = EXCLUDED.total_break_minutes,
-            status = 'present',
+            status = 'clocked_out',
             updated_at = NOW()
         RETURNING id INTO v_rec_id;
 

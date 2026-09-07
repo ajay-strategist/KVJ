@@ -294,17 +294,17 @@ export function ApprovalsQueue() {
     const proj = projects.find((p) => p.id === task.projectId);
     const projTitle = proj ? proj.title : 'Office Task';
     const ok = await confirm({
-      title: 'Approve Task Completion?',
-      message: `Approve completed work for task "${projTitle}: ${task.title}"?`,
+      title: 'Evaluate Task Completion?',
+      message: `Evaluate and approve completed work for task "${projTitle}: ${task.title}"?`,
     });
     if (!ok) return;
 
     const res = await approveTaskSubmission(task.id);
     if (res.ok) {
-      toast({ variant: 'success', title: 'Task Approved' });
+      toast({ variant: 'success', title: 'Task Evaluated & Approved' });
       refreshProjects();
     } else {
-      toast({ variant: 'error', title: 'Approval Failed', message: res.error });
+      toast({ variant: 'error', title: 'Evaluation Failed', message: res.error });
     }
   };
 
@@ -431,7 +431,7 @@ export function ApprovalsQueue() {
         }
         return (
           <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
-            <Button size="sm" onClick={() => handleApproveTaskInline(r)}>Approve Task</Button>
+            <Button size="sm" variant="evaluate" onClick={() => handleApproveTaskInline(r)}>Evaluate</Button>
             <Button size="sm" variant="danger" onClick={() => handleReworkTaskInline(r)}>Rework</Button>
           </div>
         );

@@ -24,7 +24,7 @@ export function Button({
   className = '',
   ...rest
 }: {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'success';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'success' | 'evaluate' | 'purple';
   size?: 'xs' | 'sm' | 'md' | 'lg';
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;

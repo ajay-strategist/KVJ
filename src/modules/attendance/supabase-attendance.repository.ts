@@ -210,7 +210,19 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       const rec = toCamelCaseObject(openData) as AttendanceRecord;
       const attached = await this.attachSessionsToRecords([rec]);
       const withBreaks = await this.attachBreaksToRecords(attached);
-      return withBreaks[0];
+      const activeCandidate = withBreaks[0];
+
+      const hasRealOpenSession = activeCandidate?.sessions?.some((s) => !s.clockOut);
+      if (hasRealOpenSession || activeCandidate?.workDate === dateStr) {
+        return activeCandidate;
+      } else {
+        // Self-heal: the record status was left as 'present'/'on_break' on a past date despite all sessions being closed
+        try {
+          await supabase.from(this.tableName).update({ status: 'clocked_out' }).eq('id', openData.id);
+        } catch (e) {
+          console.warn('Failed to self-heal stale attendance status:', e);
+        }
+      }
     }
 
     // 2. If no open session, query for the record on dateStr
