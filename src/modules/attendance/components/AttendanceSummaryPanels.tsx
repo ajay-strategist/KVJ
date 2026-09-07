@@ -368,7 +368,7 @@ export function AttendanceSummaryPanels({
                 <th style={{ padding: 8, textAlign: 'center' }}>Online Classes</th>
                 <th style={{ padding: 8, textAlign: 'center' }}>Physical Duration (hr)</th>
                 <th style={{ padding: 8, textAlign: 'center' }}>Online Duration (hr)</th>
-                <th style={{ padding: 8, textAlign: 'center' }}>Total Duration</th>
+                <th style={{ padding: 8, textAlign: 'center' }}>Duration</th>
               </tr>
             </thead>
             <tbody>

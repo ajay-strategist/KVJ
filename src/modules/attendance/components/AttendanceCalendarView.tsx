@@ -459,7 +459,7 @@ export function AttendanceCalendarView({
                     <th style={{ padding: 6 }}>Institution</th>
                     <th style={{ padding: 6, textAlign: 'center' }}>Physical Classes</th>
                     <th style={{ padding: 6, textAlign: 'center' }}>Online Classes</th>
-                    <th style={{ padding: 6, textAlign: 'center' }}>Total Duration</th>
+                    <th style={{ padding: 6, textAlign: 'center' }}>Duration</th>
                   </tr>
                 </thead>
                 <tbody>

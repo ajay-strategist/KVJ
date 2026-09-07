@@ -384,7 +384,7 @@ export function ApprovalsQueue() {
     },
     {
       key: 'duration',
-      header: 'Total Duration',
+      header: 'Duration',
       render: (r) => {
         const hrs = r.actualHours || r.totalHoursWorked || r.proposedHours || 0;
         return (
