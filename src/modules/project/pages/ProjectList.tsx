@@ -619,7 +619,7 @@ export function ProjectList({
             </div>
             <div class="kpi" style="background:#e0f2fe;border-left:4px solid #0891b2;">
               <div class="kpi-label" style="color:#0891b2;">⏱️ Total Hours</div>
-              <div class="kpi-value" style="color:#0284c7;">${p.totalHours} hrs</div>
+              <div class="kpi-value" style="color:#0284c7;">${p.totalHours}</div>
             </div>
             <div class="kpi" style="background:#dcfce7;border-left:4px solid #16a34a;">
               <div class="kpi-label" style="color:#15803d;">✅ Tasks Done</div>
@@ -658,7 +658,7 @@ export function ProjectList({
                     ${m.avatarUrl ? `<img src="${m.avatarUrl}" class="avatar-img" />` : `<span class="avatar-initial">${(m.name || '?').charAt(0)}</span>`}
                     <strong>${m.name || '—'}</strong>
                   </td>
-                  <td style="text-align:right;font-weight:700;color:#6366f1;">${m.hours} hrs</td>
+                  <td style="text-align:right;font-weight:700;color:#6366f1;">${m.hours}</td>
                 </tr>
               `).join('') : '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No members assigned.</td></tr>'}
             </tbody>
@@ -693,7 +693,7 @@ export function ProjectList({
                       ${assigneeName}
                     </td>
                     <td>${statusBadge(t.status || 'todo')}</td>
-                    <td style="text-align:right;font-weight:700;color:#6366f1;">${Math.round(hrs * 10) / 10} hrs</td>
+                    <td style="text-align:right;font-weight:700;color:#6366f1;">${Math.round(hrs * 10) / 10}</td>
                     <td style="color:#64748b;">${t.dueDate || '—'}</td>
                   </tr>
                 `;
@@ -728,7 +728,7 @@ export function ProjectList({
         ))}
       </div>
     )},
-    { key: 'totalHours', header: 'Total Hours', sortable: true, render: (p) => <strong>⏱ {p.totalHours} hrs</strong> },
+    { key: 'totalHours', header: 'Total Hours', sortable: true, render: (p) => <strong>⏱ {p.totalHours}</strong> },
     { key: 'completion', header: 'Completion Ratio', render: (p) => {
       const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
       return (
@@ -773,7 +773,7 @@ export function ProjectList({
 
     const rows = filteredProjects.map((p) => {
       const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
-      const memberStr = p.members.map((m) => `${m.name} (${m.hours} hrs)`).join('; ');
+      const memberStr = p.members.map((m) => `${m.name} (${m.hours})`).join('; ');
       return [
         p.code,
         p.title,
@@ -985,7 +985,7 @@ export function ProjectList({
                       {p.members.map((m, idx) => (
                         <div key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           <Avatar name={m.name} src={m.avatarUrl} size={20} />
-                          <span>{m.name}: <strong style={{ color: 'var(--brand)' }}>{m.hours} hrs</strong></span>
+                          <span>{m.name}: <strong style={{ color: 'var(--brand)' }}>{m.hours}</strong></span>
                         </div>
                       ))}
                     </div>
@@ -995,7 +995,7 @@ export function ProjectList({
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 12 }}>
                     <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase', fontWeight: 700 }}>Total Hours Worked:</span>
-                      <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>⏱ {p.totalHours} hrs</div>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>⏱ {p.totalHours}</div>
                     </div>
                     <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase', fontWeight: 700 }}>Task Ratio:</span>
@@ -1161,7 +1161,7 @@ export function ProjectList({
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
                 {[
                   { label: 'Status', value: selectedProject.status, icon: '🏷️', bg: '#ede9fe', border: '#6366f1', color: '#4f46e5' },
-                  { label: 'Total Hours', value: `${selectedProject.totalHours} hrs`, icon: '⏱️', bg: '#e0f2fe', border: '#0891b2', color: '#0284c7' },
+                  { label: 'Total Hours', value: `${selectedProject.totalHours}`, icon: '⏱️', bg: '#e0f2fe', border: '#0891b2', color: '#0284c7' },
                   { label: 'Tasks Done', value: `${selectedProject.tasksCompleted} / ${selectedProject.tasksTotal}`, icon: '✅', bg: '#dcfce7', border: '#16a34a', color: '#15803d' },
                   { label: 'Milestones', value: `${selectedProject.milestonesCount} Planned`, icon: '🏁', bg: '#fef9c3', border: '#ca8a04', color: '#a16207' },
                 ].map((kpi) => (
@@ -1361,9 +1361,9 @@ export function ProjectList({
                               </select>
                             </td>
                             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#8b5cf6' }}>
-                              {t.proposedHours || t.estimatedHours ? `${t.proposedHours || t.estimatedHours} hrs` : '—'}
+                              {t.proposedHours || t.estimatedHours ? `${t.proposedHours || t.estimatedHours}` : '—'}
                             </td>
-                            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged} hrs</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged}</td>
                             <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{formatDisplayDate(t.dueDate)}</td>
                             <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                               <button

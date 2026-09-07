@@ -389,7 +389,7 @@ export function ApprovalsQueue() {
         const hrs = r.actualHours || r.totalHoursWorked || r.proposedHours || 0;
         return (
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
-            {Number(hrs).toFixed(1)} hrs
+            {Number(hrs).toFixed(1)}
           </span>
         );
       },

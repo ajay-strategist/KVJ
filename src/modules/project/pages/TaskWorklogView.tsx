@@ -518,7 +518,7 @@ export function TaskWorklogView({
         empName,
         supName,
         s.workTitle || 'Work Session',
-        `${durHrs} hrs`,
+        `${durHrs}`,
         (s as any).notes || (s as any).description || '—',
         s.status || 'completed',
         (s as any).notes || (s as any).description || '',
@@ -734,7 +734,7 @@ export function TaskWorklogView({
 
         <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursLogged.toFixed(1)} hrs</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursLogged.toFixed(1)}</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--status-warning)', padding: 16 }}>
@@ -829,7 +829,7 @@ export function TaskWorklogView({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                     <div style={{ fontWeight: 800, color: 'var(--accent)', fontSize: 13 }}>
-                      ⏱ {(log.durationHrs || 0).toFixed(1)} hrs
+                      ⏱ {(log.durationHrs || 0).toFixed(1)}
                     </div>
                     {isSupervisor && log.reviewStatus === 'Pending Review' && (
                       <Button size="sm" onClick={() => handleApprove(log.id)} style={{ fontSize: 12 }}>

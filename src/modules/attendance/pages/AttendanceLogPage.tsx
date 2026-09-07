@@ -1165,7 +1165,7 @@ export function AttendanceLogPage() {
         const assigneeName = assignee ? `${assignee.firstName || ''} ${assignee.lastName || ''}`.trim() : 'Unassigned';
         const supervisorName = supervisor ? `${supervisor.firstName || ''} ${supervisor.lastName || ''}`.trim() : 'Admin';
         const dueDateFmt = t.dueDate ? t.dueDate.split('-').reverse().join('-') : '—';
-        const hrsWorkedStr = `${(t.actualHours || t.proposedHours || 0).toFixed(1)} hrs`;
+        const hrsWorkedStr = `${(t.actualHours || t.proposedHours || 0).toFixed(1)}`;
 
         return [
           t.title || 'Untitled Task',
@@ -1217,7 +1217,7 @@ export function AttendanceLogPage() {
           workNote,
           '09:30 AM',
           '05:30 PM',
-          `${(t.actualHours || t.proposedHours || 1).toFixed(1)} hrs`,
+          `${(t.actualHours || t.proposedHours || 1).toFixed(1)}`,
           t.projectId ? 'Project Task' : 'Office Task',
         ]);
       });

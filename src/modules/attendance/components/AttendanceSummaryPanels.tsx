@@ -310,13 +310,13 @@ export function AttendanceSummaryPanels({
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Working Days in Month:</span> <strong>{stats.workingDaysInMonth}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Days to be Worked:</span> <strong>{stats.daysToBeWorked}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--brand)', fontWeight: 700 }}>
-              <span>Expected Office Hours (8h/day):</span> <strong>{(stats.workingDays * 8)} hrs</strong>
+              <span>Expected Office Hours (8h/day):</span> <strong>{(stats.workingDays * 8)}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--status-danger)' }}><span>No. of Leaves:</span> <strong>{stats.noOfLeaves}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--brand)' }}><span>Holiday Worked:</span> <strong>{stats.holidayWorked}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Working Days:</span> <strong>{stats.workingDays}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Late Reporting:</span> <strong>{stats.lateReporting}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Break Total:</span> <strong>{stats.breakHrs} hrs</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Break Total:</span> <strong>{stats.breakHrs}</strong></div>
           </div>
         </Card>
 
@@ -327,7 +327,7 @@ export function AttendanceSummaryPanels({
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Joined Date:</span> <strong>{stats.joinedDate}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--status-danger)' }}><span>Accumulated Leave:</span> <strong>{stats.accumulatedLeave}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--brand)' }}><span>Holiday Worked Total:</span> <strong>{stats.accumulatedHolidayWorked}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Overall Avg Duration:</span> <strong>{stats.overallAvgDuration} hrs/day</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Overall Avg Duration:</span> <strong>{stats.overallAvgDuration}/day</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
               <span>Total Expenses:</span> <strong style={{ color: 'var(--status-success)' }}>₹ {stats.totalExpenses.toLocaleString()}</strong>
             </div>
@@ -348,7 +348,7 @@ export function AttendanceSummaryPanels({
               {orgBreakdown.map((row) => (
                 <tr key={row.organization} style={{ borderBottom: '1px dashed var(--border)' }}>
                   <td style={{ padding: '6px 0' }}>{row.organization}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.avgDuration} hrs</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.avgDuration}</td>
                 </tr>
               ))}
             </tbody>
@@ -379,7 +379,7 @@ export function AttendanceSummaryPanels({
                   <td style={{ padding: 8, textAlign: 'center' }}>{c.onlineClasses}</td>
                   <td style={{ padding: 8, textAlign: 'center' }}>{c.physicalClassDuration.toFixed(1)}</td>
                   <td style={{ padding: 8, textAlign: 'center' }}>{c.onlineDuration.toFixed(1)}</td>
-                  <td style={{ padding: 8, textAlign: 'center', fontWeight: 700, color: 'var(--brand)' }}>{c.totalPhysicalDuration.toFixed(1)} hrs</td>
+                  <td style={{ padding: 8, textAlign: 'center', fontWeight: 700, color: 'var(--brand)' }}>{c.totalPhysicalDuration.toFixed(1)}</td>
                 </tr>
               ))}
             </tbody>

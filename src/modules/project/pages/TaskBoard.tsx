@@ -768,8 +768,8 @@ export function TaskBoard({
       t.status,
       formatDisplayDate(t.startDate),
       formatDisplayDate(t.dueDate),
-      t.proposedHours ? `${t.proposedHours} hrs` : '—',
-      `${Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)} hrs`,
+      t.proposedHours ? `${t.proposedHours}` : '—',
+      `${Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)}`,
       t.description || '',
     ]);
 
@@ -813,7 +813,7 @@ export function TaskBoard({
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{pt.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Assigned to: <strong>{pt.assignee}</strong> · Category: {pt.category} · Due: {pt.dueDate}{pt.proposedHours ? ` · Proposed: ${pt.proposedHours} hrs` : ''}
+                    Assigned to: <strong>{pt.assignee}</strong> · Category: {pt.category} · Due: {pt.dueDate}{pt.proposedHours ? ` · Proposed: ${pt.proposedHours}` : ''}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -840,12 +840,12 @@ export function TaskBoard({
 
         <Card padding="compact" style={{ borderLeft: '4px solid #8b5cf6', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Proposed Hours</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#8b5cf6', marginTop: 4 }}>📋 {totalProposedHoursSum.toFixed(1)} hrs</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#8b5cf6', marginTop: 4 }}>📋 {totalProposedHoursSum.toFixed(1)}</div>
         </Card>
 
         <Card padding="compact" style={{ borderLeft: '4px solid var(--accent)', width: 200, flex: '0 0 200px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)} hrs</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)}</div>
         </Card>
       </div>
 
@@ -1060,10 +1060,10 @@ export function TaskBoard({
                           <td style={{ padding: '12px 16px' }}>{formatTableDate((t as any).startDate || t.startDate)}</td>
                           <td style={{ padding: '12px 16px' }}>{formatTableDate(t.dueDate)}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--brand)' }}>
-                            {t.proposedHours ? `${t.proposedHours} hrs` : '—'}
+                            {t.proposedHours ? `${t.proposedHours}` : '—'}
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                            ⏱ {Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)} hrs
+                            ⏱ {Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)}
                           </td>
                           <td style={{ padding: '12px 16px' }}>
                             <Badge tone={

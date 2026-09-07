@@ -245,10 +245,10 @@ export function AttendanceCalendarView({
               <span style={{ color: 'var(--text-muted)' }}>Late / Early:</span> <strong>{monthlyStats.lateReporting} / {monthlyStats.earlyLeaving}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Total Break:</span> <strong>{monthlyStats.totalBreakHrs} hrs</strong>
+              <span style={{ color: 'var(--text-muted)' }}>Total Break:</span> <strong>{monthlyStats.totalBreakHrs}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Total Hours Worked:</span> <strong>{monthlyStats.totalHoursWorked} hrs</strong>
+              <span style={{ color: 'var(--text-muted)' }}>Total Hours Worked:</span> <strong>{monthlyStats.totalHoursWorked}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid #22C55E' }}>
               <span style={{ fontWeight: 600 }}>Total Expenses:</span> <strong style={{ color: 'var(--status-success)', fontSize: 13 }}>₹ {monthlyStats.totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>

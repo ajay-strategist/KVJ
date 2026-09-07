@@ -54,7 +54,7 @@ export function TimesheetTracker() {
   const columns: Column<TimesheetRecord>[] = [
     { key: 'project', header: 'Project Title', render: (t) => projectName(t.projectId) },
     { key: 'date', header: 'Work Date', accessor: (t) => t.workDate },
-    { key: 'hours', header: 'Hours Logged', accessor: (t) => `${t.hoursLogged} hrs` },
+    { key: 'hours', header: 'Hours Logged', accessor: (t) => `${t.hoursLogged}` },
     { key: 'billable', header: 'Billable', render: (t) => t.billable ? 'Yes' : 'No' },
     { key: 'status', header: 'Approval Status', render: (t) => (
       <span className={`kvj-badge kvj-badge--${t.status === 'approved' ? 'success' : 'neutral'}`}>{t.status}</span>

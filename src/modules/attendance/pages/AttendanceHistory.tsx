@@ -116,7 +116,7 @@ export function AttendanceHistory() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           <StatCard label="Days Clocked In" value={`${presentDays} / ${records.length || 0}`} tone="success" icon="✓" />
-          <StatCard label="Average Hours" value={`${avgHours} hrs`} icon="◷" />
+          <StatCard label="Average Hours" value={`${avgHours}`} icon="◷" />
           <Card>
             <SectionHeader title="Logs Tip" />
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
