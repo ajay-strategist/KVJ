@@ -358,17 +358,28 @@ export function ApprovalsQueue() {
       key: 'type',
       header: 'Approval Type',
       render: (r) => {
-        if (r.approvalStatus === 'pending_assignment_approval') {
-          return <span style={{ color: 'var(--status-warning)', fontWeight: 600 }}>Assignment Approval</span>;
-        }
-        return <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>Task Completion</span>;
+        const isAssignment = r.approvalStatus === 'pending_assignment_approval';
+        return (
+          <span
+            style={{
+              color: isAssignment ? 'var(--status-warning)' : 'var(--status-success)',
+              fontWeight: 600,
+              display: 'inline-block',
+              maxWidth: 100,
+              whiteSpace: 'normal',
+              lineHeight: 1.3,
+            }}
+          >
+            {isAssignment ? 'Assignment Approval' : 'Task Completion'}
+          </span>
+        );
       }
     },
     {
       key: 'startDate',
       header: 'Start Date',
       render: (r) => (
-        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
           {formatDisplayDate(r.startDate || r.createdAt)}
         </span>
       ),
@@ -377,7 +388,7 @@ export function ApprovalsQueue() {
       key: 'endDate',
       header: 'End Date',
       render: (r) => (
-        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
           {formatDisplayDate(r.dueDate || r.endDate)}
         </span>
       ),
@@ -408,12 +419,23 @@ export function ApprovalsQueue() {
     },
     {
       key: 'submittedAt',
-      header: 'Submitted Date & Time',
-      render: (r) => (
-        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          {formatDateTime(r.submittedAt || r.createdAt || r.updatedAt)}
-        </span>
-      ),
+      header: 'Submitted Time',
+      render: (r) => {
+        const dtStr = formatDateTime(r.submittedAt || r.createdAt || r.updatedAt);
+        if (!dtStr || dtStr === '—') return '—';
+        const parts = dtStr.split(' ');
+        if (parts.length >= 2) {
+          const datePart = parts[0];
+          const timePart = parts.slice(1).join(' ');
+          return (
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ whiteSpace: 'nowrap' }}>{datePart}</span>
+              <span style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: 12 }}>{timePart}</span>
+            </div>
+          );
+        }
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{dtStr}</span>;
+      },
     },
     {
       key: 'actions',
@@ -481,12 +503,23 @@ export function ApprovalsQueue() {
     },
     {
       key: 'submittedAt',
-      header: 'Submitted Date & Time',
-      render: (r) => (
-        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          {formatDateTime(r.createdAt || r.updatedAt)}
-        </span>
-      ),
+      header: 'Submitted Time',
+      render: (r) => {
+        const dtStr = formatDateTime(r.createdAt || r.updatedAt);
+        if (!dtStr || dtStr === '—') return '—';
+        const parts = dtStr.split(' ');
+        if (parts.length >= 2) {
+          const datePart = parts[0];
+          const timePart = parts.slice(1).join(' ');
+          return (
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ whiteSpace: 'nowrap' }}>{datePart}</span>
+              <span style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: 12 }}>{timePart}</span>
+            </div>
+          );
+        }
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{dtStr}</span>;
+      },
     },
     {
       key: 'actions',
@@ -538,12 +571,23 @@ export function ApprovalsQueue() {
     },
     {
       key: 'submittedAt',
-      header: 'Submitted Date & Time',
-      render: (r) => (
-        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          {formatDateTime(r.createdAt || r.created_at || r.updatedAt || r.requestedDate)}
-        </span>
-      ),
+      header: 'Submitted Time',
+      render: (r) => {
+        const dtStr = formatDateTime(r.createdAt || r.created_at || r.updatedAt || r.requestedDate);
+        if (!dtStr || dtStr === '—') return '—';
+        const parts = dtStr.split(' ');
+        if (parts.length >= 2) {
+          const datePart = parts[0];
+          const timePart = parts.slice(1).join(' ');
+          return (
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ whiteSpace: 'nowrap' }}>{datePart}</span>
+              <span style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: 12 }}>{timePart}</span>
+            </div>
+          );
+        }
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{dtStr}</span>;
+      },
     },
     {
       key: 'actions',
