@@ -15,7 +15,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
-import { formatDateTime, formatDisplayDate } from '../../../shared/utils/date';
+import { formatDateTime, formatDisplayDate, localDateTimeToUtcIso } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
 
 export function ApprovalsQueue() {
@@ -615,7 +615,7 @@ export function ApprovalsQueue() {
     if (!ok) return;
 
     const workDate = selectedUnclosedRecord.work_date || selectedUnclosedRecord.workDate;
-    const outTimeIso = `${workDate}T${forceClockOutTime || '17:30'}:00`;
+    const outTimeIso = localDateTimeToUtcIso(workDate, forceClockOutTime || '17:30');
     const res = await attService.forceClockOutSession(
       selectedUnclosedRecord.id,
       outTimeIso,

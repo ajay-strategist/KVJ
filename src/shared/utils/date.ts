@@ -104,3 +104,71 @@ export function formatDisplayTime(val?: string | Date | null): string {
 
   return String(val);
 }
+
+/**
+ * Convert a local date string (YYYY-MM-DD) and a time string (HH:mm, HH:mm:ss, 12h AM/PM, or ISO string)
+ * into a full UTC ISO string (ending in Z) representing that local moment.
+ * If the input already has a timezone indicator ('Z' or offset like '+05:30'), it is normalized.
+ */
+export function localDateTimeToUtcIso(dateStr?: string, timeStr?: string): string {
+  // If timeStr is already a full ISO string with timezone, normalize to UTC ISO
+  if (timeStr) {
+    const trimmed = timeStr.trim();
+    if (trimmed.includes('T') && (trimmed.endsWith('Z') || /[+-]\d{2}(?::?\d{2})?$/.test(trimmed))) {
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+  }
+
+  const baseDate = dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr.trim())
+    ? dateStr.trim()
+    : todayISO();
+
+  const [yStr, mStr, dStr] = baseDate.split('-');
+  let year = parseInt(yStr, 10);
+  let month = parseInt(mStr, 10) - 1;
+  let day = parseInt(dStr, 10);
+
+  let hours = 17;
+  let minutes = 30;
+  let seconds = 0;
+
+  if (timeStr) {
+    const str = timeStr.trim();
+    // Check if format is "YYYY-MM-DDTHH:mm(:ss)?" without timezone
+    const dateTimeMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (dateTimeMatch) {
+      year = parseInt(dateTimeMatch[1], 10);
+      month = parseInt(dateTimeMatch[2], 10) - 1;
+      day = parseInt(dateTimeMatch[3], 10);
+      hours = parseInt(dateTimeMatch[4], 10);
+      minutes = parseInt(dateTimeMatch[5], 10);
+      seconds = dateTimeMatch[6] ? parseInt(dateTimeMatch[6], 10) : 0;
+      const localDate = new Date(year, month, day, hours, minutes, seconds);
+      return localDate.toISOString();
+    }
+
+    // Check 12-hour format "hh:mm(:ss)? AM/PM"
+    const match12 = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+    if (match12) {
+      hours = parseInt(match12[1], 10);
+      minutes = parseInt(match12[2], 10);
+      seconds = match12[3] ? parseInt(match12[3], 10) : 0;
+      const ampm = match12[4].toUpperCase();
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+    } else {
+      // Check 24-hour format "HH:mm(:ss)?"
+      const match24 = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (match24) {
+        hours = parseInt(match24[1], 10);
+        minutes = parseInt(match24[2], 10);
+        seconds = match24[3] ? parseInt(match24[3], 10) : 0;
+      }
+    }
+  }
+
+  const localDate = new Date(year, month, day, hours, minutes, seconds);
+  return localDate.toISOString();
+}
+

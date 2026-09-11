@@ -1,5 +1,5 @@
 import { container, createToken } from '../../core/registry';
-import { todayISO } from '../../shared/utils/date';
+import { todayISO, localDateTimeToUtcIso } from '../../shared/utils/date';
 import { AppError, Err, Ok, type Result } from '../../core/result';
 import type { Actor, GeoPoint, UUID, DateRange } from '../../core/types';
 import { eventBus } from '../../core/event-bus';
@@ -422,7 +422,37 @@ export class AttendanceService implements IAttendanceService {
       let parsedSessions: WorkSession[] = [];
       let totalCalculatedMinutes = 0;
 
-      if (corr.fieldToCorrect === 'attendance_claim') {
+      let record: AttendanceRecord | null = null;
+      if (corr.attendanceRecordId && corr.attendanceRecordId.length === 36) {
+        try {
+          record = await this.repo.findById(corr.attendanceRecordId);
+        } catch {}
+      }
+
+      if (!record && workDate) {
+        const candidate = await this.repo.findActiveRecord(corr.requestedBy, workDate);
+        if (candidate && candidate.workDate === workDate) {
+          record = candidate;
+        }
+      }
+
+      if (corr.fieldToCorrect === 'firstClockIn') {
+        firstClockIn = parseTimeStr(workDate, corr.proposedValue);
+        const endIso = record?.lastClockOut;
+        if (firstClockIn && endIso) {
+          const sMs = new Date(firstClockIn).getTime();
+          const eMs = new Date(endIso).getTime();
+          if (eMs > sMs) totalCalculatedMinutes = Math.round((eMs - sMs) / 60000);
+        }
+      } else if (corr.fieldToCorrect === 'lastClockOut') {
+        lastClockOut = parseTimeStr(workDate, corr.proposedValue);
+        const startIso = record?.firstClockIn;
+        if (lastClockOut && startIso) {
+          const sMs = new Date(startIso).getTime();
+          const eMs = new Date(lastClockOut).getTime();
+          if (eMs > sMs) totalCalculatedMinutes = Math.round((eMs - sMs) / 60000);
+        }
+      } else if (corr.fieldToCorrect === 'attendance_claim') {
         const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\((.+)\)$/s);
         if (claimMatch) {
           workDate = claimMatch[1].trim();
@@ -505,7 +535,7 @@ export class AttendanceService implements IAttendanceService {
         workType = 'Training';
       }
 
-      if (parsedSessions.length === 0) {
+      if (parsedSessions.length === 0 && !record) {
         parsedSessions.push({
           id: this.uuid(),
           workType,
@@ -513,20 +543,6 @@ export class AttendanceService implements IAttendanceService {
           clockOut: lastClockOut,
           notes: corr.reason || 'Approved Claim',
         });
-      }
-
-      let record = null;
-      if (corr.attendanceRecordId && corr.attendanceRecordId.length === 36) {
-        try {
-          record = await this.repo.findById(corr.attendanceRecordId);
-        } catch {}
-      }
-
-      if (!record && workDate) {
-        const candidate = await this.repo.findActiveRecord(corr.requestedBy, workDate);
-        if (candidate && candidate.workDate === workDate) {
-          record = candidate;
-        }
       }
 
       const calculatedMins = totalCalculatedMinutes > 0 ? totalCalculatedMinutes : 480;
@@ -557,7 +573,7 @@ export class AttendanceService implements IAttendanceService {
         const patch: Partial<AttendanceRecord> = {
           status: 'clocked_out',
           workDate: workDate || record.workDate,
-          totalWorkingMinutes: calculatedMins,
+          totalWorkingMinutes: totalCalculatedMinutes > 0 ? totalCalculatedMinutes : record.totalWorkingMinutes || calculatedMins,
           updatedAt: nowIso(),
           updatedBy: actor.id,
         };
@@ -565,7 +581,19 @@ export class AttendanceService implements IAttendanceService {
         if (firstClockIn) patch.firstClockIn = firstClockIn;
         if (lastClockOut) patch.lastClockOut = lastClockOut;
 
-        patch.sessions = parsedSessions;
+        if (parsedSessions.length > 0) {
+          patch.sessions = parsedSessions;
+        } else if (record.sessions && record.sessions.length > 0) {
+          if (lastClockOut) {
+            patch.sessions = record.sessions.map((s, idx) =>
+              idx === record.sessions!.length - 1 ? { ...s, clockOut: lastClockOut } : s
+            );
+          } else if (firstClockIn) {
+            patch.sessions = record.sessions.map((s, idx) =>
+              idx === 0 ? { ...s, clockIn: firstClockIn } : s
+            );
+          }
+        }
         await this.repo.update(record.id, patch, actor);
       }
 
@@ -615,7 +643,7 @@ export class AttendanceService implements IAttendanceService {
       if (!record) return Err(AppError.notFound('Attendance record not found.'));
 
       const workDate = record.workDate || todayStr();
-      const outTs = clockOutTime || `${workDate}T17:30:00`;
+      const outTs = localDateTimeToUtcIso(workDate, clockOutTime || '17:30');
 
       let totalMins = record.totalWorkingMinutes || 0;
       if (record.firstClockIn) {
