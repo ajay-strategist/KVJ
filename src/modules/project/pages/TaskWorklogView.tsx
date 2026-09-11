@@ -269,12 +269,19 @@ export function TaskWorklogView({
       .filter((ts: any) => {
         // Specific employee filter (from parent dropdown)
         if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-          return ts.employeeId === selectedEmployeeId;
+          if (ts.employeeId !== selectedEmployeeId) return false;
+        } else if (!isManagement && user) {
+          if (ts.employeeId !== user.id) return false;
         }
-        // Employees only see their own; management sees everyone
-        if (!isManagement && user) {
-          return ts.employeeId === user.id;
+        if (selectedProjectId !== 'all') {
+          if (selectedProjectId === 'OFFICE_TASK') {
+            if (ts.projectId && ts.projectId !== 'OFFICE_TASK') return false;
+          } else if (ts.projectId !== selectedProjectId) {
+            return false;
+          }
         }
+        if (sessFrom && ts.workDate && ts.workDate < sessFrom) return false;
+        if (sessTo && ts.workDate && ts.workDate > sessTo) return false;
         return true;
       })
       .map((ts: any) => {
@@ -315,12 +322,12 @@ export function TaskWorklogView({
         };
       });
 
-    // Synthetic entries from tasks with actualHours when no timesheets exist
+    // Synthetic entries from tasks with active timer secondsToday when no timesheet exists today
     const timerStates = getTimerStates();
     const fromTasks: WorklogRecord[] = (tasks || [])
       .filter((t: any) => {
-        const actualSec =
-          timerStates[t.id]?.secondsToday || Math.round((t.actualHours || 0) * 3600);
+        const stored = timerStates[t.id];
+        const actualSec = stored?.secondsToday || 0;
         if (actualSec <= 10) return false; // ignore tasks with <10s tracked
         // Employees only see their own tasks
         if (!isManagement && user) {
@@ -334,8 +341,17 @@ export function TaskWorklogView({
         }
         // Management can further filter by a specific employee
         if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-          return t.assigneeId === selectedEmployeeId;
+          if (t.assigneeId !== selectedEmployeeId) return false;
         }
+        if (selectedProjectId !== 'all') {
+          if (selectedProjectId === 'OFFICE_TASK') {
+            if (t.projectId && t.projectId !== 'OFFICE_TASK') return false;
+          } else if (t.projectId !== selectedProjectId) {
+            return false;
+          }
+        }
+        if (sessFrom && today < sessFrom) return false;
+        if (sessTo && today > sessTo) return false;
         // Don't duplicate if there's already a timesheet for this task today
         const alreadyHasSheet = fromTimesheets.some(
           (l: WorklogRecord) => l.taskName === t.title && l.date === today,
@@ -359,8 +375,7 @@ export function TaskWorklogView({
         const supervisorEmp = supervisorAlloc
           ? employees.find((e) => e.id === supervisorAlloc.employeeId)
           : null;
-        const actualSec =
-          timerStates[t.id]?.secondsToday || Math.round((t.actualHours || 0) * 3600);
+        const actualSec = timerStates[t.id]?.secondsToday || 0;
 
         const isApproved =
           t.status === 'done' ||
@@ -395,7 +410,7 @@ export function TaskWorklogView({
       const timeB = b.date ? new Date(b.date).getTime() : 0;
       return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
     });
-  }, [timesheets, tasks, projects, employees, allocations, selectedEmployeeId, isSupervisor, user, isManagement]);
+  }, [timesheets, tasks, projects, employees, allocations, selectedEmployeeId, selectedProjectId, sessFrom, sessTo, isSupervisor, user, isManagement]);
 
   useEffect(() => {
     setLogs(mappedLogs);
@@ -494,6 +509,24 @@ export function TaskWorklogView({
     if (sessTo && d > sessTo) return false;
     return true;
   });
+
+  const totalSessionMinutes = useMemo(() => {
+    return filteredSessions.reduce((acc, s) => {
+      let mins = s.durationMinutes;
+      if ((mins == null || mins > 1440) && s.startTime && s.endTime) {
+        try {
+          const sDate = new Date(s.startTime);
+          const eDate = new Date(s.endTime);
+          if (!isNaN(sDate.getTime()) && !isNaN(eDate.getTime())) {
+            mins = Math.max(0, Math.round((eDate.getTime() - sDate.getTime()) / 60000));
+          }
+        } catch {}
+      }
+      return acc + (mins || 0);
+    }, 0);
+  }, [filteredSessions]);
+
+  const totalSessionHours = Math.round((totalSessionMinutes / 60) * 10) / 10;
 
   const handleExportWorklogsToExcel = () => {
     const headers = [
@@ -738,13 +771,13 @@ export function TaskWorklogView({
       {/* KPI Cards Banner */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <Card style={{ borderLeft: '4px solid var(--brand)', padding: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Logged Entries</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{filteredLogs.length} Entries</div>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Work Sessions</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{filteredSessions.length} Sessions</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--accent)', padding: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursLogged.toFixed(1)}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalSessionHours.toFixed(1)}</div>
         </Card>
 
         <Card style={{ borderLeft: '4px solid var(--status-warning)', padding: 16 }}>

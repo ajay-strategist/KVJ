@@ -100,21 +100,21 @@ export function useAttendance() {
 
         if (s.taskId) {
           taskTimerStore.pauseTask(s.taskId);
-          // Calculate total logged actual hours from DB task sessions
           const allSessionsPage = await taskRepo.findMany({
             filters: [
               { field: 'taskId', op: 'eq', value: s.taskId },
-              { field: 'status', op: 'eq', value: 'paused' }
+              { field: 'status', op: 'neq', value: 'running' }
             ],
             pageSize: 1000
           });
-          const totalPrevMins = (allSessionsPage.data || []).reduce((sum, item) => sum + (item.durationMinutes || 0), 0);
-          const totalActualHours = Number(((totalPrevMins + durationMinutes) / 60).toFixed(2));
+          const totalMins = (allSessionsPage.data || []).reduce((sum, item) => sum + (item.durationMinutes || 0), 0);
+          const totalActualHours = Number((totalMins / 60).toFixed(2));
 
           await mainTaskRepo.update(s.taskId, {
             status: 'todo',
             actualHours: totalActualHours,
           }, actor);
+          taskTimerStore.syncTaskTime(s.taskId, totalActualHours);
         }
       }
     } catch (e) {
@@ -176,17 +176,18 @@ export function useAttendance() {
           const allSessionsPage = await taskRepo.findMany({
             filters: [
               { field: 'taskId', op: 'eq', value: s.taskId },
-              { field: 'status', op: 'eq', value: 'paused' }
+              { field: 'status', op: 'neq', value: 'running' }
             ],
             pageSize: 1000
           });
-          const totalPrevMins = (allSessionsPage.data || []).reduce((sum, item) => sum + (item.durationMinutes || 0), 0);
-          const totalActualHours = Number(((totalPrevMins + durationMinutes) / 60).toFixed(2));
+          const totalMins = (allSessionsPage.data || []).reduce((sum, item) => sum + (item.durationMinutes || 0), 0);
+          const totalActualHours = Number((totalMins / 60).toFixed(2));
 
           await mainTaskRepo.update(s.taskId, {
             status: 'todo',
             actualHours: totalActualHours,
           }, actor);
+          taskTimerStore.syncTaskTime(s.taskId, totalActualHours);
         }
 
         resumeList.push({

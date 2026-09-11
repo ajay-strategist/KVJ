@@ -1432,12 +1432,37 @@ export function AttendanceLogPage() {
           tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
         })) || [];
 
-        let totalMins = record.totalWorkingMinutes || 0;
-        if (record.firstClockIn && record.lastClockOut) {
+        let totalMins = 0;
+        const validSessions = (record.sessions || []).filter(s => {
+          const st = safeFormatTime(s.clockIn);
+          return !!st && st !== '—';
+        });
+
+        if (validSessions.length > 0) {
+          const seenKeys = new Set<string>();
+          for (const s of validSessions) {
+            const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              if (s.clockIn) {
+                const t1 = new Date(s.clockIn).getTime();
+                const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
+                  totalMins += Math.max(0, Math.round((t2 - t1) / 60000));
+                }
+              }
+            }
+          }
+          if (record.totalBreakMinutes) {
+            totalMins = Math.max(0, totalMins - record.totalBreakMinutes);
+          }
+        } else if (record.totalWorkingMinutes && record.totalWorkingMinutes > 0) {
+          totalMins = record.totalWorkingMinutes;
+        } else if (record.firstClockIn && record.lastClockOut) {
           const endTs = new Date(record.lastClockOut).getTime();
           const startTs = new Date(record.firstClockIn).getTime();
           if (!isNaN(endTs) && !isNaN(startTs) && endTs > startTs) {
-            totalMins = Math.round((endTs - startTs) / 60000);
+            totalMins = Math.max(0, Math.round((endTs - startTs) / 60000) - (record.totalBreakMinutes || 0));
           }
         }
         const totalHrs = Math.floor(totalMins / 60);

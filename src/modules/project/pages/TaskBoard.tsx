@@ -99,7 +99,17 @@ export function TaskBoard({
   const [tasksList, setTasksList] = useState<TaskItem[]>([]);
 
   const localProjectData = useProject();
-  const { startSession, pauseSession, completeSession } = useTaskSessions();
+  const { startSession, pauseSession, completeSession, listSessions } = useTaskSessions();
+  const [taskSessions, setTaskSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    listSessions().then((data) => {
+      if (active) setTaskSessions(data);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [listSessions]);
+
   const actualProjectData = projectData || localProjectData;
   const projects = actualProjectData?.projects || [];
   const tasks = actualProjectData?.tasks || [];
@@ -183,9 +193,13 @@ export function TaskBoard({
       const supervisorEmp = supervisorId ? employees.find((e) => e.id === supervisorId) : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : (t.supervisorName || '');
 
+      const sessionMins = (taskSessions || [])
+        .filter((s: any) => s.taskId === t.id || s.task_id === t.id)
+        .reduce((sum: number, s: any) => sum + (Number(s.durationMinutes || s.duration_minutes) || 0), 0);
+      const sessionHrs = sessionMins > 0 ? Math.round((sessionMins / 60) * 10) / 10 : 0;
       const tTimesheets = timesheets.filter((ts: any) => ts.taskId === t.id);
       const timesheetHours = tTimesheets.reduce((sum: number, ts: any) => sum + ts.hoursLogged, 0);
-      const totalHoursWorked = t.actualHours && t.actualHours > timesheetHours ? t.actualHours : timesheetHours;
+      const totalHoursWorked = sessionHrs > 0 ? sessionHrs : (t.actualHours && t.actualHours > timesheetHours ? t.actualHours : timesheetHours);
 
       const dailyTimeEntries = tTimesheets.map((ts: any) => {
         const emp = employees.find((e) => e.id === ts.employeeId);
@@ -239,15 +253,19 @@ export function TaskBoard({
         reworkNotes: t.reworkNotes,
       };
     });
-  }, [tasks, projects, employees, allocations, timesheets, todayStr]);
+  }, [tasks, projects, employees, allocations, timesheets, taskSessions, todayStr]);
 
   useEffect(() => {
     setTasksList(mappedTasks);
-    // Synchronize global timer store with database actualHours for loaded tasks
+    // Synchronize global timer store with accurate session/database hours for loaded tasks
     (tasks || []).forEach((t: any) => {
-      taskTimerStore.syncTaskTime(t.id, t.actualHours || 0);
+      const sMins = (taskSessions || [])
+        .filter((s: any) => s.taskId === t.id || s.task_id === t.id)
+        .reduce((sum: number, s: any) => sum + (Number(s.durationMinutes || s.duration_minutes) || 0), 0);
+      const effectiveHours = sMins > 0 ? sMins / 60 : (t.actualHours || 0);
+      taskTimerStore.syncTaskTime(t.id, effectiveHours);
     });
-  }, [mappedTasks, tasks]);
+  }, [mappedTasks, tasks, taskSessions]);
 
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
