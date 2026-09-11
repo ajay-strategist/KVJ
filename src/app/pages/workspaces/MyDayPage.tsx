@@ -30,7 +30,7 @@ import { LEAVE_REPOSITORY_TOKEN } from '../../../modules/leave/leave.repository'
 import { TASK_REPOSITORY_TOKEN } from '../../../modules/project/project.repository';
 import { toLocalISODate, formatDisplayTime } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
-import { CreateTaskModal } from '../../../modules/project/components/CreateTaskModal';
+import { TaskFormModal } from '../../../modules/project/forms/TaskFormModal';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
 
 function Greeting() {
@@ -2836,7 +2836,7 @@ export function MyDayPage() {
       </div>
 
       {/* Create Task Modal */}
-      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
+      <TaskFormModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
 
       {/* Apply Leave Modal on My Day */}
       <ApplyLeaveModal open={applyLeaveOpen} onClose={() => setApplyLeaveOpen(false)} />

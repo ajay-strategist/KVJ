@@ -28,7 +28,7 @@ import { useTaskSessions, saveSessionNote } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
-import { CreateTaskModal } from '../components/CreateTaskModal';
+import { TaskFormModal } from '../forms/TaskFormModal';
 
 export type TaskStatus = 'Pending Approval' | 'To Do' | 'In Progress' | 'Under Review' | 'Completed';
 
@@ -1204,7 +1204,7 @@ export function TaskBoard({
       })()}
 
       {/* Create Task Modal */}
-      <CreateTaskModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
+      <TaskFormModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
 
       {/* Log Time Drawer */}
       <Drawer open={timeEntryOpen} onClose={() => setTimeEntryOpen(false)} title={`Log Time: ${selectedTask?.name ?? ''}`}>
