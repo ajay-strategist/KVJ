@@ -54,6 +54,7 @@ export function AttendanceCalendarView({
   const [selectedDay, setSelectedDay] = useState<CalendarDayDetail | null>(null);
   const [selectedFY, setSelectedFY] = useState(getCurrentFinancialYear());
   const [fyAttendance, setFyAttendance] = useState<any[]>([]);
+  const [fyLeaves, setFyLeaves] = useState<any[]>([]);
   const [fyExpenses, setFyExpenses] = useState<number>(0);
   const [fyHolidays, setFyHolidays] = useState<string[]>([]);
 
@@ -69,12 +70,13 @@ export function AttendanceCalendarView({
         const fromDate = `${startYr}-04-01`;
         const toDate = `${startYr + 1}-03-31`;
 
-        const selectedEmp = employees.find(
-          (e) => `${e.firstName} ${e.lastName}` === selectedEmployeeName
-        );
+        const selectedEmp = (employees || []).find((e) => {
+          const fullName = `${e.firstName || ''} ${e.lastName || ''}`.trim();
+          return fullName === (selectedEmployeeName || '').trim() || e.id === selectedEmployeeName;
+        });
 
         let attQuery = supabase
-          .from('flwdsk_attendance')
+          .from('flwdsk_attendance_records')
           .select('*')
           .gte('work_date', fromDate)
           .lte('work_date', toDate)
@@ -86,11 +88,25 @@ export function AttendanceCalendarView({
 
         const { data: attData } = await attQuery;
 
+        let leaveQuery = supabase
+          .from('flwdsk_leave_records')
+          .select('*')
+          .gte('end_date', fromDate)
+          .lte('start_date', toDate)
+          .eq('status', 'approved')
+          .is('deleted_at', null);
+
+        if (selectedEmp?.id) {
+          leaveQuery = leaveQuery.eq('employee_id', selectedEmp.id);
+        }
+
+        const { data: leaveData } = await leaveQuery;
+
         let expQuery = supabase
           .from('flwdsk_expense_claims')
-          .select('amount, created_at, status')
+          .select('*')
           .gte('created_at', fromDate)
-          .lte('created_at', toDate)
+          .lte('created_at', `${startYr + 1}-03-31T23:59:59.999Z`)
           .is('deleted_at', null);
 
         if (selectedEmp?.id) {
@@ -101,13 +117,16 @@ export function AttendanceCalendarView({
 
         const { data: holData } = await supabase
           .from('flwdsk_declared_holidays')
-          .select('holiday_date, date')
+          .select('*')
           .is('deleted_at', null);
 
         if (active) {
           if (attData) setFyAttendance(attData);
+          if (leaveData) setFyLeaves(leaveData);
           if (expData) {
-            const sumExp = expData.reduce((acc: number, c: any) => acc + (Number(c.amount) || 0), 0);
+            const sumExp = expData
+              .filter((c: any) => c.status !== 'rejected')
+              .reduce((acc: number, c: any) => acc + (Number(c.amount) || 0), 0);
             setFyExpenses(sumExp);
           }
           if (holData) {
@@ -229,53 +248,64 @@ export function AttendanceCalendarView({
 
   // Financial Year Accumulated Stats matching specs starting from April 1st
   const fyStats = useMemo(() => {
-    const selectedEmp = employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployeeName) || employees[0];
+    const selectedEmp = (employees || []).find((e) => {
+      const fullName = `${e.firstName || ''} ${e.lastName || ''}`.trim();
+      return fullName === (selectedEmployeeName || '').trim() || e.id === selectedEmployeeName;
+    }) || employees[0];
     const joinedDate = selectedEmp?.dateOfJoining || '—';
 
     // If we have actual FY attendance records, aggregate them accurately across the financial year
     if (fyAttendance.length > 0) {
-      const workingDaysFY = fyAttendance.filter((r) => r.status === 'present' || r.status === 'clocked_out').length;
-      const lateReportingFY = fyAttendance.filter((r) => (r.late_minutes && r.late_minutes > 0) || isLate(r.first_clock_in ? new Date(r.first_clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined)).length;
-      const earlyLeavingFY = fyAttendance.filter((r) => r.early_departure_minutes && r.early_departure_minutes > 0).length;
-      const totalBreakHrsFY = Math.round((fyAttendance.reduce((sum, r) => sum + (r.total_break_minutes || 0), 0) / 60) * 10) / 10;
-      const totalHoursWorkedFY = Math.round((fyAttendance.reduce((sum, r) => sum + (r.total_working_minutes || 0), 0) / 60) * 10) / 10;
+      const workingDaysFY = fyAttendance.filter(
+        (r) => r.status === 'present' || r.status === 'clocked_out' || r.status === 'on_break' || (r.total_working_minutes && r.total_working_minutes > 0)
+      ).length;
+
+      const lateReportingFY = fyAttendance.filter((r) => {
+        if (r.late_minutes && r.late_minutes > 0) return true;
+        if (r.first_clock_in) {
+          const d = new Date(r.first_clock_in);
+          const mins = d.getHours() * 60 + d.getMinutes();
+          return mins >= (9 * 60 + 31);
+        }
+        return false;
+      }).length;
+
+      const earlyLeavingFY = fyAttendance.filter((r) => {
+        if (r.early_departure_minutes && r.early_departure_minutes > 0) return true;
+        if (r.last_clock_out) {
+          const d = new Date(r.last_clock_out);
+          const mins = d.getHours() * 60 + d.getMinutes();
+          return mins < 17 * 60;
+        }
+        return false;
+      }).length;
+
+      const totalBreakMins = fyAttendance.reduce((sum, r) => sum + (Number(r.total_break_minutes) || 0), 0);
+      const totalBreakHrsFY = Math.round((totalBreakMins / 60) * 10) / 10;
+
+      const totalWorkingMins = fyAttendance.reduce((sum, r) => sum + (Number(r.total_working_minutes) || 0), 0);
+      const totalHoursWorkedFY = Math.round((totalWorkingMins / 60) * 10) / 10;
+
       const expectedOfficeHoursFY = workingDaysFY * 8;
 
-      // Calculate working days in FY up to today
-      const matchFY = selectedFY.match(/(\d{4})/);
-      const startYr = matchFY ? parseInt(matchFY[1], 10) : 2026;
-      const fyStart = `${startYr}-04-01`;
-      const todayStr = todayISO();
-      const effStart = joinedDate && joinedDate !== '—' && joinedDate > fyStart ? joinedDate : fyStart;
-      const effEnd = todayStr < `${startYr + 1}-03-31` ? todayStr : `${startYr + 1}-03-31`;
+      const noOfLeavesFY = (fyLeaves || []).reduce((acc: number, l: any) => {
+        if (!l.start_date || !l.end_date) return acc + 1;
+        const s = new Date(l.start_date).getTime();
+        const e = new Date(l.end_date).getTime();
+        const diff = Math.max(1, Math.round((e - s) / 86400000) + 1);
+        return acc + (l.half_day ? 0.5 * diff : diff);
+      }, 0);
 
       const holSet = new Set(fyHolidays);
-      let daysCount = 0;
-      const presentDates = new Set(fyAttendance.filter(r => r.status === 'present' || r.status === 'clocked_out').map(r => r.work_date));
-      let leaveCount = 0;
-
-      if (effStart <= effEnd) {
-        const cur = new Date(effStart);
-        const endD = new Date(effEnd);
-        while (cur <= endD) {
-          const iso = cur.toISOString().slice(0, 10);
-          if (cur.getDay() !== 0 && !holSet.has(iso)) {
-            daysCount++;
-            if (!presentDates.has(iso)) {
-              leaveCount++;
-            }
-          }
-          cur.setDate(cur.getDate() + 1);
-        }
-      }
+      const holidayWorkedFY = fyAttendance.filter(
+        (r) => new Date(r.work_date).getDay() === 0 || holSet.has(r.work_date)
+      ).length;
 
       return {
         joinedDate,
-        workingDaysInFY: daysCount || workingDaysFY,
-        daysToBeWorkedFY: daysCount || workingDaysFY,
-        noOfLeavesFY: leaveCount,
-        holidayWorkedFY: fyAttendance.filter(r => new Date(r.work_date).getDay() === 0 || holSet.has(r.work_date)).length,
         workingDaysFY,
+        noOfLeavesFY,
+        holidayWorkedFY,
         expectedOfficeHoursFY,
         lateReportingFY,
         earlyLeavingFY,
@@ -286,21 +316,36 @@ export function AttendanceCalendarView({
     }
 
     // Fallback baseline if no DB records found yet
+    const matchFY = selectedFY.match(/(\d{4})/);
+    const startYr = matchFY ? parseInt(matchFY[1], 10) : 2026;
+    const fyStart = `${startYr}-04-01`;
+    const todayStr = todayISO();
+    const effStart = joinedDate && joinedDate !== '—' && joinedDate > fyStart ? joinedDate : fyStart;
+    const effEnd = todayStr < `${startYr + 1}-03-31` ? todayStr : `${startYr + 1}-03-31`;
+
+    let daysCount = 0;
+    if (effStart <= effEnd) {
+      const cur = new Date(effStart);
+      const endD = new Date(effEnd);
+      while (cur <= endD) {
+        if (cur.getDay() !== 0) daysCount++;
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+
     return {
       joinedDate,
-      workingDaysInFY: monthlyStats.workingDaysInMonth,
-      daysToBeWorkedFY: monthlyStats.daysToBeWorked,
-      noOfLeavesFY: monthlyStats.noOfLeaves,
-      holidayWorkedFY: monthlyStats.holidayWorked,
-      workingDaysFY: monthlyStats.workingDays,
-      expectedOfficeHoursFY: monthlyStats.workingDays * 8,
-      lateReportingFY: monthlyStats.lateReporting,
-      earlyLeavingFY: monthlyStats.earlyLeaving,
-      totalBreakHrsFY: monthlyStats.totalBreakHrs,
-      totalExpensesFY: monthlyStats.totalExpenses,
-      totalHoursWorkedFY: monthlyStats.totalHoursWorked,
+      workingDaysFY: daysCount || monthlyStats.workingDays,
+      noOfLeavesFY: 0,
+      holidayWorkedFY: 0,
+      expectedOfficeHoursFY: (daysCount || monthlyStats.workingDays) * 8,
+      lateReportingFY: 0,
+      earlyLeavingFY: 0,
+      totalBreakHrsFY: 0,
+      totalExpensesFY: 0,
+      totalHoursWorkedFY: 0,
     };
-  }, [fyAttendance, fyExpenses, fyHolidays, monthlyStats, employees, selectedEmployeeName, selectedFY]);
+  }, [fyAttendance, fyLeaves, fyExpenses, fyHolidays, monthlyStats, employees, selectedEmployeeName, selectedFY]);
 
   const orgBreakdown = useMemo(() => {
     const orgMap: Record<string, { totalHrs: number; count: number }> = {};
