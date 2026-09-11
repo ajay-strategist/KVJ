@@ -70,7 +70,12 @@ export function TaskWorklogView({
   // ── Work Sessions: try Supabase first, fall back to localStorage timer state ─
   const { listSessions, updateSessionNote } = useTaskSessions();
   const [dbSessions, setDbSessions] = useState<TaskWorkSession[]>([]);
-  const [sessFrom, setSessFrom] = useState('');
+  const [sessFrom, setSessFrom] = useState<string>(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}-01`;
+  });
   const [sessTo, setSessTo] = useState('');
 
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
