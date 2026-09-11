@@ -15,6 +15,7 @@ import type { UUID } from '../../../core/types';
 import { exportToExcel } from '../../../shared/utils/exportToExcel';
 import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
 import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
+import { supabase } from '../../../shared/integration/supabase';
 
 /**
  * Multi-select of project members, bound to the shared Form's `memberIds` value.
@@ -198,6 +199,47 @@ export function ProjectList({
   const timesheets = actualProjectData?.timesheets || [];
   const { createProject, updateProject, createTask, updateTask, submitTask, deleteTask, deleteProject } = actualProjectData || {};
   const { employees = [] } = useEmployee() || {};
+
+  const [taskSessions, setTaskSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchTaskSessions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('flwdsk_task_work_sessions')
+          .select('*')
+          .is('deleted_at', null);
+        if (!error && data && active) {
+          setTaskSessions(data);
+        }
+      } catch (e) {
+        console.warn('Failed to load task sessions in ProjectList:', e);
+      }
+    };
+    fetchTaskSessions();
+    const interval = window.setInterval(fetchTaskSessions, 15000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const nextProjectCode = useMemo(() => {
+    let maxNum = 0;
+    (projects || []).forEach((p: any) => {
+      const codeStr = (p.code || '') as string;
+      const match = codeStr.match(/(?:PRJ|PROJECT)[-_]?(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    });
+    const nextNum = maxNum + 1;
+    return `KVJ-PRJ-${String(nextNum).padStart(2, '0')}`;
+  }, [projects]);
 
   const assigneeOptions = useMemo(() => {
     if (employees.length > 0) {
@@ -404,8 +446,14 @@ export function ProjectList({
     const pTasks = tasks.filter((t: any) => t.projectId === selectedProject.id);
     return pTasks.map((t: any) => {
       const assignee = employees.find((e) => e.id === t.assigneeId || e.firstName === t.assigneeId || `${e.firstName} ${e.lastName}` === t.assigneeId);
+      
+      const sessionMins = taskSessions
+        .filter((s: any) => s.taskId === t.id || s.task_id === t.id)
+        .reduce((sum: number, s: any) => sum + (Number(s.durationMinutes || s.duration_minutes) || 0), 0);
+      const sessionHrs = sessionMins > 0 ? Math.round((sessionMins / 60) * 10) / 10 : 0;
       const tTimesheets = timesheets.filter((ts: any) => ts.taskId === t.id);
-      const hoursLogged = tTimesheets.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0) || Number(t.actualHours || 0);
+      const tsHours = tTimesheets.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
+      const hoursLogged = sessionHrs > 0 ? sessionHrs : (tsHours > 0 ? tsHours : Number(t.actualHours || 0));
 
       let status = 'To Do';
       if (t.status === 'done' || (t.status as any) === 'Completed') status = 'Completed';
@@ -420,10 +468,11 @@ export function ProjectList({
         status,
         rawStatus: t.status || 'todo',
         hoursLogged: Math.round(hoursLogged * 10) / 10,
+        proposedHours: t.proposedHours || t.estimatedHours || 0,
         dueDate: t.dueDate || '—',
       };
     });
-  }, [selectedProject, tasks, timesheets, employees]);
+  }, [selectedProject, tasks, timesheets, employees, taskSessions]);
 
   const handleCreateProject = async (values: Record<string, unknown>) => {
     const initialStatus = isMgmt ? ((values.status as any) || 'execution') : 'planning';
@@ -507,8 +556,12 @@ export function ProjectList({
     const dbProj = projects.find((p: any) => p.id === selectedProject.id);
     const supervisorId = (dbProj as any)?.supervisorId || user?.id;
 
+    const existingCount = tasks.filter((t: any) => t.projectId === selectedProject.id).length;
+    const taskCode = `${selectedProject.code}-T${String(existingCount + 1).padStart(2, '0')}`;
+
     const res = await createTask({
       projectId: selectedProject.id as UUID,
+      code: taskCode,
       title: values.title as string,
       description: (values.description as string) || undefined,
       proposedHours: values.proposedHours ? Number(values.proposedHours) : undefined,
@@ -682,8 +735,13 @@ export function ProjectList({
                 const assignee = employees.find((e) => e.id === t.assigneeId);
                 const assigneeName = assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned';
                 const assigneeAvatar = assignee?.avatarUrl;
+                const sessionMins = taskSessions
+                  .filter((s: any) => s.taskId === t.id || s.task_id === t.id)
+                  .reduce((sum: number, s: any) => sum + (Number(s.durationMinutes || s.duration_minutes) || 0), 0);
+                const sessionHrs = sessionMins > 0 ? Math.round((sessionMins / 60) * 10) / 10 : 0;
                 const pTs = timesheets.filter((ts: any) => ts.taskId === t.id);
-                const hrs = pTs.reduce((sum: number, ts: any) => sum + (ts.hoursLogged || 0), 0);
+                const tsHours = pTs.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
+                const hrs = sessionHrs > 0 ? sessionHrs : (tsHours > 0 ? tsHours : Number(t.actualHours || 0));
                 return `
                   <tr>
                     <td style="color:#94a3b8;">${i + 1}</td>
@@ -759,37 +817,71 @@ export function ProjectList({
 
   const handleExportProjectsToExcel = () => {
     const headers = [
-      'Project Code',
       'Project Name',
-      'Client',
       'Supervisor',
-      'Status',
-      'Total Hours Worked',
-      'Tasks Completed',
-      'Total Tasks',
-      'Completion %',
-      'Assigned Members',
+      'Task Name',
+      'Assignee',
+      'Start Date',
+      'End Date',
+      'Due Date',
+      'Proposed hours',
+      'Total hours',
+      'Current Status',
     ];
 
-    const rows = filteredProjects.map((p) => {
-      const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
-      const memberStr = p.members.map((m) => `${m.name} (${m.hours})`).join('; ');
-      return [
-        p.code,
-        p.title,
-        p.client,
-        p.supervisor || '—',
-        p.status,
-        p.totalHours,
-        p.tasksCompleted,
-        p.tasksTotal,
-        `${pct}%`,
-        memberStr || 'None',
-      ];
+    const rows: (string | number)[][] = [];
+
+    filteredProjects.forEach((p) => {
+      const pTasks = tasks.filter((t: any) => t.projectId === p.id && !t.deletedAt);
+      if (pTasks.length === 0) {
+        rows.push([
+          p.title,
+          p.supervisor || '—',
+          '—',
+          '—',
+          '—',
+          '—',
+          '—',
+          0,
+          p.totalHours,
+          p.status,
+        ]);
+      } else {
+        pTasks.forEach((t: any) => {
+          const assignee = employees.find((e) => e.id === t.assigneeId);
+          const assigneeName = assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned';
+
+          const sessionMins = taskSessions
+            .filter((s: any) => s.taskId === t.id || s.task_id === t.id)
+            .reduce((sum: number, s: any) => sum + (Number(s.durationMinutes || s.duration_minutes) || 0), 0);
+          const sessionHrs = sessionMins > 0 ? Math.round((sessionMins / 60) * 10) / 10 : 0;
+          const pTs = timesheets.filter((ts: any) => ts.taskId === t.id);
+          const tsHours = pTs.reduce((sum: number, ts: any) => sum + Number(ts.hoursLogged || 0), 0);
+          const hrs = sessionHrs > 0 ? sessionHrs : (tsHours > 0 ? tsHours : Number(t.actualHours || 0));
+
+          let status = 'To Do';
+          if (t.status === 'done' || (t.status as any) === 'Completed') status = 'Completed';
+          else if (t.status === 'in_progress' || (t.status as any) === 'In Progress') status = 'In Progress';
+          else if (t.status === 'review' || (t.status as any) === 'Under Review') status = 'Under Review';
+
+          rows.push([
+            p.title,
+            p.supervisor || '—',
+            t.title || '—',
+            assigneeName,
+            formatDisplayDate(t.startDate),
+            formatDisplayDate(t.endDate || (t.status === 'done' ? t.dueDate : '—')),
+            formatDisplayDate(t.dueDate),
+            t.proposedHours || t.estimatedHours || 0,
+            Math.round(hrs * 10) / 10,
+            status,
+          ]);
+        });
+      }
     });
 
     exportToExcel(`Projects_Report_${todayISO()}`, headers, rows);
-    toast({ variant: 'success', title: 'Export Complete', message: 'Projects report exported to Excel successfully.' });
+    toast({ variant: 'success', title: 'Export Complete', message: 'Projects and tasks report exported to Excel successfully.' });
   };
 
   return (
@@ -1476,7 +1568,7 @@ export function ProjectList({
 
       {/* Create Project Modal */}
       <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create New Project">
-        <Form initial={{ code: 'KVJ-PRJ-00', status: 'not_started' }} onSubmit={handleCreateProject}>
+        <Form key={nextProjectCode} initial={{ code: nextProjectCode, status: 'not_started' }} onSubmit={handleCreateProject}>
           <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
           <TextField name="title" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
 

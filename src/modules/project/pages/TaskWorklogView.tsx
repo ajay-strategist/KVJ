@@ -497,31 +497,41 @@ export function TaskWorklogView({
 
   const handleExportWorklogsToExcel = () => {
     const headers = [
-      'Date',
-      'Employee',
+      'Project Name',
       'Supervisor',
-      'Task / Work Title',
-      'Duration (Hours)',
-      'Update',
+      'Task Name',
+      'Assignee',
+      'Date',
+      'Start Time',
+      'End Time',
+      'Duration',
       'Status',
-      'Notes',
+      'Update',
     ];
 
     const rows = filteredSessions.map((s) => {
-      const durHrs = s.durationMinutes ? (s.durationMinutes / 60).toFixed(2) : '0.00';
       const empObj = employees.find((e) => e.id === s.employeeId);
-      const empName = empObj ? `${empObj.firstName} ${empObj.lastName}` : (s.employeeId || 'Employee');
+      const employee = empObj ? `${empObj.firstName} ${empObj.lastName}` : (s.employeeId || 'Employee');
       const supObj = employees.find((e) => e.id === s.supervisorId);
-      const supName = supObj ? `${supObj.firstName} ${supObj.lastName}` : (s.supervisorName || '—');
+      const supervisor = supObj ? `${supObj.firstName} ${supObj.lastName}` : (s.supervisorName || '—');
+      const tObj = (tasks || []).find((tk: any) => tk.id === s.taskId);
+      const pObj = (projects || []).find((p: any) => p.id === (s.projectId || tObj?.projectId));
+      const projectName = pObj ? pObj.title : (tObj?.project && tObj.project !== 'Office Task' ? tObj.project : 'Office Task');
+      const taskName = s.workTitle || tObj?.title || 'Work Session';
+      const duration = s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes, s.startTime, s.endTime);
+      const updateNote = (s as any).notes || (s as any).description || '—';
+
       return [
+        projectName,
+        supervisor,
+        taskName,
+        employee,
         formatDisplayDate(s.startTime?.slice(0, 10)),
-        empName,
-        supName,
-        s.workTitle || 'Work Session',
-        `${durHrs}`,
-        (s as any).notes || (s as any).description || '—',
+        tOnly(s.startTime),
+        tOnly(s.endTime),
+        duration,
         s.status || 'completed',
-        (s as any).notes || (s as any).description || '',
+        updateNote,
       ];
     });
 

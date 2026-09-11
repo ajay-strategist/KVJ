@@ -399,15 +399,28 @@ export const AttendancePanel = memo(function AttendancePanel({
     }
   }, [confirm, clockOut, toast, onActivityLog]);
 
-  const handleDirectStartBreak = useCallback(async () => {
-    const res = await startBreak('Official Break');
+  const [breakModalOpen, setBreakModalOpen] = useState(false);
+  const [breakReason, setBreakReason] = useState('Official Break');
+  const [breakStatusUpdate, setBreakStatusUpdate] = useState('');
+
+  const handleConfirmBreak = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    const reasonText = breakReason || 'Official Break';
+    const res = await startBreak(reasonText);
     if (res.ok) {
-      toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
-      if (onActivityLog) onActivityLog('Started official break', 'info');
+      const updateMsg = breakStatusUpdate.trim();
+      if (updateMsg && onActivityLog) {
+        onActivityLog(`Started break (${reasonText}). Work status: ${updateMsg}`, 'info');
+      } else if (onActivityLog) {
+        onActivityLog(`Started official break (${reasonText})`, 'info');
+      }
+      toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break. Status update saved.' });
+      setBreakModalOpen(false);
+      setBreakStatusUpdate('');
     } else {
       toast({ variant: 'error', title: 'Break Failed', message: res.error });
     }
-  }, [startBreak, toast, onActivityLog]);
+  }, [breakReason, breakStatusUpdate, startBreak, toast, onActivityLog]);
 
   const handleEndBreak = useCallback(async () => {
     const res = await endBreak();
@@ -575,7 +588,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 type="button"
                 className="kvj-btn"
                 disabled={loading}
-                onClick={handleDirectStartBreak}
+                onClick={() => setBreakModalOpen(true)}
                 style={{
                   background: 'var(--status-warning)',
                   color: 'white',
@@ -891,6 +904,56 @@ export const AttendancePanel = memo(function AttendancePanel({
         </Form>
       </Drawer>
 
+      {/* Official Break Status Update Drawer */}
+      <Drawer open={breakModalOpen} onClose={() => setBreakModalOpen(false)} title="Start Official Break — Update Work Status">
+        <form onSubmit={handleConfirmBreak} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: '1.5' }}>
+            Before starting your official break, please provide a brief update on your current task progress and work status.
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
+              Break Reason / Type *
+            </label>
+            <select
+              className="kvj-select"
+              value={breakReason}
+              onChange={(e) => setBreakReason(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13 }}
+            >
+              <option value="Official Break">Official Break</option>
+              <option value="Lunch Break">Lunch Break</option>
+              <option value="Tea / Coffee Break">Tea / Coffee Break</option>
+              <option value="Personal / Short Break">Personal / Short Break</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
+              Current Work Status &amp; Progress *
+            </label>
+            <textarea
+              className="kvj-input"
+              required
+              rows={4}
+              value={breakStatusUpdate}
+              onChange={(e) => setBreakStatusUpdate(e.target.value)}
+              placeholder="e.g. Completed morning batch verification, pausing before client review..."
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13, resize: 'vertical' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+            <Button variant="secondary" type="button" onClick={() => setBreakModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" style={{ background: 'var(--status-warning)', color: 'white' }}>
+              ☕ Confirm &amp; Start Break
+            </Button>
+          </div>
+        </form>
+      </Drawer>
+
 
     </>
   );
@@ -935,7 +998,9 @@ export interface TaskItem {
   isRework?: boolean;
   reworkNotes?: string;
   secondsToday: number;
+  totalHoursWorked?: number;
   assignee?: string;
+  assigneeId?: string;
   supervisor?: string;
 }
 
@@ -1224,9 +1289,34 @@ export const TaskWidget = memo(function TaskWidget({
                       {t.isRework && <span style={{ flexShrink: 0 }}><Badge tone="warning">🔄 Rework</Badge></span>}
                    </div>
                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-                     <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                       ⏱ {formatSec(t.secondsToday)}
-                     </span>
+                     {(() => {
+                       const isMyAssignee = Boolean(
+                         user?.id && (
+                           (t as any).assigneeId === user.id ||
+                           (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
+                         )
+                       );
+                       const totalHrsNum = (t.totalHoursWorked || 0) > 0 ? (t.totalHoursWorked || 0) : ((t.secondsToday || 0) / 3600);
+                       const totalHrsFormatted = `${Math.floor(totalHrsNum)}h ${Math.round((totalHrsNum % 1) * 60)}m`;
+
+                       if (!isMyAssignee) {
+                         return (
+                           <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title="Total Hours Worked">
+                             ⏱ Total: {totalHrsFormatted}
+                           </span>
+                         );
+                       }
+                       return (
+                         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={`Today: ${formatSec(t.secondsToday)}${totalHrsNum > 0 ? ` · Total: ${totalHrsFormatted}` : ''}`}>
+                           ⏱ {formatSec(t.secondsToday)}
+                           {totalHrsNum > ((t.secondsToday || 0) / 3600) && (
+                             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginLeft: 6 }}>
+                               (Total: {totalHrsFormatted})
+                             </span>
+                           )}
+                         </span>
+                       );
+                     })()}
                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                        {t.isApproved ? (
                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -2340,7 +2430,9 @@ export function MyDayPage() {
           isRework,
           reworkNotes,
           secondsToday,
+          totalHoursWorked: Number((t as any).actualHours || (t as any).totalHoursWorked || 0),
           assignee: assigneeName,
+          assigneeId: t.assigneeId,
           supervisor: supervisorName,
         };
       });

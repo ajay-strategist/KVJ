@@ -233,8 +233,23 @@ export class ProjectService implements IProjectService {
         }
       }
 
+      let taskCode = data.code;
+      if (!taskCode) {
+        let prjPrefix = 'TSK';
+        if (projectId) {
+          try {
+            const prj = await this.projectRepo.findById(projectId);
+            if (prj && prj.code) {
+              prjPrefix = prj.code;
+            }
+          } catch (_) {}
+        }
+        taskCode = `${prjPrefix}-T${Math.floor(100 + Math.random() * 900)}`;
+      }
+
       const payload: Partial<Task> = {
         ...data,
+        code: taskCode,
         projectId,
         supervisorId,
         assigneeId: finalAssigneeId,

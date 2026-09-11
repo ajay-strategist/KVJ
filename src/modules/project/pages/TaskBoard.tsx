@@ -748,29 +748,29 @@ export function TaskBoard({
 
   const handleExportTasksToExcel = () => {
     const headers = [
-      'Task Title',
-      'Category / Project',
-      'Assignee',
+      'Project Name',
       'Supervisor',
-      'Status',
+      'Task Name',
+      'Assignee',
       'Start Date',
+      'End Date',
       'Due Date',
-      'Proposed Time',
-      'Total Hours Logged',
-      'Description',
+      'Proposed hours',
+      'Total hours',
+      'Current Status',
     ];
 
     const rows = sortedTasks.map((t) => [
+      t.projectName || t.category || 'Office Task',
+      t.supervisor || '—',
       t.name,
-      t.projectName || t.category,
-      t.assignee,
-      t.supervisor,
-      t.status,
+      t.assignee || 'Unassigned',
       formatDisplayDate(t.startDate),
+      formatDisplayDate(t.endDate || (t.status === 'Completed' ? t.dueDate : '—')),
       formatDisplayDate(t.dueDate),
       t.proposedHours ? `${t.proposedHours}` : '—',
       `${Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)}`,
-      t.description || '',
+      t.status,
     ]);
 
     exportToExcel(`Tasks_Board_${todayISO()}`, headers, rows);

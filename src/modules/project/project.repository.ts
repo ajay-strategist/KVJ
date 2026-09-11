@@ -52,6 +52,7 @@ export interface ResourceAllocation extends Entity {
 }
 
 export interface Task extends Entity {
+  code?: string;
   projectId: UUID;
   milestoneId?: UUID;
   assigneeId?: UUID;

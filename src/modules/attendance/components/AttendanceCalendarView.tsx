@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, SectionHeader, Badge } from '../../../shared/ui/components';
 import { useEmployee } from '../../employee/hooks/useEmployee';
+import { supabase } from '../../../shared/integration/supabase';
+import { todayISO } from '../../../shared/utils/date';
 
 export interface SessionEntry {
   location: string;
@@ -51,6 +53,76 @@ export function AttendanceCalendarView({
 }: AttendanceCalendarViewProps) {
   const [selectedDay, setSelectedDay] = useState<CalendarDayDetail | null>(null);
   const [selectedFY, setSelectedFY] = useState(getCurrentFinancialYear());
+  const [fyAttendance, setFyAttendance] = useState<any[]>([]);
+  const [fyExpenses, setFyExpenses] = useState<number>(0);
+  const [fyHolidays, setFyHolidays] = useState<string[]>([]);
+
+  const { employees } = useEmployee();
+
+  // Load actual attendance & expenses across the entire selected Financial Year
+  useEffect(() => {
+    let active = true;
+    const loadFYData = async () => {
+      try {
+        const matchFY = selectedFY.match(/(\d{4})/);
+        const startYr = matchFY ? parseInt(matchFY[1], 10) : 2026;
+        const fromDate = `${startYr}-04-01`;
+        const toDate = `${startYr + 1}-03-31`;
+
+        const selectedEmp = employees.find(
+          (e) => `${e.firstName} ${e.lastName}` === selectedEmployeeName
+        );
+
+        let attQuery = supabase
+          .from('flwdsk_attendance')
+          .select('*')
+          .gte('work_date', fromDate)
+          .lte('work_date', toDate)
+          .is('deleted_at', null);
+
+        if (selectedEmp?.id) {
+          attQuery = attQuery.eq('employee_id', selectedEmp.id);
+        }
+
+        const { data: attData } = await attQuery;
+
+        let expQuery = supabase
+          .from('flwdsk_expense_claims')
+          .select('amount, created_at, status')
+          .gte('created_at', fromDate)
+          .lte('created_at', toDate)
+          .is('deleted_at', null);
+
+        if (selectedEmp?.id) {
+          expQuery = expQuery.eq('employee_id', selectedEmp.id);
+        }
+
+        const { data: expData } = await expQuery;
+
+        const { data: holData } = await supabase
+          .from('flwdsk_declared_holidays')
+          .select('holiday_date, date')
+          .is('deleted_at', null);
+
+        if (active) {
+          if (attData) setFyAttendance(attData);
+          if (expData) {
+            const sumExp = expData.reduce((acc: number, c: any) => acc + (Number(c.amount) || 0), 0);
+            setFyExpenses(sumExp);
+          }
+          if (holData) {
+            setFyHolidays(holData.map((h: any) => h.holiday_date || h.date).filter(Boolean));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load FY data:', err);
+      }
+    };
+    loadFYData();
+    return () => {
+      active = false;
+    };
+  }, [selectedFY, selectedEmployeeName, employees]);
 
   const getStatusColor = (status: 'present' | 'absent' | 'leave' | 'holiday') => {
     switch (status) {
@@ -138,12 +210,15 @@ export function AttendanceCalendarView({
       return sum;
     }, 0);
 
+    const expectedOfficeHours = workingDays * 8;
+
     return {
       workingDaysInMonth,
       daysToBeWorked,
       noOfLeaves,
       holidayWorked,
       workingDays,
+      expectedOfficeHours,
       lateReporting,
       earlyLeaving,
       totalBreakHrs,
@@ -152,12 +227,65 @@ export function AttendanceCalendarView({
     };
   }, [days]);
 
-  const { employees } = useEmployee();
-
-  // Financial Year Accumulated Stats matching specs
+  // Financial Year Accumulated Stats matching specs starting from April 1st
   const fyStats = useMemo(() => {
     const selectedEmp = employees.find(e => `${e.firstName} ${e.lastName}` === selectedEmployeeName) || employees[0];
     const joinedDate = selectedEmp?.dateOfJoining || '—';
+
+    // If we have actual FY attendance records, aggregate them accurately across the financial year
+    if (fyAttendance.length > 0) {
+      const workingDaysFY = fyAttendance.filter((r) => r.status === 'present' || r.status === 'clocked_out').length;
+      const lateReportingFY = fyAttendance.filter((r) => (r.late_minutes && r.late_minutes > 0) || isLate(r.first_clock_in ? new Date(r.first_clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined)).length;
+      const earlyLeavingFY = fyAttendance.filter((r) => r.early_departure_minutes && r.early_departure_minutes > 0).length;
+      const totalBreakHrsFY = Math.round((fyAttendance.reduce((sum, r) => sum + (r.total_break_minutes || 0), 0) / 60) * 10) / 10;
+      const totalHoursWorkedFY = Math.round((fyAttendance.reduce((sum, r) => sum + (r.total_working_minutes || 0), 0) / 60) * 10) / 10;
+      const expectedOfficeHoursFY = workingDaysFY * 8;
+
+      // Calculate working days in FY up to today
+      const matchFY = selectedFY.match(/(\d{4})/);
+      const startYr = matchFY ? parseInt(matchFY[1], 10) : 2026;
+      const fyStart = `${startYr}-04-01`;
+      const todayStr = todayISO();
+      const effStart = joinedDate && joinedDate !== '—' && joinedDate > fyStart ? joinedDate : fyStart;
+      const effEnd = todayStr < `${startYr + 1}-03-31` ? todayStr : `${startYr + 1}-03-31`;
+
+      const holSet = new Set(fyHolidays);
+      let daysCount = 0;
+      const presentDates = new Set(fyAttendance.filter(r => r.status === 'present' || r.status === 'clocked_out').map(r => r.work_date));
+      let leaveCount = 0;
+
+      if (effStart <= effEnd) {
+        const cur = new Date(effStart);
+        const endD = new Date(effEnd);
+        while (cur <= endD) {
+          const iso = cur.toISOString().slice(0, 10);
+          if (cur.getDay() !== 0 && !holSet.has(iso)) {
+            daysCount++;
+            if (!presentDates.has(iso)) {
+              leaveCount++;
+            }
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+
+      return {
+        joinedDate,
+        workingDaysInFY: daysCount || workingDaysFY,
+        daysToBeWorkedFY: daysCount || workingDaysFY,
+        noOfLeavesFY: leaveCount,
+        holidayWorkedFY: fyAttendance.filter(r => new Date(r.work_date).getDay() === 0 || holSet.has(r.work_date)).length,
+        workingDaysFY,
+        expectedOfficeHoursFY,
+        lateReportingFY,
+        earlyLeavingFY,
+        totalBreakHrsFY,
+        totalExpensesFY: fyExpenses,
+        totalHoursWorkedFY,
+      };
+    }
+
+    // Fallback baseline if no DB records found yet
     return {
       joinedDate,
       workingDaysInFY: monthlyStats.workingDaysInMonth,
@@ -165,13 +293,14 @@ export function AttendanceCalendarView({
       noOfLeavesFY: monthlyStats.noOfLeaves,
       holidayWorkedFY: monthlyStats.holidayWorked,
       workingDaysFY: monthlyStats.workingDays,
+      expectedOfficeHoursFY: monthlyStats.workingDays * 8,
       lateReportingFY: monthlyStats.lateReporting,
       earlyLeavingFY: monthlyStats.earlyLeaving,
       totalBreakHrsFY: monthlyStats.totalBreakHrs,
       totalExpensesFY: monthlyStats.totalExpenses,
       totalHoursWorkedFY: monthlyStats.totalHoursWorked,
     };
-  }, [monthlyStats, employees, selectedEmployeeName]);
+  }, [fyAttendance, fyExpenses, fyHolidays, monthlyStats, employees, selectedEmployeeName, selectedFY]);
 
   const orgBreakdown = useMemo(() => {
     const orgMap: Record<string, { totalHrs: number; count: number }> = {};
@@ -250,6 +379,9 @@ export function AttendanceCalendarView({
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>Total Hours Worked:</span> <strong>{monthlyStats.totalHoursWorked}</strong>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: 'var(--radius-xs)' }}>
+              <span style={{ color: 'var(--brand)', fontWeight: 600 }}>Expected Office Hours:</span> <strong style={{ color: 'var(--brand)' }}>{monthlyStats.expectedOfficeHours} hrs</strong>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid #22C55E' }}>
               <span style={{ fontWeight: 600 }}>Total Expenses:</span> <strong style={{ color: 'var(--status-success)', fontSize: 13 }}>₹ {monthlyStats.totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
@@ -289,10 +421,13 @@ export function AttendanceCalendarView({
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>FY Total Break:</span> <strong>{fyStats.totalBreakHrsFY} hrs</strong>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: 'var(--radius-xs)' }}>
+              <span style={{ color: 'var(--brand)', fontWeight: 600 }}>FY Expected Office Hours:</span> <strong style={{ color: 'var(--brand)' }}>{fyStats.expectedOfficeHoursFY} hrs</strong>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>FY Total Hours Worked:</span> <strong>{fyStats.totalHoursWorkedFY} hrs</strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(95, 211, 232, 0.12)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(95, 211, 232, 0.12)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
               <span style={{ fontWeight: 600 }}>FY Total Expenses:</span> <strong style={{ color: 'var(--accent)', fontSize: 13 }}>₹ {fyStats.totalExpensesFY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>

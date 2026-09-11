@@ -103,9 +103,14 @@ export function CreateTaskModal({
 
       const proposedHrs = Number(form.proposedHours) || 0;
 
+      const proj = projects.find((p) => p.id === projectId);
+      const prjCode = proj?.code || 'TSK';
+      const autoTaskCode = `${prjCode}-T${Math.floor(100 + Math.random() * 900)}`;
+
       const projectService = container.resolve(PROJECT_SERVICE_TOKEN);
       const res = await projectService.createTask(
         {
+          code: autoTaskCode,
           title: form.title.trim(),
           projectId,
           assigneeId: form.assigneeId || user?.id,
