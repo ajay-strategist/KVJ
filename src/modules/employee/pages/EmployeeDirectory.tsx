@@ -9,6 +9,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import Drawer from '../../../shared/ui/Drawer';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Employee } from '../employee.repository';
+import { EmployeeFormModal } from '../forms/EmployeeFormModal';
 import { useProject } from '../../project/hooks/useProject';
 import { supabase } from '../../../shared/integration/supabase';
 import { Authorize } from '../../../shared/permissions/react';
@@ -646,273 +647,108 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         </div>
       )}
 
-      {/* CREATE EMPLOYEE MODAL */}
-      {addModalOpen && (
-        <Drawer
-          open={true}
-          onClose={() => setAddModalOpen(false)}
-          title="➕ Add New Employee"
-        >
-          <form onSubmit={handleAddSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  First Name *
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  placeholder="e.g. Rahul"
-                  value={form.firstName}
-                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Last Name *
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  placeholder="e.g. Menon"
-                  value={form.lastName}
-                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                />
-              </div>
-            </div>
+      {/* ADD EMPLOYEE MODAL */}
+      <EmployeeFormModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        employeesList={employees}
+        onSave={async (data) => {
+          const res = await createEmployee({
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            employeeId: data.employeeId,
+            designation: data.designation,
+            dateOfJoining: data.dateOfJoining,
+            phone: data.phone,
+            role: data.role,
+          } as any);
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Email Address *
-              </label>
-              <input
-                type="email"
-                className="kvj-input"
-                required
-                placeholder="e.g. rahul.menon@kvjanalytics.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
-            </div>
+          if (res.ok) {
+            try {
+              await createUser({
+                username: data.email.trim(),
+                fullName: `${data.firstName.trim()} ${data.lastName.trim()}`,
+                email: data.email.trim(),
+                role: data.role as any,
+              });
+            } catch (err) {
+              console.warn('Auth user creation note:', err);
+            }
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Employee ID
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  placeholder="e.g. EMP-102"
-                  value={form.employeeId}
-                  onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Joining Date
-                </label>
-                <input
-                  type="date"
-                  className="kvj-input"
-                  required
-                  value={form.dateOfJoining}
-                  onChange={(e) => setForm({ ...form, dateOfJoining: e.target.value })}
-                />
-              </div>
-            </div>
+            getUsers().then((uRes) => {
+              if (Array.isArray(uRes)) setUsersList(uRes);
+            });
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Designation
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  placeholder="e.g. Senior Technical Trainer"
-                  value={form.designation}
-                  onChange={(e) => setForm({ ...form, designation: e.target.value })}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Phone Number (Optional)
-                </label>
-                <input
-                  type="tel"
-                  className="kvj-input"
-                  placeholder="e.g. +91 98765 43210"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                System Role *
-              </label>
-              <select
-                className="kvj-select"
-                required
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg-input, var(--bg-surface))', color: 'var(--text-primary)', fontSize: 14 }}
-              >
-                <option value="EMPLOYEE">Employee</option>
-                <option value="MANAGER">Manager</option>
-                <option value="CEO">CEO</option>
-                <option value="ADMIN">Admin</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
-              <Button type="button" variant="secondary" onClick={() => setAddModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                ➕ Save Employee
-              </Button>
-            </div>
-          </form>
-        </Drawer>
-      )}
+            toast({
+              variant: 'success',
+              title: 'Employee Created',
+              message: `${data.firstName} ${data.lastName} added. Default password is "password".`,
+            });
+            return true;
+          } else {
+            toast({
+              variant: 'error',
+              title: 'Employee Creation Failed',
+              message: res.error || 'Could not save employee. Check email format and network connection.',
+            });
+            return false;
+          }
+        }}
+      />
 
       {/* EDIT EMPLOYEE MODAL */}
-      {editModalOpen && editingEmployee && (
-        <Drawer
-          open={true}
-          onClose={() => { setEditModalOpen(false); setEditingEmployee(null); }}
-          title={`✏️ Edit Employee: ${editingEmployee.firstName} ${editingEmployee.lastName}`}
-        >
-          <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  First Name *
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  value={editForm.firstName || ''}
-                  onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Last Name *
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  value={editForm.lastName || ''}
-                  onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                />
-              </div>
-            </div>
+      <EmployeeFormModal
+        open={editModalOpen && !!editingEmployee}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditingEmployee(null);
+        }}
+        employee={editingEmployee}
+        employeesList={employees}
+        onSave={async (data) => {
+          if (!editingEmployee) return false;
+          const res = await updateProfile(editingEmployee.id, {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            employeeId: data.employeeId,
+            designation: data.designation,
+            dateOfJoining: data.dateOfJoining,
+            phone: data.phone,
+            status: data.status as any,
+          });
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Email Address *
-              </label>
-              <input
-                type="email"
-                className="kvj-input"
-                required
-                value={editForm.email || ''}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-              />
-            </div>
+          if (res.ok) {
+            try {
+              const u = getEmployeeUser(editingEmployee.email);
+              if (u && data.role && u.role !== data.role) {
+                await updateUser(u.id, { role: data.role as any });
+              }
+            } catch (err) {
+              console.warn('Auth user role update note:', err);
+            }
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Employee ID
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  value={editForm.employeeId || ''}
-                  onChange={(e) => setEditForm({ ...editForm, employeeId: e.target.value })}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Joining Date
-                </label>
-                <input
-                  type="date"
-                  className="kvj-input"
-                  required
-                  value={editForm.dateOfJoining || ''}
-                  onChange={(e) => setEditForm({ ...editForm, dateOfJoining: e.target.value })}
-                />
-              </div>
-            </div>
+            getUsers().then((uRes) => {
+              if (Array.isArray(uRes)) setUsersList(uRes);
+            });
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Designation
-                </label>
-                <input
-                  type="text"
-                  className="kvj-input"
-                  required
-                  value={editForm.designation || ''}
-                  onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  className="kvj-input"
-                  value={editForm.phone || ''}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                System Role *
-              </label>
-              <select
-                className="kvj-select"
-                required
-                value={editForm.role || 'EMPLOYEE'}
-                onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg-input, var(--bg-surface))', color: 'var(--text-primary)', fontSize: 14 }}
-              >
-                <option value="EMPLOYEE">Employee</option>
-                <option value="MANAGER">Manager</option>
-                <option value="CEO">CEO</option>
-                <option value="ADMIN">Admin</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
-              <Button type="button" variant="secondary" onClick={() => { setEditModalOpen(false); setEditingEmployee(null); }}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                💾 Save Changes
-              </Button>
-            </div>
-          </form>
-        </Drawer>
-      )}
+            toast({
+              variant: 'success',
+              title: 'Employee Updated',
+              message: `Updated details for ${data.firstName} ${data.lastName}.`,
+            });
+            return true;
+          } else {
+            toast({
+              variant: 'error',
+              title: 'Update Failed',
+              message: res.error || 'Could not update employee details.',
+            });
+            return false;
+          }
+        }}
+      />
     </AppShell>
   );
 }

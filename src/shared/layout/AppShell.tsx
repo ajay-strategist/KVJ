@@ -727,20 +727,44 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               }}
             >
               {(() => {
-                const isApproverRole = ['ADMIN', 'CEO', 'MANAGER'].includes((user?.role || '').toUpperCase());
                 const mobileNavItems = [
                   { to: '/app', label: 'My Day', icon: 'Home' },
-                  ...(isApproverRole ? [{ to: '/app/approvals', label: 'Approvals', icon: 'CheckSquare' }] : []),
+                  { to: '/app/attendance/log', label: 'Clock In', icon: 'Clock' },
                   { to: '/app/project/tasks', label: 'Tasks', icon: 'FolderKanban' },
-                  { to: '/app/communication/chat', label: 'Chat', icon: 'MessageSquare' },
-                  { to: '/app/leave', label: 'Leave', icon: 'Clock' },
+                  { to: '/app/training/batches', label: 'Training', icon: 'GraduationCap' },
                 ];
-                return mobileNavItems.map((item) => {
-                  const active = pathname === item.to || (item.to !== '/app' && pathname.startsWith(item.to));
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
+                return (
+                  <>
+                    {mobileNavItems.map((item) => {
+                      const active = pathname === item.to || (item.to !== '/app' && pathname.startsWith(item.to));
+                      return (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 3,
+                            flex: 1,
+                            height: '100%',
+                            color: active ? 'var(--brand)' : 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            fontSize: 11,
+                            fontWeight: active ? 700 : 500,
+                            transition: 'color 140ms ease',
+                          }}
+                        >
+                          <Icon name={item.icon} size={18} />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setMobileOpen((prev) => !prev)}
+                      aria-label="Toggle mobile menu"
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -749,18 +773,20 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                         gap: 3,
                         flex: 1,
                         height: '100%',
-                        color: active ? 'var(--brand)' : 'var(--text-secondary)',
-                        textDecoration: 'none',
-                        fontSize: 12,
-                        fontWeight: active ? 700 : 500,
-                        transition: 'color 140ms ease',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: mobileOpen ? 'var(--brand)' : 'var(--text-secondary)',
+                        fontSize: 11,
+                        fontWeight: mobileOpen ? 700 : 500,
+                        padding: 0,
                       }}
                     >
-                      <Icon name={item.icon} size={18} />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                });
+                      <Icon name="Menu" size={18} />
+                      <span>Menu</span>
+                    </button>
+                  </>
+                );
               })()}
             </nav>
           )}

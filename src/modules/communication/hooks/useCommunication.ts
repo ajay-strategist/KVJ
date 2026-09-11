@@ -12,6 +12,7 @@ import {
 import type { UUID } from '../../../core/types';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../../shared/integration/supabase';
+import { playChatNotificationSound } from '../../../shared/notifications/NotificationProvider';
 
 type CallbackResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -328,11 +329,19 @@ export function useCommunication(activeChannelId?: UUID) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'flwdsk_chat_messages', filter: `channel_id=eq.${activeChannelId}` },
-        () => { fetchMessages(); },
+        (payload: any) => {
+          fetchMessages();
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new;
+            if (newMsg && newMsg.sender_id !== user?.id) {
+              playChatNotificationSound(newMsg.id);
+            }
+          }
+        },
       )
       .subscribe();
     return () => { supabase.removeChannel(sub); };
-  }, [activeChannelId, fetchMessages]);
+  }, [activeChannelId, fetchMessages, user?.id]);
 
   // Live channel-list changes (new channels, membership, pins) for this user.
   useEffect(() => {
@@ -350,8 +359,15 @@ export function useCommunication(activeChannelId?: UUID) {
   useEffect(() => {
     if (!chatSyncChannel) return;
     const handler = (e: MessageEvent) => {
-      if (e.data.type === 'message_updated' && e.data.channelId === activeChannelId) {
-        fetchMessages();
+      if (e.data.type === 'message_updated') {
+        if (e.data.channelId === activeChannelId) {
+          fetchMessages();
+        }
+        // Also reload unread counts from localStorage
+        try {
+          const saved = localStorage.getItem('kvj_chat_unread_counts');
+          if (saved) setUnreadCounts(JSON.parse(saved));
+        } catch {}
       }
       if (e.data.type === 'channels_updated') {
         fetchChannels();

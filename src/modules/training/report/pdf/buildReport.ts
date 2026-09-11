@@ -234,6 +234,7 @@ export function buildReportPdf(data: DailyReportData, config: DailyReportConfig)
       head,
       body,
       startY: y,
+      showHead: 'everyPage',
       margin: { left: P.margin.left, right: P.margin.right, top: P.margin.top, bottom: P.margin.bottom },
       theme: 'grid',
       styles: {
@@ -257,9 +258,6 @@ export function buildReportPdf(data: DailyReportData, config: DailyReportConfig)
       columnStyles: opts?.colStyles,
       didParseCell: opts?.onCell,
       didDrawCell: opts?.onDrawCell,
-      didDrawPage: () => {
-        if (doc.getCurrentPageInfo().pageNumber > 1) drawRunningHeader(doc, title, data);
-      },
     });
     // @ts-expect-error lastAutoTable is attached at runtime
     y = (doc.lastAutoTable?.finalY ?? y) + S.paragraph;

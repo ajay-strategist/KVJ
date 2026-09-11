@@ -12,6 +12,7 @@ import { businessRules } from '../../../config/business-rules';
 import Drawer from '../../../shared/ui/Drawer';
 import type { LeaveRecord } from '../leave.repository';
 import { googleIntegration, getMonthlyFolderName } from '../../../shared/integration/google';
+import { ApplyLeaveModal } from '../forms/ApplyLeaveModal';
 
 function formatLeaveDates(startDate: string, endDate: string, halfDay?: boolean, halfDayShift?: string): string {
   if (!startDate) return '—';
@@ -588,30 +589,8 @@ export function LeaveBoard() {
         pageSize={20}
       />
 
-      {/* Apply Leave Drawer */}
-      <Drawer open={applyOpen} onClose={() => setApplyOpen(false)} title="Apply for Leave">
-        <Form initial={{ leaveType: 'Leave', startDate: '', endDate: '', reason: '', halfDay: false, halfDayShift: 'Morning' }} onSubmit={handleApplySubmit}>
-          <SelectField name="leaveType" label="Leave Type" options={leaveTypes} />
-          <DatePickerField name="startDate" label="Start Date" />
-          <DatePickerField name="endDate" label="End Date" />
-          <CheckboxField name="halfDay" label="Apply for Half Day" />
-          <SelectField
-            name="halfDayShift"
-            label="Half Day Shift"
-            options={[
-              { value: 'Morning', label: 'Morning Half Day (Cancel cutoff 10:30 AM)' },
-              { value: 'Evening', label: 'Evening Half Day (Cancel cutoff 3:00 PM)' },
-            ]}
-          />
-          <FileUploadField name="medCert" label="Medical Certificate (Optional upfront; can be uploaded after leave)" accept=".pdf,.png,.jpg" />
-          <TextAreaField name="reason" label="Reason for Leave" />
-          
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setApplyOpen(false)}>Cancel</Button>
-            <Button type="submit">Submit Request</Button>
-          </div>
-        </Form>
-      </Drawer>
+      {/* Apply Leave Modal */}
+      <ApplyLeaveModal open={applyOpen} onClose={() => setApplyOpen(false)} onSuccess={() => refreshMyLeaves()} />
 
       {/* Upload Post-Leave Medical Certificate Drawer */}
       {uploadCertOpen && uploadTargetLeave && (

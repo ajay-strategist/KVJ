@@ -23,6 +23,7 @@ export type SectionId =
   | 'student-data'
   | 'progress-analytics'
   | 'risk-analysis'
+  | 'training-delivery-logs'
   | 'trainer-notes'
   | 'attachments-summary';
 
@@ -141,6 +142,17 @@ export interface BatchCertificateStatus {
   pendingCount: number;
 }
 
+export interface TrainingDeliveryLogItem {
+  id: string;
+  date: string;
+  dayNumber: number;
+  trainerName: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  hours: number;
+}
+
 export interface DailyReportData {
   reportDate: string;
   batchId: string;
@@ -165,4 +177,5 @@ export interface DailyReportData {
   certificateStatus?: any;
   attachments?: any[];
   defaultTrainerNotes: string;
+  deliveryLogs?: TrainingDeliveryLogItem[];
 }

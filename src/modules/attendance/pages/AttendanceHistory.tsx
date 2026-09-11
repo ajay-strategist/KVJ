@@ -10,6 +10,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import type { AttendanceRecord } from '../attendance.repository';
+import { AttendanceCorrectionModal } from '../forms/AttendanceCorrectionModal';
 
 export function AttendanceHistory() {
   const { user } = useAuth();
@@ -192,26 +193,13 @@ export function AttendanceHistory() {
         )}
       </Drawer>
 
-      {/* Corrections Drawer */}
-      <Drawer open={correctOpen} onClose={() => setCorrectOpen(false)} title="Attendance Correction Claim">
-        {selectedDayRecord && (
-          <Form initial={{ field: 'firstClockIn', proposedTime: '', reason: '' }} onSubmit={handleCorrectionSubmit}>
-            <div style={{ marginBottom: 16 }}>
-              <label className="kvj-label">Field to Correct</label>
-              <select name="field" className="kvj-select">
-                <option value="firstClockIn">First Clock In Time</option>
-                <option value="lastClockOut">Last Clock Out Time</option>
-              </select>
-            </div>
-            <TimePickerField name="proposedTime" label="Proposed Correct Time" />
-            <TextField name="reason" label="Reason for Correction" placeholder="Forgot to punch, device issue..." />
-            <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <Button variant="secondary" type="button" onClick={() => setCorrectOpen(false)}>Cancel</Button>
-              <Button type="submit">Submit Request</Button>
-            </div>
-          </Form>
-        )}
-      </Drawer>
+      {/* Attendance Correction Modal */}
+      <AttendanceCorrectionModal
+        open={correctOpen}
+        onClose={() => setCorrectOpen(false)}
+        defaultRecordId={selectedDayRecord?.id}
+        onSuccess={() => fetchHistory()}
+      />
     </AppShell>
   );
 }

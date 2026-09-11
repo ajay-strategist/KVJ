@@ -17,6 +17,9 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { useAuth } from '../../auth/AuthProvider';
 import { formatDateTime, formatDisplayDate, localDateTimeToUtcIso } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
+import { ForceClockOutModal } from '../forms/ForceClockOutModal';
+import { useBreakpoint } from '../../../shared/hooks/responsive';
+import { DesktopOnlyNotice } from '../../../shared/ui/DesktopOnlyNotice';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
@@ -42,6 +45,7 @@ export function ApprovalsQueue() {
   
   const userRole = user?.role || 'EMPLOYEE';
   const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole.toUpperCase());
+  const isDesktop = useBreakpoint('md');
 
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval'>('all');
 
@@ -749,7 +753,13 @@ export function ApprovalsQueue() {
     {
       id: 'corrections',
       label: `Attendance Corrections (${corrections.length})`,
-      content: (
+      content: !isDesktop ? (
+        <DesktopOnlyNotice
+          featureName="Attendance Correction Approval"
+          reason="Attendance correction approvals require reviewing multi-session timesheet comparisons, overlap audits, and supervisor logs that are optimized for desktop viewports."
+          recommendedAction="Please open Approvals from your laptop or desktop browser to review and approve attendance correction requests."
+        />
+      ) : (
         <DataTable
           columns={correctionColumns}
           rows={corrections}
@@ -761,7 +771,13 @@ export function ApprovalsQueue() {
     {
       id: 'unclosed',
       label: `Unclosed Sessions (${unclosedSessions.length})`,
-      content: (
+      content: !isDesktop ? (
+        <DesktopOnlyNotice
+          featureName="Unclosed Sessions Audit"
+          reason="Emergency force clock-out and multi-employee unclosed session audits are restricted to desktop viewports."
+          recommendedAction="Please open Approvals from your laptop or desktop browser to perform force clock-out operations."
+        />
+      ) : (
         <DataTable
           columns={unclosedColumns}
           rows={unclosedSessions}
@@ -775,6 +791,12 @@ export function ApprovalsQueue() {
   return (
     <AppShell>
       <PageHeader title="Pending Approvals Queue" subtitle="Approve or reject leaves, attendance logs, and project tasks" />
+      {!isDesktop && (
+        <div style={{ marginBottom: 14, padding: '10px 14px', background: 'var(--brand-muted)', border: '1px solid var(--brand)', borderRadius: 'var(--radius-md)', fontSize: 12.5, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>📱</span>
+          <span><strong>Mobile Quick Approvals:</strong> You can review and approve <strong>Leaves</strong> and <strong>Peer Tasks</strong> directly on mobile. Attendance corrections and financial audits are restricted to Desktop/Laptop for compliance accuracy.</span>
+        </div>
+      )}
       {!canApprove && (
         <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>🔒</span>
@@ -947,50 +969,16 @@ export function ApprovalsQueue() {
         )}
       </Drawer>
 
-      {/* Force Clock Out Drawer */}
-      <Drawer open={!!selectedUnclosedRecord} onClose={() => setSelectedUnclosedRecord(null)} title="Admin Force Clock Out Session">
-        {selectedUnclosedRecord && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: 'var(--bg-sunken)', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}>
-              <div><strong>Employee:</strong> {empName(selectedUnclosedRecord.employee_id || selectedUnclosedRecord.employeeId)}</div>
-              <div><strong>Work Date:</strong> {formatDisplayDate(selectedUnclosedRecord.work_date || selectedUnclosedRecord.workDate)}</div>
-              <div><strong>Clock In Time:</strong> {formatDateTime(selectedUnclosedRecord.first_clock_in || selectedUnclosedRecord.firstClockIn)}</div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-                Clock Out Time (HH:MM) *
-              </label>
-              <input
-                type="time"
-                className="kvj-input"
-                value={forceClockOutTime}
-                onChange={(e) => setForceClockOutTime(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-                Admin Notes / Reason
-              </label>
-              <textarea
-                className="kvj-textarea"
-                rows={3}
-                placeholder="Reason for force clock-out (e.g. Employee forgot to clock out)..."
-                value={forceClockOutNotes}
-                onChange={(e) => setForceClockOutNotes(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-              <Button variant="secondary" onClick={() => setSelectedUnclosedRecord(null)}>Cancel</Button>
-              <Button variant="danger" onClick={handleConfirmForceClockOut}>🔴 Confirm Force Clock Out</Button>
-            </div>
-          </div>
-        )}
-      </Drawer>
+      {/* Force Clock Out Modal */}
+      <ForceClockOutModal
+        open={!!selectedUnclosedRecord}
+        onClose={() => setSelectedUnclosedRecord(null)}
+        record={selectedUnclosedRecord}
+        onSuccess={() => {
+          setSelectedUnclosedRecord(null);
+          fetchUnclosedSessions();
+        }}
+      />
     </AppShell>
   );
 }

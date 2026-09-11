@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SectionProps } from './CoverPageSection';
+import type { ReportBlock } from '../ReportPaginator';
 
 /** A rendered column in the Student Performance Register. */
 interface RegisterColumn {
@@ -22,12 +23,17 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => {
+/**
+ * Generates discrete ReportBlocks for the Student Performance Register.
+ * Instead of wrapping 180+ rows in one giant DOM element (which breaks A4 pagination),
+ * each 16-row chunk is exported as its own independent ReportBlock with repeated headers.
+ */
+export function buildStudentDataBlocks(
+  data: SectionProps['data'],
+  config: SectionProps['config']
+): ReportBlock[] {
   const selectedCols = config.selectedStudentColumns;
   const selectedAsses = data.assessments.filter((a) => config.selectedAssessmentIds.includes(a.id));
-  // Final-exam marks are raw scores out of the course maximum. The pass mark is a
-  // percentage, so scale it to the mark scale before comparing/displaying — never
-  // compare a raw mark (e.g. 754) against a percentage (e.g. 70), and never show "/ 100".
   const finalExamMax = data.courseMaxMarks || 100;
   const finalExamPassMarks = Math.round(((data.finalExamPassMarkPercent || 70) / 100) * finalExamMax);
 
@@ -39,7 +45,7 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
       render: (st) => {
         const initials = st.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
         return (
-          <div style={{ width: 38, height: 38, borderRadius: '50%', overflow: 'hidden', border: '1.5px solid #cbd5e1', background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12.5, color: '#1e293b', margin: '0 auto' }}>
+          <div style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', border: '1.5px solid #cbd5e1', background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: '#1e293b', margin: '0 auto' }}>
             {st.avatarUrl ? <img src={st.avatarUrl} alt={st.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
           </div>
         );
@@ -136,75 +142,93 @@ export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => 
 
   const groups = dataCols.length > 0 ? chunk(dataCols, MAX_DATA_COLS_PER_TABLE) : [[]];
   const multi = groups.length > 1;
-  // Split the roster into page-sized row blocks so a large batch prints as a
-  // series of readable tables (each with its own repeated header) instead of one
-  // giant table that the exporter has to shrink to fit.
+  // Slicing into 16 rows per page ensures each table block fits cleanly on an A4 page
+  // alongside running headers and numbered footers.
   const ROWS_PER_TABLE = 16;
   const studentPages = chunk(data.students, ROWS_PER_TABLE);
   const multiRow = studentPages.length > 1;
+  const thStyle: React.CSSProperties = { padding: '8px 6px', fontSize: 10, fontWeight: 700, color: '#ffffff' };
 
-  const thStyle: React.CSSProperties = { padding: '9px 6px', fontSize: 10.5, fontWeight: 700, color: '#ffffff' };
+  const blocks: ReportBlock[] = [];
 
+  groups.forEach((group, gi) => {
+    const cols = [...identityCols, ...group];
+    studentPages.forEach((studentSlice, ri) => {
+      const isFirst = gi === 0 && ri === 0;
+      const from = ri * ROWS_PER_TABLE + 1;
+      const to = ri * ROWS_PER_TABLE + studentSlice.length;
+
+      blocks.push({
+        key: `student-data-p${gi}-r${ri}`,
+        breakBefore: !isFirst,
+        node: (
+          <div style={{ marginBottom: 12 }}>
+            {isFirst && (
+              <div style={{ marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid #cbd5e1' }}>
+                <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4, paddingLeft: 10, borderLeft: '4px solid #1e40af' }}>
+                  Student Performance Register
+                </h2>
+                <div style={{ fontSize: 11, color: '#64748b' }}>
+                  Complete academic performance, attendance, assessment, and final exam certification records for every enrolled student.
+                  {multi && ` The register is split into ${groups.length} column parts so every column stays readable on the page.`}
+                </div>
+              </div>
+            )}
+
+            {(multi || multiRow) && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: 10.5, fontWeight: 700, color: '#475569' }}>
+                <span>
+                  Register Roster
+                  {multi ? ` — Part ${gi + 1} of ${groups.length}` : ''}
+                  {multiRow ? ` — Students ${from}–${to} of ${data.students.length}` : ''}
+                </span>
+                {multi && (
+                  <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: 10 }}>
+                    {group.map((c) => c.short).join(' · ')}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5, border: '1px solid #cbd5e1' }}>
+              <thead>
+                <tr style={{ background: '#1e40af', borderBottom: '2px solid #1e3a8a' }}>
+                  {cols.map((c) => (
+                    <th key={c.id} style={{ ...thStyle, textAlign: c.align, width: c.id === 'photo' ? 46 : undefined }}>
+                      {c.header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {studentSlice.map((st, idx) => (
+                  <tr key={st.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                    {cols.map((c) => (
+                      <td key={c.id} style={{ padding: '3.5px 5px', textAlign: c.align }}>
+                        {c.render(st)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ),
+      });
+    });
+  });
+
+  return blocks;
+}
+
+export const StudentDataSection: React.FC<SectionProps> = ({ data, config }) => {
+  const blocks = buildStudentDataBlocks(data, config);
   return (
     <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #cbd5e1' }}>
-      <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4, paddingLeft: 10, borderLeft: '4px solid #1e40af' }}>
-         Student Performance Register
-      </h2>
-      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
-        Complete academic performance, attendance, assessment, and final exam certification records for every enrolled student.
-        {multi && ` The register is split into ${groups.length} parts so every column stays readable on the page.`}
-      </div>
-
-      {groups.map((group, gi) => {
-        const cols = [...identityCols, ...group];
-        return (
-          <React.Fragment key={gi}>
-            {studentPages.map((studentSlice, ri) => (
-              <div
-                key={`${gi}-${ri}`}
-                className="report-student-table"
-                style={{ marginBottom: 12, breakInside: 'avoid', pageBreakInside: 'avoid' }}
-              >
-                {(multi || multiRow) && (
-                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#475569', marginBottom: 5 }}>
-                    Register
-                    {multi ? ` — Part ${gi + 1} of ${groups.length}` : ''}
-                    {multiRow ? ` — Students ${ri * ROWS_PER_TABLE + 1}–${ri * ROWS_PER_TABLE + studentSlice.length} of ${data.students.length}` : ''}
-                    {multi && (
-                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>
-                        {' · '}{group.map((c) => c.short).join(' · ')}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, border: '1px solid #cbd5e1' }}>
-                  <thead>
-                    <tr style={{ background: '#1e40af', borderBottom: '2px solid #1e3a8a' }}>
-                      {cols.map((c) => (
-                        <th key={c.id} style={{ ...thStyle, textAlign: c.align, width: c.id === 'photo' ? 52 : undefined }}>
-                          {c.header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentSlice.map((st, idx) => (
-                      <tr key={st.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                        {cols.map((c) => (
-                          <td key={c.id} style={{ padding: '4px 6px', textAlign: c.align }}>
-                            {c.render(st)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-          </React.Fragment>
-        );
-      })}
+      {blocks.map((b) => (
+        <React.Fragment key={b.key}>{b.node}</React.Fragment>
+      ))}
     </div>
   );
 };
+

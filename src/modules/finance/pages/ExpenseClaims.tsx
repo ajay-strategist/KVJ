@@ -18,11 +18,14 @@ import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, FileUploadField, DatePickerField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
+import { useBreakpoint } from '../../../shared/hooks/responsive';
 import { useTraining } from '../../training/hooks/useTraining';
 import { supabase } from '../../../shared/integration/supabase';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 import { googleIntegration } from '../../../shared/integration/google';
+import { ExpenseClaimModal } from '../forms/ExpenseClaimModal';
+import { TravelRatesModal } from '../forms/TravelRatesModal';
 
 export interface ExpenseRecord {
   id: string;
@@ -322,6 +325,7 @@ export function ExpenseClaims() {
 
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const isDesktop = useBreakpoint('md');
   const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>(isManagement ? 'all' : (user?.fullName || 'me'));
 
   // Load custom expense types from Supabase
@@ -932,10 +936,10 @@ export function ExpenseClaims() {
         subtitle="Conditional expense filing, auto-calculated travel KM rates, and locked approval audit trails"
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {isManagement && (
+            {isManagement && isDesktop && (
               <Button variant="secondary" onClick={() => setRateModalOpen(true)}>⚙️ Travel Rates (KM)</Button>
             )}
-            {isManagement && (
+            {isManagement && isDesktop && (
               <>
                 <Button
                   style={{ background: 'var(--status-success)', color: 'white' }}
@@ -964,6 +968,14 @@ export function ExpenseClaims() {
           </div>
         }
       />
+
+      {/* Mobile Notice for Managers */}
+      {isManagement && !isDesktop && (
+        <div style={{ marginBottom: 14, padding: '10px 14px', background: 'var(--brand-muted)', border: '1px solid var(--brand)', borderRadius: 'var(--radius-md)', fontSize: 12.5, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>📱</span>
+          <span><strong>Mobile View:</strong> Quick Expense Claim submission is enabled. Manager auditing, invoice receipt scrutiny, and bulk approval actions are restricted to Desktop/Laptop for financial governance.</span>
+        </div>
+      )}
 
       {/* Central Rate Info Banner */}
       <Card style={{ marginBottom: 16 }}>
@@ -1283,11 +1295,14 @@ export function ExpenseClaims() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {!isLocked && exp.status === 'submitted' && isManagement && (
+                          {!isLocked && exp.status === 'submitted' && isManagement && isDesktop && (
                             <>
                               <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>Approve</Button>
                               <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>Reject</Button>
                             </>
+                          )}
+                          {!isLocked && exp.status === 'submitted' && isManagement && !isDesktop && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>💻 Audit on Desktop</span>
                           )}
                           {!isLocked && (
                             <Button
@@ -1324,74 +1339,29 @@ export function ExpenseClaims() {
       </Card>
       </div>
 
-      {/* Submit Expense Drawer */}
-      <Drawer open={expenseOpen} onClose={() => setExpenseOpen(false)} title="Submit Expense Claim">
-        <Form initial={{ categoryType: 'Office Expense', expenseDate: new Date().toISOString().slice(0, 10), expenseType: 'Self Travel', vehicle: 'Bike', km: '', route: '', amount: '' }} onSubmit={handleExpenseSubmit}>
-          <DynamicExpenseForm
-            bikeRate={bikeRate}
-            carRate={carRate}
-            batches={batches}
-            customExpenseTypes={customExpenseTypes}
-            onRegisterNewType={handleRegisterNewType}
-            onSubmit={handleExpenseSubmit}
-            onCancel={() => setExpenseOpen(false)}
-            submittingClaim={submittingClaim}
-          />
-        </Form>
-      </Drawer>
+      {/* Submit Expense Modal */}
+      <ExpenseClaimModal
+        open={expenseOpen}
+        onClose={() => setExpenseOpen(false)}
+        onSuccess={() => loadClaims()}
+        bikeRate={bikeRate}
+        carRate={carRate}
+        batches={batches}
+        customExpenseTypes={customExpenseTypes}
+        onRegisterNewType={handleRegisterNewType}
+      />
 
-      {/* Rate Config Modal */}
-      <Drawer open={rateModalOpen} onClose={() => setRateModalOpen(false)} title="CEO Settings: Self-Travel KM Rates">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label className="kvj-label">Bike Rate per KM (₹)</label>
-            <input type="number" value={bikeRate} onChange={(e) => setBikeRate(Number(e.target.value))} className="kvj-input" />
-          </div>
-          <div>
-            <label className="kvj-label">Car Rate per KM (₹)</label>
-            <input type="number" value={carRate} onChange={(e) => setCarRate(Number(e.target.value))} className="kvj-input" />
-          </div>
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => setRateModalOpen(false)}>Cancel</Button>
-            <Button onClick={async () => {
-              try {
-                // Save to localStorage as a robust immediate fallback
-                localStorage.setItem('kvj_bike_rate', String(bikeRate));
-                localStorage.setItem('kvj_car_rate', String(carRate));
-
-                // Save to Supabase
-                const { error: errBike } = await supabase
-                  .from('flwdsk_system_settings')
-                  .upsert({ key: 'bike_rate_per_km', value: bikeRate });
-                  
-                const { error: errCar } = await supabase
-                  .from('flwdsk_system_settings')
-                  .upsert({ key: 'car_rate_per_km', value: carRate });
-
-                if (errBike || errCar) {
-                  console.warn('Supabase travel rates upsert warning:', errBike || errCar);
-                  toast({
-                    variant: 'success',
-                    title: 'Rates Saved (Local Only)',
-                    message: 'Rates saved to local browser storage. Note: Database sync failed.'
-                  });
-                } else {
-                  toast({
-                    variant: 'success',
-                    title: 'Rates Saved',
-                    message: 'Updated central travel KM reimbursement rates in DB and local storage.'
-                  });
-                }
-                setRateModalOpen(false);
-              } catch (e: any) {
-                toast({ variant: 'error', title: 'Save Failed', message: e.message });
-              }
-            }}>
-              Save Travel Rates
-            </Button>
-          </div>
-        </div>
-      </Drawer>
+      {/* Travel Rates Modal */}
+      <TravelRatesModal
+        open={rateModalOpen}
+        onClose={() => setRateModalOpen(false)}
+        bikeRate={bikeRate}
+        carRate={carRate}
+        onRatesUpdated={(b, c) => {
+          setBikeRate(b);
+          setCarRate(c);
+        }}
+      />
     </AppShell>
   );
 }

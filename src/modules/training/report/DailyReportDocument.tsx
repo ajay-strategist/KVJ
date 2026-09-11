@@ -2,6 +2,7 @@ import React from 'react';
 import type { DailyReportData, DailyReportConfig } from './daily-report.types';
 import { SECTIONS } from './daily-report.registry';
 import { ExecutiveSummarySection } from './sections/ExecutiveSummarySection';
+import { buildStudentDataBlocks } from './sections/StudentDataSection';
 import { ReportPaginator, A4, type ReportBlock } from './ReportPaginator';
 
 interface DailyReportDocumentProps {
@@ -30,6 +31,8 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
   };
 
   // ── Blocks: the executive summary first, then each selected section. ────────
+  // Large multi-row tables (e.g. 180 student rows) are unpacked into discrete page-sized
+  // blocks with repeating headers so ReportPaginator assigns each to a true A4 page.
   const blocks: ReportBlock[] = [
     {
       key: 'executive-summary',
@@ -37,15 +40,20 @@ export const DailyReportDocument: React.FC<DailyReportDocumentProps> = ({ data, 
     },
     ...activeSections
       .filter((sec) => sec.id !== 'executive-summary')
-      .map((sec) => {
+      .flatMap((sec) => {
+        if (sec.id === 'student-data') {
+          return buildStudentDataBlocks(data, config);
+        }
         const SectionComponent = sec.component;
-        return {
-          key: sec.id,
-          // Major sections open on a fresh sheet, but the paginator only honours
-          // this when the page already has content — so no blank pages.
-          breakBefore: true,
-          node: <SectionComponent data={data} config={config} />,
-        } as ReportBlock;
+        return [
+          {
+            key: sec.id,
+            // Major sections open on a fresh sheet, but the paginator only honours
+            // this when the page already has content — so no blank pages.
+            breakBefore: true,
+            node: <SectionComponent data={data} config={config} />,
+          } as ReportBlock,
+        ];
       }),
   ];
 

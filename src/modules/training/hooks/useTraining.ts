@@ -489,6 +489,12 @@ export function useTraining(options?: {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const getBatchTrainingDeliveryLogs = useCallback(async (batchId: UUID, upToDate?: string): Promise<CallbackResult<any>> => {
+    const res = await service.getBatchTrainingDeliveryLogs(batchId, upToDate);
+    if (res.ok) return { ok: true, value: res.value };
+    return { ok: false, error: res.error.message };
+  }, [service]);
+
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
@@ -534,6 +540,7 @@ export function useTraining(options?: {
     syncExamAttempt,
     saveCalendarSession,
     deleteCalendarSession,
+    getBatchTrainingDeliveryLogs,
     refresh: fetchAll,
   };
 }
