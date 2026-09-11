@@ -52,6 +52,7 @@ export interface ChecklistItem {
 
 export interface StudentRecord {
   id: string;
+  registerNo?: string;
   name: string;
   photo: string;
   photoUrl?: string;

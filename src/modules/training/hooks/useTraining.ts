@@ -421,29 +421,43 @@ export function useTraining(options?: {
   }, [service, user]);
 
   const resolveExamAttemptDiscrepancy = useCallback(async (
-    studentId: UUID,
-    batchId: UUID,
-    attemptType: 'Initial' | 'Retest',
-    category: string,
-    resolutionAction: string,
-    resolutionReason: string,
-    selectedDuplicateId: UUID | null,
-    dbMark: number | null,
-    cacheMark: number | null,
-    coursePassPct: number
+    studentIdOrPayload: UUID | any,
+    batchId?: UUID,
+    attemptType?: 'Initial' | 'Retest',
+    category?: string,
+    resolutionAction?: string,
+    resolutionReason?: string,
+    selectedDuplicateId?: UUID | null,
+    dbMark?: number | null,
+    cacheMark?: number | null,
+    coursePassPct?: number
   ): Promise<CallbackResult<any>> => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
+    const p = typeof studentIdOrPayload === 'object' && studentIdOrPayload !== null
+      ? studentIdOrPayload
+      : {
+          studentId: studentIdOrPayload,
+          batchId,
+          attemptType,
+          category,
+          resolutionAction,
+          resolutionReason,
+          selectedDuplicateId,
+          dbMark,
+          cacheMark,
+          coursePassPct,
+        };
     const res = await service.resolveExamAttemptDiscrepancy(
-      studentId,
-      batchId,
-      attemptType,
-      category,
-      resolutionAction,
-      resolutionReason,
-      selectedDuplicateId,
-      dbMark,
-      cacheMark,
-      coursePassPct,
+      p.studentId || p.student_id,
+      p.batchId || p.batch_id,
+      p.attemptType || p.attempt_type || 'Initial',
+      p.category || '',
+      p.resolutionAction || p.action || '',
+      p.resolutionReason || p.reason || '',
+      p.selectedDuplicateId ?? p.duplicate_id ?? null,
+      p.dbMark ?? p.overrideScore ?? null,
+      p.cacheMark ?? null,
+      p.coursePassPct ?? 50,
       { id: user.id, role: user.role }
     );
     if (res.ok) return { ok: true, value: res.value };

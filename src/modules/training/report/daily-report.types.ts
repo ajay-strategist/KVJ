@@ -151,6 +151,7 @@ export interface TrainingDeliveryLogItem {
   endTime: string;
   duration: string;
   hours: number;
+  topic?: string;
 }
 
 export interface DailyReportData {
@@ -178,4 +179,7 @@ export interface DailyReportData {
   attachments?: any[];
   defaultTrainerNotes: string;
   deliveryLogs?: TrainingDeliveryLogItem[];
+  currentSession?: any;
+  batch?: any;
+  attendanceMetrics?: any;
 }

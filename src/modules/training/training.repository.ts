@@ -67,6 +67,7 @@ export interface Batch extends Entity {
   courseId: UUID;
   code: string;
   trainerId?: UUID;
+  coTrainerIds?: UUID[];
   startDate: string;
   endDate: string;
   capacity: number;

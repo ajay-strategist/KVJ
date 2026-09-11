@@ -15,6 +15,9 @@ export interface Employee extends Entity {
   avatarUrl?: string;
   googleDriveFolderId?: string;
   leaveAllocationPerMonth?: number;
+  role?: string;
+  status: 'active' | 'on_notice' | 'relieved' | string;
+  supervisorId?: UUID;
 }
 
 export interface IEmployeeRepository extends IRepository<Employee> {

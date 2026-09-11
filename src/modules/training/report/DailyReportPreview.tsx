@@ -11,8 +11,24 @@ interface DailyReportPreviewProps {
   isOpen: boolean;
   onClose: () => void;
   data: DailyReportData;
-  initialConfig: DailyReportConfig;
+  initialConfig?: DailyReportConfig | null;
 }
+
+const DEFAULT_CONFIG: DailyReportConfig = {
+  reportMode: 'daily',
+  selectedSections: [
+    'cover',
+    'executive-summary',
+    'batch-info',
+    'attendance-summary',
+    'datewise-attendance',
+    'training-delivery-logs',
+    'trainer-notes',
+  ],
+  selectedAssessmentIds: [],
+  selectedStudentColumns: ['studentName', 'qualification', 'attendancePct'],
+  trainerNotes: '',
+};
 
 export const DailyReportPreview: React.FC<DailyReportPreviewProps> = ({
   isOpen,
@@ -21,7 +37,7 @@ export const DailyReportPreview: React.FC<DailyReportPreviewProps> = ({
   initialConfig,
 }) => {
   const { toast } = useNotifications();
-  const [config, setConfig] = useState<DailyReportConfig>(initialConfig);
+  const [config, setConfig] = useState<DailyReportConfig>(initialConfig || DEFAULT_CONFIG);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'preview' | 'document'>('preview');
 

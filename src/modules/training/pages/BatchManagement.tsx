@@ -454,7 +454,7 @@ export function BatchManagement() {
     a.href = url;
     a.download = 'Student_Voucher_ID_Template.csv';
     a.click();
-    URL.revokeObjectURL(a);
+    URL.revokeObjectURL(url);
     toast({ variant: 'success', title: 'Template Downloaded', message: 'Student_Voucher_ID_Template.csv downloaded.' });
   };
 
@@ -853,7 +853,7 @@ export function BatchManagement() {
             setAttendanceThreshold(thr);
             setEligibilityCriteria(crit);
             if (selectedBatchId) {
-              await saveBatchEligibilityRules(selectedBatchId, thr, crit);
+              await saveBatchEligibilityRules(selectedBatchId, cond, thr, coursePassPct, crit);
             }
           }}
           onSetConsiderAttendance={setConsiderAttendance}
@@ -917,7 +917,7 @@ export function BatchManagement() {
           onOpenReconciliation={() => setReconciliationDrawerOpen(true)}
           onUploadMarks={handleUploadExamMarks}
           onSaveRetestPaymentLedger={async (sid, st) => {
-            await verifyRetestPayment(sid, selectedBatchId, st === 'Paid');
+            await verifyRetestPayment(sid, selectedBatchId, st === 'Paid' ? 'Verified' : 'Pending');
           }}
           toast={toast}
           isExecutive={isExecutive}
@@ -941,7 +941,7 @@ export function BatchManagement() {
           onOpenReconciliation={() => setReconciliationDrawerOpen(true)}
           onUploadMarks={handleUploadExamMarks}
           onSaveRetestPaymentLedger={async (sid, st) => {
-            await verifyRetestPayment(sid, selectedBatchId, st === 'Paid');
+            await verifyRetestPayment(sid, selectedBatchId, st === 'Paid' ? 'Verified' : 'Pending');
           }}
           toast={toast}
           isExecutive={isExecutive}

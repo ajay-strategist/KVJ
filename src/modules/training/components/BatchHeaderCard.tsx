@@ -91,8 +91,14 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
         activeId={selectedBatchId}
         onSelect={onSelectBatchId}
         onAction={onCarouselAction}
-        onEdit={onEditBatch}
-        onCopy={onCopyBatch}
+        onEdit={(batchId: string) => {
+          const b = safeBatches.find((x) => x.id === batchId);
+          if (b) onEditBatch(b);
+        }}
+        onCopy={(batchId: string) => {
+          const b = safeBatches.find((x) => x.id === batchId);
+          if (b) onCopyBatch(b);
+        }}
         onDelete={onDeleteBatch}
       />
     </div>

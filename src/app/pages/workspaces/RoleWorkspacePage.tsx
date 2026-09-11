@@ -7,10 +7,9 @@ import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attenda
 import { EXPENSE_CLAIM_REPOSITORY_TOKEN } from '../../../modules/finance/finance.repository';
 import { LEAVE_REPOSITORY_TOKEN } from '../../../modules/leave/leave.repository';
 import { TASK_REPOSITORY_TOKEN } from '../../../modules/project/project.repository';
-import { WorkspaceShell } from '../../../shared/workspace/WorkspaceShell';
+import { WorkspaceShell, type WorkspaceRole } from '../../../shared/workspace/WorkspaceShell';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, StatCard, Card, SectionHeader, Badge, Button } from '../../../shared/ui/components';
-import type { WorkspaceRole } from '../../../core/types';
 
 function escapeXml(val: any): string {
   if (val === undefined || val === null) return '';
@@ -109,7 +108,7 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
         l.leaveType,
         l.startDate,
         l.endDate,
-        l.daysCount,
+        (l as any).daysCount || (l.halfDay ? 0.5 : 1),
         l.status,
         l.reason || ''
       ]);
@@ -133,7 +132,7 @@ export function RoleWorkspacePage({ role }: { role: Exclude<WorkspaceRole, 'empl
         x.id,
         x.employeeId,
         x.category,
-        x.expenseDate,
+        (x as any).expenseDate || x.createdAt?.slice(0, 10) || '',
         x.amount,
         x.status,
         (x as any).kmTravelled || '',
@@ -179,7 +178,7 @@ ${buildSheet('Employees', empHeaders, empRows)}${buildSheet('Attendance', attHea
       const expRepo = container.resolve(EXPENSE_CLAIM_REPOSITORY_TOKEN);
       expRepo.findMany({ pageSize: 500 }).then((res) => {
         if (res && res.data) {
-          const pending = res.data.filter((e) => e.status === 'pending');
+          const pending = res.data.filter((e) => e.status === 'submitted');
           setPendingExpenses(pending.length);
         }
       });
@@ -197,7 +196,7 @@ ${buildSheet('Employees', empHeaders, empRows)}${buildSheet('Attendance', attHea
     const client = clients?.find((c) => c.id === p.clientId);
     return {
       id: p.id,
-      name: p.name,
+      name: p.title,
       client: client ? client.name : 'Internal',
       health: 'On Track',
       healthTone: 'success' as const,
@@ -212,8 +211,8 @@ ${buildSheet('Employees', empHeaders, empRows)}${buildSheet('Attendance', attHea
 
   return (
     <AppShell>
-      <WorkspaceShell slots={{
-        header: (
+      <WorkspaceShell role={role} regions={{
+        greeting: (
           <PageHeader
             title={titles[role].title}
             subtitle={titles[role].subtitle}
