@@ -42,6 +42,7 @@ export interface TaskItem {
   assignee: string;
   dueDate: string;
   startDate?: string;
+  endDate?: string;
   description?: string;
   proposedHours?: number;
   status: TaskStatus;
@@ -228,6 +229,7 @@ export function TaskBoard({
         assignedByEmployeeId: t.assignedByEmployeeId,
         dueDate: t.dueDate || todayStr,
         startDate: t.startDate || t.dueDate || todayStr,
+        endDate: t.endDate || (t.status === 'done' || t.status === 'completed' ? t.dueDate : undefined),
         description: t.description || '',
         proposedHours: Number(t.proposedHours || t.estimatedHours || 0),
         status,
