@@ -998,31 +998,31 @@ export function ExpenseClaims() {
         subtitle="Conditional expense filing, auto-calculated travel KM rates, and locked approval audit trails"
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {isManagement && isDesktop && (
+            {isManagement && (
               <Button variant="secondary" onClick={() => setRateModalOpen(true)}>⚙️ Travel Rates (KM)</Button>
             )}
-            {isManagement && isDesktop && (
+            {isManagement && (
               <>
                 <Button
                   style={{ background: 'var(--status-success)', color: 'white' }}
                   onClick={() => handleBulkAction('approve')}
                   disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                 >
-                  ✓ Bulk Approve Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  ✓ Bulk Approve ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
                 </Button>
                 <Button
                   style={{ background: 'var(--status-danger)', color: 'white' }}
                   onClick={() => handleBulkAction('reject')}
                   disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                 >
-                  ✕ Bulk Reject Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  ✕ Bulk Reject ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
                 </Button>
                 <Button
                   variant="danger"
                   onClick={() => handleBulkAction('delete')}
                   disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                 >
-                  🗑️ Bulk Delete Selected ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  🗑️ Delete ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
                 </Button>
               </>
             )}
@@ -1030,14 +1030,6 @@ export function ExpenseClaims() {
           </div>
         }
       />
-
-      {/* Mobile Notice for Managers */}
-      {isManagement && !isDesktop && (
-        <div style={{ marginBottom: 14, padding: '10px 14px', background: 'var(--brand-muted)', border: '1px solid var(--brand)', borderRadius: 'var(--radius-md)', fontSize: 12.5, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>📱</span>
-          <span><strong>Mobile View:</strong> Quick Expense Claim submission is enabled. Manager auditing, invoice receipt scrutiny, and bulk approval actions are restricted to Desktop/Laptop for financial governance.</span>
-        </div>
-      )}
 
       {/* Central Rate Info Banner */}
       <Card style={{ marginBottom: 16 }}>
@@ -1208,6 +1200,126 @@ export function ExpenseClaims() {
             title="No expense claims found"
             message="No records match your selected search query or filter criteria."
           />
+        ) : !isDesktop ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {filteredExpenses.map((exp) => {
+              const isLocked = exp.status === 'approved';
+              const r = exp.receipt || '';
+              const isRealUrl = r.startsWith('http://') || r.startsWith('https://') || r.startsWith('data:');
+
+              return (
+                <div key={exp.id} className="kvj-mobile-card">
+                  {/* Top Bar: Date, Employee, Status */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {isManagement && (
+                        <input
+                          type="checkbox"
+                          checked={!!selectedExpenses[exp.id]}
+                          onChange={(e) => handleSelectExpense(exp.id, e.target.checked)}
+                          style={{ width: 18, height: 18, cursor: 'pointer' }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{exp.person}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{exp.date} · {exp.category}</div>
+                      </div>
+                    </div>
+                    <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
+                      {isLocked ? '🔒 Approved' : exp.status}
+                    </Badge>
+                  </div>
+
+                  {/* Expense Type & Travel Details */}
+                  <div style={{ background: 'var(--bg-sunken)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{exp.type}</div>
+                    {exp.vehicle && (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                        <span>🚗 {exp.vehicle} · {exp.km} km @ ₹{exp.rate || getVehicleRate(exp.vehicle)}/km</span>
+                      </div>
+                    )}
+                    {(exp.batch || exp.route) && (
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                        {exp.batch && <span>Batch: <strong>{exp.batch}</strong> </span>}
+                        {exp.route && <span>(Route: {exp.route})</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Amount and Receipt Row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 2 }}>
+                    <div>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Claim Amount</span>
+                      <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--status-success)', fontVariantNumeric: 'tabular-nums' }}>
+                        ₹{exp.amount.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div>
+                      {isRealUrl ? (
+                        <a
+                          href={r}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg-sunken)', padding: '5px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+                        >
+                          📎 View Receipt
+                        </a>
+                      ) : r && r !== 'Uploaded Proof' ? (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📎 {r}</span>
+                      ) : exp.vehicle ? (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Auto KM Calc</span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'var(--status-danger)', fontWeight: 600 }}>No Receipt</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Manager audit info if approved */}
+                  {exp.approvedBy && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      Approved by {exp.approvedBy}
+                    </div>
+                  )}
+
+                  {/* Actions Row */}
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--border)' }}>
+                    {!isLocked && exp.status === 'submitted' && isManagement && (
+                      <>
+                        <Button size="sm" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>
+                          ✓ Approve
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>
+                          ✕ Reject
+                        </Button>
+                      </>
+                    )}
+                    {!isLocked && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        loading={processingAction}
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: 'Delete Expense Claim?',
+                            message: `Are you sure you want to delete this expense claim for ₹${exp.amount.toFixed(2)}? This cannot be undone.`,
+                          });
+                          if (ok) {
+                            await handleDeleteClaim(exp.id);
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                    {isLocked && (
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Audit Locked</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           // Horizontal scroll only — the page (AppShell main) scrolls vertically,
           // so the table shows its full height and the last row's actions are
@@ -1360,14 +1472,11 @@ export function ExpenseClaims() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {!isLocked && exp.status === 'submitted' && isManagement && isDesktop && (
+                          {!isLocked && exp.status === 'submitted' && isManagement && (
                             <>
                               <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>Approve</Button>
                               <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>Reject</Button>
                             </>
-                          )}
-                          {!isLocked && exp.status === 'submitted' && isManagement && !isDesktop && (
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>💻 Audit on Desktop</span>
                           )}
                           {!isLocked && (
                             <Button

@@ -131,7 +131,10 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const items = visibleNav(can, user?.role);
   const isMobile = device === 'mobile';
   const isTablet = device === 'tablet';
-  const width = collapsed && !isMobile ? 68 : 256;
+  const width = isMobile ? 'min(300px, 85vw)' : collapsed ? 68 : 256;
+
+  const currentNavItem = items.find((i) => pathname === i.path || (i.path !== '/app' && pathname.startsWith(i.path)));
+  const currentNavTitle = currentNavItem ? currentNavItem.label : '';
 
   // On tablet-width screens the full 256px sidebar crowds the content area, so
   // collapse it to the icon rail automatically (desktop keeps the user's choice).
@@ -186,16 +189,16 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             borderRadius: isMobile ? 0 : 'var(--radius-xl)',
             backdropFilter: 'blur(var(--glass-blur, 24px))',
             WebkitBackdropFilter: 'blur(var(--glass-blur, 24px))',
-            boxShadow: 'var(--e2)',
+            boxShadow: isMobile ? '0 0 24px rgba(0,0,0,0.3)' : 'var(--e2)',
             display: 'flex',
             flexDirection: 'column',
             position: isMobile ? 'fixed' : 'sticky',
             top: isMobile ? 0 : 16,
-            left: isMobile ? 0 : undefined,
-            height: isMobile ? '100vh' : 'calc(100vh - 32px)',
+            left: 0,
+            height: isMobile ? '100dvh' : 'calc(100vh - 32px)',
             margin: isMobile ? 0 : '16px 0 16px 16px',
-            zIndex: 1100,
-            transition: 'width 280ms cubic-bezier(0.16, 1, 0.3, 1)',
+            zIndex: 1200,
+            transition: 'width 280ms cubic-bezier(0.16, 1, 0.3, 1), transform 280ms cubic-bezier(0.16, 1, 0.3, 1)',
             overflow: 'hidden',
           }}>
 
@@ -205,8 +208,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               padding: collapsed && !isMobile ? '14px 8px' : '14px 16px',
               borderBottom: '1px solid var(--border)', flexShrink: 0, gap: 10, overflow: 'hidden'
             }}>
-              {/* Light chip keeps the (dark-ink) logo readable on any theme,
-                  including the dark sidebar — fixes "logo disappears in dark mode". */}
+              {/* Light chip keeps the (dark-ink) logo readable on any theme */}
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 background: '#FFFFFF', borderRadius: 10,
@@ -225,8 +227,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                 />
               </span>
               {(!collapsed || isMobile) && (
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  {/* Product wordmark shows only once a product name is set. */}
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                   {appConfig.app.productTitle && (
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                       <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
@@ -241,6 +242,32 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                     {appConfig.app.tagline}
                   </span>
                 </div>
+              )}
+
+              {/* Explicit Mobile Close Button */}
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  aria-label="Close sidebar"
+                  style={{
+                    marginLeft: 'auto',
+                    width: 32,
+                    height: 32,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-sunken)',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    padding: 0,
+                  }}
+                >
+                  ✕
+                </button>
               )}
             </div>
 
@@ -642,35 +669,120 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               background: 'var(--bg-overlay)',
               backdropFilter: 'blur(var(--overlay-blur, 3px))',
               WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
-              zIndex: 1050,
+              zIndex: 1180,
             }}
           />
         )}
 
         {/* ── Main content ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, height: '100vh' }}>
-          {isMobile && !mobileOpen && (
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
+          
+          {/* Mobile Top App Bar */}
+          {isMobile && (
+            <header
               style={{
-                position: 'fixed', top: 12, left: 12, zIndex: 1000,
-                width: 38, height: 38, borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)', background: 'var(--bg-surface)',
-                color: 'var(--text-primary)', boxShadow: 'var(--e2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
+                position: 'sticky',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 52,
+                padding: '0 12px',
+                background: 'var(--bg-surface)',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                zIndex: 1000,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                paddingTop: 'env(safe-area-inset-top, 0px)',
+                flexShrink: 0,
               }}
             >
-              <Icon name="Menu" size={18} />
-            </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(true)}
+                  aria-label="Open menu"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-sunken)',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <Icon name="Menu" size={18} />
+                </button>
+                <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {currentNavTitle || appConfig.app.productTitle || 'FlowDesk'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Mobile Notification Button */}
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen((o) => !o)}
+                  aria-label={`Notifications (${unreadCount} unread)`}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-sunken)',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    padding: 0,
+                  }}
+                >
+                  <Icon name="Bell" size={17} />
+                  {unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: 2, right: 2,
+                      minWidth: 14, height: 14, padding: '0 3px',
+                      borderRadius: 999, background: 'var(--status-danger)',
+                      color: '#fff', fontSize: 10, fontWeight: 800,
+                      display: 'grid', placeItems: 'center', lineHeight: 1,
+                    }}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Mobile Profile Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setUserOpen((o) => !o)}
+                  aria-label="User profile"
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                  }}
+                >
+                  <Avatar name={user?.fullName || 'User'} src={user?.avatarUrl} size={32} />
+                </button>
+              </div>
+            </header>
           )}
+
           <main style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            padding: isMobile ? '12px 12px 72px 12px' : '16px 20px 36px 20px',
+            padding: isMobile ? '14px 12px calc(76px + env(safe-area-inset-bottom, 16px)) 12px' : '16px 20px 36px 20px',
             maxWidth: '100%',
             width: '100%',
             margin: 0,
@@ -714,7 +826,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: 56,
+                height: 'calc(58px + env(safe-area-inset-bottom, 0px))',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
                 background: 'var(--bg-surface)',
                 borderTop: '1px solid var(--border)',
                 boxShadow: '0 -2px 10px rgba(0,0,0,0.06)',
@@ -722,7 +835,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                 alignItems: 'center',
                 justifyContent: 'space-around',
                 zIndex: 1150,
-                padding: '0 4px',
+                paddingLeft: 4,
+                paddingRight: 4,
                 boxSizing: 'border-box',
               }}
             >
@@ -731,7 +845,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   { to: '/app', label: 'My Day', icon: 'Home' },
                   { to: '/app/attendance/log', label: 'Clock In', icon: 'Clock' },
                   { to: '/app/project/tasks', label: 'Tasks', icon: 'FolderKanban' },
-                  { to: '/app/training/batches', label: 'Training', icon: 'GraduationCap' },
+                  { to: '/app/finance/expenses', label: 'Expenses', icon: 'Receipt' },
                 ];
                 return (
                   <>

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, SectionHeader, StatCard, Button, Avatar, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
+import { useDevice } from '../../../shared/hooks/responsive';
 import { useLeave } from '../hooks/useLeave';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import { Form, SelectField, DatePickerField, TextAreaField, CheckboxField, FileUploadField } from '../../../shared/forms/form';
@@ -97,8 +98,10 @@ function checkLeaveCancellationStatus(r: LeaveRecord, isMgmt: boolean, user: any
 }
 
 function LeaveStatCard({ label, value, tone = 'progress', icon }: { label: string; value: number; tone?: string; icon: string }) {
+  const device = useDevice();
+  const isMobile = device === 'mobile';
   return (
-    <Card style={{ padding: '14px 18px', width: 220, flex: '0 0 220px' }}>
+    <Card style={{ padding: isMobile ? '12px 14px' : '14px 18px', flex: isMobile ? '1 1 calc(50% - 8px)' : '0 0 220px', minWidth: isMobile ? 135 : 220 }}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
         <span
           className={`kvj-badge kvj-badge--${tone}`}
@@ -117,7 +120,7 @@ function LeaveStatCard({ label, value, tone = 'progress', icon }: { label: strin
           {icon}
         </span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>
             {value}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -130,6 +133,8 @@ function LeaveStatCard({ label, value, tone = 'progress', icon }: { label: strin
 }
 
 export function LeaveBoard() {
+  const device = useDevice();
+  const isMobile = device === 'mobile';
   const { leaves, allLeaves, applyLeave, approveLeave, rejectLeave, cancelLeave, uploadMedicalCertificate, loading, refreshAll, refreshMyLeaves } = useLeave();
   const { employees } = useEmployee();
   const { user } = useAuth();
@@ -580,14 +585,187 @@ export function LeaveBoard() {
         )}
       </div>
 
-      <DataTable
-        columns={columns}
-        rows={filteredLeaves}
-        rowKey={(r) => r.id}
-        loading={loading}
-        maxHeight={380}
-        pageSize={20}
-      />
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filteredLeaves.length === 0 ? (
+            <Card style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No leave records found.
+            </Card>
+          ) : (
+            filteredLeaves.map((r) => {
+              const emp = employees.find((e) => e.id === r.employeeId);
+              const name = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.email : (r.employeeId || 'Employee');
+              const cancelCheck = checkLeaveCancellationStatus(r, isMgmt, user);
+              const showCancelBtn = r.status === 'pending' || r.status === 'approved';
+              const tone = r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : r.status === 'cancelled' ? 'neutral' : 'danger';
+              const label = r.status === 'approved' ? 'Approved' : r.status === 'pending' ? 'Pending' : r.status === 'cancelled' ? 'Cancelled' : 'Rejected';
+
+              return (
+                <div key={r.id} className="kvj-mobile-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div>
+                      {isMgmt && (
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', marginBottom: 2 }}>
+                          {name}
+                        </div>
+                      )}
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--brand)' }}>
+                        {r.leaveType}
+                      </div>
+                    </div>
+                    <Badge tone={tone}>{label}</Badge>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-sunken)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
+                    <div>
+                      <strong>Duration:</strong> 🗓️ {formatLeaveDates(r.startDate, r.endDate, r.halfDay, r.halfDayShift)}
+                    </div>
+                    {r.reason && (
+                      <div style={{ marginTop: 3, color: 'var(--text-secondary)' }}>
+                        <strong>Reason:</strong> {r.reason}
+                      </div>
+                    )}
+                    {r.approverNotes && (
+                      <div style={{ marginTop: 3, color: 'var(--text-muted)' }}>
+                        <strong>Approver Notes:</strong> {r.approverNotes}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Medical Certificate */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Medical Cert:</span>
+                    {r.medicalCertUrl ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <a
+                          href={r.medicalCertUrl && r.medicalCertUrl.includes('http') ? r.medicalCertUrl : '#'}
+                          target={r.medicalCertUrl && r.medicalCertUrl.includes('http') ? '_blank' : undefined}
+                          rel={r.medicalCertUrl && r.medicalCertUrl.includes('http') ? 'noopener noreferrer' : undefined}
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#059669',
+                            background: '#ecfdf5',
+                            border: '1px solid #a7f3d0',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          📄 View
+                        </a>
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUploadTargetLeave(r);
+                            setUploadCertOpen(true);
+                          }}
+                        >
+                          ✏️ Change
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUploadTargetLeave(r);
+                          setUploadCertOpen(true);
+                        }}
+                      >
+                        📤 Upload
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Actions Row */}
+                  {(showCancelBtn || (isMgmt && r.status === 'pending')) && (
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4, borderTop: '1px solid var(--border)' }}>
+                      {isMgmt && r.status === 'pending' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="success"
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Approve Leave?',
+                                message: `Approve leave request for ${name}?`,
+                              });
+                              if (ok) {
+                                await approveLeave(r.id);
+                                refreshAll(); refreshMyLeaves();
+                              }
+                            }}
+                          >
+                            ✓ Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Reject Leave?',
+                                message: `Reject leave request for ${name}?`,
+                              });
+                              if (ok) {
+                                await rejectLeave(r.id, 'Rejected by manager');
+                                refreshAll(); refreshMyLeaves();
+                              }
+                            }}
+                          >
+                            ✕ Reject
+                          </Button>
+                        </>
+                      )}
+
+                      {showCancelBtn && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={async () => {
+                            if (!cancelCheck.canCancel) {
+                              toast({
+                                variant: 'error',
+                                title: 'Cancellation Window Closed',
+                                message: cancelCheck.errorReason || 'You cannot cancel this leave.',
+                              });
+                              return;
+                            }
+                            const ok = await confirm({
+                              title: 'Cancel Leave Request?',
+                              message: 'Are you sure you want to cancel this leave application?',
+                            });
+                            if (!ok) return;
+                            const res = await cancelLeave(r.id, 'Cancelled by user');
+                            if (res && res.ok) {
+                              toast({ variant: 'info', title: 'Leave Cancelled', message: `Leave for ${r.startDate} has been cancelled.` });
+                              refreshAll(); refreshMyLeaves();
+                            }
+                          }}
+                        >
+                          Cancel Leave
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filteredLeaves}
+          rowKey={(r) => r.id}
+          loading={loading}
+          maxHeight={380}
+          pageSize={20}
+        />
+      )}
 
       {/* Apply Leave Modal */}
       <ApplyLeaveModal open={applyOpen} onClose={() => setApplyOpen(false)} onSuccess={() => refreshMyLeaves()} />

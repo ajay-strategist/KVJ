@@ -19,7 +19,6 @@ import { formatDateTime, formatDisplayDate, localDateTimeToUtcIso } from '../../
 import { supabase } from '../../../shared/integration/supabase';
 import { ForceClockOutModal } from '../forms/ForceClockOutModal';
 import { useBreakpoint } from '../../../shared/hooks/responsive';
-import { DesktopOnlyNotice } from '../../../shared/ui/DesktopOnlyNotice';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
@@ -754,11 +753,58 @@ export function ApprovalsQueue() {
       id: 'corrections',
       label: `Attendance Corrections (${corrections.length})`,
       content: !isDesktop ? (
-        <DesktopOnlyNotice
-          featureName="Attendance Correction Approval"
-          reason="Attendance correction approvals require reviewing multi-session timesheet comparisons, overlap audits, and supervisor logs that are optimized for desktop viewports."
-          recommendedAction="Please open Approvals from your laptop or desktop browser to review and approve attendance correction requests."
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {corrections.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+              No pending attendance corrections found.
+            </div>
+          ) : (
+            corrections.map((r) => {
+              const fieldLabel =
+                r.fieldToCorrect === 'firstClockIn' ? 'First Clock In' :
+                r.fieldToCorrect === 'lastClockOut' ? 'Last Clock Out' :
+                r.fieldToCorrect === 'attendance_claim' ? 'Attendance Claim' :
+                r.fieldToCorrect;
+
+              return (
+                <div key={r.id} className="kvj-mobile-card" onClick={() => setSelectedCorrection(r)} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>
+                        {empName(r.requestedBy)}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        Date: <strong>{r.requestedDate}</strong>
+                      </div>
+                    </div>
+                    <Badge tone="warning">Pending Review</Badge>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-sunken)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
+                    <div><strong>Field:</strong> {fieldLabel}</div>
+                    <div style={{ marginTop: 2 }}><strong>Proposed Time:</strong> {r.proposedValue}</div>
+                    {r.reason && <div style={{ marginTop: 2, color: 'var(--text-muted)' }}><strong>Reason:</strong> {r.reason}</div>}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4, borderTop: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+                    {canApprove ? (
+                      <>
+                        <Button size="sm" onClick={() => handleDecideCorrection(r, 'accept')}>
+                          Accept
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={() => handleDecideCorrection(r, 'reject')}>
+                          Reject
+                        </Button>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       ) : (
         <DataTable
           columns={correctionColumns}
@@ -772,11 +818,44 @@ export function ApprovalsQueue() {
       id: 'unclosed',
       label: `Unclosed Sessions (${unclosedSessions.length})`,
       content: !isDesktop ? (
-        <DesktopOnlyNotice
-          featureName="Unclosed Sessions Audit"
-          reason="Emergency force clock-out and multi-employee unclosed session audits are restricted to desktop viewports."
-          recommendedAction="Please open Approvals from your laptop or desktop browser to perform force clock-out operations."
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {unclosedSessions.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+              No unclosed attendance sessions found.
+            </div>
+          ) : (
+            unclosedSessions.map((r) => (
+              <div key={r.id} className="kvj-mobile-card" onClick={() => setSelectedUnclosedRecord(r)} style={{ cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>
+                      {empName(r.employee_id || r.employeeId)}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      Work Date: <strong>{formatDisplayDate(r.work_date || r.workDate)}</strong>
+                    </div>
+                  </div>
+                  <Badge tone="danger">Open Session</Badge>
+                </div>
+
+                <div style={{ background: 'var(--bg-sunken)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
+                  <div><strong>Clock In:</strong> {formatDateTime(r.first_clock_in || r.firstClockIn)}</div>
+                  <div style={{ marginTop: 2 }}><strong>Mode:</strong> {r.sessions?.[0]?.workType || r.work_type || 'Office'}</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4, borderTop: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+                  {canApprove ? (
+                    <Button size="sm" variant="danger" onClick={() => setSelectedUnclosedRecord(r)}>
+                      🔴 Force Clock Out
+                    </Button>
+                  ) : (
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Read Only</span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       ) : (
         <DataTable
           columns={unclosedColumns}
@@ -791,12 +870,6 @@ export function ApprovalsQueue() {
   return (
     <AppShell>
       <PageHeader title="Pending Approvals Queue" subtitle="Approve or reject leaves, attendance logs, and project tasks" />
-      {!isDesktop && (
-        <div style={{ marginBottom: 14, padding: '10px 14px', background: 'var(--brand-muted)', border: '1px solid var(--brand)', borderRadius: 'var(--radius-md)', fontSize: 12.5, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>📱</span>
-          <span><strong>Mobile Quick Approvals:</strong> You can review and approve <strong>Leaves</strong> and <strong>Peer Tasks</strong> directly on mobile. Attendance corrections and financial audits are restricted to Desktop/Laptop for compliance accuracy.</span>
-        </div>
-      )}
       {!canApprove && (
         <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>🔒</span>

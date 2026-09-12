@@ -22,6 +22,7 @@ import { usePermissions } from '../../../shared/permissions/react';
 import { todayISO, addDaysISO, formatDisplayDate } from '../../../shared/utils/date';
 import { exportToExcel } from '../../../shared/utils/exportToExcel';
 import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
+import { useDevice } from '../../../shared/hooks/responsive';
 
 import { useProject } from '../hooks/useProject';
 import { useTaskSessions, saveSessionNote } from '../hooks/useTaskSessions';
@@ -73,6 +74,8 @@ export function TaskBoard({
   selectedEmployeeId?: string;
 }) {
   const { user } = useAuth();
+  const device = useDevice();
+  const isMobile = device === 'mobile';
   const { toast } = useNotifications();
   const { prompt } = useDialog();
   const { can } = usePermissions();
@@ -799,11 +802,11 @@ export function TaskBoard({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
-        <Button variant="secondary" onClick={handleExportTasksToExcel}>
+      <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <Button variant="secondary" onClick={handleExportTasksToExcel} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>
           📥 Export Tasks to Excel
         </Button>
-        <Button onClick={() => setCreateTaskOpen(true)}>➕ Create Task</Button>
+        <Button onClick={() => setCreateTaskOpen(true)} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>➕ Create Task</Button>
       </div>
 
       {/* ── Pending Task Assignment Approvals Banner (CEO/Admin only) ── */}
@@ -847,25 +850,25 @@ export function TaskBoard({
       )}
 
       {/* KPI Stat Cards */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)', width: 200, flex: '0 0 200px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks Active</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
+      <div style={{ display: 'flex', gap: isMobile ? 8 : 16, flexWrap: 'wrap', marginBottom: 4 }}>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks Active</div>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
         </Card>
 
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-danger)', width: 200, flex: '0 0 200px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due Today</div>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-danger)', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due</div>
         </Card>
 
-        <Card padding="compact" style={{ borderLeft: '4px solid #8b5cf6', width: 200, flex: '0 0 200px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Proposed Hours</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#8b5cf6', marginTop: 4 }}>📋 {totalProposedHoursSum.toFixed(1)}</div>
+        <Card padding="compact" style={{ borderLeft: '4px solid #8b5cf6', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Proposed Hours</div>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#8b5cf6', marginTop: 4 }}>📋 {totalProposedHoursSum.toFixed(1)}</div>
         </Card>
 
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--accent)', width: 200, flex: '0 0 200px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)}</div>
+        <Card padding="compact" style={{ borderLeft: '4px solid var(--accent)', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)}</div>
         </Card>
       </div>
 
@@ -1020,6 +1023,220 @@ export function TaskBoard({
             return '—';
           }
         };
+
+        if (isMobile) {
+          if (sortedTasks.length === 0) {
+            return (
+              <Card style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No tasks found in the selected filter window.
+              </Card>
+            );
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {sortedTasks.map((t) => {
+                const isAssignee =
+                  t.assigneeId === user?.id ||
+                  t.assigneeId === user?.email ||
+                  (t.assignee && user?.fullName && t.assignee.toLowerCase() === user.fullName.toLowerCase());
+                const isPendingAssignment = t.approvalStatus === 'pending_assignment_approval';
+                const isDueToday = t.dueDate === todayStr;
+
+                return (
+                  <div
+                    key={t.id}
+                    className="kvj-mobile-card"
+                    style={{
+                      borderLeft: isDueToday ? '4px solid var(--status-danger)' : undefined,
+                      padding: 14,
+                    }}
+                  >
+                    {/* Top Row: Project & Status Badge */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {t.projectName || 'General Project'}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {t.category}
+                        </span>
+                      </div>
+                      <Badge
+                        tone={
+                          t.status === 'Completed' ? 'success' :
+                          t.status === 'Under Review' ? 'info' :
+                          t.status === 'In Progress' ? 'progress' :
+                          'neutral'
+                        }
+                      >
+                        {t.status}
+                      </Badge>
+                    </div>
+
+                    {/* Task Title */}
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                        {t.name}
+                      </div>
+                      {t.approvalStatus === 'rework' && t.reworkNotes && (
+                        <div style={{ marginTop: 6, padding: '6px 10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6, color: '#991b1b', fontSize: 12 }}>
+                          <strong>🔄 Rework Required:</strong> {t.reworkNotes}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Active Timer Display */}
+                    {t.status === 'In Progress' && (
+                      <div
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: timers[t.id]?.isRunning ? 'var(--status-success-bg, #ecfdf5)' : 'var(--bg-sunken)',
+                          border: `1px solid ${timers[t.id]?.isRunning ? 'var(--status-success, #10b981)' : 'var(--border)'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: timers[t.id]?.isRunning ? 'var(--status-success)' : 'var(--text-muted)' }}>
+                          <span>⏱️ {timers[t.id]?.isRunning ? 'Timer Running' : 'Timer Paused'}</span>
+                        </div>
+                        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 800, fontSize: 13 }}>
+                          {getTaskDurationString(t.id)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Details: Assignee, Supervisor, Due Date, Hours */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px', fontSize: 12, padding: '8px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Assignee</span>
+                        <strong style={{ color: 'var(--text-primary)' }}>{t.assignee || 'Unassigned'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Supervisor</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{t.supervisor || '—'}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Due Date</span>
+                        <span style={{ fontWeight: isDueToday ? 800 : 600, color: isDueToday ? 'var(--status-danger)' : 'var(--text-primary)' }}>
+                          {formatTableDate(t.dueDate)} {isDueToday && '📌'}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Hours (Worked / Prop)</span>
+                        <strong style={{ color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+                          ⏱ {Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)}h
+                        </strong>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> / {t.proposedHours || 0}h</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
+                      {/* Assignment approval for management */}
+                      {t.approvalStatus === 'pending_assignment_approval' && (() => {
+                        const creator = employees.find(e => e.id === t.assignedByEmployeeId);
+                        const creatorRole = ((creator as any)?.role || '').toUpperCase();
+                        const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
+                        if (needsCeoOnly) {
+                          if (user?.role?.toUpperCase() === 'CEO') {
+                            return (
+                              <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
+                                Approve Assignment
+                              </Button>
+                            );
+                          }
+                        } else if (isManagement) {
+                          return (
+                            <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
+                              Approve Assignment
+                            </Button>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {/* Assignee options */}
+                      {isAssignee && !isPendingAssignment && (
+                        <>
+                          {(t.status === 'To Do' || t.approvalStatus === 'rework') && (
+                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
+                              ▶️ Start
+                            </Button>
+                          )}
+                          {t.status === 'In Progress' && timers[t.id]?.isRunning && (
+                            <Button size="sm" variant="secondary" onClick={() => handlePauseTask(t.id)}>
+                              ⏸️ Pause
+                            </Button>
+                          )}
+                          {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
+                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
+                              ▶️ Resume
+                            </Button>
+                          )}
+                          {t.status === 'In Progress' && (
+                            <Button size="sm" onClick={() => { setSelectedTask(t); setTimeEntryOpen(true); }}>
+                              Log Time
+                            </Button>
+                          )}
+                          {t.status === 'In Progress' && (
+                            <Button size="sm" variant="primary" onClick={() => handleSubmitTaskForApproval(t)}>
+                              Submit
+                            </Button>
+                          )}
+                        </>
+                      )}
+
+                      {/* Supervisor/Manager actions for review */}
+                      {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
+                        <>
+                          <Button size="sm" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={async () => {
+                            const { ok, reason } = await prompt({
+                              title: 'Request rework',
+                              message: 'Enter the reason this task needs rework:',
+                              variant: 'confirm',
+                            });
+                            if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
+                          }}>
+                            Rework
+                          </Button>
+                        </>
+                      )}
+
+                      {/* Reopen action */}
+                      {t.status === 'Completed' && (
+                        <Button size="sm" variant="secondary" onClick={() => handleReopenTask(t)}>
+                          Reopen
+                        </Button>
+                      )}
+
+                      {/* Edit task (restricted to Top Management only) */}
+                      {isManagement && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setEditingTask(t);
+                            setEditTaskOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
 
         return (
           <Card style={{ padding: 0, overflow: 'hidden' }}>

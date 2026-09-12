@@ -72,7 +72,8 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
             position: 'sticky',
             top: 0,
             zIndex: 20,
-            padding: '16px 20px',
+            padding: isMobile ? '12px 14px' : '16px 20px',
+            paddingTop: isMobile ? 'calc(12px + env(safe-area-inset-top, 0px))' : '16px',
             background: 'var(--bg-panel)',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
@@ -80,7 +81,7 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
             justifyContent: 'space-between',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
+          <h3 style={{ margin: 0, fontSize: isMobile ? 15 : 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -110,7 +111,7 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 20, minHeight: 0 }}>{children}</div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? 14 : 20, minHeight: 0 }}>{children}</div>
 
         {/* Footer */}
         {footer && (
@@ -120,7 +121,8 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
               position: 'sticky',
               bottom: 0,
               zIndex: 20,
-              padding: '14px 20px',
+              padding: isMobile ? '12px 14px' : '14px 20px',
+              paddingBottom: isMobile ? 'calc(14px + env(safe-area-inset-bottom, 12px))' : '14px',
               borderTop: '1px solid var(--border)',
               display: 'flex',
               justifyContent: 'flex-end',
