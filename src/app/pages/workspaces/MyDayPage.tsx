@@ -97,6 +97,24 @@ const resolveLocationName = (locStr: string) => {
   }
   return locStr;
 };
+export interface TaskItem {
+  id: string;
+  title: string;
+  project: string;
+  due: string;
+  priority: string;
+  active: boolean;
+  underReview?: boolean;
+  isApproved?: boolean;
+  isRework?: boolean;
+  reworkNotes?: string;
+  secondsToday: number;
+  totalHoursWorked?: number;
+  assignee?: string;
+  assigneeId?: string;
+  supervisor?: string;
+}
+
 interface AttendancePanelProps {
   record: AttendanceRecord | null;
   loading: boolean;
@@ -106,6 +124,8 @@ interface AttendancePanelProps {
   endBreak: () => Promise<any>;
   onActivityLog?: (title: string, tone?: 'success' | 'progress' | 'info' | 'neutral') => void;
   timelineEntries?: Array<{ title: string; time: string }>;
+  tasks?: TaskItem[];
+  onStartBreakWithTask?: (reason: string, updateMsg: string, targetTaskId?: string) => Promise<boolean>;
 }
 
 export const AttendancePanel = memo(function AttendancePanel({
@@ -117,6 +137,8 @@ export const AttendancePanel = memo(function AttendancePanel({
   endBreak,
   onActivityLog,
   timelineEntries = [],
+  tasks = [],
+  onStartBreakWithTask,
 }: AttendancePanelProps) {
   const device = useDevice();
   const isMobile = device === 'mobile';
@@ -400,16 +422,49 @@ export const AttendancePanel = memo(function AttendancePanel({
     }
   }, [confirm, clockOut, toast, onActivityLog]);
 
+  const activeRunningTask = useMemo(() => {
+    return (tasks || []).find((t) => t.active) || null;
+  }, [tasks]);
+
   const [breakModalOpen, setBreakModalOpen] = useState(false);
   const [breakReason, setBreakReason] = useState('Official Break');
   const [breakStatusUpdate, setBreakStatusUpdate] = useState('');
+  const [selectedBreakTaskId, setSelectedBreakTaskId] = useState('');
+
+  // Sync selected break task when modal opens or active task changes
+  useEffect(() => {
+    if (breakModalOpen) {
+      if (activeRunningTask) {
+        setSelectedBreakTaskId(activeRunningTask.id);
+      } else if (tasks && tasks.length > 0 && !selectedBreakTaskId) {
+        setSelectedBreakTaskId(tasks[0].id);
+      }
+    }
+  }, [breakModalOpen, activeRunningTask, tasks, selectedBreakTaskId]);
 
   const handleConfirmBreak = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     const reasonText = breakReason || 'Official Break';
+    const updateMsg = breakStatusUpdate.trim();
+
+    if (!updateMsg) {
+      toast({ variant: 'error', title: 'Work Update Required', message: 'Please provide a work progress update before starting your break.' });
+      return;
+    }
+
+    const targetTaskId = activeRunningTask?.id || selectedBreakTaskId || undefined;
+
+    if (onStartBreakWithTask) {
+      const ok = await onStartBreakWithTask(reasonText, updateMsg, targetTaskId);
+      if (ok) {
+        setBreakModalOpen(false);
+        setBreakStatusUpdate('');
+      }
+      return;
+    }
+
     const res = await startBreak(reasonText);
     if (res.ok) {
-      const updateMsg = breakStatusUpdate.trim();
       if (updateMsg && onActivityLog) {
         onActivityLog(`Started break (${reasonText}). Work status: ${updateMsg}`, 'info');
       } else if (onActivityLog) {
@@ -421,7 +476,7 @@ export const AttendancePanel = memo(function AttendancePanel({
     } else {
       toast({ variant: 'error', title: 'Break Failed', message: res.error });
     }
-  }, [breakReason, breakStatusUpdate, startBreak, toast, onActivityLog]);
+  }, [breakReason, breakStatusUpdate, activeRunningTask, selectedBreakTaskId, onStartBreakWithTask, startBreak, toast, onActivityLog]);
 
   const handleEndBreak = useCallback(async () => {
     const res = await endBreak();
@@ -909,8 +964,62 @@ export const AttendancePanel = memo(function AttendancePanel({
       <Drawer open={breakModalOpen} onClose={() => setBreakModalOpen(false)} title="Start Official Break — Update Work Status">
         <form onSubmit={handleConfirmBreak} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: '1.5' }}>
-            Before starting your official break, please provide a brief update on your current task progress and work status.
+            Before starting your official break, please provide an update on your current task progress. This update will be recorded in your task worklog.
           </div>
+
+          {/* Currently Running Task Card */}
+          {activeRunningTask ? (
+            <div
+              style={{
+                padding: '14px 16px',
+                borderRadius: 12,
+                background: 'rgba(34, 197, 94, 0.08)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--status-success)', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  🟢 Currently Running Task
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  ⏱ {Math.floor(activeRunningTask.secondsToday / 3600)}h {Math.floor((activeRunningTask.secondsToday % 3600) / 60)}m today
+                </span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {activeRunningTask.title}
+              </div>
+              {activeRunningTask.project && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  📁 Project: {activeRunningTask.project}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                ℹ️ Starting your break will automatically pause this task timer and save your update to the Task Worklog.
+              </div>
+            </div>
+          ) : tasks && tasks.length > 0 ? (
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
+                Target Task for Work Progress (Optional)
+              </label>
+              <select
+                className="kvj-select"
+                value={selectedBreakTaskId}
+                onChange={(e) => setSelectedBreakTaskId(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13 }}
+              >
+                <option value="">— General Workspace Update —</option>
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} {t.project ? `(${t.project})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
@@ -931,7 +1040,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
-              Current Work Status &amp; Progress *
+              {activeRunningTask ? `Work Progress Update on "${activeRunningTask.title}" *` : 'Current Work Status & Progress *'}
             </label>
             <textarea
               className="kvj-input"
@@ -939,7 +1048,7 @@ export const AttendancePanel = memo(function AttendancePanel({
               rows={4}
               value={breakStatusUpdate}
               onChange={(e) => setBreakStatusUpdate(e.target.value)}
-              placeholder="e.g. Completed morning batch verification, pausing before client review..."
+              placeholder={activeRunningTask ? `Describe what you completed on "${activeRunningTask.title}" before taking a break...` : "e.g. Completed morning batch verification, pausing before client review..."}
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13, resize: 'vertical' }}
             />
           </div>
@@ -986,24 +1095,6 @@ const saveStoredTaskStates = (states: Record<string, StoredTaskState>) => {
     localStorage.setItem(TASK_TIMER_STORAGE_KEY, JSON.stringify(states));
   } catch (e) { void e; }
 };
-
-export interface TaskItem {
-  id: string;
-  title: string;
-  project: string;
-  due: string;
-  priority: string;
-  active: boolean;
-  underReview?: boolean;
-  isApproved?: boolean;
-  isRework?: boolean;
-  reworkNotes?: string;
-  secondsToday: number;
-  totalHoursWorked?: number;
-  assignee?: string;
-  assigneeId?: string;
-  supervisor?: string;
-}
 
 function getTimeLeftInfo(dueStr: string): { label: string; tone: 'danger' | 'warning' | 'neutral' } {
   if (!dueStr || typeof dueStr !== 'string') return { label: 'No due date', tone: 'neutral' };
@@ -2605,6 +2696,60 @@ export function MyDayPage() {
     });
   };
 
+  const handleStartBreakWithTask = useCallback(async (reason: string, updateMsg: string, targetTaskId?: string): Promise<boolean> => {
+    const res = await startBreak(reason);
+    if (!res.ok) {
+      toast({ variant: 'error', title: 'Break Failed', message: res.error });
+      return false;
+    }
+
+    // If an active task is running or a target task is selected, pause it and save progress notes
+    const runningTask = tasks.find((t) => t.active);
+    const taskIdToPause = runningTask?.id || targetTaskId;
+
+    if (taskIdToPause) {
+      const targetTask = tasks.find((t) => t.id === taskIdToPause) || (projectTasks || []).find((t) => t.id === taskIdToPause);
+      taskTimerStore.pauseTask(taskIdToPause);
+      const timer = taskTimerStore.getTimer(taskIdToPause);
+      const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : (targetTask?.secondsToday || 0);
+
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskIdToPause ? { ...t, active: false, secondsToday } : t))
+      );
+
+      try {
+        if (updateMsg) {
+          saveSessionNote(taskIdToPause, updateMsg);
+          await updateTask(taskIdToPause as any, { status: 'todo', actualHours: secondsToday / 3600, description: updateMsg });
+          await pauseSession(taskIdToPause as any, updateMsg);
+        } else {
+          await updateTask(taskIdToPause as any, { status: 'todo', actualHours: secondsToday / 3600 });
+          await pauseSession(taskIdToPause as any);
+        }
+      } catch (e) {
+        console.warn('Failed to pause task during break start:', e);
+      }
+
+      const taskTitleText = targetTask?.title || taskIdToPause;
+      handleActivityLog(`Started break (${reason}) on task: "${taskTitleText}". Work status: ${updateMsg || 'Paused for break'}`, 'info');
+    } else {
+      if (updateMsg) {
+        handleActivityLog(`Started break (${reason}). Work status: ${updateMsg}`, 'info');
+      } else {
+        handleActivityLog(`Started official break (${reason})`, 'info');
+      }
+    }
+
+    toast({
+      variant: 'info',
+      title: 'On Break',
+      message: runningTask
+        ? `Break started. Active task "${runningTask.title}" paused and progress update recorded.`
+        : 'Enjoy your break. Status update saved.'
+    });
+    return true;
+  }, [startBreak, tasks, projectTasks, toast]);
+
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
   const [pauseTargetTaskId, setPauseTargetTaskId] = useState<string | null>(null);
   const [pauseWorkNote, setPauseWorkNote] = useState('');
@@ -2924,6 +3069,8 @@ export function MyDayPage() {
         endBreak={endBreak}
         onActivityLog={handleActivityLog}
         timelineEntries={timelineEntries}
+        tasks={tasks}
+        onStartBreakWithTask={handleStartBreakWithTask}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
