@@ -648,7 +648,7 @@ export function ChatChannels() {
             open={mobileDrawerOpen}
             onClose={() => setMobileDrawerOpen(false)}
             title="💬 Channels & Messages"
-            size="full"
+            size="xl"
           >
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <Button style={{ flex: 1 }} size="sm" onClick={() => { setCreateChannelOpen(true); setMobileDrawerOpen(false); }}>
@@ -662,25 +662,25 @@ export function ChatChannels() {
             <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
               {(Object.keys(CATEGORY_LABELS) as ChannelCategory[]).map((catKey) => {
                 const { label, icon } = CATEGORY_LABELS[catKey];
-                const catChannels = categorizedChannels[catKey] || [];
-                const isOpen = openCategories[catKey] ?? true;
+                const catChannels = filteredChannelsGrouped[catKey] || [];
+                const isOpen = activeCategory === catKey;
                 return (
                   <div key={catKey}>
                     <button
                       type="button"
-                      onClick={() => setOpenCategories((p) => ({ ...p, [catKey]: !isOpen }))}
+                      onClick={() => setActiveCategory(isOpen ? 'department' : catKey)}
                       style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px', fontWeight: 700, fontSize: 12, color: 'var(--text-secondary)', letterSpacing: '0.04em' }}
                     >
                       <span>{icon} {label.toUpperCase()} ({catChannels.length})</span>
                       <span>{isOpen ? '▼' : '▶'}</span>
                     </button>
-                    {isOpen && catChannels.map((c) => {
+                    {isOpen && catChannels.map((c: typeof catChannels[0]) => {
                       const active = c.id === activeChannelId;
                       return (
                         <button
                           key={c.id}
                           type="button"
-                          onClick={() => { handleSelectChannel(c.id); setMobileDrawerOpen(false); }}
+                          onClick={() => { setActiveChannelId(c.id); setMobileDrawerOpen(false); }}
                           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', background: active ? 'var(--brand-light, rgba(99,102,241,0.1))' : 'transparent', color: active ? 'var(--brand)' : 'var(--text-primary)', fontWeight: active ? 700 : 400, fontSize: 14, marginBottom: 2 }}
                         >
                           {c.type === 'direct' ? (
