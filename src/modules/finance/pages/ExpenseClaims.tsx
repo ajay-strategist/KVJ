@@ -830,14 +830,24 @@ export function ExpenseClaims() {
     if (processingAction) return;
     setProcessingAction(true);
     try {
-      const { error } = await supabase
+      const isUuid = user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
+      const updates: Record<string, any> = {
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+      };
+      if (isUuid) {
+        updates.approved_by = user.id;
+      }
+      let { error } = await supabase
         .from('flwdsk_expense_claims')
-        .update({
-          status: 'approved',
-          approved_by: user?.id,
-          approved_at: new Date().toISOString(),
-        })
+        .update(updates)
         .eq('id', id);
+
+      if (error && updates.approved_by) {
+        delete updates.approved_by;
+        const res2 = await supabase.from('flwdsk_expense_claims').update(updates).eq('id', id);
+        error = res2.error;
+      }
 
       if (error) {
         toast({ variant: 'error', title: 'Approval Failed', message: error.message });
@@ -880,13 +890,23 @@ export function ExpenseClaims() {
     if (processingAction) return;
     setProcessingAction(true);
     try {
-      const { error } = await supabase
+      const isUuid = user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
+      const updates: Record<string, any> = {
+        deleted_at: new Date().toISOString(),
+      };
+      if (isUuid) {
+        updates.deleted_by = user.id;
+      }
+      let { error } = await supabase
         .from('flwdsk_expense_claims')
-        .update({
-          deleted_at: new Date().toISOString(),
-          deleted_by: user?.id,
-        })
+        .update(updates)
         .eq('id', id);
+
+      if (error && updates.deleted_by) {
+        delete updates.deleted_by;
+        const res2 = await supabase.from('flwdsk_expense_claims').update(updates).eq('id', id);
+        error = res2.error;
+      }
 
       if (error) {
         toast({ variant: 'error', title: 'Deletion Failed', message: error.message });
@@ -928,14 +948,23 @@ export function ExpenseClaims() {
 
     setProcessingAction(true);
     try {
+      const isUuid = user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
       if (action === 'delete') {
-        const { error } = await supabase
+        const updates: Record<string, any> = {
+          deleted_at: new Date().toISOString(),
+        };
+        if (isUuid) {
+          updates.deleted_by = user.id;
+        }
+        let { error } = await supabase
           .from('flwdsk_expense_claims')
-          .update({
-            deleted_at: new Date().toISOString(),
-            deleted_by: user?.id,
-          })
+          .update(updates)
           .in('id', selectedIds);
+        if (error && updates.deleted_by) {
+          delete updates.deleted_by;
+          const res2 = await supabase.from('flwdsk_expense_claims').update(updates).in('id', selectedIds);
+          error = res2.error;
+        }
         if (error) throw error;
         toast({ variant: 'warning', title: 'Claims Deleted', message: `${selectedIds.length} claim(s) successfully deleted.` });
       } else {
@@ -943,13 +972,20 @@ export function ExpenseClaims() {
           status: action === 'approve' ? 'approved' : 'rejected'
         };
         if (action === 'approve') {
-          updates.approved_by = user?.id;
+          if (isUuid) {
+            updates.approved_by = user.id;
+          }
           updates.approved_at = new Date().toISOString();
         }
-        const { error } = await supabase
+        let { error } = await supabase
           .from('flwdsk_expense_claims')
           .update(updates)
           .in('id', selectedIds);
+        if (error && updates.approved_by) {
+          delete updates.approved_by;
+          const res2 = await supabase.from('flwdsk_expense_claims').update(updates).in('id', selectedIds);
+          error = res2.error;
+        }
         if (error) throw error;
         toast({ variant: 'success', title: `Claims ${action === 'approve' ? 'Approved' : 'Rejected'}`, message: `${selectedIds.length} claim(s) successfully updated.` });
       }

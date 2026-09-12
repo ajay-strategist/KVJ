@@ -703,13 +703,24 @@ export function AttendanceLogPage() {
     if (!confirmOk) return;
 
     try {
+      const isUuid = user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
       if (action === 'delete') {
         // Soft-delete (keep the financial audit trail), matching the Expense
         // Claims screen. Hard DELETE would erase the record permanently.
-        const { error } = await supabase
+        const updates: Record<string, any> = {
+          deleted_at: new Date().toISOString(),
+        };
+        if (isUuid) updates.deleted_by = user.id;
+
+        let { error } = await supabase
           .from('flwdsk_expense_claims')
-          .update({ deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
+          .update(updates)
           .in('id', selectedIds);
+        if (error && updates.deleted_by) {
+          delete updates.deleted_by;
+          const res2 = await supabase.from('flwdsk_expense_claims').update(updates).in('id', selectedIds);
+          error = res2.error;
+        }
         if (error) throw error;
         toast({ variant: 'warning', title: 'Claims Deleted', message: `${selectedIds.length} claim(s) successfully deleted.` });
       } else {
@@ -717,13 +728,18 @@ export function AttendanceLogPage() {
           status: action === 'approve' ? 'approved' : 'rejected'
         };
         if (action === 'approve') {
-          updates.approved_by = user?.id;
+          if (isUuid) updates.approved_by = user.id;
           updates.approved_at = new Date().toISOString();
         }
-        const { error } = await supabase
+        let { error } = await supabase
           .from('flwdsk_expense_claims')
           .update(updates)
           .in('id', selectedIds);
+        if (error && updates.approved_by) {
+          delete updates.approved_by;
+          const res2 = await supabase.from('flwdsk_expense_claims').update(updates).in('id', selectedIds);
+          error = res2.error;
+        }
         if (error) throw error;
         toast({ variant: 'success', title: `Claims ${action === 'approve' ? 'Approved' : 'Rejected'}`, message: `${selectedIds.length} claim(s) successfully updated.` });
       }
@@ -736,16 +752,28 @@ export function AttendanceLogPage() {
 
   const handleIndividualAction = async (id: string, action: 'approve' | 'reject' | 'delete') => {
     try {
+      const isUuid = user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
       if (action === 'delete') {
         const confirmOk = await confirm({
           title: 'Delete Expense Claim?',
           message: 'Are you sure you want to delete this expense claim? This cannot be undone.',
         });
         if (!confirmOk) return;
-        const { error } = await supabase
+
+        const updates: Record<string, any> = {
+          deleted_at: new Date().toISOString(),
+        };
+        if (isUuid) updates.deleted_by = user.id;
+
+        let { error } = await supabase
           .from('flwdsk_expense_claims')
-          .update({ deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
+          .update(updates)
           .eq('id', id);
+        if (error && updates.deleted_by) {
+          delete updates.deleted_by;
+          const res2 = await supabase.from('flwdsk_expense_claims').update(updates).eq('id', id);
+          error = res2.error;
+        }
         if (error) throw error;
         toast({ variant: 'warning', title: 'Claim Deleted', message: 'Expense claim deleted successfully.' });
       } else {
@@ -753,10 +781,15 @@ export function AttendanceLogPage() {
           status: action === 'approve' ? 'approved' : 'rejected'
         };
         if (action === 'approve') {
-          updates.approved_by = user?.id;
+          if (isUuid) updates.approved_by = user.id;
           updates.approved_at = new Date().toISOString();
         }
-        const { error } = await supabase.from('flwdsk_expense_claims').update(updates).eq('id', id);
+        let { error } = await supabase.from('flwdsk_expense_claims').update(updates).eq('id', id);
+        if (error && updates.approved_by) {
+          delete updates.approved_by;
+          const res2 = await supabase.from('flwdsk_expense_claims').update(updates).eq('id', id);
+          error = res2.error;
+        }
         if (error) throw error;
         toast({ variant: 'success', title: `Claim ${action === 'approve' ? 'Approved' : 'Rejected'}`, message: `Expense claim successfully updated.` });
       }
