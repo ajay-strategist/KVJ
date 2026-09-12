@@ -14,8 +14,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge, EmptyState } from '../../../shared/ui/components';
-import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, FileUploadField, DatePickerField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { useBreakpoint } from '../../../shared/hooks/responsive';
@@ -97,220 +95,6 @@ export function formatDisplayDateGB(val?: string | Date | null): string {
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   }
   return '—';
-}
-
-function DynamicExpenseForm({
-  bikeRate,
-  carRate,
-  batches,
-  customExpenseTypes,
-  onRegisterNewType,
-  onSubmit,
-  onCancel,
-  submittingClaim,
-}: {
-  bikeRate: number;
-  carRate: number;
-  batches: Array<any>;
-  customExpenseTypes: string[];
-  onRegisterNewType: (name: string) => Promise<boolean>;
-  onSubmit: (vals: any) => void;
-  onCancel: () => void;
-  submittingClaim: boolean;
-}) {
-  const { values, setValue } = useForm();
-  const [newTypeInput, setNewTypeInput] = useState('');
-
-  const category = values.categoryType || 'Office Expense';
-  const isSelfTravel = values.expenseType === 'Self Travel';
-  const isTraining = category === 'Training Expense';
-
-  const kmVal = Number(values.km || 0);
-  const vehicle = values.vehicle || 'Bike';
-  const rate = vehicle === 'Car' ? carRate : bikeRate;
-  const calculatedAmount = isSelfTravel ? kmVal * rate : Number(values.amount || 0);
-
-  const batchOptions = useMemo(() => {
-    if (batches && batches.length > 0) {
-      return batches.map((b: any) => {
-        const name = b.name || 'Batch';
-        const code = b.batchCode || b.code || 'Batch';
-        return {
-          value: `${name} (${code})`,
-          label: `${name} (${code})`,
-        };
-      });
-    }
-    return [
-      { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
-      { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
-      { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
-    ];
-  }, [batches]);
-
-  const expenseTypeOptions = useMemo(() => {
-    const defaultTypes = [
-      'Self Travel',
-      'Morning Tea',
-      'Lunch & Refreshments',
-      'Evening Tea',
-      'Stationery & Printing',
-      'Lab / System Supplies',
-      'Miscellaneous',
-    ];
-    const combined = Array.from(new Set([...defaultTypes, ...customExpenseTypes]));
-    const opts = combined.map((t) => ({
-      value: t,
-      label: t === 'Self Travel' ? 'Self Travel (Bike / Car KM Reimbursement)' : t,
-    }));
-    opts.push({ value: '__NEW_TYPE__', label: '➕ Register New Expense Type...' });
-    return opts;
-  }, [customExpenseTypes]);
-
-  const handleSaveNewType = async () => {
-    const val = newTypeInput.trim();
-    if (!val) return;
-    const ok = await onRegisterNewType(val);
-    if (ok) {
-      setValue('expenseType', val);
-      setNewTypeInput('');
-    }
-  };
-
-  const validationRules = {
-    expenseType: [
-      (v: any) =>
-        !v || v === '' || v === '__NEW_TYPE__'
-          ? 'Please select or register a valid expense type.'
-          : null,
-    ],
-    batch: [
-      (v: any, all: any) =>
-        all.categoryType === 'Training Expense' && (!v || v === '')
-          ? 'Training Batch is mandatory for Training Expenses.'
-          : null,
-    ],
-    km: [
-      (v: any, all: any) =>
-        all.expenseType === 'Self Travel' && (v === undefined || v === null || v === '' || isNaN(Number(v)) || Number(v) <= 0)
-          ? 'Kilometers travelled must be a positive number.'
-          : null,
-    ],
-    route: [
-      (v: any, all: any) =>
-        all.expenseType === 'Self Travel' && (!v || v.trim() === '')
-          ? 'Travel Route is mandatory for Self Travel.'
-          : null,
-    ],
-    amount: [
-      (v: any, all: any) =>
-        all.expenseType !== 'Self Travel' && (v === undefined || v === null || v === '' || isNaN(Number(v)) || Number(v) <= 0)
-          ? 'Expense Amount must be a positive number.'
-          : null,
-    ],
-    receiptFile: [
-      (v: any, all: any) =>
-        all.expenseType !== 'Self Travel' && !v
-          ? 'Receipt file upload is required.'
-          : null,
-      (v: any, all: any) => {
-        if (all.expenseType === 'Self Travel' || !v) return null;
-        const fileObj = v as File;
-        if (fileObj.size > 10 * 1024 * 1024) {
-          return 'File size exceeds the 10MB limit.';
-        }
-        const ext = fileObj.name.split('.').pop()?.toLowerCase();
-        const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
-        if (!ext || !allowedExts.includes(ext)) {
-          return 'Unsupported file format. Please upload JPG, PNG, WEBP, or PDF.';
-        }
-        return null;
-      }
-    ],
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <DatePickerField name="expenseDate" label="Expense Date *" />
-
-      <SelectField
-        name="categoryType"
-        label="Expense Classification *"
-        options={[
-          { value: 'Office Expense', label: 'Office Expense' },
-          { value: 'Training Expense', label: 'Training Expense' },
-        ]}
-      />
-
-      {isTraining && (
-        <SelectField
-          name="batch"
-          label="Training Batch (Mandatory for Training Expenses) *"
-          options={batchOptions}
-          rules={validationRules.batch}
-        />
-      )}
-
-      <SelectField
-        name="expenseType"
-        label="Expense Type *"
-        options={expenseTypeOptions}
-        rules={validationRules.expenseType}
-      />
-
-      {values.expenseType === '__NEW_TYPE__' && (
-        <div style={{ padding: 12, borderRadius: 'var(--radius-sm)', background: 'var(--bg-sunken)', border: '1px solid var(--border)' }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>New Expense Type Name *</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="text"
-              placeholder="e.g. Software License, Hotel Booking..."
-              value={newTypeInput}
-              onChange={(e) => setNewTypeInput(e.target.value)}
-              style={{ flex: 1, padding: '6px 12px', fontSize: 13, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}
-            />
-            <Button size="sm" type="button" onClick={handleSaveNewType}>Register in DB</Button>
-          </div>
-        </div>
-      )}
-
-      {isSelfTravel ? (
-        <>
-          <SelectField
-            name="vehicle"
-            label="Vehicle Type *"
-            options={[
-              { value: 'Bike', label: 'Bike' },
-              { value: 'Car', label: 'Car' },
-            ]}
-          />
-          <TextField name="km" label="Kilometers (KM) Travelled *" placeholder="e.g. 16" rules={validationRules.km} />
-          <TextField name="route" label="Travel Route (Mandatory: e.g., HQ to Christ College) *" placeholder="e.g. Kakkanad HQ to Irinjalakuda" rules={validationRules.route} />
-
-          {kmVal > 0 && (
-            <div style={{ padding: '10px 14px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Auto Calculated Reimbursement</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--status-success)', marginTop: 2 }}>
-                ₹ {calculatedAmount.toFixed(2)} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({kmVal} km × ₹{rate}/km)</span>
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <TextField name="amount" label="Expense Amount (₹) *" placeholder="e.g. 150.00" rules={validationRules.amount} />
-          <FileUploadField name="receiptFile" label="Upload Receipt Image / PDF (Optional)" accept="image/*,.pdf" />
-        </>
-      )}
-
-      <TextField name="notes" label="Notes / Description (Optional)" placeholder="Additional details..." />
-
-      <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <Button variant="secondary" type="button" onClick={onCancel} disabled={submittingClaim}>Cancel</Button>
-        <Button type="submit" loading={submittingClaim}>Submit Expense Claim</Button>
-      </div>
-    </div>
-  );
 }
 
 export function ExpenseClaims() {
@@ -1396,21 +1180,21 @@ export function ExpenseClaims() {
                         />
                       )}
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{exp.person}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{exp.date} · {exp.category}</div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{exp.person || 'Employee'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{exp.date || '—'} · {exp.category || 'Office Expense'}</div>
                       </div>
                     </div>
                     <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
-                      {isLocked ? '🔒 Approved' : exp.status}
+                      {isLocked ? '🔒 Approved' : (exp.status || 'submitted')}
                     </Badge>
                   </div>
 
                   {/* Expense Type & Travel Details */}
                   <div style={{ background: 'var(--bg-sunken)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{exp.type}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{exp.type || 'Expense'}</div>
                     {exp.vehicle && (
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                        <span>🚗 {exp.vehicle} · {exp.km} km @ ₹{exp.rate || getVehicleRate(exp.vehicle)}/km</span>
+                        <span>🚗 {exp.vehicle} · {exp.km || 0} km @ ₹{exp.rate || getVehicleRate(exp.vehicle)}/km</span>
                       </div>
                     )}
                     {(exp.batch || exp.route) && (
@@ -1426,7 +1210,7 @@ export function ExpenseClaims() {
                     <div>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Claim Amount</span>
                       <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--status-success)', fontVariantNumeric: 'tabular-nums' }}>
-                        ₹{exp.amount.toFixed(2)}
+                        ₹{(Number(exp.amount) || 0).toFixed(2)}
                       </span>
                     </div>
 
@@ -1477,7 +1261,7 @@ export function ExpenseClaims() {
                         onClick={async () => {
                           const ok = await confirm({
                             title: 'Delete Expense Claim?',
-                            message: `Are you sure you want to delete this expense claim for ₹${exp.amount.toFixed(2)}? This cannot be undone.`,
+                            message: `Are you sure you want to delete this expense claim for ₹${(Number(exp.amount) || 0).toFixed(2)}? This cannot be undone.`,
                           });
                           if (ok) {
                             await handleDeleteClaim(exp.id);
@@ -1540,18 +1324,18 @@ export function ExpenseClaims() {
                           />
                         </td>
                       )}
-                      <td style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{exp.date}</td>
-                      <td>{exp.person}</td>
+                      <td style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{exp.date || '—'}</td>
+                      <td>{exp.person || 'Employee'}</td>
                       <td>
-                        <Badge tone={exp.category.includes('Training') ? 'info' : 'neutral'}>
-                          {exp.category}
+                        <Badge tone={(exp.category || '').includes('Training') ? 'info' : 'neutral'}>
+                          {exp.category || 'Office Expense'}
                         </Badge>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{exp.type}</div>
+                        <div style={{ fontWeight: 600 }}>{exp.type || 'Expense'}</div>
                         {exp.vehicle && (
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                            <span>{exp.vehicle} · {exp.km} km @ ₹</span>
+                            <span>{exp.vehicle} · {exp.km || 0} km @ ₹</span>
                             {exp.status === 'submitted' && isManagement ? (
                               <input
                                 type="number"
@@ -1605,7 +1389,7 @@ export function ExpenseClaims() {
                         {exp.route && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>🗺 {exp.route}</div>}
                       </td>
                       <td style={{ fontWeight: 800, color: 'var(--status-success)', fontVariantNumeric: 'tabular-nums' }}>
-                        ₹ {exp.amount.toFixed(2)}
+                        ₹ {(Number(exp.amount) || 0).toFixed(2)}
                       </td>
                       <td>
                         {(() => {
@@ -1637,7 +1421,7 @@ export function ExpenseClaims() {
                       </td>
                       <td>
                         <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
-                          {isLocked ? '🔒 Approved' : exp.status}
+                          {isLocked ? '🔒 Approved' : (exp.status || 'submitted')}
                         </Badge>
                         {exp.approvedBy && (
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -1661,7 +1445,7 @@ export function ExpenseClaims() {
                               onClick={async () => {
                                 const ok = await confirm({
                                   title: 'Delete Expense Claim?',
-                                  message: `Are you sure you want to delete this expense claim for ₹${exp.amount.toFixed(2)}? This cannot be undone.`,
+                                  message: `Are you sure you want to delete this expense claim for ₹${(Number(exp.amount) || 0).toFixed(2)}? This cannot be undone.`,
                                 });
                                 if (ok) {
                                   await handleDeleteClaim(exp.id);
