@@ -74,15 +74,13 @@ export type ProjectStatusLabel = 'Not Started' | 'In Progress' | 'Completed';
 /** The three project statuses (stored value ⇄ display label). */
 export const PROJECT_STATUS_OPTIONS: { value: string; label: ProjectStatusLabel }[] = [
   { value: 'not_started', label: 'Not Started' },
-  { value: 'planning', label: 'In Progress' },
   { value: 'execution', label: 'In Progress' },
   { value: 'closure', label: 'Completed' },
 ];
 
 export const projectStatusToLabel = (s?: string): ProjectStatusLabel =>
-  s === 'closure' ? 'Completed'
-  : s === 'execution' ? 'In Progress'
-  : s === 'planning' ? 'In Progress'
+  s === 'closure' || s === 'completed' ? 'Completed'
+  : s === 'execution' || s === 'planning' || s === 'in_progress' ? 'In Progress'
   : 'Not Started';
 
 export const projectStatusLabelToValue = (l?: string): string =>

@@ -122,7 +122,7 @@ export function ChatChannels() {
 
   // ── Input Composer State ─────────────────────────────────────────
   const [text, setText] = useState('');
-  const [composerAttachment, setComposerAttachment] = useState<{ name: string; type: 'image' | 'pdf' | 'file'; url: string; size: string } | null>(null);
+  const [composerAttachment, setComposerAttachment] = useState<{ name: string; type: 'image' | 'pdf' | 'file' | 'audio'; url: string; size: string } | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<{ id: string; senderName: string; text: string } | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
@@ -138,10 +138,13 @@ export function ChatChannels() {
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [activeMessageActionId, setActiveMessageActionId] = useState<string | null>(null);
 
-  // Voice recording
+  // Voice recording & file upload refs
   const [isRecording, setIsRecording] = useState(false);
   const [recordDuration, setRecordDuration] = useState(0);
   const recordTimerRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Drawers & Modals
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
@@ -264,6 +267,12 @@ export function ChatChannels() {
         reactionsGrouped[r.reaction].push(rName);
       });
 
+      // 1-Week (7-day) retention policy: clear/expire attachment payloads on messages older than 7 days to preserve storage space
+      const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+      const isExpired = m.createdAt ? (Date.now() - new Date(m.createdAt).getTime() > ONE_WEEK_MS) : false;
+      const fileAttachment = isExpired ? undefined : m.fileAttachment;
+      const hadAttachmentExpired = isExpired && !!m.fileAttachment;
+
       return {
         id: m.id,
         senderId: m.senderId,
@@ -278,7 +287,8 @@ export function ChatChannels() {
         isPinned: m.isPinned,
         isEdited: m.isEdited,
         isDeleted: m.isDeleted,
-        fileAttachment: m.fileAttachment,
+        fileAttachment,
+        hadAttachmentExpired,
         replyToMessage: m.replyToMessage || (m.replyTo ? { id: m.replyTo, senderName: 'Message', text: 'Thread Reply' } : undefined),
       };
     });
@@ -349,26 +359,121 @@ export function ChatChannels() {
     composerInputRef.current?.focus();
   };
 
-  // Voice recording simulation
-  const startRecording = () => {
-    setIsRecording(true);
-    setRecordDuration(0);
-    recordTimerRef.current = setInterval(() => {
-      setRecordDuration((prev) => prev + 1);
-    }, 1000);
+  // Real Voice recording using MediaRecorder API
+  const startRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast({ variant: 'error', title: 'Not Supported', message: 'Audio recording is not supported in this browser.' });
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordDuration(0);
+      recordTimerRef.current = setInterval(() => {
+        setRecordDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Audio recording error:', err);
+      toast({ variant: 'error', title: 'Microphone Permission Needed', message: 'Please allow microphone access to record voice messages.' });
+    }
   };
 
   const stopRecording = (shouldAttach: boolean) => {
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     setIsRecording(false);
-    if (shouldAttach) {
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.onstop = () => {
+        // Stop all tracks to release hardware microphone
+        recorder.stream.getTracks().forEach((t) => t.stop());
+
+        if (shouldAttach && audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+          const sizeKb = Math.round(audioBlob.size / 1024);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64Url = reader.result as string;
+            setComposerAttachment({
+              name: `Voice_Note_${new Date().toLocaleTimeString().replace(/ /g, '')}.webm`,
+              type: 'audio',
+              url: base64Url,
+              size: `${sizeKb > 0 ? sizeKb : 1} KB`,
+            });
+            toast({ variant: 'success', title: 'Voice Note Attached', message: 'Voice message recorded and attached.' });
+          };
+          reader.readAsDataURL(audioBlob);
+        }
+      };
+      recorder.stop();
+    }
+  };
+
+  // Real File Upload Handler (Images, PDFs, Spreadsheets, Docs, Audio)
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const sizeInMb = file.size / (1024 * 1024);
+    if (sizeInMb > 25) {
+      toast({ variant: 'error', title: 'File Too Large', message: 'Please attach files under 25MB.' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Url = reader.result as string;
+      let type: 'image' | 'pdf' | 'audio' | 'file' = 'file';
+      if (file.type.startsWith('image/')) type = 'image';
+      else if (file.type.startsWith('audio/')) type = 'audio';
+      else if (file.type === 'application/pdf') type = 'pdf';
+
+      const formattedSize = file.size < 1024 * 1024
+        ? `${Math.round(file.size / 1024)} KB`
+        : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
       setComposerAttachment({
-        name: `Audio_Memo_${new Date().toLocaleTimeString().replace(/ /g, '')}.mp3`,
-        type: 'file',
-        url: '#',
-        size: `${Math.round(recordDuration * 12.8)} KB`,
+        name: file.name,
+        type,
+        url: base64Url,
+        size: formattedSize,
       });
-      toast({ variant: 'success', title: 'Voice Note Attached', message: 'Audio memo attached successfully.' });
+      setShowAttachmentMenu(false);
+      toast({ variant: 'success', title: 'File Attached', message: `${file.name} ready to send.` });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Reliable Attachment Download Handler
+  const handleDownloadAttachment = (attachment: { name: string; url: string }) => {
+    if (!attachment.url || attachment.url === '#' || attachment.url === '') {
+      toast({ variant: 'error', title: 'Download Unavailable', message: 'Attachment file is expired or unavailable.' });
+      return;
+    }
+    try {
+      const link = document.createElement('a');
+      link.href = attachment.url;
+      link.download = attachment.name || 'attachment';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast({ variant: 'success', title: 'Download Started', message: `Downloading ${attachment.name}...` });
+    } catch (err: any) {
+      window.open(attachment.url, '_blank');
     }
   };
 
@@ -488,7 +593,10 @@ export function ChatChannels() {
 
   const handleStartDirectMessage = async (targetEmployeeId: string) => {
     const existing = mappedChannels.find(
-      (c) => c.type === 'direct' && c.name?.includes(targetEmployeeId) && c.name?.includes(user?.id || '')
+      (c) => c.type === 'direct' && (
+        (c.name?.includes(targetEmployeeId) && c.name?.includes(user?.id || '')) ||
+        (c.dmParticipant?.id === targetEmployeeId)
+      )
     );
     if (existing) {
       setActiveChannelId(existing.id);
@@ -524,6 +632,19 @@ export function ChatChannels() {
       else if (c.isArchived) groups.archived.push(c);
       else groups[c.category]?.push(c);
     });
+
+    // Deduplicate DM list by participant ID / normalized name so the same colleague is never shown twice
+    const seenDm = new Set<string>();
+    const uniqueDms: typeof mappedChannels = [];
+    for (const dm of groups.dm) {
+      const key = dm.dmParticipant?.id?.toLowerCase() || dm.name.trim().toLowerCase();
+      if (!seenDm.has(key)) {
+        seenDm.add(key);
+        uniqueDms.push(dm);
+      }
+    }
+    groups.dm = uniqueDms;
+
     return groups;
   }, [mappedChannels, channelSearch]);
 
@@ -1303,34 +1424,88 @@ export function ChatChannels() {
                           msg.text
                         )}
 
-                        {/* File Attachment Card */}
+                        {/* File Attachment Card / Voice Note Player */}
                         {msg.fileAttachment && (
                           <div style={{
                             marginTop: 10,
-                            padding: '8px 10px',
+                            padding: '10px 12px',
                             borderRadius: 'var(--radius-md)',
-                            background: isMe ? 'rgba(255,255,255,0.15)' : 'var(--bg-surface)',
-                            border: '1px solid var(--border)',
+                            background: isMe ? 'rgba(255,255,255,0.18)' : 'var(--bg-surface)',
+                            border: isMe ? '1px solid rgba(255,255,255,0.25)' : '1px solid var(--border)',
                             display: 'flex',
-                            alignItems: 'center',
+                            flexDirection: 'column',
                             gap: 8,
                           }}>
-                            <span style={{ fontSize: 22 }}>
-                              {msg.fileAttachment.type === 'image' ? '🖼️' : '📄'}
-                            </span>
-                            <div style={{ flex: 1, overflow: 'hidden' }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {msg.fileAttachment.name}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 24, flexShrink: 0 }}>
+                                {msg.fileAttachment.type === 'audio' || msg.fileAttachment.name.endsWith('.webm') || msg.fileAttachment.name.endsWith('.mp3') || msg.fileAttachment.name.endsWith('.wav') ? '🎙️' : msg.fileAttachment.type === 'image' ? '🖼️' : msg.fileAttachment.type === 'pdf' ? '📄' : '📎'}
+                              </span>
+                              <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <div style={{ fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {msg.fileAttachment.name}
+                                </div>
+                                <div style={{ fontSize: 11, opacity: 0.8 }}>{msg.fileAttachment.size}</div>
                               </div>
-                              <div style={{ fontSize: 11, opacity: 0.8 }}>{msg.fileAttachment.size}</div>
+                              <Button
+                                size="xs"
+                                variant={isMe ? 'ghost' : 'secondary'}
+                                onClick={() => handleDownloadAttachment(msg.fileAttachment!)}
+                                style={isMe ? { color: '#ffffff', borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.1)' } : undefined}
+                              >
+                                ⬇ Download
+                              </Button>
                             </div>
-                            <Button
-                              size="xs"
-                              variant="secondary"
-                              onClick={() => toast({ variant: 'info', title: 'Downloading file', message: msg.fileAttachment?.name })}
-                            >
-                              Download
-                            </Button>
+
+                            {/* Inline Audio Player for Voice Messages */}
+                            {(msg.fileAttachment.type === 'audio' || msg.fileAttachment.name.endsWith('.webm') || msg.fileAttachment.name.endsWith('.mp3') || msg.fileAttachment.name.endsWith('.wav') || msg.fileAttachment.name.endsWith('.ogg') || msg.fileAttachment.name.endsWith('.m4a') || msg.fileAttachment.url.startsWith('data:audio/')) && (
+                              <audio
+                                controls
+                                preload="metadata"
+                                src={msg.fileAttachment.url}
+                                style={{
+                                  width: '100%',
+                                  height: 36,
+                                  borderRadius: 8,
+                                  marginTop: 4,
+                                  outline: 'none',
+                                }}
+                              />
+                            )}
+
+                            {/* Inline Image Preview */}
+                            {msg.fileAttachment.type === 'image' && msg.fileAttachment.url && msg.fileAttachment.url !== '#' && (
+                              <img
+                                src={msg.fileAttachment.url}
+                                alt={msg.fileAttachment.name}
+                                style={{
+                                  maxWidth: '100%',
+                                  maxHeight: 200,
+                                  borderRadius: 6,
+                                  objectFit: 'contain',
+                                  cursor: 'pointer',
+                                  marginTop: 4,
+                                }}
+                                onClick={() => handleDownloadAttachment(msg.fileAttachment!)}
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* 1-Week Retention Expiry Notice (if attachment was pruned) */}
+                        {msg.hadAttachmentExpired && (
+                          <div style={{
+                            marginTop: 6,
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            background: isMe ? 'rgba(255,255,255,0.12)' : 'var(--bg-surface)',
+                            fontSize: 11,
+                            fontStyle: 'italic',
+                            opacity: 0.75,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}>
+                            <span>📎</span> <span>Attachment cleared (1-week storage retention limit)</span>
                           </div>
                         )}
                       </div>
@@ -1647,6 +1822,15 @@ export function ChatChannels() {
             </div>
           )}
 
+          {/* Hidden Real File Input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileInputChange}
+            style={{ display: 'none' }}
+            accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+          />
+
           {/* Attachment Menu Popup */}
           {showAttachmentMenu && (
             <div style={{
@@ -1660,29 +1844,33 @@ export function ChatChannels() {
               display: 'flex',
               flexDirection: 'column',
               zIndex: 100,
-              width: 190,
+              width: 220,
+              overflow: 'hidden',
             }}>
               {[
-                { label: '🖼️ Image File', type: 'image', name: 'Dashboard_Screen.png', size: '1.4 MB' },
-                { label: '📄 PDF Document', type: 'pdf', name: 'Training_Syllabus.pdf', size: '380 KB' },
-                { label: '📊 Excel Sheet', type: 'file', name: 'Q3_Payroll_Records.xlsx', size: '2.1 MB' },
-                { label: '🗂️ Zip Archive', type: 'file', name: 'Assets_Bundle.zip', size: '12.4 MB' },
+                { label: '📁 Upload File from Device...', action: () => fileInputRef.current?.click() },
+                { label: '🖼️ Photos & Images', action: () => fileInputRef.current?.click() },
+                { label: '📄 Documents & PDFs', action: () => fileInputRef.current?.click() },
+                { label: '🎙️ Record Voice Note', action: () => { setShowAttachmentMenu(false); startRecording(); } },
               ].map((item, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => {
-                    setComposerAttachment({ name: item.name, type: item.type as any, url: '#', size: item.size });
+                    item.action();
                     setShowAttachmentMenu(false);
                   }}
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
+                    padding: '10px 14px',
                     textAlign: 'left',
                     background: 'none',
                     border: 'none',
+                    borderBottom: idx < 3 ? '1px solid var(--border-subtle, rgba(0,0,0,0.05))' : 'none',
                     fontSize: 13,
+                    fontWeight: 600,
                     cursor: 'pointer',
+                    color: 'var(--text-primary)',
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
@@ -1743,17 +1931,18 @@ export function ChatChannels() {
             <button
               type="button"
               onClick={isRecording ? () => stopRecording(false) : startRecording}
-              title="Record Voice Note"
+              title={isRecording ? 'Stop Recording' : 'Record Voice Note'}
               style={{
                 width: 36,
                 height: 36,
                 borderRadius: 'var(--radius-md)',
-                border: isRecording ? '1px solid #d32f2f' : '1px solid var(--border)',
+                border: isRecording ? '1.5px solid #d32f2f' : '1px solid var(--border)',
                 background: isRecording ? '#ffebeb' : 'var(--bg-surface)',
                 cursor: 'pointer',
                 fontSize: 17,
                 display: 'grid',
                 placeItems: 'center',
+                animation: isRecording ? 'pulse 1s infinite' : 'none',
               }}
             >
               🎙️

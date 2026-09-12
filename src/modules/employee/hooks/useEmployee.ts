@@ -15,7 +15,16 @@ export function useEmployee() {
     setLoading(true);
     const res = await service.listEmployees();
     if (res.ok) {
-      setEmployees(Array.isArray(res.value) ? res.value : []);
+      const raw = Array.isArray(res.value) ? res.value : [];
+      const seen = new Set<string>();
+      const unique = raw.filter((emp) => {
+        if (!emp || !emp.id) return false;
+        const key = emp.id.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setEmployees(unique);
       setError(null);
     } else {
       setEmployees([]);
