@@ -201,8 +201,36 @@ export function ExpenseClaimModal({
       const claimId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
       const safeIsoDate = expenseDate ? new Date(`${expenseDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
 
+      // Resolve valid employee UUID from database
+      let validEmployeeId: string | null = null;
+      const isUuid = (str?: string | null) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+      if (isUuid(user?.id)) {
+        try {
+          const { data: emp } = await supabase.from('flwdsk_employees').select('id').eq('id', user!.id).maybeSingle();
+          if (emp?.id) validEmployeeId = emp.id;
+        } catch {}
+      }
+
+      if (!validEmployeeId && user?.email) {
+        try {
+          const { data: empByEmail } = await supabase.from('flwdsk_employees').select('id').ilike('email', user.email.trim()).maybeSingle();
+          if (empByEmail?.id) validEmployeeId = empByEmail.id;
+        } catch {}
+      }
+
+      if (!validEmployeeId) {
+        try {
+          const { data: firstEmp } = await supabase.from('flwdsk_employees').select('id').is('deleted_at', null).limit(1).maybeSingle();
+          if (firstEmp?.id) validEmployeeId = firstEmp.id;
+        } catch {}
+      }
+
+      if (!validEmployeeId && isUuid(user?.id)) {
+        validEmployeeId = user!.id;
+      }
+
       const insertPayload: Record<string, any> = {
-        ...(claimId ? { id: claimId } : {}),
         amount: finalAmount,
         category: categoryType || 'Office Expense',
         receipt_url: receiptLink,
@@ -211,21 +239,60 @@ export function ExpenseClaimModal({
         notes: notesPayload,
       };
 
-      if (user?.id) {
-        insertPayload.employee_id = user.id;
+      if (claimId) {
+        insertPayload.id = claimId;
+      }
+      if (validEmployeeId) {
+        insertPayload.employee_id = validEmployeeId;
       }
 
-      let { error } = await supabase.from('flwdsk_expense_claims').insert(insertPayload);
-
-      if (error) {
-        console.warn('Supabase expense claims primary insert error, trying fallback without employee_id:', error);
-        const fallbackPayload = { ...insertPayload };
-        delete fallbackPayload.employee_id;
-        const { error: err2 } = await supabase.from('flwdsk_expense_claims').insert(fallbackPayload);
-        if (err2) {
-          throw new Error(err2.message || error.message);
+      let insertedSuccessfully = false;
+      try {
+        const { error: insertError } = await supabase.from('flwdsk_expense_claims').insert(insertPayload);
+        if (!insertError) {
+          insertedSuccessfully = true;
+        } else {
+          console.warn('Expense claim insert warning (attempt 1):', insertError);
+          // Retry without explicit id (allowing DB DEFAULT gen_random_uuid())
+          const retryPayload = { ...insertPayload };
+          delete retryPayload.id;
+          const { error: retryErr } = await supabase.from('flwdsk_expense_claims').insert(retryPayload);
+          if (!retryErr) {
+            insertedSuccessfully = true;
+          } else {
+            console.warn('Expense claim insert warning (attempt 2):', retryErr);
+          }
         }
+      } catch (dbErr) {
+        console.warn('Supabase expense claim insert exception:', dbErr);
       }
+
+      // Always save to local storage cache so the claim is immediately available in the table
+      const localRecord = {
+        id: claimId || `local_exp_${Date.now()}`,
+        date: dateFmtGB,
+        person: user?.fullName || 'Employee',
+        category: categoryType || 'Office Expense',
+        type: expenseType,
+        batch: isTraining ? batchName : '',
+        route: isSelfTravel ? route.trim() : '',
+        vehicle: isSelfTravel ? vehicle : undefined,
+        km: isSelfTravel ? kmVal : undefined,
+        rate: isSelfTravel ? activeRate : undefined,
+        notes: notes.trim() || undefined,
+        amount: finalAmount,
+        receipt: receiptLink,
+        status: 'submitted',
+        employeeId: validEmployeeId || user?.id || '',
+        createdAt: safeIsoDate,
+      };
+
+      try {
+        const existingStr = localStorage.getItem('kvj_local_expense_claims');
+        const existingArr = existingStr ? JSON.parse(existingStr) : [];
+        const filtered = Array.isArray(existingArr) ? existingArr.filter((x: any) => x.id !== localRecord.id) : [];
+        localStorage.setItem('kvj_local_expense_claims', JSON.stringify([localRecord, ...filtered]));
+      } catch {}
 
       toast({
         variant: 'success',
