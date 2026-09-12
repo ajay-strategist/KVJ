@@ -311,6 +311,7 @@ export function ExpenseClaims() {
   // Async lock states
   const [submittingClaim, setSubmittingClaim] = useState(false);
   const [processingAction, setProcessingAction] = useState(false);
+  const [isLoadingClaims, setIsLoadingClaims] = useState(true);
 
   // Load central travel rates from system settings on mount
   useEffect(() => {
@@ -407,6 +408,7 @@ export function ExpenseClaims() {
 
   const loadClaims = useCallback(async () => {
     if (!user) return;
+    setIsLoadingClaims(true);
     try {
       let query = supabase
         .from('flwdsk_expense_claims')
@@ -482,6 +484,8 @@ export function ExpenseClaims() {
       }
     } catch (e) {
       console.warn('Could not load expense_claims:', e);
+    } finally {
+      setIsLoadingClaims(false);
     }
   }, [user, isManagement]);
 
@@ -997,21 +1001,21 @@ export function ExpenseClaims() {
         title="Expense Claims & Reimbursements"
         subtitle="Conditional expense filing, auto-calculated travel KM rates, and locked approval audit trails"
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', overflowX: 'auto', maxWidth: '100%', paddingBottom: 2 }}>
             {isManagement && (
-              <Button variant="secondary" onClick={() => setRateModalOpen(true)}>⚙️ Travel Rates (KM)</Button>
+              <Button variant="secondary" onClick={() => setRateModalOpen(true)} style={{ whiteSpace: 'nowrap' }}>⚙️ Travel Rates (KM)</Button>
             )}
             {isManagement && (
               <>
                 <Button
-                  style={{ background: 'var(--status-success)', color: 'white' }}
+                  style={{ background: 'var(--status-success)', color: 'white', whiteSpace: 'nowrap' }}
                   onClick={() => handleBulkAction('approve')}
                   disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                 >
                   ✓ Bulk Approve ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
                 </Button>
                 <Button
-                  style={{ background: 'var(--status-danger)', color: 'white' }}
+                  style={{ background: 'var(--status-danger)', color: 'white', whiteSpace: 'nowrap' }}
                   onClick={() => handleBulkAction('reject')}
                   disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                 >
@@ -1021,12 +1025,13 @@ export function ExpenseClaims() {
                   variant="danger"
                   onClick={() => handleBulkAction('delete')}
                   disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
+                  style={{ whiteSpace: 'nowrap' }}
                 >
                   🗑️ Delete ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
                 </Button>
               </>
             )}
-            <Button onClick={() => setExpenseOpen(true)}>Submit Expense Claim</Button>
+            <Button onClick={() => setExpenseOpen(true)} style={{ whiteSpace: 'nowrap' }}>Submit Expense Claim</Button>
           </div>
         }
       />
@@ -1195,7 +1200,11 @@ export function ExpenseClaims() {
           </div>
         </div>
 
-        {filteredExpenses.length === 0 ? (
+        {isLoadingClaims ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: 14, gap: 10 }}>
+            <span style={{ fontSize: 20 }}>⏳</span> Loading expense claims...
+          </div>
+        ) : filteredExpenses.length === 0 ? (
           <EmptyState
             title="No expense claims found"
             message="No records match your selected search query or filter criteria."

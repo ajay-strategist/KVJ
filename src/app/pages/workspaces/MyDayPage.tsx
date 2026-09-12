@@ -1258,9 +1258,10 @@ export const TaskWidget = memo(function TaskWidget({
                   boxShadow: 'var(--e1)',
                 }}
               >
-                 {/* Task Details Header */}
-                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 0 }}>
+                 {/* Task Details Header — two-row on mobile to prevent text squishing */}
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                   {/* Row 1: Drag handle + expand + title */}
+                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                      <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4, flexShrink: 0 }}>⣿</span>
                      <button
                        type="button"
@@ -1284,12 +1285,14 @@ export const TaskWidget = memo(function TaskWidget({
                      >
                        {isExpanded ? '▼' : '▶'}
                      </button>
-                     <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: '1.4', wordBreak: 'break-word' }}>
+                     <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: '1.4', wordBreak: 'break-word', flex: '1 1 auto', minWidth: 0 }}>
                        <strong style={{ fontWeight: 700 }}>{t.project && t.project !== 'Office Task' ? t.project : 'Office Task'}:</strong> {t.title}
                      </div>
                       {t.isRework && <span style={{ flexShrink: 0 }}><Badge tone="warning">🔄 Rework</Badge></span>}
                    </div>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+                   {/* Row 2: Timer + Actions */}
+                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingLeft: 48 }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                      {(() => {
                        const isMyAssignee = Boolean(
                          user?.id && (
@@ -1363,6 +1366,7 @@ export const TaskWidget = memo(function TaskWidget({
                           })()
                         )}
                      </div>
+                   </div>
                    </div>
                  </div>
 

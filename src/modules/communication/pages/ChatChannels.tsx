@@ -12,6 +12,7 @@ import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { container } from '../../../core/registry';
 import { CHAT_CHANNEL_REPOSITORY_TOKEN, type ChannelType } from '../communication.repository';
+import { useBreakpoint } from '../../../shared/hooks/responsive';
 
 export type ChannelCategory = 'announcement' | 'department' | 'dm' | 'starred' | 'archived';
 export type LeftPanelState = 'expanded' | 'slim' | 'hidden';
@@ -45,6 +46,7 @@ export function ChatChannels() {
   const { toast } = useNotifications();
   const { confirm } = useDialog();
   const { employees, loading: employeesLoading } = useEmployee();
+  const isMobile = !useBreakpoint('md');
 
   // Active channel
   const [activeChannelId, setActiveChannelId] = useState<string>('');
@@ -537,13 +539,16 @@ export function ChatChannels() {
 
   // Compute CSS grid columns dynamically based on collapse states
   const gridColumns = useMemo(() => {
+    // On mobile: always single column — channel list goes in a drawer
+    if (isMobile) return '1fr';
+
     let leftWidth = '0px';
     if (leftPanelState === 'expanded') leftWidth = '300px';
     else if (leftPanelState === 'slim') leftWidth = '68px';
 
     const rightWidth = showRightPanel ? '320px' : '0px';
     return `${leftWidth} 1fr ${rightWidth}`.trim();
-  }, [leftPanelState, showRightPanel]);
+  }, [leftPanelState, showRightPanel, isMobile]);
 
   return (
     <AppShell>
@@ -637,8 +642,71 @@ export function ChatChannels() {
       {/* ── Main Chat Outer Grid Layout ── */}
       <div className="kvj-chat-grid" style={{ gridTemplateColumns: gridColumns }}>
 
-        {/* ── 1. Left Sidebar (Collapsible: Expanded | Slim Rail | Hidden) ── */}
-        {leftPanelState !== 'hidden' && (
+        {/* ── Mobile: Channel List Drawer ── */}
+        {isMobile && (
+          <Drawer
+            open={mobileDrawerOpen}
+            onClose={() => setMobileDrawerOpen(false)}
+            title="💬 Channels & Messages"
+            size="full"
+          >
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <Button style={{ flex: 1 }} size="sm" onClick={() => { setCreateChannelOpen(true); setMobileDrawerOpen(false); }}>
+                💬 Create Group
+              </Button>
+              <Button style={{ flex: 1 }} size="sm" variant="secondary" onClick={() => { setCreateDmOpen(true); setMobileDrawerOpen(false); }}>
+                👤 New Chat
+              </Button>
+            </div>
+            <SearchInput value={channelSearch} onChange={setChannelSearch} placeholder="Jump to channel or colleague..." />
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {(Object.keys(CATEGORY_LABELS) as ChannelCategory[]).map((catKey) => {
+                const { label, icon } = CATEGORY_LABELS[catKey];
+                const catChannels = categorizedChannels[catKey] || [];
+                const isOpen = openCategories[catKey] ?? true;
+                return (
+                  <div key={catKey}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenCategories((p) => ({ ...p, [catKey]: !isOpen }))}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px', fontWeight: 700, fontSize: 12, color: 'var(--text-secondary)', letterSpacing: '0.04em' }}
+                    >
+                      <span>{icon} {label.toUpperCase()} ({catChannels.length})</span>
+                      <span>{isOpen ? '▼' : '▶'}</span>
+                    </button>
+                    {isOpen && catChannels.map((c) => {
+                      const active = c.id === activeChannelId;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => { handleSelectChannel(c.id); setMobileDrawerOpen(false); }}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', background: active ? 'var(--brand-light, rgba(99,102,241,0.1))' : 'transparent', color: active ? 'var(--brand)' : 'var(--text-primary)', fontWeight: active ? 700 : 400, fontSize: 14, marginBottom: 2 }}
+                        >
+                          {c.type === 'direct' ? (
+                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                              <Avatar name={c.name} src={c.dmParticipant?.avatarUrl} size={28} />
+                              <span style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: c.dmParticipant?.status === 'active' ? '#22c55e' : '#94a3b8', border: '1.5px solid var(--bg-surface)' }} />
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 16, fontWeight: 800, color: active ? 'var(--brand)' : 'var(--text-muted)', width: 28, textAlign: 'center' }}>#</span>
+                          )}
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          {c.unreadCount > 0 && (
+                            <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: 'var(--brand)', color: 'white', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{c.unreadCount}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </Drawer>
+        )}
+
+        {/* ── 1. Left Sidebar — Desktop only ── */}
+        {!isMobile && leftPanelState !== 'hidden' && (
           <div className="kvj-chat-panel">
             {/* Expanded State Header */}
             {leftPanelState === 'expanded' ? (
@@ -872,27 +940,49 @@ export function ChatChannels() {
             gap: 12,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {/* Left Panel Collapse Toggle Button */}
-              <button
-                type="button"
-                onClick={toggleLeftPanelMode}
-                title={leftPanelState === 'expanded' ? "Switch to Slim Rail" : "Expand Channels Sidebar"}
-                style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border)',
-                  padding: '5px 9px',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                {leftPanelState === 'expanded' ? '◀ Slim View' : '▶ Expand Channels'}
-              </button>
+              {/* Left Panel Collapse Toggle — desktop only; mobile gets drawer button */}
+              {isMobile ? (
+                <button
+                  type="button"
+                  onClick={() => setMobileDrawerOpen(true)}
+                  style={{
+                    background: 'var(--brand)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '7px 12px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  ☰ Channels
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={toggleLeftPanelMode}
+                  title={leftPanelState === 'expanded' ? "Switch to Slim Rail" : "Expand Channels Sidebar"}
+                  style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    padding: '5px 9px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  {leftPanelState === 'expanded' ? '◀ Slim View' : '▶ Expand Channels'}
+                </button>
+              )}
 
               {/* Focus Mode Button */}
               <button
@@ -1691,8 +1781,8 @@ export function ChatChannels() {
           </form>
         </div>
 
-        {/* ── 3. Right Panel (Room Specifications & Pin List) ── */}
-        {showRightPanel && (
+        {/* ── 3. Right Panel (Room Specifications & Pin List) — desktop only ── */}
+        {showRightPanel && !isMobile && (
           <div className="kvj-chat-panel">
             <div style={{ padding: 14, borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
               <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>
