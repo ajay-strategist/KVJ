@@ -2708,10 +2708,13 @@ export function MyDayPage() {
     const taskIdToPause = runningTask?.id || targetTaskId;
 
     if (taskIdToPause) {
-      const targetTask = tasks.find((t) => t.id === taskIdToPause) || (projectTasks || []).find((t) => t.id === taskIdToPause);
+      const matchingTaskItem = tasks.find((t) => t.id === taskIdToPause);
+      const targetTask = matchingTaskItem || (projectTasks || []).find((t) => t.id === taskIdToPause);
       taskTimerStore.pauseTask(taskIdToPause);
       const timer = taskTimerStore.getTimer(taskIdToPause);
-      const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : (targetTask?.secondsToday || 0);
+      const secondsToday = timer
+        ? Math.floor(timer.elapsedMs / 1000)
+        : (matchingTaskItem?.secondsToday ?? Math.round(((targetTask as any)?.actualHours || 0) * 3600));
 
       setTasks((prev) =>
         prev.map((t) => (t.id === taskIdToPause ? { ...t, active: false, secondsToday } : t))
