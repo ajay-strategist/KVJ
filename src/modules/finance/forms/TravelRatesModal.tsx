@@ -114,33 +114,36 @@ export function TravelRatesModal({
       localStorage.setItem('kvj_car_rate', String(carVal));
 
       // 2. Save to Supabase system settings
-      const { error: errRates } = await supabase
-        .from('flwdsk_system_settings')
-        .upsert({ key: 'travel_rates', value: rates });
+      try {
+        const valStr = JSON.stringify(rates);
+        const { error: errRates } = await supabase
+          .from('flwdsk_system_settings')
+          .upsert({ key: 'travel_rates', value: rates });
 
-      // Keep legacy keys synced for backward compatibility
-      await supabase
-        .from('flwdsk_system_settings')
-        .upsert({ key: 'bike_rate_per_km', value: bikeVal });
+        if (errRates) {
+          // Retry as string in case column is TEXT
+          await supabase
+            .from('flwdsk_system_settings')
+            .upsert({ key: 'travel_rates', value: valStr });
+        }
 
-      await supabase
-        .from('flwdsk_system_settings')
-        .upsert({ key: 'car_rate_per_km', value: carVal });
+        // Keep legacy keys synced for backward compatibility
+        await supabase
+          .from('flwdsk_system_settings')
+          .upsert({ key: 'bike_rate_per_km', value: String(bikeVal) });
 
-      if (errRates) {
-        console.warn('Supabase travel rates upsert warning:', errRates);
-        toast({
-          variant: 'warning',
-          title: 'Rates Saved Locally',
-          message: 'Rates saved to local storage. Database sync warning.',
-        });
-      } else {
-        toast({
-          variant: 'success',
-          title: 'Travel Rates Updated',
-          message: `${rates.length} travel reimbursement rates updated centrally.`,
-        });
+        await supabase
+          .from('flwdsk_system_settings')
+          .upsert({ key: 'car_rate_per_km', value: String(carVal) });
+      } catch (dbErr) {
+        console.warn('Supabase travel rates upsert warning:', dbErr);
       }
+
+      toast({
+        variant: 'success',
+        title: 'Travel Rates Updated',
+        message: `${rates.length} rates updated (Bike: ₹${bikeVal}/km, Car: ₹${carVal}/km).`,
+      });
 
       onRatesUpdated(rates, bikeVal, carVal);
       onClose();

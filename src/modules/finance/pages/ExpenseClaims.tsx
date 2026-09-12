@@ -944,6 +944,8 @@ export function ExpenseClaims() {
     toast({ variant: 'success', title: 'Exported', message: `Downloaded ${rows.length} expense record(s) as Excel.` });
   }, [filteredExpenses, toast]);
 
+  const selectedCount = Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length;
+
   return (
     <AppShell>
       <div style={{ flexShrink: 0 }}>
@@ -951,37 +953,34 @@ export function ExpenseClaims() {
         title="Expense Claims & Reimbursements"
         subtitle="Conditional expense filing, auto-calculated travel KM rates, and locked approval audit trails"
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', overflowX: 'auto', maxWidth: '100%', paddingBottom: 2 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
             {isManagement && (
               <Button variant="secondary" onClick={() => setRateModalOpen(true)} style={{ whiteSpace: 'nowrap' }}>⚙️ Travel Rates (KM)</Button>
             )}
-            {isManagement && (
+            {isManagement && selectedCount > 0 && (
               <>
                 <Button
                   style={{ background: 'var(--status-success)', color: 'white', whiteSpace: 'nowrap' }}
                   onClick={() => handleBulkAction('approve')}
-                  disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                 >
-                  ✓ Bulk Approve ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  ✓ Bulk Approve ({selectedCount})
                 </Button>
                 <Button
                   style={{ background: 'var(--status-danger)', color: 'white', whiteSpace: 'nowrap' }}
                   onClick={() => handleBulkAction('reject')}
-                  disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                 >
-                  ✕ Bulk Reject ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  ✕ Bulk Reject ({selectedCount})
                 </Button>
                 <Button
                   variant="danger"
                   onClick={() => handleBulkAction('delete')}
-                  disabled={Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length === 0}
                   style={{ whiteSpace: 'nowrap' }}
                 >
-                  🗑️ Delete ({Object.keys(selectedExpenses).filter((k) => selectedExpenses[k]).length})
+                  🗑️ Delete ({selectedCount})
                 </Button>
               </>
             )}
-            <Button onClick={() => setExpenseOpen(true)} style={{ whiteSpace: 'nowrap' }}>Submit Expense Claim</Button>
+            <Button onClick={() => setExpenseOpen(true)} style={{ whiteSpace: 'nowrap' }}>+ Submit Expense Claim</Button>
           </div>
         }
       />
