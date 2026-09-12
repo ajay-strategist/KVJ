@@ -33,6 +33,7 @@ export interface ChatMessage extends Entity {
   isEdited?: boolean;
   isDeleted?: boolean;
   isPinned?: boolean;
+  isImportant?: boolean;
   fileAttachment?: { name: string; type: 'image' | 'pdf' | 'file' | 'audio'; url: string; size: string };
   replyToMessage?: { id: string; senderName: string; text: string };
 }

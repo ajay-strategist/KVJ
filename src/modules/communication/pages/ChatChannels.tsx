@@ -175,6 +175,7 @@ export function ChatChannels() {
     deleteMessage: hookDeleteMessage,
     toggleReaction: hookToggleReaction,
     togglePinMessage: hookTogglePinMessage,
+    toggleImportantMessage: hookToggleImportantMessage,
     sendTypingStatus,
     createChannel: hookCreateChannel,
     refresh,
@@ -267,9 +268,14 @@ export function ChatChannels() {
         reactionsGrouped[r.reaction].push(rName);
       });
 
-      // 1-Week (7-day) retention policy: clear/expire attachment payloads on messages older than 7 days to preserve storage space
-      const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-      const isExpired = m.createdAt ? (Date.now() - new Date(m.createdAt).getTime() > ONE_WEEK_MS) : false;
+      // Message & Attachment Retention Policy:
+      // - Standard messages & attachments: 7 days (1 week)
+      // - Important / Pinned messages: 14 days (2 weeks) extended retention
+      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+      const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+      const isImportant = !!(m.isImportant || m.isPinned);
+      const retentionLimitMs = isImportant ? FOURTEEN_DAYS_MS : SEVEN_DAYS_MS;
+      const isExpired = m.createdAt ? (Date.now() - new Date(m.createdAt).getTime() > retentionLimitMs) : false;
       const fileAttachment = isExpired ? undefined : m.fileAttachment;
       const hadAttachmentExpired = isExpired && !!m.fileAttachment;
 
@@ -285,6 +291,8 @@ export function ChatChannels() {
         rawDate: m.createdAt,
         reactions: reactionsGrouped,
         isPinned: m.isPinned,
+        isImportant: m.isImportant,
+        isEffectivelyImportant: isImportant,
         isEdited: m.isEdited,
         isDeleted: m.isDeleted,
         fileAttachment,
@@ -1384,6 +1392,22 @@ export function ChatChannels() {
                         <span style={{ fontSize: 10, opacity: 0.7 }}>{msg.senderRole}</span>
                         <span>{msg.createdAt}</span>
                         {msg.isPinned && <span>📌</span>}
+                        {msg.isImportant && (
+                          <span style={{
+                            background: 'rgba(234, 179, 8, 0.15)',
+                            color: '#ca8a04',
+                            border: '1px solid rgba(234, 179, 8, 0.3)',
+                            borderRadius: 12,
+                            padding: '1px 6px',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                          }}>
+                            ⭐ Important (14d)
+                          </span>
+                        )}
                         {msg.isEdited && <span style={{ fontStyle: 'italic' }}>(edited)</span>}
                       </div>
 
@@ -1491,7 +1515,7 @@ export function ChatChannels() {
                           </div>
                         )}
 
-                        {/* 1-Week Retention Expiry Notice (if attachment was pruned) */}
+                        {/* Retention Expiry Notice (if attachment was pruned) */}
                         {msg.hadAttachmentExpired && (
                           <div style={{
                             marginTop: 6,
@@ -1505,7 +1529,7 @@ export function ChatChannels() {
                             alignItems: 'center',
                             gap: 4,
                           }}>
-                            <span>📎</span> <span>Attachment cleared (1-week storage retention limit)</span>
+                            <span>📎</span> <span>Attachment cleared ({msg.isEffectivelyImportant ? '14-day important retention limit' : '7-day storage retention limit'})</span>
                           </div>
                         )}
                       </div>
@@ -1565,6 +1589,22 @@ export function ChatChannels() {
                         >
                           📌
                         </button>
+                        <button
+                          type="button"
+                          className="kvj-action-btn"
+                          title={msg.isImportant ? 'Unmark important (revert to 7-day retention)' : 'Mark as Important (Keep 14 days)'}
+                          onClick={() => {
+                            hookToggleImportantMessage(msg.id as UUID);
+                            toast({
+                              variant: 'info',
+                              title: msg.isImportant ? 'Unmarked Important' : 'Marked Important',
+                              message: msg.isImportant ? 'Message follows standard 7-day retention.' : 'Message retained for 14 days.',
+                            });
+                          }}
+                          style={{ color: msg.isImportant ? '#eab308' : undefined, fontWeight: msg.isImportant ? 800 : 400 }}
+                        >
+                          {msg.isImportant ? '★' : '☆'}
+                        </button>
 
                         {/* More Menu Dropdown Toggle */}
                         <div style={{ position: 'relative' }}>
@@ -1590,9 +1630,24 @@ export function ChatChannels() {
                               display: 'flex',
                               flexDirection: 'column',
                               gap: 2,
-                              minWidth: 120,
+                              minWidth: 150,
                               zIndex: 99999,
                             }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  hookToggleImportantMessage(msg.id as UUID);
+                                  setActiveMessageActionId(null);
+                                  toast({
+                                    variant: 'info',
+                                    title: msg.isImportant ? 'Unmarked Important' : 'Marked Important',
+                                    message: msg.isImportant ? 'Message follows standard 7-day retention.' : 'Message retained for 14 days.',
+                                  });
+                                }}
+                                style={{ padding: '6px 10px', fontSize: 12, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}
+                              >
+                                <span>{msg.isImportant ? '★' : '⭐'}</span> <span>{msg.isImportant ? 'Unmark Important' : 'Mark Important (14d)'}</span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2020,30 +2075,42 @@ export function ChatChannels() {
                 </div>
               )}
 
-              {/* Pin list panel */}
+              {/* Important & Pinned Messages Panel (14-Day Retention) */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-                <h5 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 800, color: 'var(--text-secondary)' }}>
-                  📌 Pinned Messages ({currentMessages.filter((m) => m.isPinned).length})
+                <h5 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 800, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>⭐ Important & Pinned ({currentMessages.filter((m) => m.isPinned || m.isImportant).length})</span>
+                  <span style={{ fontSize: 10, color: 'var(--brand)', fontWeight: 700 }}>14d retention</span>
                 </h5>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {currentMessages.filter((m) => m.isPinned).map((pm) => (
-                    <div
-                      key={pm.id}
-                      style={{
-                        padding: 10,
-                        background: 'var(--bg-sunken)',
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: 12,
-                        border: '1px solid var(--border)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <strong>{pm.senderName}</strong>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{pm.createdAt}</span>
-                      </div>
-                      <div>{pm.text}</div>
+                  {currentMessages.filter((m) => m.isPinned || m.isImportant).length === 0 ? (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      No important or pinned messages in this conversation.
                     </div>
-                  ))}
+                  ) : (
+                    currentMessages.filter((m) => m.isPinned || m.isImportant).map((pm) => (
+                      <div
+                        key={pm.id}
+                        style={{
+                          padding: 10,
+                          background: pm.isImportant ? 'rgba(234, 179, 8, 0.08)' : 'var(--bg-sunken)',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: 12,
+                          border: pm.isImportant ? '1px solid rgba(234, 179, 8, 0.25)' : '1px solid var(--border)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
+                          <span style={{ fontWeight: 700 }}>{pm.senderName} {pm.isPinned ? '📌' : '⭐'}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{pm.createdAt}</span>
+                        </div>
+                        <div style={{ wordBreak: 'break-word', color: 'var(--text-primary)' }}>{pm.text}</div>
+                        {pm.fileAttachment && (
+                          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>📎</span> <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{pm.fileAttachment.name}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

@@ -233,6 +233,22 @@ export function useCommunication(activeChannelId?: UUID) {
     }
   }, [user, activeChannelId]);
 
+  const toggleImportantMessage = useCallback(async (messageId: UUID): Promise<CallbackResult<ChatMessage>> => {
+    if (!user || !activeChannelId) return { ok: false, error: 'Unauthenticated' };
+    try {
+      const msgRepo = container.resolve(CHAT_MESSAGE_REPOSITORY_TOKEN);
+      const msg = await msgRepo.findById(messageId);
+      if (!msg) return { ok: false, error: 'Message not found' };
+      msg.isImportant = !msg.isImportant;
+      const updated = await msgRepo.update(messageId, msg, { id: user.id, role: user.role });
+      setMessages((prev) => prev.map((m) => m.id === messageId ? updated : m));
+      chatSyncChannel?.postMessage({ type: 'message_updated', channelId: activeChannelId });
+      return { ok: true, value: updated };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  }, [user, activeChannelId]);
+
   const deleteMessage = useCallback(async (messageId: UUID): Promise<CallbackResult<void>> => {
     if (!user || !activeChannelId) return { ok: false, error: 'Unauthenticated' };
     try {
@@ -407,6 +423,7 @@ export function useCommunication(activeChannelId?: UUID) {
     editMessage,
     toggleReaction,
     togglePinMessage,
+    toggleImportantMessage,
     deleteMessage,
     sendTypingStatus,
     postAnnouncement,
