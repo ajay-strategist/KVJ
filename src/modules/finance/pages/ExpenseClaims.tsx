@@ -627,7 +627,7 @@ export function ExpenseClaims() {
 
       const isSelfTravel = values.expenseType === 'Self Travel';
       const km = Number(values.km || 0);
-      const vehicle = (values.vehicle || 'Bike') as string;
+      const vehicle = (values.vehicle || 'Bike') as 'Bike' | 'Car';
       const rate = getVehicleRate(vehicle);
       const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
       const expType = values.expenseType === '__NEW_TYPE__' ? (values.newTypeInput as string) : (values.expenseType as string) || 'Miscellaneous';

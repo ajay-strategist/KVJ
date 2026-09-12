@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, SectionHeader, Button } from '../../../shared/ui/components';
+import { PageHeader, SectionHeader, Button, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { Tabs } from '../../../shared/ui/Tabs';
 import { useLeave } from '../../leave/hooks/useLeave';
