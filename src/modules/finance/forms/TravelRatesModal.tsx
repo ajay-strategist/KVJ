@@ -59,8 +59,6 @@ export function TravelRatesModal({
     }
   }, [open, travelRates, initialBikeRate, initialCarRate]);
 
-  if (!open) return null;
-
   const handleRateChange = (index: number, field: keyof TravelRate, value: any) => {
     setRates((prev) => {
       const next = [...prev];

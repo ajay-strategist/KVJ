@@ -49,8 +49,6 @@ export function ExpenseClaimModal({
   const [newTypeInput, setNewTypeInput] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  if (!open) return null;
-
   const isSelfTravel = expenseType === 'Self Travel';
   const isTraining = categoryType === 'Training Expense';
 
