@@ -6,6 +6,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { googleIntegration } from '../../../shared/integration/google';
 import { supabase } from '../../../shared/integration/supabase';
 import type { TravelRate } from './TravelRatesModal';
+import { parseExpenseDateToYMD, formatDisplayDateGB } from '../pages/ExpenseClaims';
 
 export interface ExpenseClaimModalProps {
   open: boolean;
@@ -183,8 +184,8 @@ export function ExpenseClaimModal({
       }
 
       // Format date for display
-      const [y, m, d] = expenseDate.split('-');
-      const dateFmtGB = `${d}/${m}/${y}`;
+      const normalizedYMD = parseExpenseDateToYMD(expenseDate);
+      const dateFmtGB = formatDisplayDateGB(expenseDate);
 
       const notesPayload = JSON.stringify({
         personName: user?.fullName || 'Employee',
@@ -195,11 +196,11 @@ export function ExpenseClaimModal({
         km: isSelfTravel ? kmVal : undefined,
         rate: isSelfTravel ? activeRate : undefined,
         userNotes: notes.trim() || undefined,
-        expenseDate,
+        expenseDate: normalizedYMD,
       });
 
       const claimId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
-      const safeIsoDate = expenseDate ? new Date(`${expenseDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
+      const safeIsoDate = normalizedYMD ? new Date(`${normalizedYMD}T12:00:00.000Z`).toISOString() : new Date().toISOString();
 
       // Resolve valid employee UUID from database
       let validEmployeeId: string | null = null;

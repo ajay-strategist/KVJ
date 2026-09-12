@@ -46,6 +46,59 @@ export interface ExpenseRecord {
   approvedAt?: string;
 }
 
+export function parseExpenseDateToYMD(val?: string | Date | null): string {
+  if (!val || val === '—' || val === 'undefined' || val === 'null') return '1970-01-01';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '1970-01-01';
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const str = String(val).trim();
+  if (!str) return '1970-01-01';
+
+  // Check if starts with YYYY-MM-DD
+  const ymdMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (ymdMatch) {
+    const y = ymdMatch[1];
+    const m = ymdMatch[2].padStart(2, '0');
+    const d = ymdMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // Check if DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, '0');
+    const m = dmyMatch[2].padStart(2, '0');
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // Fallback to Date parser
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  return '1970-01-01';
+}
+
+export function formatDisplayDateGB(val?: string | Date | null): string {
+  if (!val || val === '—' || val === 'undefined' || val === 'null') return '—';
+  const ymd = parseExpenseDateToYMD(val);
+  if (ymd === '1970-01-01' && String(val).trim() !== '1970-01-01') return '—';
+  const parts = ymd.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return '—';
+}
+
 function DynamicExpenseForm({
   bikeRate,
   carRate,
@@ -453,19 +506,13 @@ export function ExpenseClaims() {
           let dateFmt = '—';
           const targetDateStr = expDateVal || r.created_at || '';
           if (targetDateStr) {
-            const cleanStr = targetDateStr.slice(0, 10);
-            const parts = cleanStr.split('-');
-            if (parts.length === 3) {
-              dateFmt = `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
-            } else {
-              dateFmt = new Date(targetDateStr).toLocaleDateString('en-GB');
-            }
+            dateFmt = formatDisplayDateGB(targetDateStr);
           }
 
           return {
             id: r.id,
             date: dateFmt,
-            person,
+            person: r.person || person,
             category: r.category || 'Office Expense',
             type,
             batch,
@@ -498,7 +545,7 @@ export function ExpenseClaims() {
         .filter((lc) => !existingIds.has(lc.id))
         .map((lc) => ({
           id: lc.id,
-          date: lc.date || (lc.createdAt ? new Date(lc.createdAt).toLocaleDateString('en-GB') : '—'),
+          date: formatDisplayDateGB(lc.date || lc.createdAt),
           person: lc.person || 'Employee',
           category: lc.category || 'Office Expense',
           type: lc.type || 'Self Travel',
@@ -564,10 +611,10 @@ export function ExpenseClaims() {
       .filter((exp) => {
         if (isManagement) {
           if (selectedPersonFilter !== 'all') {
-            if (exp.person.toLowerCase() !== selectedPersonFilter.toLowerCase()) return false;
+            if ((exp.person || '').toLowerCase() !== selectedPersonFilter.toLowerCase()) return false;
           }
         } else {
-          if (exp.person.toLowerCase() !== (user?.fullName || '').toLowerCase()) return false;
+          if ((exp.person || '').toLowerCase() !== (user?.fullName || '').toLowerCase()) return false;
         }
 
         if (categoryFilter !== 'all') {
@@ -580,21 +627,19 @@ export function ExpenseClaims() {
 
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
-          const matchName = exp.person.toLowerCase().includes(q);
-          const matchType = exp.type.toLowerCase().includes(q);
+          const matchName = (exp.person || '').toLowerCase().includes(q);
+          const matchType = (exp.type || '').toLowerCase().includes(q);
           const matchBatch = (exp.batch || '').toLowerCase().includes(q);
           const matchRoute = (exp.route || '').toLowerCase().includes(q);
           if (!matchName && !matchType && !matchBatch && !matchRoute) return false;
         }
 
         if (startDateFilter) {
-          const [d, m, y] = exp.date.split('/');
-          const expDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          const expDateStr = parseExpenseDateToYMD(exp.date);
           if (expDateStr < startDateFilter) return false;
         }
         if (endDateFilter) {
-          const [d, m, y] = exp.date.split('/');
-          const expDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          const expDateStr = parseExpenseDateToYMD(exp.date);
           if (expDateStr > endDateFilter) return false;
         }
 
@@ -605,16 +650,16 @@ export function ExpenseClaims() {
         let valB: any = b[sortBy];
 
         if (sortBy === 'date') {
-          const [dA, mA, yA] = a.date.split('/');
-          const [dB, mB, yB] = b.date.split('/');
-          valA = `${yA}-${mA.padStart(2, '0')}-${dA.padStart(2, '0')}`;
-          valB = `${yB}-${mB.padStart(2, '0')}-${dB.padStart(2, '0')}`;
+          valA = parseExpenseDateToYMD(a.date);
+          valB = parseExpenseDateToYMD(b.date);
         }
 
         if (typeof valA === 'string') {
-          return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+          return sortOrder === 'asc' ? valA.localeCompare(valB || '') : (valB || '').localeCompare(valA);
         } else {
-          return sortOrder === 'asc' ? valA - valB : valB - valA;
+          const numA = Number(valA) || 0;
+          const numB = Number(valB) || 0;
+          return sortOrder === 'asc' ? numA - numB : numB - numA;
         }
       });
   }, [
@@ -637,31 +682,9 @@ export function ExpenseClaims() {
     try {
       // 1. Normalize expense date FIRST so it is available for Google Drive folder and DB timestamps
       const rawDate = (values.expenseDate as string) || new Date().toISOString().slice(0, 10);
-      let safeIsoDate = new Date().toISOString();
-      let normalizedYMD = rawDate;
-      let dateFmtGB = rawDate;
-
-      if (rawDate) {
-        let yyyy = '', mm = '', dd = '';
-        if (rawDate.includes('-')) {
-          const p = rawDate.split('-');
-          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
-          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
-        } else if (rawDate.includes('/')) {
-          const p = rawDate.split('/');
-          if (p[0].length === 4) { [yyyy, mm, dd] = p; }
-          else if (p[2].length === 4) { [dd, mm, yyyy] = p; }
-        }
-
-        if (yyyy && mm && dd) {
-          normalizedYMD = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-          dateFmtGB = `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`;
-          const dObj = new Date(`${normalizedYMD}T12:00:00.000Z`);
-          if (!isNaN(dObj.getTime())) {
-            safeIsoDate = dObj.toISOString();
-          }
-        }
-      }
+      const normalizedYMD = parseExpenseDateToYMD(rawDate);
+      const dateFmtGB = formatDisplayDateGB(rawDate);
+      const safeIsoDate = normalizedYMD ? new Date(`${normalizedYMD}T12:00:00.000Z`).toISOString() : new Date().toISOString();
 
       const isSelfTravel = values.expenseType === 'Self Travel';
       const km = Number(values.km || 0);
