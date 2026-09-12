@@ -204,11 +204,11 @@ export function PageHeader({
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          gap: 16,
+          gap: 12,
           flexWrap: 'wrap',
         }}
       >
-        <div>
+        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
           <h1
             style={{
               margin: 0,
@@ -235,7 +235,7 @@ export function PageHeader({
           )}
         </div>
         {actions && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
             {actions}
           </div>
         )}

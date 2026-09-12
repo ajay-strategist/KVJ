@@ -2279,72 +2279,76 @@ export function AttendanceLogPage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <Card style={{ padding: '12px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>📅 Date Filter:</span>
-                <select
-                  className="kvj-select"
-                  value={activeFilterPreset}
-                  onChange={(e) => handleFilterPreset(e.target.value as any)}
-                  style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
-                >
-                  <option value="current_month">Current Month</option>
-                  <option value="last_month">Last Month</option>
-                  <option value="last_1_year">Last One Year</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-              </div>
-
-              {activeFilterPreset === 'custom' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-sunken)', padding: '4px 10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
-                  <input
-                    type="date"
-                    className="kvj-input"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    style={{ padding: '2px 6px', fontSize: 12 }}
-                  />
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
-                  <input
-                    type="date"
-                    className="kvj-input"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    style={{ padding: '2px 6px', fontSize: 12 }}
-                  />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Filter row: scrollable on mobile */}
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 'max-content' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>📅 Date Filter:</span>
+                  <select
+                    className="kvj-select"
+                    value={activeFilterPreset}
+                    onChange={(e) => handleFilterPreset(e.target.value as any)}
+                    style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
+                  >
+                    <option value="current_month">Current Month</option>
+                    <option value="last_month">Last Month</option>
+                    <option value="last_1_year">Last One Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
                 </div>
-              )}
 
-              {isManagement && (
-                <>
-                  <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Employee:</span>
-                    <select
-                      className="kvj-select"
-                      value={selectedEmployee}
-                      onChange={(e) => setSelectedEmployee(e.target.value)}
-                      style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
-                    >
-                      <option value={user?.fullName || 'System Admin'}>Me ({user?.fullName || 'Personal'})</option>
-                      <option value="All Employees">All Employees (Manager Access)</option>
-                      {employeeNames.filter((name) => name !== user?.fullName).map((name) => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
+                {activeFilterPreset === 'custom' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-sunken)', padding: '4px 10px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
+                    <input
+                      type="date"
+                      className="kvj-input"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      style={{ padding: '2px 6px', fontSize: 12 }}
+                    />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
+                    <input
+                      type="date"
+                      className="kvj-input"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      style={{ padding: '2px 6px', fontSize: 12 }}
+                    />
                   </div>
-                </>
-              )}
+                )}
+
+                {isManagement && (
+                  <>
+                    <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Employee:</span>
+                      <select
+                        className="kvj-select"
+                        value={selectedEmployee}
+                        onChange={(e) => setSelectedEmployee(e.target.value)}
+                        style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
+                      >
+                        <option value={user?.fullName || 'System Admin'}>Me ({user?.fullName || 'Personal'})</option>
+                        <option value="All Employees">All Employees (Manager Access)</option>
+                        {employeeNames.filter((name) => name !== user?.fullName).map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Action buttons row */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {isManagement && (
-                <Button variant="secondary" onClick={handleExportAllData} style={{ padding: '6px 16px', fontSize: 12 }}>
+                <Button variant="secondary" onClick={handleExportAllData} style={{ padding: '6px 16px', fontSize: 12, whiteSpace: 'nowrap' }}>
                   📥 Export Spreadsheet (Excel)
                 </Button>
               )}
-              <Button onClick={() => setSubmitDrawerOpen(true)} style={{ padding: '6px 16px', fontSize: 12 }}>
+              <Button onClick={() => setSubmitDrawerOpen(true)} style={{ padding: '6px 16px', fontSize: 12, whiteSpace: 'nowrap' }}>
                 📋 Submit Attendance
               </Button>
             </div>
