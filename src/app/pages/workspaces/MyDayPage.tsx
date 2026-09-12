@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { useDevice } from '../../../shared/hooks/responsive';
+import { useDevice, useBreakpoint } from '../../../shared/hooks/responsive';
 import { WorkspaceShell, type WorkspaceRole } from '../../../shared/workspace/WorkspaceShell';
 import { DashboardGrid } from '../../../shared/dashboard/dashboard';
 import { PageHeader, Card, SectionHeader, StatCard, QuickActionCard, Badge, Timeline, ActivityCard, Button } from '../../../shared/ui/components';
@@ -1060,6 +1060,7 @@ export const TaskWidget = memo(function TaskWidget({
   onSyncTask?: (id: string, secondsToday: number, active: boolean, underReview?: boolean) => void;
 }) {
   const { user } = useAuth();
+  const isDesktop = useBreakpoint('md');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const [showSubmitted, setShowSubmitted] = useState(false);
@@ -1258,117 +1259,226 @@ export const TaskWidget = memo(function TaskWidget({
                   boxShadow: 'var(--e1)',
                 }}
               >
-                 {/* Task Details Header — two-row on mobile to prevent text squishing */}
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                   {/* Row 1: Drag handle + expand + title */}
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                     <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4, flexShrink: 0 }}>⣿</span>
-                     <button
-                       type="button"
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         toggleExpand(t.id);
-                       }}
-                       style={{
-                         background: 'transparent',
-                         border: 'none',
-                         color: 'var(--text-muted)',
-                         cursor: 'pointer',
-                         fontSize: 11,
-                         padding: 4,
-                         display: 'flex',
-                         alignItems: 'center',
-                         justifyContent: 'center',
-                         flexShrink: 0
-                       }}
-                       aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
-                     >
-                       {isExpanded ? '▼' : '▶'}
-                     </button>
-                     <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: '1.4', wordBreak: 'break-word', flex: '1 1 auto', minWidth: 0 }}>
-                       <strong style={{ fontWeight: 700 }}>{t.project && t.project !== 'Office Task' ? t.project : 'Office Task'}:</strong> {t.title}
+                 {/* Task Details Header — desktop single row, mobile two-row */}
+                 {isDesktop ? (
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 0 }}>
+                       <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4, flexShrink: 0 }}>⣿</span>
+                       <button
+                         type="button"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           toggleExpand(t.id);
+                         }}
+                         style={{
+                           background: 'transparent',
+                           border: 'none',
+                           color: 'var(--text-muted)',
+                           cursor: 'pointer',
+                           fontSize: 11,
+                           padding: 4,
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           flexShrink: 0
+                         }}
+                         aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                       >
+                         {isExpanded ? '▼' : '▶'}
+                       </button>
+                       <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: '1.4', wordBreak: 'break-word', flex: '1 1 auto', minWidth: 0 }}>
+                         <strong style={{ fontWeight: 700 }}>{t.project && t.project !== 'Office Task' ? t.project : 'Office Task'}:</strong> {t.title}
+                       </div>
+                       {t.isRework && <span style={{ flexShrink: 0 }}><Badge tone="warning">🔄 Rework</Badge></span>}
                      </div>
-                      {t.isRework && <span style={{ flexShrink: 0 }}><Badge tone="warning">🔄 Rework</Badge></span>}
-                   </div>
-                   {/* Row 2: Timer + Actions */}
-                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingLeft: 48 }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                     {(() => {
-                       const isMyAssignee = Boolean(
-                         user?.id && (
-                           (t as any).assigneeId === user.id ||
-                           (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
-                         )
-                       );
-                       const totalHrsNum = (t.totalHoursWorked || 0) > 0 ? (t.totalHoursWorked || 0) : ((t.secondsToday || 0) / 3600);
-                       const totalHrsFormatted = `${Math.floor(totalHrsNum)}h ${Math.round((totalHrsNum % 1) * 60)}m`;
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+                       {(() => {
+                         const isMyAssignee = Boolean(
+                           user?.id && (
+                             (t as any).assigneeId === user.id ||
+                             (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
+                           )
+                         );
+                         const totalHrsNum = (t.totalHoursWorked || 0) > 0 ? (t.totalHoursWorked || 0) : ((t.secondsToday || 0) / 3600);
+                         const totalHrsFormatted = `${Math.floor(totalHrsNum)}h ${Math.round((totalHrsNum % 1) * 60)}m`;
 
-                       if (!isMyAssignee) {
+                         if (!isMyAssignee) {
+                           return (
+                             <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title="Total Hours Worked">
+                               ⏱ Total: {totalHrsFormatted}
+                             </span>
+                           );
+                         }
                          return (
-                           <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title="Total Hours Worked">
-                             ⏱ Total: {totalHrsFormatted}
+                           <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={`Today: ${formatSec(t.secondsToday)}${totalHrsNum > 0 ? ` · Total: ${totalHrsFormatted}` : ''}`}>
+                             ⏱ {formatSec(t.secondsToday)}
+                             {totalHrsNum > ((t.secondsToday || 0) / 3600) && (
+                               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginLeft: 6 }}>
+                                 (Total: {totalHrsFormatted})
+                               </span>
+                             )}
                            </span>
                          );
-                       }
-                       return (
-                         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={`Today: ${formatSec(t.secondsToday)}${totalHrsNum > 0 ? ` · Total: ${totalHrsFormatted}` : ''}`}>
-                           ⏱ {formatSec(t.secondsToday)}
-                           {totalHrsNum > ((t.secondsToday || 0) / 3600) && (
-                             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginLeft: 6 }}>
-                               (Total: {totalHrsFormatted})
-                             </span>
-                           )}
-                         </span>
-                       );
-                     })()}
-                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                       {t.isApproved ? (
-                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                           ✓ Approved &amp; Completed
-                         </span>
-                       ) : t.underReview ? (
-                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                           📩 Submitted &amp; Requires Approval
-                         </span>
-                       ) : (
-                          (() => {
-                            const isMyAssignee = Boolean(
-                              user?.id && (
-                                (t as any).assigneeId === user.id ||
-                                (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
-                              )
-                            );
-                            if (!isMyAssignee) {
-                              return (
-                                <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 6, border: '1px solid var(--border)' }}>
-                                  👁 Supervisor View
-                                </span>
-                              );
-                            }
-                            return (
-                              <>
-                                <Button
-                                  variant={t.active ? 'secondary' : 'primary'}
-                                  onClick={() => onToggleTask(t.id, t.title, t.active)}
-                                  style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
-                                >
-                                  {t.active ? '⏸ Pause' : '▶ Start'}
-                                </Button>
+                       })()}
+                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                         {t.isApproved ? (
+                           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                             ✓ Approved &amp; Completed
+                           </span>
+                         ) : t.underReview ? (
+                           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                             📩 Submitted &amp; Requires Approval
+                           </span>
+                         ) : (
+                           (() => {
+                             const isMyAssignee = Boolean(
+                               user?.id && (
+                                 (t as any).assigneeId === user.id ||
+                                 (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
+                               )
+                             );
+                             if (!isMyAssignee) {
+                               return (
+                                 <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                                   👁 Supervisor View
+                                 </span>
+                               );
+                             }
+                             return (
+                               <>
+                                 <Button
+                                   variant={t.active ? 'secondary' : 'primary'}
+                                   onClick={() => onToggleTask(t.id, t.title, t.active)}
+                                   style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                                 >
+                                   {t.active ? '⏸ Pause' : '▶ Start'}
+                                 </Button>
 
-                                <Button
-                                  onClick={() => onSubmitReview(t.id, t.title)}
-                                  style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
-                                >
-                                  📩 Submit
-                                </Button>
-                              </>
-                            );
-                          })()
-                        )}
+                                 <Button
+                                   onClick={() => onSubmitReview(t.id, t.title)}
+                                   style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                                 >
+                                   📩 Submit
+                                 </Button>
+                               </>
+                             );
+                           })()
+                         )}
+                       </div>
                      </div>
                    </div>
+                 ) : (
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                     {/* Row 1: Drag handle + expand + title */}
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                       <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4, flexShrink: 0 }}>⣿</span>
+                       <button
+                         type="button"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           toggleExpand(t.id);
+                         }}
+                         style={{
+                           background: 'transparent',
+                           border: 'none',
+                           color: 'var(--text-muted)',
+                           cursor: 'pointer',
+                           fontSize: 11,
+                           padding: 4,
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           flexShrink: 0
+                         }}
+                         aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                       >
+                         {isExpanded ? '▼' : '▶'}
+                       </button>
+                       <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: '1.4', wordBreak: 'break-word', flex: '1 1 auto', minWidth: 0 }}>
+                         <strong style={{ fontWeight: 700 }}>{t.project && t.project !== 'Office Task' ? t.project : 'Office Task'}:</strong> {t.title}
+                       </div>
+                       {t.isRework && <span style={{ flexShrink: 0 }}><Badge tone="warning">🔄 Rework</Badge></span>}
+                     </div>
+                     {/* Row 2: Timer + Actions */}
+                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingLeft: 32, flexWrap: 'wrap' }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                         {(() => {
+                           const isMyAssignee = Boolean(
+                             user?.id && (
+                               (t as any).assigneeId === user.id ||
+                               (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
+                             )
+                           );
+                           const totalHrsNum = (t.totalHoursWorked || 0) > 0 ? (t.totalHoursWorked || 0) : ((t.secondsToday || 0) / 3600);
+                           const totalHrsFormatted = `${Math.floor(totalHrsNum)}h ${Math.round((totalHrsNum % 1) * 60)}m`;
+
+                           if (!isMyAssignee) {
+                             return (
+                               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title="Total Hours Worked">
+                                 ⏱ Total: {totalHrsFormatted}
+                               </span>
+                             );
+                           }
+                           return (
+                             <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={`Today: ${formatSec(t.secondsToday)}${totalHrsNum > 0 ? ` · Total: ${totalHrsFormatted}` : ''}`}>
+                               ⏱ {formatSec(t.secondsToday)}
+                               {totalHrsNum > ((t.secondsToday || 0) / 3600) && (
+                                 <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginLeft: 6 }}>
+                                   (Total: {totalHrsFormatted})
+                                 </span>
+                               )}
+                             </span>
+                           );
+                         })()}
+                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                           {t.isApproved ? (
+                             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                               ✓ Approved &amp; Completed
+                             </span>
+                           ) : t.underReview ? (
+                             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-info)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                               📩 Submitted &amp; Requires Approval
+                             </span>
+                           ) : (
+                             (() => {
+                               const isMyAssignee = Boolean(
+                                 user?.id && (
+                                   (t as any).assigneeId === user.id ||
+                                   (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
+                                 )
+                               );
+                               if (!isMyAssignee) {
+                                 return (
+                                   <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                                     👁 Supervisor View
+                                   </span>
+                                 );
+                               }
+                               return (
+                                 <>
+                                   <Button
+                                     variant={t.active ? 'secondary' : 'primary'}
+                                     onClick={() => onToggleTask(t.id, t.title, t.active)}
+                                     style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                                   >
+                                     {t.active ? '⏸ Pause' : '▶ Start'}
+                                   </Button>
+
+                                   <Button
+                                     onClick={() => onSubmitReview(t.id, t.title)}
+                                     style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                                   >
+                                     📩 Submit
+                                   </Button>
+                                 </>
+                               );
+                             })()
+                           )}
+                         </div>
+                       </div>
+                     </div>
                    </div>
-                 </div>
+                 )}
 
                 {/* Collapsible Details in 2x2 Grid */}
                 {isExpanded && (

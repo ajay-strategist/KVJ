@@ -8,6 +8,7 @@
 import {
   type ButtonHTMLAttributes, type ReactNode, useState, useRef, useEffect,
 } from 'react';
+import { useBreakpoint } from '../hooks/responsive';
 import './ui.css';
 
 export type StatusTone =
@@ -196,19 +197,21 @@ export function PageHeader({
   tabs?: ReactNode;
   breadcrumb?: ReactNode;
 }) {
+  const isDesktop = useBreakpoint('md');
+
   return (
     <div style={{ marginBottom: 24 }}>
       {breadcrumb}
       <div
         style={{
           display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
+          flexDirection: isDesktop ? 'row' : 'column',
+          alignItems: isDesktop ? 'flex-start' : 'stretch',
+          justifyContent: isDesktop ? 'space-between' : 'flex-start',
+          gap: isDesktop ? 16 : 12,
         }}
       >
-        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <div style={{ flex: isDesktop ? '1 1 auto' : undefined, minWidth: 0 }}>
           <h1
             style={{
               margin: 0,
@@ -235,7 +238,18 @@ export function PageHeader({
           )}
         </div>
         {actions && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              flexShrink: isDesktop ? 0 : undefined,
+              maxWidth: '100%',
+              overflowX: isDesktop ? 'visible' : 'auto',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
             {actions}
           </div>
         )}
