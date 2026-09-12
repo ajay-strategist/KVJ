@@ -25,7 +25,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 import { googleIntegration } from '../../../shared/integration/google';
 import { ExpenseClaimModal } from '../forms/ExpenseClaimModal';
-import { TravelRatesModal } from '../forms/TravelRatesModal';
+import { TravelRatesModal, type TravelRate, DEFAULT_TRAVEL_RATES } from '../forms/TravelRatesModal';
 
 export interface ExpenseRecord {
   id: string;
@@ -268,8 +268,31 @@ export function ExpenseClaims() {
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [rateModalOpen, setRateModalOpen] = useState(false);
-  const [bikeRate, setBikeRate] = useState(5.0);
-  const [carRate, setCarRate] = useState(12.0);
+  const [travelRates, setTravelRates] = useState<TravelRate[]>(() => {
+    try {
+      const stored = localStorage.getItem('kvj_travel_rates');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_TRAVEL_RATES;
+  });
+  const [bikeRate, setBikeRate] = useState<number>(() => {
+    const b = travelRates.find((r) => r.id === 'bike' || r.name.toLowerCase().includes('bike'));
+    return b ? b.ratePerKm : 5.2;
+  });
+  const [carRate, setCarRate] = useState<number>(() => {
+    const c = travelRates.find((r) => r.id === 'car' || r.name.toLowerCase().includes('car'));
+    return c ? c.ratePerKm : 8.5;
+  });
+
+  const getVehicleRate = (vehicleName?: string) => {
+    if (!vehicleName) return bikeRate;
+    const match = travelRates.find((r) => r.name.toLowerCase() === vehicleName.toLowerCase());
+    if (match) return match.ratePerKm;
+    return vehicleName.toLowerCase().includes('car') ? carRate : bikeRate;
+  };
 
   const [customExpenseTypes, setCustomExpenseTypes] = useState<string[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
@@ -297,14 +320,41 @@ export function ExpenseClaims() {
         const { data, error } = await supabase
           .from('flwdsk_system_settings')
           .select('key, value')
-          .in('key', ['bike_rate_per_km', 'car_rate_per_km']);
+          .in('key', ['travel_rates', 'bike_rate_per_km', 'car_rate_per_km']);
         
         if (!error && data && data.length > 0) {
+          const ratesRow = data.find((d: any) => d.key === 'travel_rates');
           const bikeRow = data.find((d: any) => d.key === 'bike_rate_per_km');
           const carRow = data.find((d: any) => d.key === 'car_rate_per_km');
-          if (bikeRow) setBikeRate(Number(bikeRow.value));
-          if (carRow) setCarRate(Number(carRow.value));
-          return; // successfully loaded from DB
+
+          let loadedRates: TravelRate[] | null = null;
+          if (ratesRow && ratesRow.value) {
+            const val = typeof ratesRow.value === 'string' ? JSON.parse(ratesRow.value) : ratesRow.value;
+            if (Array.isArray(val) && val.length > 0) {
+              loadedRates = val;
+            }
+          }
+
+          if (loadedRates) {
+            setTravelRates(loadedRates);
+            const b = loadedRates.find((r) => r.id === 'bike' || r.name.toLowerCase().includes('bike'));
+            const c = loadedRates.find((r) => r.id === 'car' || r.name.toLowerCase().includes('car'));
+            if (b) setBikeRate(Number(b.ratePerKm));
+            if (c) setCarRate(Number(c.ratePerKm));
+            return;
+          }
+
+          if (bikeRow || carRow) {
+            const bVal = bikeRow ? Number(bikeRow.value) : 5.2;
+            const cVal = carRow ? Number(carRow.value) : 8.5;
+            setBikeRate(bVal);
+            setCarRate(cVal);
+            setTravelRates([
+              { id: 'bike', name: 'Bike', ratePerKm: bVal, icon: '🏍️' },
+              { id: 'car', name: 'Car', ratePerKm: cVal, icon: '🚗' },
+            ]);
+            return;
+          }
         }
       } catch (e) {
         console.warn('Could not load travel rates from database settings:', e);
@@ -312,6 +362,18 @@ export function ExpenseClaims() {
 
       // 2. Fallback to localStorage
       try {
+        const storedRates = localStorage.getItem('kvj_travel_rates');
+        if (storedRates) {
+          const parsed = JSON.parse(storedRates);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTravelRates(parsed);
+            const b = parsed.find((r: any) => r.id === 'bike' || r.name.toLowerCase().includes('bike'));
+            const c = parsed.find((r: any) => r.id === 'car' || r.name.toLowerCase().includes('car'));
+            if (b) setBikeRate(Number(b.ratePerKm));
+            if (c) setCarRate(Number(c.ratePerKm));
+            return;
+          }
+        }
         const storedBike = localStorage.getItem('kvj_bike_rate');
         const storedCar = localStorage.getItem('kvj_car_rate');
         if (storedBike) setBikeRate(Number(storedBike));
@@ -565,8 +627,8 @@ export function ExpenseClaims() {
 
       const isSelfTravel = values.expenseType === 'Self Travel';
       const km = Number(values.km || 0);
-      const vehicle = (values.vehicle || 'Bike') as 'Bike' | 'Car';
-      const rate = vehicle === 'Car' ? carRate : bikeRate;
+      const vehicle = (values.vehicle || 'Bike') as string;
+      const rate = getVehicleRate(vehicle);
       const amount = isSelfTravel ? km * rate : Number(values.amount || 0);
       const expType = values.expenseType === '__NEW_TYPE__' ? (values.newTypeInput as string) : (values.expenseType as string) || 'Miscellaneous';
 
@@ -979,10 +1041,13 @@ export function ExpenseClaims() {
 
       {/* Central Rate Info Banner */}
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 24, fontSize: 13, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 16, fontSize: 13, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>📍 Central Reimbursement Rates:</span>
-          <Badge tone="info">🏍️ Bike: ₹{bikeRate} / KM</Badge>
-          <Badge tone="purple">🚗 Car: ₹{carRate} / KM</Badge>
+          {travelRates.map((r) => (
+            <Badge key={r.id || r.name} tone={r.name.toLowerCase().includes('bike') ? 'info' : r.name.toLowerCase().includes('car') ? 'purple' : 'neutral'}>
+              {r.icon || '🚗'} {r.name}: ₹{r.ratePerKm} / KM
+            </Badge>
+          ))}
         </div>
       </Card>
 
@@ -1203,7 +1268,7 @@ export function ExpenseClaims() {
                             {exp.status === 'submitted' && isManagement ? (
                               <input
                                 type="number"
-                                value={editingRates[exp.id] !== undefined ? editingRates[exp.id] : (exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate))}
+                                value={editingRates[exp.id] !== undefined ? editingRates[exp.id] : (exp.rate || getVehicleRate(exp.vehicle))}
                                 onChange={(e) => setEditingRates(prev => ({ ...prev, [exp.id]: e.target.value }))}
                                 onBlur={(e) => {
                                   const val = Number(e.target.value);
@@ -1242,7 +1307,7 @@ export function ExpenseClaims() {
                                 }}
                               />
                             ) : (
-                              <span>{exp.rate || (exp.vehicle === 'Car' ? carRate : bikeRate)}</span>
+                              <span>{exp.rate || getVehicleRate(exp.vehicle)}</span>
                             )}
                             <span>/km</span>
                           </div>
@@ -1344,6 +1409,7 @@ export function ExpenseClaims() {
         open={expenseOpen}
         onClose={() => setExpenseOpen(false)}
         onSuccess={() => loadClaims()}
+        travelRates={travelRates}
         bikeRate={bikeRate}
         carRate={carRate}
         batches={batches}
@@ -1355,11 +1421,13 @@ export function ExpenseClaims() {
       <TravelRatesModal
         open={rateModalOpen}
         onClose={() => setRateModalOpen(false)}
+        travelRates={travelRates}
         bikeRate={bikeRate}
         carRate={carRate}
-        onRatesUpdated={(b, c) => {
-          setBikeRate(b);
-          setCarRate(c);
+        onRatesUpdated={(newRates, b, c) => {
+          setTravelRates(newRates);
+          if (b !== undefined) setBikeRate(b);
+          if (c !== undefined) setCarRate(c);
         }}
       />
     </AppShell>

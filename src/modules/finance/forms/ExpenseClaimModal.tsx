@@ -5,13 +5,15 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { googleIntegration } from '../../../shared/integration/google';
 import { supabase } from '../../../shared/integration/supabase';
+import type { TravelRate } from './TravelRatesModal';
 
 export interface ExpenseClaimModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-  bikeRate: number;
-  carRate: number;
+  travelRates?: TravelRate[];
+  bikeRate?: number;
+  carRate?: number;
   batches: Array<any>;
   customExpenseTypes: string[];
   onRegisterNewType: (name: string) => Promise<boolean>;
@@ -21,8 +23,9 @@ export function ExpenseClaimModal({
   open,
   onClose,
   onSuccess,
-  bikeRate,
-  carRate,
+  travelRates,
+  bikeRate = 5.2,
+  carRate = 8.5,
   batches,
   customExpenseTypes,
   onRegisterNewType,
@@ -36,7 +39,7 @@ export function ExpenseClaimModal({
   const [categoryType, setCategoryType] = useState<'Office Expense' | 'Training Expense'>('Office Expense');
   const [batchName, setBatchName] = useState<string>('');
   const [expenseType, setExpenseType] = useState<string>('Self Travel');
-  const [vehicle, setVehicle] = useState<'Bike' | 'Car'>('Bike');
+  const [vehicle, setVehicle] = useState<string>('Bike');
   const [km, setKm] = useState<string>('');
   const [route, setRoute] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
@@ -51,7 +54,23 @@ export function ExpenseClaimModal({
   const isTraining = categoryType === 'Training Expense';
 
   const kmVal = Number(km || 0);
-  const activeRate = vehicle === 'Car' ? carRate : bikeRate;
+
+  const availableRates: TravelRate[] = useMemo(() => {
+    if (travelRates && travelRates.length > 0) return travelRates;
+    return [
+      { id: 'bike', name: 'Bike', ratePerKm: bikeRate, icon: '🏍️' },
+      { id: 'car', name: 'Car', ratePerKm: carRate, icon: '🚗' },
+    ];
+  }, [travelRates, bikeRate, carRate]);
+
+  const selectedRateObj = useMemo(() => {
+    return (
+      availableRates.find((r) => r.name.toLowerCase() === vehicle.toLowerCase()) ||
+      availableRates[0]
+    );
+  }, [availableRates, vehicle]);
+
+  const activeRate = selectedRateObj ? selectedRateObj.ratePerKm : (vehicle.toLowerCase().includes('car') ? carRate : bikeRate);
   const calculatedTravelAmount = isSelfTravel ? kmVal * activeRate : 0;
   const finalAmount = isSelfTravel ? calculatedTravelAmount : Number(amount || 0);
 
@@ -321,11 +340,14 @@ export function ExpenseClaimModal({
                 <select
                   className="kvj-select"
                   value={vehicle}
-                  onChange={(e) => setVehicle(e.target.value as any)}
+                  onChange={(e) => setVehicle(e.target.value)}
                   style={{ width: '100%' }}
                 >
-                  <option value="Bike">🏍️ Bike (₹{bikeRate}/km)</option>
-                  <option value="Car">🚗 Car (₹{carRate}/km)</option>
+                  {availableRates.map((r) => (
+                    <option key={r.id || r.name} value={r.name}>
+                      {r.icon || '🚗'} {r.name} (₹{r.ratePerKm}/km)
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
