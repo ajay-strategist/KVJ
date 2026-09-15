@@ -130,6 +130,7 @@ export interface TaskWorkSession extends Entity {
   startTime: string;
   endTime?: string;
   durationMinutes?: number;
+  notes?: string;
   // status is inherited from Entity ('running' | 'paused' | 'completed').
 }
 

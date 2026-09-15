@@ -557,7 +557,8 @@ export function TaskWorklogView({
       const projectName = pObj ? pObj.title : (tObj?.project && tObj.project !== 'Office Task' ? tObj.project : 'Office Task');
       const taskName = s.workTitle || tObj?.title || 'Work Session';
       const duration = s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes, s.startTime, s.endTime);
-      const updateNote = (s as any).notes || (s as any).description || '—';
+      const sessionNotesMap = getSessionNotesMap();
+      const updateNote = s.notes || sessionNotesMap[s.id] || (s as any).description || '—';
 
       return [
         projectName,
@@ -704,8 +705,7 @@ export function TaskWorklogView({
                 const resolvedSupervisorName = s.supervisorName || empName(resolvedSupervisorId);
 
                 const sessionNotesMap = getSessionNotesMap();
-                const savedNote = sessionNotesMap[s.id] || (s.taskId ? sessionNotesMap[s.taskId] : '');
-                const updateVal = savedNote || (s as any).notes || (s as any).description || task?.description || (task as any)?.reworkNotes || '';
+                const updateVal = s.notes || sessionNotesMap[s.id] || (s as any).description || '';
                 const updateDisplay = updateVal || '—';
 
                 const isSupervisorOrAdmin = isSupervisor || isManagement;

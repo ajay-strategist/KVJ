@@ -172,12 +172,23 @@ export function useTaskSessions() {
             Math.round((endTime.getTime() - new Date(primary.start_time).getTime()) / 60000),
           );
           const updates: any = { endTime: endTime.toISOString(), durationMinutes, status };
-          if (notes) updates.notes = notes;
+          if (notes) {
+            updates.notes = notes;
+            saveSessionNote(primary.id, notes);
+          }
           await repo.update(
             primary.id,
             updates as Partial<TaskWorkSession>,
             actor,
           );
+          if (notes) {
+            try {
+              await supabase
+                .from('flwdsk_task_work_sessions')
+                .update({ notes })
+                .eq('id', primary.id);
+            } catch (_) {}
+          }
 
           // If duplicate open sessions existed, soft-delete them to avoid double-counting time
           if (data.length > 1) {
@@ -266,15 +277,6 @@ export function useTaskSessions() {
   const pauseSession = useCallback(
     async (taskId: UUID | undefined, notes?: string) => {
       try {
-        if (taskId && notes) {
-          saveSessionNote(taskId, notes);
-          try {
-            await supabase
-              .from('flwdsk_tasks')
-              .update({ description: notes })
-              .eq('id', taskId);
-          } catch (_) {}
-        }
         await closeOpen(taskId, 'paused', notes);
         return { ok: true as const };
       } catch (e: any) {
@@ -306,29 +308,9 @@ export function useTaskSessions() {
   }, [repo]);
 
   const updateSessionNote = useCallback(
-    async (sessionId: UUID | string, notes: string, taskId?: UUID | string) => {
+    async (sessionId: UUID | string, notes: string, _taskId?: UUID | string) => {
       try {
         saveSessionNote(sessionId, notes);
-        if (taskId) {
-          saveSessionNote(taskId, notes);
-          try {
-            await supabase
-              .from('flwdsk_tasks')
-              .update({ description: notes })
-              .eq('id', taskId);
-          } catch (_) {}
-        } else {
-          const tid = sessionId.replace(/^local-(db-)?/, '');
-          if (tid) {
-            saveSessionNote(tid, notes);
-            try {
-              await supabase
-                .from('flwdsk_tasks')
-                .update({ description: notes })
-                .eq('id', tid);
-            } catch (_) {}
-          }
-        }
         try {
           await supabase
             .from('flwdsk_task_work_sessions')

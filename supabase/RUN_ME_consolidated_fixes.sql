@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS public.flwdsk_task_work_sessions (
   end_time         timestamptz,
   duration_minutes integer,
   status           text NOT NULL DEFAULT 'running',
+  notes            text,
   created_at       timestamptz DEFAULT now(),
   updated_at       timestamptz DEFAULT now(),
   created_by       uuid,
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS public.flwdsk_task_work_sessions (
   deleted_at       timestamptz,
   deleted_by       uuid
 );
+ALTER TABLE public.flwdsk_task_work_sessions ADD COLUMN IF NOT EXISTS notes text;
 CREATE INDEX IF NOT EXISTS idx_flwdsk_task_sessions_employee ON public.flwdsk_task_work_sessions(employee_id, start_time DESC);
 CREATE INDEX IF NOT EXISTS idx_flwdsk_task_sessions_task     ON public.flwdsk_task_work_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_flwdsk_task_sessions_open     ON public.flwdsk_task_work_sessions(employee_id, task_id) WHERE end_time IS NULL AND deleted_at IS NULL;
