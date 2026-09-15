@@ -6,7 +6,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { isFullControl } from '../../../shared/permissions/roles';
 
 import { useProject } from '../hooks/useProject';
-import { useTaskSessions, getSessionNotesMap } from '../hooks/useTaskSessions';
+import { useTaskSessions, getSessionNotesMap, deduplicateTaskSessions } from '../hooks/useTaskSessions';
 import type { TaskWorkSession } from '../project.repository';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
@@ -229,7 +229,7 @@ export function TaskWorklogView({
       return synth;
     })();
 
-    return rawList.map((s: any) => {
+    return deduplicateTaskSessions(rawList).map((s: any) => {
       const t = (tasks || []).find((tk: any) => tk.id === s.taskId);
       const proj = t ? (projects || []).find((p: any) => p.id === t.projectId) : null;
       

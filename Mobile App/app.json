@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "KVJ FlowDesk",
+    "slug": "kvj-flowdesk-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kvjanalytics.flowdesk",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "KVJ FlowDesk needs your location to verify GPS clock-in attendance at assigned offices and colleges.",
+        "NSCameraUsageDescription": "KVJ FlowDesk needs access to your camera to take classroom attendance photos and upload expense receipts.",
+        "NSPhotoLibraryUsageDescription": "KVJ FlowDesk needs access to your photo library to select receipt photos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.kvjanalytics.flowdesk",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow KVJ FlowDesk to use your location for attendance punches."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you upload classroom attendance photos and receipts."
+        }
+      ]
+    ]
+  }
+}

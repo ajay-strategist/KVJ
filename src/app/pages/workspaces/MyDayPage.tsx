@@ -32,6 +32,7 @@ import { toLocalISODate, formatDisplayTime } from '../../../shared/utils/date';
 import { supabase } from '../../../shared/integration/supabase';
 import { TaskFormModal } from '../../../modules/project/forms/TaskFormModal';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
+import { DownloadMobileAppModal } from '../../../modules/mobile/components/DownloadMobileAppModal';
 
 function Greeting() {
   const { user } = useAuth();
@@ -2366,6 +2367,7 @@ export function MyDayPage() {
   const [selectedEmpId, setSelectedEmpId] = useState('me');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [mobileAppModalOpen, setMobileAppModalOpen] = useState(false);
 
   const userTimelineKey = useMemo(() => {
     const activeKey = selectedEmpId !== 'me' ? selectedEmpId : (user?.id || user?.email || 'me');
@@ -2791,7 +2793,11 @@ export function MyDayPage() {
     toast({ variant: 'info', title: 'Task Paused', message: 'Work progress saved and timer paused.' });
   };
 
-  const handleToggleTask = (id: string, taskTitle: string, currentActive: boolean) => {
+  const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
+
+  const handleToggleTask = async (id: string, taskTitle: string, currentActive: boolean) => {
+    if (togglingTaskId) return;
+
     // If active and user clicks pause, open mandatory work progress modal
     if (currentActive) {
       setPauseTargetTaskId(id);
@@ -2800,91 +2806,96 @@ export function MyDayPage() {
       return;
     }
 
-    const nextActive = !currentActive;
-    const now = Date.now();
-    let targetTask: any = null;
+    setTogglingTaskId(id);
+    try {
+      const nextActive = !currentActive;
+      const now = Date.now();
+      let targetTask: any = null;
 
-    // 1. If starting a task, find and pause any other active task in the DB & sessions first
-    if (nextActive) {
-      const activeTask = tasks.find((t) => t.active && t.id !== id);
-      if (activeTask) {
-        taskTimerStore.pauseTask(activeTask.id);
-        const activeTimer = taskTimerStore.getTimer(activeTask.id);
-        const activeSecs = activeTimer ? Math.floor(activeTimer.elapsedMs / 1000) : activeTask.secondsToday;
-        
-        updateTask(activeTask.id, {
-          status: 'todo',
-          actualHours: activeSecs / 3600,
-        }).catch((e) => console.warn('Failed to update previously active task in DB:', e));
-        
-        pauseSession(activeTask.id as any);
-        handleActivityLog(`Paused Task: ${activeTask.title}`, 'neutral');
-      }
-      
-      taskTimerStore.startTask(id);
-    } else {
-      taskTimerStore.pauseTask(id);
-    }
-
-    // 2. Query the exact correct secondsToday from the store to avoid race conditions
-    const timer = taskTimerStore.getTimer(id);
-    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
-
-    // 3. Update the tasks list state and save to local storage
-    setTasks((prev) => {
-      const found = prev.find((t) => t.id === id);
-      if (found) targetTask = found;
-
-      const updated = prev.map((t) => {
-        if (t.id === id) {
-          return { ...t, active: nextActive, secondsToday };
-        } else if (nextActive && t.active) {
-          const tTimer = taskTimerStore.getTimer(t.id);
-          const tSec = tTimer ? Math.floor(tTimer.elapsedMs / 1000) : t.secondsToday;
-          return { ...t, active: false, secondsToday: tSec };
+      // 1. If starting a task, find and pause any other active task in the DB & sessions first
+      if (nextActive) {
+        const activeTask = tasks.find((t) => t.active && t.id !== id);
+        if (activeTask) {
+          taskTimerStore.pauseTask(activeTask.id);
+          const activeTimer = taskTimerStore.getTimer(activeTask.id);
+          const activeSecs = activeTimer ? Math.floor(activeTimer.elapsedMs / 1000) : activeTask.secondsToday;
+          
+          updateTask(activeTask.id, {
+            status: 'todo',
+            actualHours: activeSecs / 3600,
+          }).catch((e) => console.warn('Failed to update previously active task in DB:', e));
+          
+          pauseSession(activeTask.id as any);
+          handleActivityLog(`Paused Task: ${activeTask.title}`, 'neutral');
         }
-        return t;
+        
+        taskTimerStore.startTask(id);
+      } else {
+        taskTimerStore.pauseTask(id);
+      }
+
+      // 2. Query the exact correct secondsToday from the store to avoid race conditions
+      const timer = taskTimerStore.getTimer(id);
+      const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
+      // 3. Update the tasks list state and save to local storage
+      setTasks((prev) => {
+        const found = prev.find((t) => t.id === id);
+        if (found) targetTask = found;
+
+        const updated = prev.map((t) => {
+          if (t.id === id) {
+            return { ...t, active: nextActive, secondsToday };
+          } else if (nextActive && t.active) {
+            const tTimer = taskTimerStore.getTimer(t.id);
+            const tSec = tTimer ? Math.floor(tTimer.elapsedMs / 1000) : t.secondsToday;
+            return { ...t, active: false, secondsToday: tSec };
+          }
+          return t;
+        });
+
+        const states = getStoredTaskStates();
+        const todayDateStr = toLocalISODate(new Date());
+        updated.forEach((t) => {
+          states[t.id] = {
+            secondsToday: t.secondsToday,
+            active: t.active,
+            lastStartTime: t.active ? now : undefined,
+            underReview: t.underReview,
+            date: todayDateStr,
+          };
+        });
+        saveStoredTaskStates(states);
+        return updated;
       });
 
-      const states = getStoredTaskStates();
-      const todayDateStr = toLocalISODate(new Date());
-      updated.forEach((t) => {
-        states[t.id] = {
-          secondsToday: t.secondsToday,
-          active: t.active,
-          lastStartTime: t.active ? now : undefined,
-          underReview: t.underReview,
-          date: todayDateStr,
-        };
-      });
-      saveStoredTaskStates(states);
-      return updated;
-    });
+      // 4. Update the clicked task in the database and sessions
+      updateTask(id, {
+        status: nextActive ? 'in_progress' : 'todo',
+        actualHours: secondsToday / 3600,
+      }).catch((e) => console.warn('Failed to update task status in DB:', e));
 
-    // 4. Update the clicked task in the database and sessions
-    updateTask(id, {
-      status: nextActive ? 'in_progress' : 'todo',
-      actualHours: secondsToday / 3600,
-    }).catch((e) => console.warn('Failed to update task status in DB:', e));
+      const raw = (projectTasks || []).find((t) => t.id === id);
+      if (nextActive) {
+        const project = raw?.projectId && raw.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === raw.projectId) : null;
+        const pSupervisorId = project ? (project as any).supervisorId : null;
+        const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
+        const supervisorId = pSupervisorId || tSupervisorId;
 
-    const raw = (projectTasks || []).find((t) => t.id === id);
-    if (nextActive) {
-      const project = raw?.projectId && raw.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === raw.projectId) : null;
-      const pSupervisorId = project ? (project as any).supervisorId : null;
-      const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
-      const supervisorId = pSupervisorId || tSupervisorId;
+        await startSession({
+          taskId: id as any,
+          projectId: raw?.projectId,
+          workTitle: taskTitle,
+          supervisorId,
+        });
+      } else {
+        await pauseSession(id as any);
+      }
 
-      startSession({
-        taskId: id as any,
-        projectId: raw?.projectId,
-        workTitle: taskTitle,
-        supervisorId,
-      });
-    } else {
-      pauseSession(id as any);
+      handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
+    } finally {
+      setTogglingTaskId(null);
     }
-
-    handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
   };
 
   const handleSubmitReview = async (id: string, taskTitle: string) => {
@@ -3056,9 +3067,25 @@ export function MyDayPage() {
         title="My Day"
         subtitle="Manage your daily attendance, tasks, breaks, and workspace activity."
         actions={
-          <Button onClick={() => setCreateTaskOpen(true)} style={{ gap: 6 }}>
-            ＋ Add Task
-          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Button
+              variant="secondary"
+              onClick={() => setMobileAppModalOpen(true)}
+              style={{
+                gap: 8,
+                fontWeight: 700,
+                border: '1.5px solid var(--brand)',
+                color: 'var(--brand)',
+                backgroundColor: 'var(--bg-sunken)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
+              📱 Download Mobile App
+            </Button>
+            <Button onClick={() => setCreateTaskOpen(true)} style={{ gap: 6 }}>
+              ＋ Add Task
+            </Button>
+          </div>
         }
       />
 
@@ -3101,6 +3128,9 @@ export function MyDayPage() {
 
       {/* Create Task Modal */}
       <TaskFormModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
+
+      {/* Download Mobile App Modal */}
+      <DownloadMobileAppModal isOpen={mobileAppModalOpen} onClose={() => setMobileAppModalOpen(false)} />
 
       {/* Apply Leave Modal on My Day */}
       <ApplyLeaveModal open={applyLeaveOpen} onClose={() => setApplyLeaveOpen(false)} />

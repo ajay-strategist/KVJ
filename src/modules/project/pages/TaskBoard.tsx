@@ -429,52 +429,63 @@ export function TaskBoard({
     toast({ variant: 'warning', title: 'Task Rejected', message: 'Task creation request rejected.' });
   };
 
+  const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
+
   const handleStartTask = async (task: TaskItem) => {
-    const updatedAssignee = (task.assignee && task.assignee !== 'Unassigned') ? task.assignee : (user?.fullName || 'Assigned User');
-    
-    // 1. Pause previously active task in DB and sessions
-    const previouslyActive = tasksList.find((x) => x.status === 'In Progress' && x.id !== task.id);
-    if (previouslyActive) {
-      taskTimerStore.pauseTask(previouslyActive.id);
-      const prevTimer = taskTimerStore.getTimer(previouslyActive.id);
-      const prevSecs = prevTimer ? Math.floor(prevTimer.elapsedMs / 1000) : 0;
-      try {
-        await updateTask(previouslyActive.id as UUID, {
-          status: 'todo',
-          actualHours: prevSecs / 3600,
-        });
-        await pauseSession(previouslyActive.id as UUID);
-      } catch (e) {
-        console.warn('Failed to pause previously active task on start:', e);
-      }
-    }
+    if (startingTaskId) return;
+    // If already in progress and timer is actively running, ignore duplicate clicks
+    if (task.status === 'In Progress' && timers[task.id]?.isRunning) return;
 
-    setTasksList((prev) =>
-      prev.map((x) => {
-        if (x.id === task.id) {
-          return { ...x, status: 'In Progress', assignee: updatedAssignee };
-        } else if (x.status === 'In Progress') {
-          return { ...x, status: 'To Do' };
-        }
-        return x;
-      })
-    );
-
-    taskTimerStore.startTask(task.id);
+    setStartingTaskId(task.id);
     try {
-      await updateTask(task.id as UUID, { status: 'in_progress', approvalStatus: null });
+      const updatedAssignee = (task.assignee && task.assignee !== 'Unassigned') ? task.assignee : (user?.fullName || 'Assigned User');
       
-      const raw = (tasks || []).find((t: any) => t.id === task.id);
-      await startSession({
-        taskId: task.id as UUID,
-        projectId: raw?.projectId,
-        workTitle: task.name,
-        supervisorId: (raw as any)?.supervisorId,
-      });
-    } catch (e) {
-      console.warn('Update task error:', e);
+      // 1. Pause previously active task in DB and sessions
+      const previouslyActive = tasksList.find((x) => x.status === 'In Progress' && x.id !== task.id);
+      if (previouslyActive) {
+        taskTimerStore.pauseTask(previouslyActive.id);
+        const prevTimer = taskTimerStore.getTimer(previouslyActive.id);
+        const prevSecs = prevTimer ? Math.floor(prevTimer.elapsedMs / 1000) : 0;
+        try {
+          await updateTask(previouslyActive.id as UUID, {
+            status: 'todo',
+            actualHours: prevSecs / 3600,
+          });
+          await pauseSession(previouslyActive.id as UUID);
+        } catch (e) {
+          console.warn('Failed to pause previously active task on start:', e);
+        }
+      }
+
+      setTasksList((prev) =>
+        prev.map((x) => {
+          if (x.id === task.id) {
+            return { ...x, status: 'In Progress', assignee: updatedAssignee };
+          } else if (x.status === 'In Progress') {
+            return { ...x, status: 'To Do' };
+          }
+          return x;
+        })
+      );
+
+      taskTimerStore.startTask(task.id);
+      try {
+        await updateTask(task.id as UUID, { status: 'in_progress', approvalStatus: null });
+        
+        const raw = (tasks || []).find((t: any) => t.id === task.id);
+        await startSession({
+          taskId: task.id as UUID,
+          projectId: raw?.projectId,
+          workTitle: task.name,
+          supervisorId: (raw as any)?.supervisorId,
+        });
+      } catch (e) {
+        console.warn('Update task error:', e);
+      }
+      toast({ variant: 'success', title: 'Task Started', message: `Task "${task.name}" is now In Progress.` });
+    } finally {
+      setStartingTaskId(null);
     }
-    toast({ variant: 'success', title: 'Task Started', message: `Task "${task.name}" is now In Progress.` });
   };
 
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
@@ -1164,8 +1175,8 @@ export function TaskBoard({
                       {isAssignee && !isPendingAssignment && (
                         <>
                           {(t.status === 'To Do' || t.approvalStatus === 'rework') && (
-                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
-                              ▶️ Start
+                            <Button size="sm" variant="success" disabled={startingTaskId === t.id} onClick={() => handleStartTask(t)}>
+                              {startingTaskId === t.id ? '⏳ Starting…' : '▶️ Start'}
                             </Button>
                           )}
                           {t.status === 'In Progress' && timers[t.id]?.isRunning && (
@@ -1174,8 +1185,8 @@ export function TaskBoard({
                             </Button>
                           )}
                           {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
-                            <Button size="sm" variant="success" onClick={() => handleStartTask(t)}>
-                              ▶️ Resume
+                            <Button size="sm" variant="success" disabled={startingTaskId === t.id} onClick={() => handleStartTask(t)}>
+                              {startingTaskId === t.id ? '⏳ Resuming…' : '▶️ Resume'}
                             </Button>
                           )}
                           {t.status === 'In Progress' && (
@@ -1341,8 +1352,8 @@ export function TaskBoard({
                               {isAssignee && !isPendingAssignment && (
                                 <>
                                   {(t.status === 'To Do' || t.approvalStatus === 'rework') && (
-                                    <Button size="xs" variant="success" onClick={() => handleStartTask(t)}>
-                                      ▶️ Start
+                                    <Button size="xs" variant="success" disabled={startingTaskId === t.id} onClick={() => handleStartTask(t)}>
+                                      {startingTaskId === t.id ? '⏳ Starting…' : '▶️ Start'}
                                     </Button>
                                   )}
                                   {t.status === 'In Progress' && timers[t.id]?.isRunning && (
@@ -1351,8 +1362,8 @@ export function TaskBoard({
                                     </Button>
                                   )}
                                   {t.status === 'In Progress' && !timers[t.id]?.isRunning && (
-                                    <Button size="xs" variant="success" onClick={() => handleStartTask(t)}>
-                                      ▶️ Resume
+                                    <Button size="xs" variant="success" disabled={startingTaskId === t.id} onClick={() => handleStartTask(t)}>
+                                      {startingTaskId === t.id ? '⏳ Resuming…' : '▶️ Resume'}
                                     </Button>
                                   )}
                                   {t.status === 'In Progress' && (

@@ -185,21 +185,22 @@ export function BatchManagement() {
     const fetchStudentsForBatch = async () => {
       try {
         const { data: enrollData, error: enrollErr } = await supabase
-          .from('flwdsk_batch_enrollments')
-          .select('student_id, flwdsk_students(*)')
-          .eq('batch_id', selectedBatchId);
+          .from('flwdsk_enrollments')
+          .select('student_id, flwdsk_student_records(*)')
+          .eq('batch_id', selectedBatchId)
+          .is('deleted_at', null);
 
         if (enrollErr) throw enrollErr;
 
         if (enrollData) {
           const loaded: StudentRecord[] = enrollData.map((row: any) => {
-            const st = row.flwdsk_students;
+            const st = row.flwdsk_student_records;
             const cf = (st?.custom_fields as any) || {};
             return {
               id: st?.id || row.student_id,
               name: `${st?.first_name || ''} ${st?.last_name || ''}`.trim() || 'Student',
               photo: '👤',
-              photoUrl: st?.avatar_url || cf.photoUrl || '',
+              photoUrl: st?.photo_url || st?.avatar_url || cf.photoUrl || '',
               phone: st?.phone || '',
               email: st?.email || '',
               college: cf.college || activeBatch?.college || '',
@@ -307,7 +308,7 @@ export function BatchManagement() {
   const handleRemoveStudent = async (studentId: string) => {
     try {
       await supabase
-        .from('flwdsk_batch_enrollments')
+        .from('flwdsk_enrollments')
         .delete()
         .eq('batch_id', selectedBatchId)
         .eq('student_id', studentId);
@@ -322,7 +323,7 @@ export function BatchManagement() {
   const handleBatchRemoveStudents = async (studentIds: string[]) => {
     try {
       await supabase
-        .from('flwdsk_batch_enrollments')
+        .from('flwdsk_enrollments')
         .delete()
         .eq('batch_id', selectedBatchId)
         .in('student_id', studentIds);
@@ -681,8 +682,8 @@ export function BatchManagement() {
 
           if (sid && selectedBatchId) {
             await supabase
-              .from('flwdsk_batch_enrollments')
-              .upsert({ batch_id: selectedBatchId, student_id: sid }, { onConflict: 'batch_id,student_id' });
+              .from('flwdsk_enrollments')
+              .upsert({ batch_id: selectedBatchId, student_id: sid }, { onConflict: 'student_id,batch_id' });
           }
           processed++;
         }
@@ -1129,7 +1130,7 @@ export function BatchManagement() {
                 });
                 if (res.ok && selectedBatchId) {
                   await supabase
-                    .from('flwdsk_batch_enrollments')
+                    .from('flwdsk_enrollments')
                     .insert({ batch_id: selectedBatchId, student_id: res.value.id });
                   toast({ variant: 'success', title: 'Student Added', message: 'Student registered and enrolled.' });
                   setAddStudentModalOpen(false);

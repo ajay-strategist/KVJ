@@ -168,6 +168,10 @@ export const taskTimerStore = {
     });
 
     const existing = current[taskId];
+    if (existing?.isRunning) {
+      // Already running; avoid resetting startTime or triggering redundant updates
+      return;
+    }
     current[taskId] = {
       taskId,
       startTime: now,

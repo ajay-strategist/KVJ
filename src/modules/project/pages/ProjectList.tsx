@@ -9,7 +9,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
 
 import { useProject } from '../hooks/useProject';
-import { useTaskSessions } from '../hooks/useTaskSessions';
+import { useTaskSessions, deduplicateTaskSessions } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { exportToExcel } from '../../../shared/utils/exportToExcel';
@@ -209,7 +209,7 @@ export function ProjectList({
           .select('*')
           .is('deleted_at', null);
         if (!error && data && active) {
-          setTaskSessions(data);
+          setTaskSessions(deduplicateTaskSessions(data));
         }
       } catch (e) {
         console.warn('Failed to load task sessions in ProjectList:', e);
