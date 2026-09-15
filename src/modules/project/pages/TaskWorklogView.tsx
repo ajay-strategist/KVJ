@@ -93,6 +93,9 @@ export function TaskWorklogView({
       if (res.ok) {
         toast({ variant: 'success', title: 'Worklog Update Saved', message: 'Work session update note updated successfully.' });
         setUpdateModalOpen(false);
+        setDbSessions((prev) =>
+          prev.map((s) => (s.id === targetSessionId ? { ...s, notes: noteInput.trim() } : s))
+        );
         const updated = await listSessions();
         setDbSessions(updated);
         actualProjectData?.refresh?.();
@@ -533,6 +536,31 @@ export function TaskWorklogView({
 
   const totalSessionHours = Math.round((totalSessionMinutes / 60) * 10) / 10;
 
+  // Map each taskId to its newest session id in filteredSessions
+  const newestSessionIdByTask = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of filteredSessions) {
+      if (s.taskId && !map.has(s.taskId)) {
+        map.set(s.taskId, s.id);
+      }
+    }
+    return map;
+  }, [filteredSessions]);
+
+  // Tasks that already have at least one session with an explicit note
+  const tasksWithExplicitNotes = useMemo(() => {
+    const set = new Set<string>();
+    const sessionNotesMap = getSessionNotesMap();
+    for (const s of filteredSessions) {
+      if (!s.taskId) continue;
+      const note = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s as any).description;
+      if (note && note !== '—') {
+        set.add(s.taskId);
+      }
+    }
+    return set;
+  }, [filteredSessions, dbSessions]);
+
   const handleExportWorklogsToExcel = () => {
     const headers = [
       'Project Name',
@@ -558,8 +586,16 @@ export function TaskWorklogView({
       const taskName = s.workTitle || tObj?.title || 'Work Session';
       const duration = s.status === 'running' ? 'Running…' : fmtDur(s.durationMinutes, s.startTime, s.endTime);
       const sessionNotesMap = getSessionNotesMap();
-      const savedNote = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s.taskId ? sessionNotesMap[s.taskId] : '');
-      const updateNote = savedNote || (s as any).description || tObj?.description || (tObj as any)?.reworkNotes || '—';
+      const directNote = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s as any).description || '';
+      let updateNote = directNote;
+      if (!updateNote && s.taskId) {
+        const hasExplicit = tasksWithExplicitNotes.has(s.taskId);
+        const isNewest = newestSessionIdByTask.get(s.taskId) === s.id;
+        if (!hasExplicit && isNewest) {
+          updateNote = tObj?.description || (tObj as any)?.reworkNotes || '';
+        }
+      }
+      updateNote = updateNote || '—';
 
       return [
         projectName,
@@ -706,8 +742,15 @@ export function TaskWorklogView({
                 const resolvedSupervisorName = s.supervisorName || empName(resolvedSupervisorId);
 
                 const sessionNotesMap = getSessionNotesMap();
-                const savedNote = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s.taskId ? sessionNotesMap[s.taskId] : '');
-                const updateVal = savedNote || (s as any).description || task?.description || (task as any)?.reworkNotes || '';
+                const directNote = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s as any).description || '';
+                let updateVal = directNote;
+                if (!updateVal && s.taskId) {
+                  const hasExplicit = tasksWithExplicitNotes.has(s.taskId);
+                  const isNewest = newestSessionIdByTask.get(s.taskId) === s.id;
+                  if (!hasExplicit && isNewest) {
+                    updateVal = task?.description || (task as any)?.reworkNotes || '';
+                  }
+                }
                 const updateDisplay = updateVal || '—';
 
                 const isSupervisorOrAdmin = isSupervisor || isManagement;

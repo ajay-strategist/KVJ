@@ -175,9 +175,6 @@ export function useTaskSessions() {
           if (notes) {
             updates.notes = notes;
             saveSessionNote(primary.id, notes);
-            if (taskId) {
-              saveSessionNote(taskId, notes);
-            }
           }
           await repo.update(
             primary.id,
@@ -280,15 +277,6 @@ export function useTaskSessions() {
   const pauseSession = useCallback(
     async (taskId: UUID | undefined, notes?: string) => {
       try {
-        if (taskId && notes) {
-          saveSessionNote(taskId, notes);
-          try {
-            await supabase
-              .from('flwdsk_tasks')
-              .update({ description: notes })
-              .eq('id', taskId);
-          } catch (_) {}
-        }
         await closeOpen(taskId, 'paused', notes);
         return { ok: true as const };
       } catch (e: any) {
@@ -320,29 +308,9 @@ export function useTaskSessions() {
   }, [repo]);
 
   const updateSessionNote = useCallback(
-    async (sessionId: UUID | string, notes: string, taskId?: UUID | string) => {
+    async (sessionId: UUID | string, notes: string, _taskId?: UUID | string) => {
       try {
         saveSessionNote(sessionId, notes);
-        if (taskId) {
-          saveSessionNote(taskId, notes);
-          try {
-            await supabase
-              .from('flwdsk_tasks')
-              .update({ description: notes })
-              .eq('id', taskId);
-          } catch (_) {}
-        } else {
-          const tid = sessionId.replace(/^local-(db-)?/, '');
-          if (tid && tid.length > 10) {
-            saveSessionNote(tid, notes);
-            try {
-              await supabase
-                .from('flwdsk_tasks')
-                .update({ description: notes })
-                .eq('id', tid);
-            } catch (_) {}
-          }
-        }
         try {
           await supabase
             .from('flwdsk_task_work_sessions')

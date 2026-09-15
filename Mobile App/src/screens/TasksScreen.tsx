@@ -173,11 +173,10 @@ export const TasksScreen: React.FC = () => {
           .eq('id', openSess.id);
       }
 
-      // 2. Update task description and status to todo
+      // 2. Update task status to todo
       await supabase
         .from('flwdsk_tasks')
         .update({
-          description: note,
           status: 'todo',
         })
         .eq('id', pauseTargetTaskId);
