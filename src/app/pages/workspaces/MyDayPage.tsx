@@ -2723,10 +2723,12 @@ export function MyDayPage() {
       );
 
       try {
-        await updateTask(taskIdToPause as any, { status: 'todo', actualHours: secondsToday / 3600 });
         if (updateMsg) {
+          saveSessionNote(taskIdToPause, updateMsg);
+          await updateTask(taskIdToPause as any, { status: 'todo', actualHours: secondsToday / 3600, description: updateMsg });
           await pauseSession(taskIdToPause as any, updateMsg);
         } else {
+          await updateTask(taskIdToPause as any, { status: 'todo', actualHours: secondsToday / 3600 });
           await pauseSession(taskIdToPause as any);
         }
       } catch (e) {
@@ -2775,7 +2777,8 @@ export function MyDayPage() {
     );
 
     try {
-      await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600 });
+      saveSessionNote(taskId, note);
+      await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600, description: note });
       await pauseSession(taskId as any, note);
       const targetTask = (projectTasks || []).find((t) => t.id === taskId) || tasks.find((t) => t.id === taskId);
       const taskTitleText = targetTask?.title || taskId;

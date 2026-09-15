@@ -516,7 +516,8 @@ export function TaskBoard({
     );
 
     try {
-      await updateTask(taskId as UUID, { status: 'todo', actualHours: secondsToday / 3600 });
+      saveSessionNote(taskId, note);
+      await updateTask(taskId as UUID, { status: 'todo', actualHours: secondsToday / 3600, description: note });
       await pauseSession(taskId as UUID, note);
     } catch (e) {
       console.warn('Pause task error:', e);
