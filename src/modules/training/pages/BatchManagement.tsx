@@ -585,9 +585,9 @@ export function BatchManagement() {
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     const courseId = newBatchForm.selectedCourseId || courses[0]?.id;
-    const trainerId = newBatchForm.trainerId || trainers[0]?.id;
-    if (!courseId || !trainerId) {
-      toast({ variant: 'error', title: 'Missing Info', message: 'Course and Lead Trainer are required.' });
+    const trainerId = newBatchForm.trainerId ? newBatchForm.trainerId : undefined;
+    if (!courseId) {
+      toast({ variant: 'error', title: 'Missing Info', message: 'Course is required.' });
       return;
     }
     const res = await createBatch({
@@ -1023,15 +1023,14 @@ export function BatchManagement() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Lead Trainer *</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Lead Trainer (Optional)</label>
                 <select
                   className="kvj-select"
-                  required
                   value={newBatchForm.trainerId}
                   onChange={(e) => setNewBatchForm({ ...newBatchForm, trainerId: e.target.value })}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
                 >
-                  <option value="">-- Choose Lead Trainer --</option>
+                  <option value="">-- Choose Lead Trainer (Optional) --</option>
                   {trainers.map((t) => (
                     <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.designation})</option>
                   ))}
