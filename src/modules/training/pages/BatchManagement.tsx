@@ -9,7 +9,7 @@ import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
-import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN, type Batch } from '../training.repository';
+import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN, type Batch, type TrainingPhase, TRAINING_PHASES } from '../training.repository';
 import { normalizeStudentKey } from '../supabase-training.repository';
 import { supabase } from '../../../shared/integration/supabase';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -86,6 +86,21 @@ export function BatchManagement() {
       void e;
     }
   }, []);
+
+  const availableColleges = useMemo(() => {
+    const set = new Set<string>();
+    (dbColleges || []).forEach((c) => {
+      const name = c?.name || c?.title;
+      if (name && typeof name === 'string' && name.trim()) set.add(name.trim());
+    });
+    (batches || []).forEach((b) => {
+      if (b.college && typeof b.college === 'string' && b.college.trim() && b.college !== '—') {
+        set.add(b.college.trim());
+      }
+    });
+    ['Christ Irinjalakkuda', 'MIM', 'MIM Kuttikkanam', 'SJCET', 'St. Thomas College'].forEach((c) => set.add(c));
+    return Array.from(set).sort();
+  }, [dbColleges, batches]);
 
   // Load Trainers
   useEffect(() => {
@@ -461,7 +476,22 @@ export function BatchManagement() {
 
   // Modals
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
-  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+  const [editBatchForm, setEditBatchForm] = useState({
+    selectedCourseId: '',
+    trainingName: '',
+    college: '',
+    collegeCourse: '',
+    academicYear: '2026-2027',
+    batchName: 'Batch 1',
+    trainerId: '',
+    coTrainerIds: [] as string[],
+    coordinator: '',
+    coordinatorEmail: '',
+    startDate: '',
+    endDate: '',
+    phase: 'Scheduled' as TrainingPhase,
+  });
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; message: string } | null>(null);
@@ -570,40 +600,68 @@ export function BatchManagement() {
     code: '',
     selectedCourseId: '',
     trainingName: '',
-    college: 'Christ Irinjalakkuda',
-    collegeCourse: 'BCOM Self',
+    college: '',
+    collegeCourse: '',
     academicYear: '2026-2027',
     batchName: 'Batch 1',
     trainerId: '',
     coTrainerIds: [] as string[],
-    coordinator: 'Prof. Anil Kumar',
-    coordinatorEmail: 'anil@christcollege.edu',
+    coordinator: '',
+    coordinatorEmail: '',
     startDate: '',
     endDate: '',
   });
+
+  const handleOpenCreateBatch = () => {
+    setNewBatchForm({
+      code: '',
+      selectedCourseId: courses[0]?.id || '',
+      trainingName: '',
+      college: '',
+      collegeCourse: '',
+      academicYear: '2026-2027',
+      batchName: 'Batch 1',
+      trainerId: '',
+      coTrainerIds: [],
+      coordinator: '',
+      coordinatorEmail: '',
+      startDate: '',
+      endDate: '',
+    });
+    setCreateBatchModalOpen(true);
+  };
 
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     const courseId = newBatchForm.selectedCourseId || courses[0]?.id;
     const trainerId = newBatchForm.trainerId ? newBatchForm.trainerId : undefined;
+    const college = newBatchForm.college.trim();
+    const program = newBatchForm.collegeCourse.trim();
+    const batchNo = newBatchForm.batchName.trim() || 'Batch 1';
+
     if (!courseId) {
       toast({ variant: 'error', title: 'Missing Info', message: 'Course is required.' });
       return;
     }
+    if (!college) {
+      toast({ variant: 'error', title: 'Missing Info', message: 'College Name is required.' });
+      return;
+    }
+
     const res = await createBatch({
-      code: `${newBatchForm.college} - ${newBatchForm.collegeCourse} - ${newBatchForm.batchName}`,
+      code: `${college} - ${program} - ${batchNo}`,
       trainingName: newBatchForm.trainingName || courses.find((c) => c.id === courseId)?.title || 'Course',
-      college: newBatchForm.college,
-      program: newBatchForm.collegeCourse,
+      college,
+      program,
       courseId,
       trainerId,
       coTrainerIds: newBatchForm.coTrainerIds,
       startDate: newBatchForm.startDate || undefined,
       endDate: newBatchForm.endDate || undefined,
-      coordinator: newBatchForm.coordinator,
-      coordinatorEmail: newBatchForm.coordinatorEmail,
-      academicYear: newBatchForm.academicYear,
-      batchNo: newBatchForm.batchName,
+      coordinator: newBatchForm.coordinator.trim(),
+      coordinatorEmail: newBatchForm.coordinatorEmail.trim(),
+      academicYear: newBatchForm.academicYear.trim() || '2026-2027',
+      batchNo,
       phase: 'Scheduled',
     });
     if (res.ok) {
@@ -612,6 +670,76 @@ export function BatchManagement() {
       refreshBatches();
     } else {
       toast({ variant: 'error', title: 'Creation Failed', message: res.error });
+    }
+  };
+
+  const handleOpenEditBatch = (b: Batch) => {
+    const college = b.college || (b.code?.includes('-') ? b.code.split('-')[0].trim() : '') || '';
+    const program = b.program || (b as any).collegeCourse || (b.code?.includes('-') ? b.code.split('-')[1]?.trim() : '') || '';
+    const batchNo = b.batchNo || (b.code?.match(/Batch\s*\d+/i)?.[0]) || (b.code?.includes('-') ? b.code.split('-').pop()?.trim() : '') || 'Batch 1';
+    const academicYear = b.academicYear || (b.code?.match(/20\d\d-20\d\d/)?.[0]) || '2026-2027';
+
+    setEditingBatch(b);
+    setEditBatchForm({
+      selectedCourseId: b.courseId || '',
+      trainingName: b.trainingName || '',
+      college,
+      collegeCourse: program,
+      academicYear,
+      batchName: batchNo,
+      trainerId: b.trainerId || '',
+      coTrainerIds: b.coTrainerIds || [],
+      coordinator: b.coordinator || '',
+      coordinatorEmail: b.coordinatorEmail || '',
+      startDate: b.startDate ? b.startDate.split('T')[0] : '',
+      endDate: b.endDate ? b.endDate.split('T')[0] : '',
+      phase: (b.phase as TrainingPhase) || 'Scheduled',
+    });
+  };
+
+  const handleUpdateBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBatch) return;
+    const courseId = editBatchForm.selectedCourseId || editingBatch.courseId;
+    const college = editBatchForm.college.trim();
+    const program = editBatchForm.collegeCourse.trim();
+    const batchNo = editBatchForm.batchName.trim() || 'Batch 1';
+
+    if (!courseId) {
+      toast({ variant: 'error', title: 'Missing Info', message: 'Course is required.' });
+      return;
+    }
+    if (!college) {
+      toast({ variant: 'error', title: 'Missing Info', message: 'College Name is required.' });
+      return;
+    }
+
+    const updatedCode = `${college} - ${program} - ${batchNo}`;
+    const course = courses.find((c) => c.id === courseId);
+
+    const res = await updateBatch(editingBatch.id, {
+      code: updatedCode,
+      trainingName: editBatchForm.trainingName || course?.title || editingBatch.trainingName || 'Course',
+      college,
+      program,
+      courseId,
+      trainerId: editBatchForm.trainerId ? editBatchForm.trainerId : undefined,
+      coTrainerIds: editBatchForm.coTrainerIds,
+      startDate: editBatchForm.startDate || undefined,
+      endDate: editBatchForm.endDate || undefined,
+      coordinator: editBatchForm.coordinator.trim(),
+      coordinatorEmail: editBatchForm.coordinatorEmail.trim(),
+      academicYear: editBatchForm.academicYear.trim() || '2026-2027',
+      batchNo,
+      phase: editBatchForm.phase,
+    });
+
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Batch Updated', message: 'Training batch updated successfully.' });
+      setEditingBatch(null);
+      refreshBatches();
+    } else {
+      toast({ variant: 'error', title: 'Update Failed', message: res.error });
     }
   };
 
@@ -754,7 +882,7 @@ export function BatchManagement() {
         selectedBatchId={selectedBatchId}
         onSelectBatchId={setSelectedBatchId}
         canCreateBatch={canCreateBatch}
-        onOpenCreateBatch={() => setCreateBatchModalOpen(true)}
+        onOpenCreateBatch={handleOpenCreateBatch}
         onCarouselAction={(batchId, action) => {
           setSelectedBatchId(batchId);
           if (action.id === 'daily') setDailyReportPreviewOpen(true);
@@ -765,7 +893,7 @@ export function BatchManagement() {
             setEmailComposerOpen(true);
           }
         }}
-        onEditBatch={(b) => setEditingBatchId(b.id)}
+        onEditBatch={handleOpenEditBatch}
         onCopyBatch={() => toast({ variant: 'info', title: 'Copy Batch', message: 'Duplicate batch template initiated.' })}
         onDeleteBatch={userRole === 'ADMIN' ? async (id) => {
           const ok = await confirm({ title: 'Delete Batch?', message: 'Are you sure you want to delete this batch?' });
@@ -1001,9 +1129,13 @@ export function BatchManagement() {
                   onChange={(e) => setNewBatchForm({ ...newBatchForm, college: e.target.value })}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
                 >
-                  {(dbColleges.length > 0 ? dbColleges : [{ name: 'Christ Irinjalakkuda' }, { name: 'MIM Kuttikkanam' }, { name: 'St. Thomas College' }]).map((c: any, i: number) => (
-                    <option key={i} value={c.name}>{c.name}</option>
+                  <option value="">-- Choose College --</option>
+                  {availableColleges.map((col) => (
+                    <option key={col} value={col}>{col}</option>
                   ))}
+                  {newBatchForm.college && !availableColleges.includes(newBatchForm.college) && (
+                    <option value={newBatchForm.college}>{newBatchForm.college}</option>
+                  )}
                 </select>
               </div>
 
@@ -1054,6 +1186,176 @@ export function BatchManagement() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
               <Button variant="secondary" type="button" onClick={() => setCreateBatchModalOpen(false)}>Cancel</Button>
               <Button type="submit">➕ Create Batch</Button>
+            </div>
+          </form>
+        </Drawer>
+      )}
+
+      {/* Edit Batch Drawer */}
+      {editingBatch && (
+        <Drawer open={true} onClose={() => setEditingBatch(null)} title="✏️ Edit Training Batch">
+          <form onSubmit={handleUpdateBatch} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Program / Course *</label>
+              <select
+                className="kvj-select"
+                required
+                value={editBatchForm.selectedCourseId}
+                onChange={(e) => setEditBatchForm({ ...editBatchForm, selectedCourseId: e.target.value })}
+                style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
+              >
+                <option value="">-- Choose Course --</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title} ({c.code})</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>College Name *</label>
+                <select
+                  className="kvj-select"
+                  required
+                  value={editBatchForm.college}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, college: e.target.value })}
+                  style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
+                >
+                  <option value="">-- Choose College --</option>
+                  {availableColleges.map((col) => (
+                    <option key={col} value={col}>{col}</option>
+                  ))}
+                  {editBatchForm.college && !availableColleges.includes(editBatchForm.college) && (
+                    <option value={editBatchForm.college}>{editBatchForm.college}</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Program / Stream *</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  value={editBatchForm.collegeCourse}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, collegeCourse: e.target.value })}
+                  placeholder="e.g. 2 MCOM / BBA"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Lead Trainer (Optional)</label>
+                <select
+                  className="kvj-select"
+                  value={editBatchForm.trainerId}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, trainerId: e.target.value })}
+                  style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
+                >
+                  <option value="">-- Choose Lead Trainer (Optional) --</option>
+                  {trainers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.designation})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Batch Name / No. *</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  required
+                  value={editBatchForm.batchName}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, batchName: e.target.value })}
+                  placeholder="e.g. Batch 1"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Academic Year</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  value={editBatchForm.academicYear}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, academicYear: e.target.value })}
+                  placeholder="e.g. 2026-2027"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Phase / Status</label>
+                <select
+                  className="kvj-select"
+                  value={editBatchForm.phase}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, phase: e.target.value as TrainingPhase })}
+                  style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
+                >
+                  {TRAINING_PHASES.map((ph) => (
+                    <option key={ph} value={ph}>{ph}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Coordinator Name</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  value={editBatchForm.coordinator}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, coordinator: e.target.value })}
+                  placeholder="e.g. Prof. Name"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Coordinator Email</label>
+                <input
+                  type="email"
+                  className="kvj-input"
+                  value={editBatchForm.coordinatorEmail}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, coordinatorEmail: e.target.value })}
+                  placeholder="e.g. coordinator@college.edu"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Start Date</label>
+                <input
+                  type="date"
+                  className="kvj-input"
+                  value={editBatchForm.startDate}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, startDate: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>End Date</label>
+                <input
+                  type="date"
+                  className="kvj-input"
+                  value={editBatchForm.endDate}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, endDate: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+              <Button variant="secondary" type="button" onClick={() => setEditingBatch(null)}>Cancel</Button>
+              <Button type="submit">💾 Save Changes</Button>
             </div>
           </form>
         </Drawer>
