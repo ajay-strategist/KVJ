@@ -208,27 +208,44 @@ function AppShellFrame({ children }: { children: ReactNode }) {
               padding: collapsed && !isMobile ? '14px 8px' : '14px 16px',
               borderBottom: '1px solid var(--border)', flexShrink: 0, gap: 10, overflow: 'hidden'
             }}>
-              {/* Light chip keeps the (dark-ink) logo readable on any theme */}
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                background: '#FFFFFF', borderRadius: 10,
-                padding: collapsed && !isMobile ? '4px 6px' : '5px 8px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.12)', flexShrink: 0,
-              }}>
-                <img
-                  src="/logo.png"
-                  alt={`${appConfig.app.company} Logo`}
-                  style={{
-                    height: collapsed && !isMobile ? 22 : 26,
-                    maxWidth: '100%',
-                    objectFit: 'contain',
-                    display: 'block',
-                  }}
-                />
-              </span>
-              {(!collapsed || isMobile) && (
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                  {appConfig.app.productTitle && (
+              {collapsed && !isMobile ? (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  background: '#FFFFFF', borderRadius: 10,
+                  padding: '4px 6px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.12)', flexShrink: 0,
+                }}>
+                  <img
+                    src="/teamz-icon.png"
+                    alt={`${appConfig.app.productTitle} Icon`}
+                    style={{
+                      height: 26,
+                      width: 26,
+                      objectFit: 'contain',
+                      display: 'block',
+                    }}
+                  />
+                </span>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: '#FFFFFF', borderRadius: 10,
+                    padding: '4px 8px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.12)', flexShrink: 0,
+                  }}>
+                    <img
+                      src="/teamz-icon.png"
+                      alt={`${appConfig.app.productTitle} Icon`}
+                      style={{
+                        height: 26,
+                        width: 26,
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                       <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
                         {appConfig.app.productTitle}
@@ -237,10 +254,10 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                         {appConfig.app.byCompany}
                       </span>
                     </div>
-                  )}
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.03em', marginTop: 2 }}>
-                    {appConfig.app.tagline}
-                  </span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--brand)', letterSpacing: '0.04em', marginTop: 2 }}>
+                      {appConfig.app.tagline}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -720,7 +737,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   <Icon name="Menu" size={18} />
                 </button>
                 <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {currentNavTitle || appConfig.app.productTitle || 'FlowDesk'}
+                  {currentNavTitle || appConfig.app.productTitle || 'Teamz'}
                 </span>
               </div>
 

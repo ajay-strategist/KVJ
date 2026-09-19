@@ -1,7 +1,7 @@
 {
-  "name": "KVJ FlowDesk - Enterprise Operations",
-  "short_name": "FlowDesk",
-  "description": "Enterprise operations, real-time attendance, daily tasks, and classroom management",
+  "name": "Teamz - Enterprise Operations",
+  "short_name": "Teamz",
+  "description": "Bring your people, processes and information together in one connected workspace.",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",

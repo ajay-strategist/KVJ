@@ -12,15 +12,15 @@ export const appConfig = {
     // Product name intentionally left blank — a name will be chosen later. Set
     // `productTitle` (and `name`/`productName`/`shortName`) here and it flows to
     // the sidebar header, login screen, error pages, page title and reports.
-    name: 'KVJ Analytics',                  // falls back to company until named
-    productName: 'KVJ Analytics',
-    productTitle: '',                       // the product wordmark — empty for now
+    name: 'Teamz',
+    productName: 'Teamz',
+    productTitle: 'Teamz',
     byCompany: 'by KVJ',
-    tagline: 'Connect. Manage. Transform.',
+    tagline: 'PEOPLE WORK TOGETHER',
     description: 'Enterprise Operations Platform',
     company: 'KVJ Analytics',
     copyright: '© 2026 KVJ Analytics. All Rights Reserved.',
-    shortName: 'KVJ',
+    shortName: 'Teamz',
     version: '1.0',
     environment: (import.meta as { env?: Record<string, string> }).env?.MODE ?? 'development',
   },
@@ -29,10 +29,11 @@ export const appConfig = {
     // Default preset = "KVJ Modern" (design system §19). "KVJ Classic" preserves
     // the existing navy/blue identity — swap by changing these tokens only.
     preset: 'kvj-modern' as 'kvj-modern' | 'kvj-classic',
-    primary: '#2563EB',                    // CONFIRM primary brand colour (Blue-600 default)
-    secondary: '#8B5CF6',                  // CONFIRM secondary (Purple)
-    logoLight: '/logo.png',
-    logoDark: '/logo.png',                 // CONFIRM dark-variant logo
+    primary: '#2563EB',                    // Primary brand colour
+    secondary: '#8B5CF6',                  // Secondary brand colour
+    logoLight: '/teamz-logo.png',
+    logoDark: '/teamz-logo.png',
+    logoIcon: '/teamz-icon.png',
     fontUi: "'Inter', sans-serif",
     fontReport: "'Fraunces', serif",       // CONFIRM report display font
   },
