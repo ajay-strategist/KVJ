@@ -204,9 +204,25 @@ export function AttendanceCalendarView({
     return isNaN(matchNum) ? 0 : matchNum;
   };
 
+  // KVJ Analytics-only day: every session must be Office or Remote (Work From Home)
+  // If ANY session is Training/Marketing/Other, the whole day is excluded from KVJ office calculations
+  const isKvjDay = (d: CalendarDayDetail): boolean => {
+    const kvjTypes = ['Office', 'Remote', 'Work From Home'];
+    if (d.sessions && d.sessions.length > 0) {
+      return d.sessions.every((s) => kvjTypes.includes(s.type || ''));
+    }
+    // No session breakdown — fall back to top-level type
+    const topType = (d as any).workType || 'Office';
+    return kvjTypes.includes(topType);
+  };
+
   // Monthly summary stats calculated dynamically
   const monthlyStats = useMemo(() => {
     const workingDaysInMonth = days.filter((d) => d.dayName !== 'Sun').length;
+    // KVJ-only schedulable days = non-Sunday, non-holiday, all sessions are Office/Remote
+    const kvjScheduledDays = days.filter(
+      (d) => d.dayName !== 'Sun' && d.status !== 'holiday' && isKvjDay(d)
+    ).length;
     const daysToBeWorked = days.filter((d) => d.dayName !== 'Sun' && d.status !== 'holiday').length;
     const noOfLeaves = days.filter((d) => d.status === 'leave').length;
     const holidayWorked = days.filter((d) => d.status === 'present' && d.dayName === 'Sun').length;
@@ -229,15 +245,25 @@ export function AttendanceCalendarView({
       return sum;
     }, 0);
 
-    const expectedOfficeHours = workingDays * 8;
+    // Expected = KVJ-only schedulable days × 8 hrs (excludes any day with Training/Marketing sessions)
+    const expectedOfficeHours = kvjScheduledDays * 8;
+
+    // Actual = hours actually worked on days that were purely KVJ (Office/Remote) sessions
+    const actualOfficeHours = Math.round(
+      days
+        .filter((d) => d.status === 'present' && isKvjDay(d))
+        .reduce((sum, d) => sum + parseHoursWorked(d.hoursWorked), 0) * 10
+    ) / 10;
 
     return {
       workingDaysInMonth,
       daysToBeWorked,
+      kvjScheduledDays,
       noOfLeaves,
       holidayWorked,
       workingDays,
       expectedOfficeHours,
+      actualOfficeHours,
       lateReporting,
       earlyLeaving,
       totalBreakHrs,
@@ -253,6 +279,17 @@ export function AttendanceCalendarView({
       return fullName === (selectedEmployeeName || '').trim() || e.id === selectedEmployeeName;
     }) || employees[0];
     const joinedDate = selectedEmp?.dateOfJoining || '—';
+
+    // KVJ-only helper for FY raw DB records: all sessions must be Office or Remote
+    const kvjSessionTypes = ['Office', 'Remote', 'Work From Home'];
+    const isFyRecordKvjOnly = (r: any): boolean => {
+      const sessions: any[] = r.sessions || r.work_sessions || [];
+      if (sessions.length > 0) {
+        return sessions.every((s: any) => kvjSessionTypes.includes(s.work_type || s.workType || 'Office'));
+      }
+      // No session breakdown — use top-level work_type
+      return kvjSessionTypes.includes(r.work_type || 'Office');
+    };
 
     // If we have actual FY attendance records, aggregate them accurately across the financial year
     if (fyAttendance.length > 0) {
@@ -286,7 +323,20 @@ export function AttendanceCalendarView({
       const totalWorkingMins = fyAttendance.reduce((sum, r) => sum + (Number(r.total_working_minutes) || 0), 0);
       const totalHoursWorkedFY = Math.round((totalWorkingMins / 60) * 10) / 10;
 
-      const expectedOfficeHoursFY = workingDaysFY * 8;
+      // KVJ-only scheduled days: present records where ALL sessions are Office/Remote
+      const kvjDaysFY = fyAttendance.filter(
+        (r) => (r.status === 'present' || r.status === 'clocked_out' || (r.total_working_minutes && r.total_working_minutes > 0)) && isFyRecordKvjOnly(r)
+      ).length;
+
+      // Expected = KVJ-only present days × 8 (training days excluded)
+      const expectedOfficeHoursFY = kvjDaysFY * 8;
+
+      // Actual = sum of actual working minutes on KVJ-only days
+      const actualOfficeHoursFY = Math.round(
+        fyAttendance
+          .filter((r) => isFyRecordKvjOnly(r) && Number(r.total_working_minutes) > 0)
+          .reduce((sum, r) => sum + Number(r.total_working_minutes), 0) / 60 * 10
+      ) / 10;
 
       const noOfLeavesFY = (fyLeaves || []).reduce((acc: number, l: any) => {
         if (!l.start_date || !l.end_date) return acc + 1;
@@ -307,6 +357,7 @@ export function AttendanceCalendarView({
         noOfLeavesFY,
         holidayWorkedFY,
         expectedOfficeHoursFY,
+        actualOfficeHoursFY,
         lateReportingFY,
         earlyLeavingFY,
         totalBreakHrsFY,
@@ -338,7 +389,8 @@ export function AttendanceCalendarView({
       workingDaysFY: daysCount || monthlyStats.workingDays,
       noOfLeavesFY: 0,
       holidayWorkedFY: 0,
-      expectedOfficeHoursFY: (daysCount || monthlyStats.workingDays) * 8,
+      expectedOfficeHoursFY: (daysCount || monthlyStats.kvjScheduledDays) * 8,
+      actualOfficeHoursFY: 0,
       lateReportingFY: 0,
       earlyLeavingFY: 0,
       totalBreakHrsFY: 0,
@@ -427,6 +479,9 @@ export function AttendanceCalendarView({
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--brand)', fontWeight: 600 }}>Expected Office Hours:</span> <strong style={{ color: 'var(--brand)' }}>{monthlyStats.expectedOfficeHours} hrs</strong>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--brand)' }}>
+              <span style={{ color: 'var(--brand)', fontWeight: 600 }}>Actual Office Hours:</span> <strong style={{ color: 'var(--brand)' }}>{monthlyStats.actualOfficeHours} hrs</strong>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid #22C55E' }}>
               <span style={{ fontWeight: 600 }}>Total Expenses:</span> <strong style={{ color: 'var(--status-success)', fontSize: 13 }}>₹ {monthlyStats.totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
@@ -468,6 +523,9 @@ export function AttendanceCalendarView({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--brand)', fontWeight: 600 }}>FY Expected Office Hours:</span> <strong style={{ color: 'var(--brand)' }}>{fyStats.expectedOfficeHoursFY} hrs</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--brand)' }}>
+              <span style={{ color: 'var(--brand)', fontWeight: 600 }}>FY Actual Office Hours:</span> <strong style={{ color: 'var(--brand)' }}>{fyStats.actualOfficeHoursFY} hrs</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>FY Total Hours Worked:</span> <strong>{fyStats.totalHoursWorkedFY} hrs</strong>
