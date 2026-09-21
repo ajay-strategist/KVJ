@@ -120,8 +120,8 @@ interface AttendancePanelProps {
   record: AttendanceRecord | null;
   loading: boolean;
   clockIn: (workType: WorkSessionType) => Promise<any>;
-  clockOut: () => Promise<any>;
-  startBreak: (reason?: string) => Promise<any>;
+  clockOut: (taskNote?: string) => Promise<any>;
+  startBreak: (reason?: string, note?: string) => Promise<any>;
   endBreak: () => Promise<any>;
   onActivityLog?: (title: string, tone?: 'success' | 'progress' | 'info' | 'neutral') => void;
   timelineEntries?: Array<{ title: string; time: string }>;
