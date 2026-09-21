@@ -427,6 +427,36 @@ export const AttendancePanel = memo(function AttendancePanel({
     return (tasks || []).find((t) => t.active) || null;
   }, [tasks]);
 
+  const [clockOutModalOpen, setClockOutModalOpen] = useState(false);
+  const [clockOutTaskNote, setClockOutTaskNote] = useState('');
+
+  const handleClockOutClick = useCallback(() => {
+    if (activeRunningTask) {
+      setClockOutTaskNote('');
+      setClockOutModalOpen(true);
+    } else {
+      handleClockOut();
+    }
+  }, [activeRunningTask, handleClockOut]);
+
+  const handleConfirmClockOutWithTask = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    const note = clockOutTaskNote.trim();
+    if (!note) {
+      toast({ variant: 'error', title: 'Work Update Required', message: 'Please provide a work progress update on your active task before clocking out.' });
+      return;
+    }
+    const res = await clockOut(note);
+    if (res.ok) {
+      toast({ variant: 'success', title: 'Clocked Out', message: 'Work progress saved and work day ended.' });
+      if (onActivityLog) onActivityLog(`Clocked out work session. Work status: ${note}`, 'neutral');
+      setClockOutModalOpen(false);
+      setClockOutTaskNote('');
+    } else {
+      toast({ variant: 'error', title: 'Clock Out Failed', message: res.error });
+    }
+  }, [clockOutTaskNote, clockOut, toast, onActivityLog]);
+
   const [breakModalOpen, setBreakModalOpen] = useState(false);
   const [breakReason, setBreakReason] = useState('Official Break');
   const [breakStatusUpdate, setBreakStatusUpdate] = useState('');
@@ -667,7 +697,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 type="button"
                 className="kvj-btn"
                 disabled={loading}
-                onClick={handleClockOut}
+                onClick={handleClockOutClick}
                 style={{
                   background: 'var(--status-danger)',
                   color: 'white',
@@ -1060,6 +1090,70 @@ export const AttendancePanel = memo(function AttendancePanel({
             </Button>
             <Button type="submit" style={{ background: 'var(--status-warning)', color: 'white' }}>
               ☕ Confirm &amp; Start Break
+            </Button>
+          </div>
+        </form>
+      </Drawer>
+
+      {/* Clock Out Work Progress Drawer */}
+      <Drawer open={clockOutModalOpen} onClose={() => setClockOutModalOpen(false)} title="Clock Out — Update Work Status">
+        <form onSubmit={handleConfirmClockOutWithTask} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: '1.5' }}>
+            You have an active task timer running. Please describe your work progress before clocking out. This will pause your task and save your update to the <strong>Task Worklog</strong>.
+          </div>
+
+          {activeRunningTask && (
+            <div
+              style={{
+                padding: '14px 16px',
+                borderRadius: 12,
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--status-danger)', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  🔴 Active Task Being Paused
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  ⏱ {Math.floor(activeRunningTask.secondsToday / 3600)}h {Math.floor((activeRunningTask.secondsToday % 3600) / 60)}m today
+                </span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {activeRunningTask.title}
+              </div>
+              {activeRunningTask.project && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  📁 Project: {activeRunningTask.project}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
+              {activeRunningTask ? `Work Progress Update on "${activeRunningTask.title}" *` : 'Work Progress Update *'}
+            </label>
+            <textarea
+              className="kvj-input"
+              required
+              rows={4}
+              value={clockOutTaskNote}
+              onChange={(e) => setClockOutTaskNote(e.target.value)}
+              placeholder={activeRunningTask ? `Describe what you accomplished on "${activeRunningTask.title}" today before clocking out...` : "Describe what you accomplished today..."}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13, resize: 'vertical' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+            <Button variant="secondary" type="button" onClick={() => setClockOutModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" style={{ background: 'var(--status-danger)', color: 'white' }}>
+              🔴 Save Progress &amp; Clock Out
             </Button>
           </div>
         </form>
@@ -2699,12 +2793,6 @@ export function MyDayPage() {
   };
 
   const handleStartBreakWithTask = useCallback(async (reason: string, updateMsg: string, targetTaskId?: string): Promise<boolean> => {
-    const res = await startBreak(reason);
-    if (!res.ok) {
-      toast({ variant: 'error', title: 'Break Failed', message: res.error });
-      return false;
-    }
-
     // If an active task is running or a target task is selected, pause it and save progress notes
     const runningTask = tasks.find((t) => t.active);
     const taskIdToPause = runningTask?.id || targetTaskId;
@@ -2721,6 +2809,19 @@ export function MyDayPage() {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskIdToPause ? { ...t, active: false, secondsToday } : t))
       );
+
+      const states = getStoredTaskStates();
+      const todayDateStr = toLocalISODate(new Date());
+      if (states[taskIdToPause]) {
+        states[taskIdToPause] = {
+          ...states[taskIdToPause],
+          active: false,
+          secondsToday,
+          lastStartTime: undefined,
+          date: todayDateStr,
+        };
+        saveStoredTaskStates(states);
+      }
 
       try {
         await updateTask(taskIdToPause as any, { status: 'todo', actualHours: secondsToday / 3600 });
@@ -2743,6 +2844,12 @@ export function MyDayPage() {
       }
     }
 
+    const res = await startBreak(reason, updateMsg);
+    if (!res.ok) {
+      toast({ variant: 'error', title: 'Break Failed', message: res.error });
+      return false;
+    }
+
     toast({
       variant: 'info',
       title: 'On Break',
@@ -2751,102 +2858,28 @@ export function MyDayPage() {
         : 'Enjoy your break. Status update saved.'
     });
     return true;
-  }, [startBreak, tasks, projectTasks, toast]);
+  }, [startBreak, tasks, projectTasks, toast, pauseSession, updateTask]);
 
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
   const [pauseTargetTaskId, setPauseTargetTaskId] = useState<string | null>(null);
   const [pauseWorkNote, setPauseWorkNote] = useState('');
-
-  const handleConfirmPauseTask = async () => {
-    if (!pauseTargetTaskId) return;
-    const note = pauseWorkNote.trim();
-    if (!note) {
-      toast({ variant: 'error', title: 'Work Update Required', message: 'Please enter a work progress update before pausing.' });
-      return;
-    }
-    const taskId = pauseTargetTaskId;
-
-    taskTimerStore.pauseTask(taskId);
-    const timer = taskTimerStore.getTimer(taskId);
-    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
-
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, active: false, secondsToday } : t))
-    );
-
-    try {
-      await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600 });
-      await pauseSession(taskId as any, note);
-      const targetTask = (projectTasks || []).find((t) => t.id === taskId) || tasks.find((t) => t.id === taskId);
-      const taskTitleText = targetTask?.title || taskId;
-      handleActivityLog(`Paused Task: ${taskTitleText}`, 'neutral');
-    } catch (e) {
-      console.warn('Pause task error in workspace:', e);
-    }
-
-    setPauseModalOpen(false);
-    setPauseTargetTaskId(null);
-    setPauseWorkNote('');
-    toast({ variant: 'info', title: 'Task Paused', message: 'Work progress saved and timer paused.' });
-  };
+  const [pendingSwitchTaskId, setPendingSwitchTaskId] = useState<string | null>(null);
+  const [pendingSwitchTaskTitle, setPendingSwitchTaskTitle] = useState<string | null>(null);
 
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
 
-  const handleToggleTask = async (id: string, taskTitle: string, currentActive: boolean) => {
-    if (togglingTaskId) return;
-
-    // If active and user clicks pause, open mandatory work progress modal
-    if (currentActive) {
-      setPauseTargetTaskId(id);
-      setPauseWorkNote('');
-      setPauseModalOpen(true);
-      return;
-    }
-
+  const performStartTask = useCallback(async (id: string, taskTitle: string) => {
     setTogglingTaskId(id);
     try {
-      const nextActive = !currentActive;
       const now = Date.now();
-      let targetTask: any = null;
-
-      // 1. If starting a task, find and pause any other active task in the DB & sessions first
-      if (nextActive) {
-        const activeTask = tasks.find((t) => t.active && t.id !== id);
-        if (activeTask) {
-          taskTimerStore.pauseTask(activeTask.id);
-          const activeTimer = taskTimerStore.getTimer(activeTask.id);
-          const activeSecs = activeTimer ? Math.floor(activeTimer.elapsedMs / 1000) : activeTask.secondsToday;
-          
-          updateTask(activeTask.id, {
-            status: 'todo',
-            actualHours: activeSecs / 3600,
-          }).catch((e) => console.warn('Failed to update previously active task in DB:', e));
-          
-          pauseSession(activeTask.id as any);
-          handleActivityLog(`Paused Task: ${activeTask.title}`, 'neutral');
-        }
-        
-        taskTimerStore.startTask(id);
-      } else {
-        taskTimerStore.pauseTask(id);
-      }
-
-      // 2. Query the exact correct secondsToday from the store to avoid race conditions
+      taskTimerStore.startTask(id);
       const timer = taskTimerStore.getTimer(id);
       const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
 
-      // 3. Update the tasks list state and save to local storage
       setTasks((prev) => {
-        const found = prev.find((t) => t.id === id);
-        if (found) targetTask = found;
-
         const updated = prev.map((t) => {
           if (t.id === id) {
-            return { ...t, active: nextActive, secondsToday };
-          } else if (nextActive && t.active) {
-            const tTimer = taskTimerStore.getTimer(t.id);
-            const tSec = tTimer ? Math.floor(tTimer.elapsedMs / 1000) : t.secondsToday;
-            return { ...t, active: false, secondsToday: tSec };
+            return { ...t, active: true, secondsToday };
           }
           return t;
         });
@@ -2866,33 +2899,112 @@ export function MyDayPage() {
         return updated;
       });
 
-      // 4. Update the clicked task in the database and sessions
       updateTask(id, {
-        status: nextActive ? 'in_progress' : 'todo',
+        status: 'in_progress',
         actualHours: secondsToday / 3600,
       }).catch((e) => console.warn('Failed to update task status in DB:', e));
 
       const raw = (projectTasks || []).find((t) => t.id === id);
-      if (nextActive) {
-        const project = raw?.projectId && raw.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === raw.projectId) : null;
-        const pSupervisorId = project ? (project as any).supervisorId : null;
-        const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
-        const supervisorId = pSupervisorId || tSupervisorId;
+      const project = raw?.projectId && raw.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === raw.projectId) : null;
+      const pSupervisorId = project ? (project as any).supervisorId : null;
+      const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
+      const supervisorId = pSupervisorId || tSupervisorId;
 
-        await startSession({
-          taskId: id as any,
-          projectId: raw?.projectId,
-          workTitle: taskTitle,
-          supervisorId,
-        });
-      } else {
-        await pauseSession(id as any);
-      }
+      await startSession({
+        taskId: id as any,
+        projectId: raw?.projectId,
+        workTitle: taskTitle,
+        supervisorId,
+      });
 
-      handleActivityLog(`${nextActive ? 'Started' : 'Paused'} Task: ${taskTitle}`, nextActive ? 'progress' : 'neutral');
+      handleActivityLog(`Started Task: ${taskTitle}`, 'progress');
     } finally {
       setTogglingTaskId(null);
     }
+  }, [projectTasks, projects, startSession, updateTask]);
+
+  const handleConfirmPauseTask = async () => {
+    if (!pauseTargetTaskId) return;
+    const note = pauseWorkNote.trim();
+    if (!note) {
+      toast({ variant: 'error', title: 'Work Update Required', message: 'Please enter a work progress update before pausing.' });
+      return;
+    }
+    const taskId = pauseTargetTaskId;
+
+    taskTimerStore.pauseTask(taskId);
+    const timer = taskTimerStore.getTimer(taskId);
+    const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, active: false, secondsToday } : t))
+    );
+
+    const states = getStoredTaskStates();
+    const todayDateStr = toLocalISODate(new Date());
+    if (states[taskId]) {
+      states[taskId] = {
+        ...states[taskId],
+        active: false,
+        secondsToday,
+        lastStartTime: undefined,
+        date: todayDateStr,
+      };
+      saveStoredTaskStates(states);
+    }
+
+    try {
+      await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600 });
+      await pauseSession(taskId as any, note);
+      const targetTask = (projectTasks || []).find((t) => t.id === taskId) || tasks.find((t) => t.id === taskId);
+      const taskTitleText = targetTask?.title || taskId;
+      handleActivityLog(`Paused Task: ${taskTitleText}. Work status: ${note}`, 'neutral');
+    } catch (e) {
+      console.warn('Pause task error in workspace:', e);
+    }
+
+    const nextTaskId = pendingSwitchTaskId;
+    const nextTaskTitle = pendingSwitchTaskTitle;
+
+    setPauseModalOpen(false);
+    setPauseTargetTaskId(null);
+    setPauseWorkNote('');
+    setPendingSwitchTaskId(null);
+    setPendingSwitchTaskTitle(null);
+
+    if (nextTaskId && nextTaskTitle) {
+      toast({ variant: 'info', title: 'Task Paused & Switched', message: 'Previous task progress saved. Starting next task...' });
+      await performStartTask(nextTaskId, nextTaskTitle);
+    } else {
+      toast({ variant: 'info', title: 'Task Paused', message: 'Work progress saved and timer paused.' });
+    }
+  };
+
+  const handleToggleTask = async (id: string, taskTitle: string, currentActive: boolean) => {
+    if (togglingTaskId) return;
+
+    // If active and user clicks pause, open mandatory work progress modal
+    if (currentActive) {
+      setPendingSwitchTaskId(null);
+      setPendingSwitchTaskTitle(null);
+      setPauseTargetTaskId(id);
+      setPauseWorkNote('');
+      setPauseModalOpen(true);
+      return;
+    }
+
+    // If starting a task, check if another task is currently active
+    const activeTask = tasks.find((t) => t.active && t.id !== id);
+    if (activeTask) {
+      setPendingSwitchTaskId(id);
+      setPendingSwitchTaskTitle(taskTitle);
+      setPauseTargetTaskId(activeTask.id);
+      setPauseWorkNote('');
+      setPauseModalOpen(true);
+      return;
+    }
+
+    await performStartTask(id, taskTitle);
   };
 
   const handleSubmitReview = async (id: string, taskTitle: string) => {
@@ -3132,15 +3244,21 @@ export function MyDayPage() {
       {/* Apply Leave Modal on My Day */}
       <ApplyLeaveModal open={applyLeaveOpen} onClose={() => setApplyLeaveOpen(false)} />
 
-      {/* Pause Task Work Progress Drawer */}
+      {/* Pause / Switch Task Work Progress Drawer */}
       <Drawer
         open={pauseModalOpen}
-        onClose={() => setPauseModalOpen(false)}
-        title="Update Work Progress (Mandatory)"
+        onClose={() => {
+          setPauseModalOpen(false);
+          setPendingSwitchTaskId(null);
+          setPendingSwitchTaskTitle(null);
+        }}
+        title={pendingSwitchTaskId ? 'Switch Task — Save Progress (Mandatory)' : 'Pause Task — Save Progress (Mandatory)'}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ background: 'var(--bg-sunken)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-secondary)' }}>
-            <strong>📌 Management Note:</strong> Please describe what work was done during this session. This note will be recorded in the <strong>Task Worklog</strong> under the <strong>Update</strong> column for CEO/Manager review.
+            <strong>📌 Management Note:</strong> {pendingSwitchTaskId
+              ? `Please describe what you completed before switching to "${pendingSwitchTaskTitle}". This note will be recorded in the Task Worklog.`
+              : 'Please describe what work was done during this session. This note will be recorded in the Task Worklog under the Update column for CEO/Manager review.'}
           </div>
 
           <div>
@@ -3167,12 +3285,22 @@ export function MyDayPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
-            <Button variant="ghost" type="button" onClick={() => setPauseModalOpen(false)}>Cancel</Button>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => {
+                setPauseModalOpen(false);
+                setPendingSwitchTaskId(null);
+                setPendingSwitchTaskTitle(null);
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleConfirmPauseTask}
               disabled={!pauseWorkNote.trim()}
             >
-              ⏸ Save Progress & Pause Timer
+              {pendingSwitchTaskId ? '⏸ Save Progress & Start Next Task' : '⏸ Save Progress & Pause Timer'}
             </Button>
           </div>
         </div>

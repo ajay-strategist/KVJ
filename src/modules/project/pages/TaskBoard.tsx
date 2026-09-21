@@ -430,39 +430,17 @@ export function TaskBoard({
   };
 
   const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
+  const [pendingSwitchTask, setPendingSwitchTask] = useState<TaskItem | null>(null);
 
-  const handleStartTask = async (task: TaskItem) => {
-    if (startingTaskId) return;
-    // If already in progress and timer is actively running, ignore duplicate clicks
-    if (task.status === 'In Progress' && timers[task.id]?.isRunning) return;
-
+  const performStartTask = async (task: TaskItem) => {
     setStartingTaskId(task.id);
     try {
       const updatedAssignee = (task.assignee && task.assignee !== 'Unassigned') ? task.assignee : (user?.fullName || 'Assigned User');
-      
-      // 1. Pause previously active task in DB and sessions
-      const previouslyActive = tasksList.find((x) => x.status === 'In Progress' && x.id !== task.id);
-      if (previouslyActive) {
-        taskTimerStore.pauseTask(previouslyActive.id);
-        const prevTimer = taskTimerStore.getTimer(previouslyActive.id);
-        const prevSecs = prevTimer ? Math.floor(prevTimer.elapsedMs / 1000) : 0;
-        try {
-          await updateTask(previouslyActive.id as UUID, {
-            status: 'todo',
-            actualHours: prevSecs / 3600,
-          });
-          await pauseSession(previouslyActive.id as UUID);
-        } catch (e) {
-          console.warn('Failed to pause previously active task on start:', e);
-        }
-      }
 
       setTasksList((prev) =>
         prev.map((x) => {
           if (x.id === task.id) {
             return { ...x, status: 'In Progress', assignee: updatedAssignee };
-          } else if (x.status === 'In Progress') {
-            return { ...x, status: 'To Do' };
           }
           return x;
         })
@@ -488,11 +466,30 @@ export function TaskBoard({
     }
   };
 
+  const handleStartTask = async (task: TaskItem) => {
+    if (startingTaskId) return;
+    // If already in progress and timer is actively running, ignore duplicate clicks
+    if (task.status === 'In Progress' && timers[task.id]?.isRunning) return;
+
+    // Check if another task is currently In Progress
+    const previouslyActive = tasksList.find((x) => x.status === 'In Progress' && x.id !== task.id);
+    if (previouslyActive) {
+      setPendingSwitchTask(task);
+      setPauseTargetTaskId(previouslyActive.id);
+      setPauseWorkNote('');
+      setPauseModalOpen(true);
+      return;
+    }
+
+    await performStartTask(task);
+  };
+
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
   const [pauseTargetTaskId, setPauseTargetTaskId] = useState<string | null>(null);
   const [pauseWorkNote, setPauseWorkNote] = useState('');
 
   const handlePauseTask = (taskId: string) => {
+    setPendingSwitchTask(null);
     setPauseTargetTaskId(taskId);
     setPauseWorkNote('');
     setPauseModalOpen(true);
@@ -521,10 +518,19 @@ export function TaskBoard({
     } catch (e) {
       console.warn('Pause task error:', e);
     }
+
+    const nextTask = pendingSwitchTask;
     setPauseModalOpen(false);
     setPauseTargetTaskId(null);
     setPauseWorkNote('');
-    toast({ variant: 'info', title: 'Task Paused', message: 'Work progress saved and timer paused.' });
+    setPendingSwitchTask(null);
+
+    if (nextTask) {
+      toast({ variant: 'info', title: 'Task Paused & Switched', message: 'Previous task progress saved. Starting next task...' });
+      await performStartTask(nextTask);
+    } else {
+      toast({ variant: 'info', title: 'Task Paused', message: 'Work progress saved and timer paused.' });
+    }
   };
 
   const handleSubmitTaskForApproval = async (task: TaskItem) => {
@@ -1508,15 +1514,20 @@ export function TaskBoard({
         })()}
       </Drawer>
 
-      {/* Pause Task Work Progress Drawer */}
+      {/* Pause / Switch Task Work Progress Drawer */}
       <Drawer
         open={pauseModalOpen}
-        onClose={() => setPauseModalOpen(false)}
-        title="Update Work Progress (Mandatory)"
+        onClose={() => {
+          setPauseModalOpen(false);
+          setPendingSwitchTask(null);
+        }}
+        title={pendingSwitchTask ? 'Switch Task — Save Progress (Mandatory)' : 'Update Work Progress (Mandatory)'}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ background: 'var(--bg-sunken)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-secondary)' }}>
-            <strong>📌 Management Note:</strong> Please describe what work was done during this session. This note will be recorded in the <strong>Task Worklog</strong> under the <strong>Update</strong> column for CEO/Manager review.
+            <strong>📌 Management Note:</strong> {pendingSwitchTask
+              ? `Please describe what you completed before switching to "${pendingSwitchTask.name}". This note will be recorded in the Task Worklog.`
+              : 'Please describe what work was done during this session. This note will be recorded in the Task Worklog under the Update column for CEO/Manager review.'}
           </div>
 
           <div>
@@ -1543,12 +1554,21 @@ export function TaskBoard({
           </div>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
-            <Button variant="ghost" type="button" onClick={() => setPauseModalOpen(false)}>Cancel</Button>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => {
+                setPauseModalOpen(false);
+                setPendingSwitchTask(null);
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleConfirmPause}
               disabled={!pauseWorkNote.trim()}
             >
-              ⏸ Save Progress & Pause Timer
+              {pendingSwitchTask ? '⏸ Save Progress & Start Next Task' : '⏸ Save Progress & Pause Timer'}
             </Button>
           </div>
         </div>

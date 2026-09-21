@@ -199,6 +199,26 @@ export function useTaskSessions() {
                 .eq('id', dup.id);
             }
           }
+        } else if (notes) {
+          // If no open session exists right now (e.g. it was just closed moments ago during attendance change), attach the note to the latest session for this employee & task
+          const { data: latestData } = await supabase
+            .from('flwdsk_task_work_sessions')
+            .select('*')
+            .eq('employee_id', user.id)
+            .eq('task_id', taskId)
+            .is('deleted_at', null)
+            .order('start_time', { ascending: false })
+            .limit(1);
+          if (latestData && latestData.length > 0) {
+            const latest = latestData[0];
+            saveSessionNote(latest.id, notes);
+            try {
+              await supabase
+                .from('flwdsk_task_work_sessions')
+                .update({ notes })
+                .eq('id', latest.id);
+            } catch (_) {}
+          }
         }
       } catch (e) {
         console.warn('Failed to close open sessions for task:', e);

@@ -218,10 +218,16 @@ export function AttendanceCalendarView({
 
   // Monthly summary stats calculated dynamically
   const monthlyStats = useMemo(() => {
-    const workingDaysInMonth = days.filter((d) => d.dayName !== 'Sun').length;
-    // KVJ-only schedulable days = non-Sunday, non-holiday, all sessions are Office/Remote
+    // Days in Month = non-Sunday AND non-declared-holiday
+    const workingDaysInMonth = days.filter(
+      (d) => d.dayName !== 'Sun' && d.status !== 'holiday'
+    ).length;
+    // KVJ-only clocked-in days: employee was present AND all sessions are
+    // Office / Remote / WFH with no split (training/marketing) sessions.
+    // status='present' already implies non-Sunday + non-declared-holiday
+    // because those days carry status='holiday' in the calendar builder.
     const kvjScheduledDays = days.filter(
-      (d) => d.dayName !== 'Sun' && d.status !== 'holiday' && isKvjDay(d)
+      (d) => d.status === 'present' && isKvjDay(d)
     ).length;
     const daysToBeWorked = days.filter((d) => d.dayName !== 'Sun' && d.status !== 'holiday').length;
     const noOfLeaves = days.filter((d) => d.status === 'leave').length;
@@ -323,18 +329,34 @@ export function AttendanceCalendarView({
       const totalWorkingMins = fyAttendance.reduce((sum, r) => sum + (Number(r.total_working_minutes) || 0), 0);
       const totalHoursWorkedFY = Math.round((totalWorkingMins / 60) * 10) / 10;
 
-      // KVJ-only scheduled days: present records where ALL sessions are Office/Remote
+      // holSet defined early so it can be reused for kvjDaysFY, actualOfficeHoursFY,
+      // and holidayWorkedFY without re-allocating the Set.
+      const holSet = new Set(fyHolidays);
+
+      // KVJ-only clocked-in days: present, all sessions Office/Remote/WFH (no split),
+      // Sundays and declared holidays excluded (those count as Holiday Worked instead).
       const kvjDaysFY = fyAttendance.filter(
-        (r) => (r.status === 'present' || r.status === 'clocked_out' || (r.total_working_minutes && r.total_working_minutes > 0)) && isFyRecordKvjOnly(r)
+        (r) =>
+          (r.status === 'present' || r.status === 'clocked_out' ||
+            (r.total_working_minutes && r.total_working_minutes > 0)) &&
+          isFyRecordKvjOnly(r) &&
+          new Date(r.work_date).getDay() !== 0 &&   // exclude Sundays
+          !holSet.has(r.work_date)                  // exclude declared holidays
       ).length;
 
-      // Expected = KVJ-only present days × 8 (training days excluded)
+      // Expected = KVJ-only clocked-in days × 8 (training/holiday/Sunday days excluded)
       const expectedOfficeHoursFY = kvjDaysFY * 8;
 
-      // Actual = sum of actual working minutes on KVJ-only days
+      // Actual = sum of working minutes on KVJ-only days (same Sunday/holiday exclusion)
       const actualOfficeHoursFY = Math.round(
         fyAttendance
-          .filter((r) => isFyRecordKvjOnly(r) && Number(r.total_working_minutes) > 0)
+          .filter(
+            (r) =>
+              isFyRecordKvjOnly(r) &&
+              Number(r.total_working_minutes) > 0 &&
+              new Date(r.work_date).getDay() !== 0 &&
+              !holSet.has(r.work_date)
+          )
           .reduce((sum, r) => sum + Number(r.total_working_minutes), 0) / 60 * 10
       ) / 10;
 
@@ -346,7 +368,6 @@ export function AttendanceCalendarView({
         return acc + (l.half_day ? 0.5 * diff : diff);
       }, 0);
 
-      const holSet = new Set(fyHolidays);
       const holidayWorkedFY = fyAttendance.filter(
         (r) => new Date(r.work_date).getDay() === 0 || holSet.has(r.work_date)
       ).length;

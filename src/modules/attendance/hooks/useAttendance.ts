@@ -9,6 +9,8 @@ import { toLocalISODate } from '../../../shared/utils/date';
 import { hoursThisMonth as calcHoursThisMonth, attendancePercent } from '../../../shared/utils/metrics';
 import { TASK_WORK_SESSION_REPOSITORY_TOKEN, TASK_REPOSITORY_TOKEN, type TaskWorkSession } from '../../project/project.repository';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
+import { saveSessionNote } from '../../project/hooks/useTaskSessions';
+import { supabase } from '../../../shared/integration/supabase';
 
 /** localStorage key holding the tasks auto-paused by the current break, per user. */
 const breakPausedKey = (userId: string) => `kvj_break_paused_tasks_${userId}`;
@@ -28,6 +30,7 @@ export function useAttendance() {
 
   const fetchTodayRecord = useCallback(async () => {
     if (!user) {
+      setRecord(null);
       setLoading(false);
       return;
     }
@@ -50,6 +53,10 @@ export function useAttendance() {
 
     setLoading(false);
   }, [service, user]);
+
+  useEffect(() => {
+    fetchTodayRecord();
+  }, [fetchTodayRecord]);
 
   /** Real monthly aggregates (0 when there is no attendance yet). */
   const monthly = useMemo(() => {
@@ -79,7 +86,7 @@ export function useAttendance() {
     return { ok: false, error: res.error.message };
   }, [service, user, getPosition]);
 
-  const pauseRunningTasks = useCallback(async () => {
+  const pauseRunningTasks = useCallback(async (note?: string) => {
     if (!user) return;
     try {
       const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
@@ -96,7 +103,17 @@ export function useAttendance() {
       for (const s of running) {
         const endTime = new Date();
         const durationMinutes = Math.max(0, Math.round((endTime.getTime() - new Date(s.startTime).getTime()) / 60000));
-        await taskRepo.update(s.id, { endTime: endTime.toISOString(), durationMinutes, status: 'paused' } as Partial<TaskWorkSession>, actor);
+        const updates: any = { endTime: endTime.toISOString(), durationMinutes, status: 'paused' };
+        if (note) {
+          updates.notes = note;
+          saveSessionNote(s.id, note);
+        }
+        await taskRepo.update(s.id, updates as Partial<TaskWorkSession>, actor);
+        if (note) {
+          try {
+            await supabase.from('flwdsk_task_work_sessions').update({ notes: note }).eq('id', s.id);
+          } catch (_) {}
+        }
 
         if (s.taskId) {
           taskTimerStore.pauseTask(s.taskId);
@@ -122,7 +139,7 @@ export function useAttendance() {
     }
   }, [user]);
 
-  const clockOut = useCallback(async () => {
+  const clockOut = useCallback(async (taskNote?: string) => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
     setLoading(true);
@@ -132,8 +149,8 @@ export function useAttendance() {
     } catch {
       console.warn('Geolocation failed. Clocking out without coordinates.');
     }
-    // Auto-pause any running tasks BEFORE clocking out
-    await pauseRunningTasks();
+    // Auto-pause any running tasks BEFORE clocking out, attaching the progress note
+    await pauseRunningTasks(taskNote);
 
     const res = await service.clockOut(user.id, geo);
     setLoading(false);
@@ -151,7 +168,7 @@ export function useAttendance() {
    * block the break itself. Nothing is deleted; a paused session is just closed
    * with status 'paused', and resuming opens a fresh 'running' session.
    */
-  const pauseRunningTasksForBreak = useCallback(async () => {
+  const pauseRunningTasksForBreak = useCallback(async (note?: string) => {
     if (!user) return;
     try {
       const taskRepo = container.resolve(TASK_WORK_SESSION_REPOSITORY_TOKEN);
@@ -169,7 +186,17 @@ export function useAttendance() {
       for (const s of running) {
         const endTime = new Date();
         const durationMinutes = Math.max(0, Math.round((endTime.getTime() - new Date(s.startTime).getTime()) / 60000));
-        await taskRepo.update(s.id, { endTime: endTime.toISOString(), durationMinutes, status: 'paused' } as Partial<TaskWorkSession>, actor);
+        const updates: any = { endTime: endTime.toISOString(), durationMinutes, status: 'paused' };
+        if (note) {
+          updates.notes = note;
+          saveSessionNote(s.id, note);
+        }
+        await taskRepo.update(s.id, updates as Partial<TaskWorkSession>, actor);
+        if (note) {
+          try {
+            await supabase.from('flwdsk_task_work_sessions').update({ notes: note }).eq('id', s.id);
+          } catch (_) {}
+        }
 
         if (s.taskId) {
           taskTimerStore.pauseTask(s.taskId);
@@ -229,11 +256,11 @@ export function useAttendance() {
     }
   }, [user]);
 
-  const startBreak = useCallback(async (reason?: string) => {
+  const startBreak = useCallback(async (reason?: string, note?: string) => {
     if (!user) return { ok: false, error: 'Unauthenticated' };
     if (!UUID_RE.test(user.id)) return { ok: false, error: SESSION_ERR };
     setLoading(true);
-    await pauseRunningTasksForBreak();
+    await pauseRunningTasksForBreak(note);
     const res = await service.startBreak(user.id, reason);
     setLoading(false);
     if (res.ok) {
@@ -256,10 +283,6 @@ export function useAttendance() {
     }
     return { ok: false, error: res.error.message };
   }, [service, user, resumeTasksAfterBreak]);
-
-  useEffect(() => {
-    fetchTodayRecord();
-  }, [fetchTodayRecord]);
 
   useEffect(() => {
     if (loading) return;
