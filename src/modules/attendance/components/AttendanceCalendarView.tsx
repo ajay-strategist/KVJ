@@ -254,11 +254,21 @@ export function AttendanceCalendarView({
     // Expected = KVJ-only schedulable days × 8 hrs (excludes any day with Training/Marketing sessions)
     const expectedOfficeHours = kvjScheduledDays * 8;
 
-    // Actual = hours actually worked on days that were purely KVJ (Office/Remote) sessions
+    // Helper to calculate gross office duration (Clock In to Clock Out / gross duration) for a day
+    const getGrossDurationHrs = (d: CalendarDayDetail): number => {
+      const startMins = parseTime(d.startTime);
+      const endMins = parseTime(d.endTime);
+      if (startMins !== null && endMins !== null && endMins > startMins) {
+        return (endMins - startMins) / 60;
+      }
+      return parseHoursWorked(d.hoursWorked) + (d.breakMinutes || 0) / 60;
+    };
+
+    // Actual = gross office presence duration on days that were purely KVJ (Office/Remote) sessions
     const actualOfficeHours = Math.round(
       days
         .filter((d) => d.status === 'present' && isKvjDay(d))
-        .reduce((sum, d) => sum + parseHoursWorked(d.hoursWorked), 0) * 10
+        .reduce((sum, d) => sum + getGrossDurationHrs(d), 0) * 10
     ) / 10;
 
     return {
@@ -347,17 +357,26 @@ export function AttendanceCalendarView({
       // Expected = KVJ-only clocked-in days × 8 (training/holiday/Sunday days excluded)
       const expectedOfficeHoursFY = kvjDaysFY * 8;
 
-      // Actual = sum of working minutes on KVJ-only days (same Sunday/holiday exclusion)
+      // Actual = gross presence duration (working + break minutes / clock in to clock out) on KVJ-only days (same Sunday/holiday exclusion)
       const actualOfficeHoursFY = Math.round(
         fyAttendance
           .filter(
             (r) =>
               isFyRecordKvjOnly(r) &&
-              Number(r.total_working_minutes) > 0 &&
+              (Number(r.total_working_minutes) > 0 || (r.first_clock_in && r.last_clock_out)) &&
               new Date(r.work_date).getDay() !== 0 &&
               !holSet.has(r.work_date)
           )
-          .reduce((sum, r) => sum + Number(r.total_working_minutes), 0) / 60 * 10
+          .reduce((sum, r) => {
+            if (r.first_clock_in && r.last_clock_out) {
+              const startTs = new Date(r.first_clock_in).getTime();
+              const endTs = new Date(r.last_clock_out).getTime();
+              if (!isNaN(startTs) && !isNaN(endTs) && endTs > startTs) {
+                return sum + (endTs - startTs) / 60000;
+              }
+            }
+            return sum + (Number(r.total_working_minutes) || 0) + (Number(r.total_break_minutes) || 0);
+          }, 0) / 60 * 10
       ) / 10;
 
       const noOfLeavesFY = (fyLeaves || []).reduce((acc: number, l: any) => {
