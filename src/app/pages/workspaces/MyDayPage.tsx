@@ -473,6 +473,36 @@ export const AttendancePanel = memo(function AttendancePanel({
     }
   }, [breakModalOpen, activeRunningTask, tasks, selectedBreakTaskId]);
 
+  const handleBreakClick = useCallback(async () => {
+    if (activeRunningTask) {
+      setBreakReason('Official Break');
+      setBreakStatusUpdate('');
+      setBreakModalOpen(true);
+    } else {
+      const ok = await confirm({
+        title: 'Start Official Break?',
+        message: 'Are you sure you want to start your official break?',
+      });
+      if (!ok) return;
+
+      if (onStartBreakWithTask) {
+        const success = await onStartBreakWithTask('Official Break', '');
+        if (success) {
+          toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
+          if (onActivityLog) onActivityLog('Started official break', 'info');
+        }
+      } else {
+        const res = await startBreak('Official Break');
+        if (res.ok) {
+          toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
+          if (onActivityLog) onActivityLog('Started official break', 'info');
+        } else {
+          toast({ variant: 'error', title: 'Break Failed', message: res.error });
+        }
+      }
+    }
+  }, [activeRunningTask, confirm, onStartBreakWithTask, startBreak, toast, onActivityLog]);
+
   const handleConfirmBreak = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     const reasonText = breakReason || 'Official Break';
@@ -501,7 +531,7 @@ export const AttendancePanel = memo(function AttendancePanel({
       } else if (onActivityLog) {
         onActivityLog(`Started official break (${reasonText})`, 'info');
       }
-      toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break. Status update saved.' });
+      toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
       setBreakModalOpen(false);
       setBreakStatusUpdate('');
     } else {
@@ -675,7 +705,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                 type="button"
                 className="kvj-btn"
                 disabled={loading}
-                onClick={() => setBreakModalOpen(true)}
+                onClick={handleBreakClick}
                 style={{
                   background: 'var(--status-warning)',
                   color: 'white',
@@ -2855,7 +2885,7 @@ export function MyDayPage() {
       title: 'On Break',
       message: runningTask
         ? `Break started. Active task "${runningTask.title}" paused and progress update recorded.`
-        : 'Enjoy your break. Status update saved.'
+        : 'Enjoy your break.'
     });
     return true;
   }, [startBreak, tasks, projectTasks, toast, pauseSession, updateTask]);
