@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { PageHeader, Button, Card, SectionHeader, Badge, Avatar } from '../../../shared/ui/components';
+import { PageHeader, Button, Card, SectionHeader, Badge, Avatar, SearchInput } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField, useForm } from '../../../shared/forms/form';
@@ -15,6 +15,7 @@ import type { UUID } from '../../../core/types';
 import { exportToExcel } from '../../../shared/utils/exportToExcel';
 import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
 import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
+import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
 import { supabase } from '../../../shared/integration/supabase';
 
 /**
@@ -129,6 +130,7 @@ export function ProjectList({
   
   // Status checklist filter state. Default: ['Not Started', 'In Progress'] (Completed unchecked)
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Not Started', 'In Progress']);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [selectedSupervisor, setSelectedSupervisor] = useState<string>('all');
   const [selectedClient, setSelectedClient] = useState<string>('all');
@@ -390,6 +392,17 @@ export function ProjectList({
     if (selectedProjectFilter !== 'all') {
       list = list.filter((p) => p.id === selectedProjectFilter);
     }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((p) =>
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.code || '').toLowerCase().includes(q) ||
+        (p.client || '').toLowerCase().includes(q) ||
+        (p.supervisor || '').toLowerCase().includes(q) ||
+        (p.status || '').toLowerCase().includes(q) ||
+        p.members.some((m) => (m.name || '').toLowerCase().includes(q))
+      );
+    }
     if (selectedSupervisor !== 'all') {
       const supEmp = employees.find((e) => e.id === selectedSupervisor);
       const supName = supEmp ? `${supEmp.firstName} ${supEmp.lastName}` : '';
@@ -406,7 +419,7 @@ export function ProjectList({
       }
     }
     return list;
-  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses, selectedProjectFilter, selectedSupervisor, selectedClient, employees]);
+  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses, selectedProjectFilter, searchQuery, selectedSupervisor, selectedClient, employees]);
 
   const totalTasksCount = useMemo(() => filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0), [filteredProjects]);
   const completedTasksCount = useMemo(() => filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0), [filteredProjects]);
@@ -586,9 +599,13 @@ export function ProjectList({
     }
   };
 
-  // PDF Export Logic — full content: KPIs, member hours, all tasks with hours/status
+  // PDF Export Logic — full content: KPIs, member hours, all tasks with hours/status, and task work logs
   const exportReportToPDF = (p: ProjectCardData) => {
     const pTasks = tasks.filter((t: any) => t.projectId === p.id && !t.deletedAt);
+    const pTaskIds = new Set(pTasks.map((t: any) => t.id));
+    const pSessions = (taskSessions || []).filter((s: any) =>
+      s.projectId === p.id || s.project_id === p.id || (s.taskId && pTaskIds.has(s.taskId)) || (s.task_id && pTaskIds.has(s.task_id))
+    );
     const completionPct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
     const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' });
 
@@ -624,7 +641,7 @@ export function ProjectList({
             .report-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #6366f1; letter-spacing: 1.5px; }
             .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
             h1 { font-size: 26px; font-weight: 800; color: #0f172a; margin: 0; }
-            .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin: 24px 0; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin: 24px 0; }
             .kpi { border-radius: 10px; padding: 14px 16px; }
             .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
             .kpi-value { font-size: 20px; font-weight: 800; }
@@ -675,10 +692,6 @@ export function ProjectList({
             <div class="kpi" style="background:#dcfce7;border-left:4px solid #16a34a;">
               <div class="kpi-label" style="color:#15803d;">✅ Tasks Done</div>
               <div class="kpi-value" style="color:#16a34a;">${p.tasksCompleted} / ${p.tasksTotal}</div>
-            </div>
-            <div class="kpi" style="background:#fef9c3;border-left:4px solid #ca8a04;">
-              <div class="kpi-label" style="color:#a16207;">🏁 Milestones</div>
-              <div class="kpi-value" style="color:#ca8a04;">${p.milestonesCount} Planned</div>
             </div>
           </div>
 
@@ -754,6 +767,43 @@ export function ProjectList({
                   </tr>
                 `;
               }).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No tasks found for this project.</td></tr>'}
+            </tbody>
+          </table>
+
+          <!-- Task Work Log -->
+          <div class="section-title">⏰ Task Work Log</div>
+          <table>
+            <thead>
+              <tr style="background:#0284c7;">
+                <th>Date</th>
+                <th>Task</th>
+                <th>Assignee</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th style="text-align:right;">Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pSessions.length > 0 ? pSessions.map((s: any) => {
+                const task = pTasks.find((t: any) => t.id === s.taskId || t.id === s.task_id);
+                const empId = s.employeeId || s.employee_id || task?.assigneeId;
+                const emp = empId ? employees.find((e) => e.id === empId || e.firstName === empId || `${e.firstName} ${e.lastName}` === empId) : null;
+                const assigneeName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : (empId || 'Unassigned');
+                const taskTitle = task ? task.title : (s.workTitle || '—');
+                const startStr = formatSessionTime(s.startTime || s.start_time);
+                const endStr = s.endTime || s.end_time ? formatSessionTime(s.endTime || s.end_time) : 'Running…';
+                const durStr = s.status === 'running' ? 'Running…' : formatSessionDuration(s.durationMinutes || s.duration_minutes);
+                return `
+                  <tr>
+                    <td style="font-weight:600;">${formatSessionDate(s.startTime || s.start_time)}</td>
+                    <td style="font-weight:600;">${taskTitle}</td>
+                    <td>${assigneeName}</td>
+                    <td>${startStr}</td>
+                    <td>${endStr}</td>
+                    <td style="text-align:right;font-weight:700;color:#0284c7;">${durStr}</td>
+                  </tr>
+                `;
+              }).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px;">No work sessions logged for this project yet.</td></tr>'}
             </tbody>
           </table>
 
@@ -892,25 +942,39 @@ export function ProjectList({
         <Button onClick={() => setCreateProjectOpen(true)}>+ Create Master Project</Button>
       </div>
 
-      {/* Full Horizontal Filter Bar (5 Slicers + Clear Action) */}
+      {/* Full Horizontal Filter Bar (Search + 4 Slicers + Clear Action) */}
       <Card style={{ padding: '14px 18px', overflow: 'visible', position: 'relative', zIndex: 40 }} bodyStyle={{ overflow: 'visible' }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Project Name Slicer */}
-          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+          {/* Search Project Input */}
+          <div style={{ flex: '1 1 200px', minWidth: 160 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Search Project</label>
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search by name, code, client..."
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          {/* Project Name Searchable Slicer */}
+          <div style={{ flex: '1 1 190px', minWidth: 160 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Project Name</label>
-            <select
-              className="kvj-select"
+            <SearchableSelect
               value={selectedProjectFilter}
-              onChange={(e) => setSelectedProjectFilter(e.target.value)}
-              style={{ width: '100%', padding: '6px 10px', fontSize: 12.5, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
-            >
-              <option value="all">All Projects</option>
-              {projectsList.map((p) => <option key={p.id} value={p.id}>{p.code} - {p.title}</option>)}
-            </select>
+              onChange={setSelectedProjectFilter}
+              placeholder="All Projects"
+              allOptionLabel="All Projects"
+              searchPlaceholder="Search project name or code..."
+              options={projectsList.map((p) => ({
+                value: p.id,
+                label: `${p.code} - ${p.title}`,
+                subLabel: p.client ? `Client: ${p.client}` : undefined,
+              }))}
+            />
           </div>
 
           {/* Supervisor Slicer */}
-          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Supervisor</label>
             <select
               className="kvj-select"
@@ -924,7 +988,7 @@ export function ProjectList({
           </div>
 
           {/* Status Checklist Slicer */}
-          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Status</label>
             <ChecklistMultiSelect
               options={[
@@ -938,7 +1002,7 @@ export function ProjectList({
           </div>
 
           {/* Client Slicer */}
-          <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Client</label>
             <select
               className="kvj-select"
@@ -952,8 +1016,8 @@ export function ProjectList({
           </div>
 
           {/* Clear Filters Action */}
-          {(selectedSupervisor !== 'all' || selectedClient !== 'all' || selectedProjectFilter !== 'all' || !(selectedStatuses.length === 2 && selectedStatuses.includes('Not Started') && selectedStatuses.includes('In Progress'))) && (
-            <Button size="sm" variant="ghost" onClick={() => { setSelectedSupervisor('all'); setSelectedStatuses(['Not Started', 'In Progress']); setSelectedClient('all'); setSelectedProjectFilter('all'); }} style={{ alignSelf: 'flex-end', marginBottom: 2 }}>
+          {(searchQuery || selectedSupervisor !== 'all' || selectedClient !== 'all' || selectedProjectFilter !== 'all' || !(selectedStatuses.length === 2 && selectedStatuses.includes('Not Started') && selectedStatuses.includes('In Progress'))) && (
+            <Button size="sm" variant="ghost" onClick={() => { setSearchQuery(''); setSelectedSupervisor('all'); setSelectedStatuses(['Not Started', 'In Progress']); setSelectedClient('all'); setSelectedProjectFilter('all'); }} style={{ alignSelf: 'flex-end', marginBottom: 2 }}>
               ✕ Clear Filters
             </Button>
           )}
@@ -1248,12 +1312,11 @@ export function ProjectList({
             <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
 
               {/* KPI Strip */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
                 {[
                   { label: 'Status', value: selectedProject.status, icon: '🏷️', bg: '#ede9fe', border: '#6366f1', color: '#4f46e5' },
                   { label: 'Total Hours', value: `${selectedProject.totalHours}`, icon: '⏱️', bg: '#e0f2fe', border: '#0891b2', color: '#0284c7' },
                   { label: 'Tasks Done', value: `${selectedProject.tasksCompleted} / ${selectedProject.tasksTotal}`, icon: '✅', bg: '#dcfce7', border: '#16a34a', color: '#15803d' },
-                  { label: 'Milestones', value: `${selectedProject.milestonesCount} Planned`, icon: '🏁', bg: '#fef9c3', border: '#ca8a04', color: '#a16207' },
                 ].map((kpi) => (
                   <div key={kpi.label} style={{ background: kpi.bg, borderRadius: 12, padding: '14px 16px', borderLeft: `4px solid ${kpi.border}`, transition: 'transform 0.15s' }}>
                     <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: kpi.color, letterSpacing: 0.8, marginBottom: 6 }}>{kpi.icon} {kpi.label}</div>
@@ -1512,6 +1575,7 @@ export function ProjectList({
                       <tr style={{ background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: 'white', textAlign: 'left' }}>
                         <th style={{ padding: '10px 12px', fontWeight: 700 }}>Date</th>
                         <th style={{ padding: '10px 12px', fontWeight: 700 }}>Task</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 700 }}>Assignee</th>
                         <th style={{ padding: '10px 12px', fontWeight: 700 }}>Start Time</th>
                         <th style={{ padding: '10px 12px', fontWeight: 700 }}>End Time</th>
                         <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right' }}>Duration</th>
@@ -1520,21 +1584,37 @@ export function ProjectList({
                     <tbody>
                       {projectSessions.length === 0 ? (
                         <tr>
-                          <td colSpan={5} style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          <td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                             No work sessions logged for this project's tasks yet.
                           </td>
                         </tr>
                       ) : (
                         projectSessions.map((s, idx) => {
-                          const task = tasks.find((t: any) => t.id === s.taskId);
+                          const task = tasks.find((t: any) => t.id === s.taskId || t.id === s.task_id);
+                          const empId = s.employeeId || s.employee_id || task?.assigneeId;
+                          const emp = empId ? employees.find((e) => e.id === empId || e.firstName === empId || `${e.firstName} ${e.lastName}` === empId) : null;
+                          const assigneeName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : (empId || 'Unassigned');
+                          const avatarUrl = emp?.avatarUrl;
                           return (
                             <tr key={idx} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-sunken)' }}>
-                              <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatSessionDate(s.startTime)}</td>
-                              <td style={{ padding: '10px 12px' }}>{task ? task.title : s.workTitle}</td>
-                              <td style={{ padding: '10px 12px' }}>{formatSessionTime(s.startTime)}</td>
-                              <td style={{ padding: '10px 12px' }}>{s.endTime ? formatSessionTime(s.endTime) : 'Running…'}</td>
-                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>
-                                {s.status === 'running' ? 'Running…' : formatSessionDuration(s.durationMinutes)}
+                              <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatSessionDate(s.startTime || s.start_time)}</td>
+                              <td style={{ padding: '10px 12px', fontWeight: 600 }}>{task ? task.title : s.workTitle || '—'}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  {avatarUrl ? (
+                                    <img src={avatarUrl} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                                  ) : (
+                                    <span style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: 'white', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+                                      {(assigneeName || '?').charAt(0)}
+                                    </span>
+                                  )}
+                                  <span style={{ fontWeight: 600 }}>{assigneeName}</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '10px 12px' }}>{formatSessionTime(s.startTime || s.start_time)}</td>
+                              <td style={{ padding: '10px 12px' }}>{s.endTime || s.end_time ? formatSessionTime(s.endTime || s.end_time) : 'Running…'}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
+                                {s.status === 'running' ? 'Running…' : formatSessionDuration(s.durationMinutes || s.duration_minutes)}
                               </td>
                             </tr>
                           );
