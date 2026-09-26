@@ -46,7 +46,8 @@ export function ApprovalsQueue() {
   const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole.toUpperCase());
   const isDesktop = useBreakpoint('md');
 
-  const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval'>('all');
+  const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval' | 'over_7_days'>('all');
+  const [taskBatchProcessing, setTaskBatchProcessing] = useState(false);
 
   const pendingAssignmentTasks = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -55,6 +56,8 @@ export function ApprovalsQueue() {
 
   const filteredTaskApprovals = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     return safeTasks.filter((t) => {
       if (!t || t.deletedAt) return false;
       const isPendingTask = t.approvalStatus === 'pending_task_approval' || t.status === 'review';
@@ -66,9 +69,30 @@ export function ApprovalsQueue() {
       if (taskStatusFilter === 'pending_assignment_approval') {
         return isPendingAssign;
       }
+      if (taskStatusFilter === 'over_7_days') {
+        if (!isPendingTask) return false;
+        const submitted = t.submittedAt || t.createdAt || t.updatedAt;
+        if (!submitted) return false;
+        return now - new Date(submitted).getTime() >= sevenDaysMs;
+      }
       return true;
     });
   }, [tasks, taskStatusFilter]);
+
+  /** Task Completion items that have been waiting in the queue for >= 7 days (used for banner). */
+  const over7DaysTasks = useMemo(() => {
+    const safeTasks = Array.isArray(tasks) ? tasks : [];
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    return safeTasks.filter((t) => {
+      if (!t || t.deletedAt) return false;
+      const isPendingTask = t.approvalStatus === 'pending_task_approval' || t.status === 'review';
+      if (!isPendingTask) return false;
+      const submitted = t.submittedAt || t.createdAt || t.updatedAt;
+      if (!submitted) return false;
+      return now - new Date(submitted).getTime() >= sevenDaysMs;
+    });
+  }, [tasks]);
 
   const fetchUnclosedSessions = useCallback(async () => {
     try {
@@ -327,6 +351,29 @@ export function ApprovalsQueue() {
     } else {
       toast({ variant: 'error', title: 'Rework Failed', message: res.error });
     }
+  };
+
+  const handleApproveAllOver7Days = async () => {
+    if (over7DaysTasks.length === 0) return;
+    const ok = await confirm({
+      title: `Approve All Tasks Waiting > 7 Days?`,
+      message: `This will approve ${over7DaysTasks.length} Task Completion request(s) that have been pending for more than 7 days. Continue?`,
+    });
+    if (!ok) return;
+
+    setTaskBatchProcessing(true);
+    let successCount = 0;
+    for (const task of over7DaysTasks) {
+      const res = await approveTaskSubmission(task.id);
+      if (res.ok) successCount++;
+    }
+    setTaskBatchProcessing(false);
+    toast({
+      variant: 'success',
+      title: 'Bulk Approval Complete',
+      message: `${successCount} task(s) approved successfully.`,
+    });
+    refreshProjects();
   };
 
   const taskApprovalColumns: Column<any>[] = [
@@ -702,6 +749,21 @@ export function ApprovalsQueue() {
             </div>
           )}
 
+          {/* Bulk-approve banner for tasks waiting > 7 days */}
+          {taskStatusFilter === 'over_7_days' && over7DaysTasks.length > 0 && canApprove && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', background: 'rgba(234, 88, 12, 0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(234, 88, 12, 0.35)' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#c2410c', flex: 1 }}>
+                ⏰ {over7DaysTasks.length} Task Completion request(s) have been pending for more than 7 days
+              </span>
+              <Button
+                size="sm"
+                onClick={handleApproveAllOver7Days}
+                disabled={taskBatchProcessing}
+              >
+                {taskBatchProcessing ? '⏳ Approving...' : `✓ Approve All (${over7DaysTasks.length})`}
+              </Button>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, alignSelf: 'flex-end' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>🔍 Filter Status:</span>
             <select
@@ -713,6 +775,7 @@ export function ApprovalsQueue() {
               <option value="all">👥 All Approvals</option>
               <option value="pending_task_approval">📝 Task Completion Approvals</option>
               <option value="pending_assignment_approval">📌 Assignment Approvals</option>
+              <option value="over_7_days">⏰ Waiting &gt; 7 Days</option>
             </select>
           </div>
           <DataTable
