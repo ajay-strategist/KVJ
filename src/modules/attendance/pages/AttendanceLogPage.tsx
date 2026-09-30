@@ -545,6 +545,7 @@ export function AttendanceLogPage() {
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
   const [expenseRows, setExpenseRows] = useState<Array<any>>([]);
+  const [expenseSortOrder, setExpenseSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1732,7 +1733,7 @@ export function AttendanceLogPage() {
   }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, leaveRecords, resolveOrgValue, resolveLocationValue, resolveClassOrWorkValue]);
 
   const mappedExpenseRows = useMemo(() => {
-    return expenseClaims.map((claim) => {
+    const list = expenseClaims.map((claim) => {
       const emp = employees.find((e) => e.id === claim.employeeId);
       const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'System Admin';
 
@@ -1743,6 +1744,7 @@ export function AttendanceLogPage() {
       let vehicle = undefined;
       let km = undefined;
       let userNotes = claim.notes || '';
+      let rawDate = (claim as any).date || (claim as any).expenseDate || claim.createdAt;
 
       if (claim.notes && claim.notes.trim().startsWith('{')) {
         try {
@@ -1754,12 +1756,31 @@ export function AttendanceLogPage() {
           vehicle = parsed.vehicle || undefined;
           km = parsed.km || undefined;
           userNotes = parsed.userNotes || '';
+          if (parsed.expenseDate) rawDate = parsed.expenseDate;
+          else if (parsed.date) rawDate = parsed.date;
         } catch (e) { void e; }
+      }
+
+      let displayDate = claim.createdAt ? new Date(claim.createdAt).toLocaleDateString('en-GB') : '';
+      if (rawDate) {
+        if (/^\d{4}-\d{2}-\d{2}/.test(String(rawDate))) {
+          const [y, m, d] = String(rawDate).slice(0, 10).split('-');
+          displayDate = `${d}/${m}/${y}`;
+        } else if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(String(rawDate))) {
+          displayDate = String(rawDate);
+        } else {
+          const dObj = new Date(rawDate);
+          if (!isNaN(dObj.getTime())) {
+            displayDate = dObj.toLocaleDateString('en-GB');
+          }
+        }
       }
 
       return {
         id: claim.id,
-        date: new Date(claim.createdAt).toLocaleDateString('en-GB'),
+        date: displayDate,
+        rawDate,
+        createdAt: claim.createdAt,
         employee: person,
         category: claim.category || 'Office Expense',
         type,
@@ -1773,7 +1794,34 @@ export function AttendanceLogPage() {
         status: (claim.status || 'submitted').toLowerCase(),
       };
     });
-  }, [expenseClaims, employees]);
+
+    const getSortTimestamp = (row: any) => {
+      const val = row.rawDate || row.createdAt;
+      if (!val) return 0;
+      if (typeof val === 'number') return val;
+      const str = String(val).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        return new Date(str.slice(0, 10)).getTime();
+      }
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(str)) {
+        const parts = str.split('/');
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
+      }
+      const t = new Date(str).getTime();
+      return isNaN(t) ? 0 : t;
+    };
+
+    return list.sort((a, b) => {
+      const timeA = getSortTimestamp(a);
+      const timeB = getSortTimestamp(b);
+      if (timeA !== timeB) {
+        return expenseSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      return expenseSortOrder === 'asc'
+        ? String(a.id || '').localeCompare(String(b.id || ''))
+        : String(b.id || '').localeCompare(String(a.id || ''));
+    });
+  }, [expenseClaims, employees, expenseSortOrder]);
 
   useEffect(() => {
     setExpenseRows(mappedExpenseRows);
@@ -2104,7 +2152,13 @@ export function AttendanceLogPage() {
                         />
                       </th>
                     )}
-                    <th style={{ padding: 10 }}>Date</th>
+                    <th
+                      style={{ padding: 10, cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => setExpenseSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+                      title="Click to toggle sort direction"
+                    >
+                      Date {expenseSortOrder === 'desc' ? '▼' : '▲'}
+                    </th>
                     <th style={{ padding: 10 }}>Employee</th>
                     <th style={{ padding: 10 }}>Classification</th>
                     <th style={{ padding: 10 }}>Expense Type</th>

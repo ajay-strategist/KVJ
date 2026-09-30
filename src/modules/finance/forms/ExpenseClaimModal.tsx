@@ -484,44 +484,6 @@ export function ExpenseClaimModal({
     <Drawer open={open} onClose={handleClose} title="Submit Expense Claim">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        {/* ── Mode Toggle ── */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 14px',
-          borderRadius: 10,
-          background: batchMode
-            ? 'color-mix(in srgb, var(--brand) 8%, var(--bg-sunken))'
-            : 'var(--bg-sunken)',
-          border: `1.5px solid ${batchMode ? 'var(--brand)' : 'var(--border)'}`,
-          cursor: 'pointer',
-          transition: 'all 150ms',
-        }} onClick={() => { if (!submitting) setBatchMode((m) => !m); }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
-              {batchMode ? '📋 Batch Mode (Multiple Expenses)' : '📄 Single Expense Mode'}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-              {batchMode
-                ? 'Add multiple line-items then submit all at once'
-                : 'Click to switch to batch entry mode'}
-            </div>
-          </div>
-          {/* Toggle pill */}
-          <div style={{
-            width: 44, height: 24, borderRadius: 12,
-            background: batchMode ? 'var(--brand)' : 'var(--border)',
-            position: 'relative', flexShrink: 0, transition: 'background 200ms',
-          }}>
-            <div style={{
-              position: 'absolute', top: 3, left: batchMode ? 23 : 3,
-              width: 18, height: 18, borderRadius: '50%', background: '#fff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 200ms',
-            }} />
-          </div>
-        </div>
-
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Expense Date */}
           <div>

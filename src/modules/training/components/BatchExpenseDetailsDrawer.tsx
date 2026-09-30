@@ -1,17 +1,18 @@
 /**
- * BatchExpenseDetailsDrawer
+ * BatchExpenseDetailsDrawer (Current Screen Popup Modal)
  *
- * Shows financial analytics for a single training batch:
- *  - KPI Cards: Total Expense | Average Expense | Cost / Student | Avg Expense / Day
- *  - Detailed sortable expense log filtered by batch name
- *
- * Data sourcing priority:
- *  1. Supabase — flwdsk_expense_claims (category = Training Expense, notes JSON contains batchName)
- *  2. localStorage — kvj_local_expense_claims (batch field match)
+ * Displays financial analytics for a training batch in a centered modal popup:
+ *  - 5 KPI Cards:
+ *      1. Total Number of Students
+ *      2. Total Expense
+ *      3. Cost Per Student (Total Expense / Number of Students)
+ *      4. Average Expense (Total Expenses / Number of Expenses)
+ *      5. Average Expense/Day (Total Expenses / Number of unique entry dates)
+ *  - Detailed sortable expense log table filtered by batch name
  */
 
 import { useEffect, useState, useMemo } from 'react';
-import Drawer from '../../../shared/ui/Drawer';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../../shared/integration/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ export interface BatchExpenseDetailsDrawerProps {
   onClose: () => void;
   /** The batch name / code used to match against expense notes.batchName */
   batchName: string;
-  /** Human-readable display label for the drawer title */
+  /** Human-readable display label for the modal title */
   batchCode: string;
   /** Number of students in the batch (live count or capacity fallback) */
   studentCount: number;
@@ -58,22 +59,12 @@ export interface BatchExpenseDetailsDrawerProps {
 
 function parseDateStr(val?: string | null): Date | null {
   if (!val || val === '—') return null;
-  // Try YYYY-MM-DD
   const ymd = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (ymd) return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
-  // Try DD/MM/YYYY
   const dmy = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
   const d = new Date(val);
   return isNaN(d.getTime()) ? null : d;
-}
-
-function daysBetween(start?: string, end?: string): number {
-  const s = parseDateStr(start);
-  const e = parseDateStr(end);
-  if (!s || !e) return 1;
-  const diff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
-  return Math.max(diff, 1);
 }
 
 function formatDate(val?: string | null): string {
@@ -84,13 +75,10 @@ function formatDate(val?: string | null): string {
 }
 
 function isBatchMatch(notes: string | undefined, batchName: string): boolean {
-  if (!batchName) return false;
-  if (!notes) return false;
+  if (!batchName || !notes) return false;
   const lower = notes.toLowerCase();
   const target = batchName.toLowerCase();
-  // Check raw JSON string
   if (lower.includes(target)) return true;
-  // Try parsing
   try {
     const parsed = JSON.parse(notes);
     const nb: string = parsed?.batchName || '';
@@ -188,8 +176,6 @@ export function BatchExpenseDetailsDrawer({
   batchName,
   batchCode,
   studentCount,
-  startDate,
-  endDate,
 }: BatchExpenseDetailsDrawerProps) {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -259,8 +245,15 @@ export function BatchExpenseDetailsDrawer({
   const totalExpense = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
   const avgExpense   = useMemo(() => expenses.length > 0 ? totalExpense / expenses.length : 0, [totalExpense, expenses]);
   const costPerStudent = useMemo(() => studentCount > 0 ? totalExpense / studentCount : 0, [totalExpense, studentCount]);
-  const trainingDays   = useMemo(() => daysBetween(startDate, endDate), [startDate, endDate]);
-  const avgPerDay      = useMemo(() => totalExpense / trainingDays, [totalExpense, trainingDays]);
+
+  // Count unique dates which have expense entry
+  const uniqueEntryDates = useMemo(() => {
+    const datesSet = new Set(expenses.map((e) => e.date).filter((d) => d && d !== '—'));
+    return datesSet.size;
+  }, [expenses]);
+
+  const activeDaysCount = useMemo(() => Math.max(uniqueEntryDates, 1), [uniqueEntryDates]);
+  const avgExpensePerDay = useMemo(() => totalExpense / activeDaysCount, [totalExpense, activeDaysCount]);
 
   // ── Sorted rows ──────────────────────────────────────────────────────────
   const sortedExpenses = useMemo(() => {
@@ -268,7 +261,6 @@ export function BatchExpenseDetailsDrawer({
       if (sortKey === 'amount') {
         return sortDir === 'desc' ? b.amount - a.amount : a.amount - b.amount;
       }
-      // Sort by date string
       const da = parseDateStr(a.date)?.getTime() ?? 0;
       const db = parseDateStr(b.date)?.getTime() ?? 0;
       return sortDir === 'desc' ? db - da : da - db;
@@ -286,183 +278,260 @@ export function BatchExpenseDetailsDrawer({
 
   const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
-  // ── Render ───────────────────────────────────────────────────────────────
-  return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      title={`💰 Expense Details — ${batchCode || batchName}`}
-      size="lg"
+  if (!open) return null;
+
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1250,
+        background: 'var(--bg-overlay, rgba(15, 23, 42, 0.6))',
+        backdropFilter: 'blur(var(--overlay-blur, 4px))',
+        WebkitBackdropFilter: 'blur(var(--overlay-blur, 4px))',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      {loading ? (
-        <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-          Loading expense data…
-        </div>
-      ) : expenses.length === 0 ? (
+      <div
+        style={{
+          background: 'var(--bg-card, var(--bg-surface))',
+          borderRadius: 20,
+          boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px var(--border)',
+          width: '100%',
+          maxWidth: 980,
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* ── Header ── */}
         <div style={{
-          padding: '48px 24px', textAlign: 'center',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+          padding: '18px 24px',
+          background: 'var(--bg-sunken)',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
         }}>
-          <span style={{ fontSize: 36 }}>📭</span>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: 0 }}>
-            No expense claims found for <strong>{batchCode || batchName}</strong>.
-          </p>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-            Expenses tagged to this batch will appear here once submitted.
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* ── KPI Cards ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <KpiCard
-              label="Total Expense"
-              value={fmt(totalExpense)}
-              sub={`${expenses.length} claim${expenses.length !== 1 ? 's' : ''}`}
-              accent="var(--brand)"
-            />
-            <KpiCard
-              label="Average Expense"
-              value={fmt(avgExpense)}
-              sub="per claim"
-            />
-            <KpiCard
-              label="Cost / Student"
-              value={studentCount > 0 ? fmt(costPerStudent) : '—'}
-              sub={studentCount > 0 ? `${studentCount} student${studentCount !== 1 ? 's' : ''}` : 'No student count available'}
-              accent={studentCount > 0 ? 'var(--status-info, #2563eb)' : undefined}
-            />
-            <KpiCard
-              label="Avg Expense / Day"
-              value={fmt(avgPerDay)}
-              sub={`over ${trainingDays} day${trainingDays !== 1 ? 's' : ''}`}
-              accent="var(--status-success, #16a34a)"
-            />
-          </div>
-
-          {/* ── Divider ── */}
-          <div style={{ borderTop: '1px solid var(--border)', margin: '0 -4px' }} />
-
-          {/* ── Expense Log Table ── */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                Detailed Expense Log
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {expenses.length} record{expenses.length !== 1 ? 's' : ''}
-              </span>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>
+              💰 Expense Details — {batchCode || batchName}
             </div>
-
-            <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-sunken)' }}>
-                    {[
-                      { key: 'date',   label: 'Date' },
-                      { key: null,     label: 'Expense Type' },
-                      { key: null,     label: 'Submitted By' },
-                      { key: 'amount', label: 'Amount' },
-                      { key: null,     label: 'Status' },
-                      { key: null,     label: 'Receipt' },
-                    ].map(({ key, label }, i) => (
-                      <th
-                        key={i}
-                        onClick={key ? () => toggleSort(key as 'date' | 'amount') : undefined}
-                        style={{
-                          padding: '10px 12px',
-                          textAlign: i === 3 ? 'right' : 'left',
-                          fontWeight: 700,
-                          fontSize: 11,
-                          color: 'var(--text-muted)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          cursor: key ? 'pointer' : 'default',
-                          whiteSpace: 'nowrap',
-                          userSelect: 'none',
-                          borderBottom: '1px solid var(--border)',
-                        }}
-                      >
-                        {label}
-                        {key && sortKey === key && (
-                          <span style={{ marginLeft: 4 }}>{sortDir === 'desc' ? '↓' : '↑'}</span>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedExpenses.map((exp, idx) => (
-                    <tr
-                      key={exp.id}
-                      style={{
-                        background: idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)',
-                        borderBottom: '1px solid var(--border)',
-                        transition: 'background 120ms',
-                      }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--brand) 6%, var(--bg-surface))')}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)')}
-                    >
-                      <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                        {exp.date}
-                      </td>
-                      <td style={{ padding: '9px 12px', color: 'var(--text-primary)', fontWeight: 600 }}>
-                        {exp.expenseType}
-                        {exp.vehicle && exp.km && (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>
-                            ({exp.vehicle} · {exp.km} km)
-                          </span>
-                        )}
-                        {exp.route && (
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                            {exp.route}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '9px 12px', color: 'var(--text-secondary)' }}>
-                        {exp.submittedBy}
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        {fmt(exp.amount)}
-                      </td>
-                      <td style={{ padding: '9px 12px' }}>
-                        <StatusBadge status={exp.status} />
-                      </td>
-                      <td style={{ padding: '9px 12px' }}>
-                        {exp.receipt ? (
-                          <a
-                            href={exp.receipt}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
-                          >
-                            📎 View
-                          </a>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ background: 'var(--bg-sunken)', borderTop: '2px solid var(--border)' }}>
-                    <td colSpan={3} style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, color: 'var(--text-secondary)' }}>
-                      Total ({expenses.length} claims)
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, fontSize: 14, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
-                      {fmt(totalExpense)}
-                    </td>
-                    <td colSpan={2} />
-                  </tr>
-                </tfoot>
-              </table>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              Batch Expense Analytics & Log
             </div>
           </div>
+          <button
+            onClick={onClose}
+            aria-label="Close modal"
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              transition: 'all 150ms',
+            }}
+          >
+            ✕
+          </button>
         </div>
-      )}
-    </Drawer>
+
+        {/* ── Content Body ── */}
+        <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+          {loading ? (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              Loading expense data…
+            </div>
+          ) : expenses.length === 0 ? (
+            <div style={{
+              padding: '48px 24px', textAlign: 'center',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+            }}>
+              <span style={{ fontSize: 36 }}>📭</span>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: 0 }}>
+                No expense claims found for <strong>{batchCode || batchName}</strong>.
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+                Expenses tagged to this batch will appear here once submitted.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* ── KPI Cards (5 Cards: Total Students, Total Expense, Cost / Student, Average Expense, Average Expense / Day) ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+                <KpiCard
+                  label="Total Students"
+                  value={String(studentCount || 0)}
+                  sub="enrolled students"
+                  accent="var(--brand)"
+                />
+                <KpiCard
+                  label="Total Expense"
+                  value={fmt(totalExpense)}
+                  sub={`${expenses.length} claim${expenses.length !== 1 ? 's' : ''}`}
+                  accent="var(--status-info, #2563eb)"
+                />
+                <KpiCard
+                  label="Cost / Student"
+                  value={studentCount > 0 ? fmt(costPerStudent) : '—'}
+                  sub={studentCount > 0 ? `Total Expense / ${studentCount} Students` : 'No student count'}
+                  accent="var(--purple-600, #9333ea)"
+                />
+                <KpiCard
+                  label="Average Expense"
+                  value={fmt(avgExpense)}
+                  sub={`per claim (${expenses.length} claims)`}
+                  accent="var(--status-warning, #d97706)"
+                />
+                <KpiCard
+                  label="Avg Expense / Day"
+                  value={fmt(avgExpensePerDay)}
+                  sub={`over ${uniqueEntryDates} entry date${uniqueEntryDates !== 1 ? 's' : ''}`}
+                  accent="var(--status-success, #16a34a)"
+                />
+              </div>
+
+              {/* ── Divider ── */}
+              <div style={{ borderTop: '1px solid var(--border)', margin: '4px -4px' }} />
+
+              {/* ── Detailed Expense Log Table ── */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    Detailed Expense Log
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {expenses.length} record{expenses.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-sunken)' }}>
+                        {[
+                          { key: 'date',   label: 'Date' },
+                          { key: null,     label: 'Expense Type' },
+                          { key: null,     label: 'Submitted By' },
+                          { key: 'amount', label: 'Amount' },
+                          { key: null,     label: 'Status' },
+                          { key: null,     label: 'Receipt' },
+                        ].map(({ key, label }, i) => (
+                          <th
+                            key={i}
+                            onClick={key ? () => toggleSort(key as 'date' | 'amount') : undefined}
+                            style={{
+                              padding: '10px 12px',
+                              textAlign: i === 3 ? 'right' : 'left',
+                              fontWeight: 700,
+                              fontSize: 11,
+                              color: 'var(--text-muted)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              cursor: key ? 'pointer' : 'default',
+                              whiteSpace: 'nowrap',
+                              userSelect: 'none',
+                              borderBottom: '1px solid var(--border)',
+                            }}
+                          >
+                            {label}
+                            {key && sortKey === key && (
+                              <span style={{ marginLeft: 4 }}>{sortDir === 'desc' ? '↓' : '↑'}</span>
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedExpenses.map((exp, idx) => (
+                        <tr
+                          key={exp.id}
+                          style={{
+                            background: idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)',
+                            borderBottom: '1px solid var(--border)',
+                            transition: 'background 120ms',
+                          }}
+                          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--brand) 6%, var(--bg-surface))')}
+                          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)')}
+                        >
+                          <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                            {exp.date}
+                          </td>
+                          <td style={{ padding: '9px 12px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                            {exp.expenseType}
+                            {exp.vehicle && exp.km && (
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>
+                                ({exp.vehicle} · {exp.km} km)
+                              </span>
+                            )}
+                            {exp.route && (
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                {exp.route}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '9px 12px', color: 'var(--text-secondary)' }}>
+                            {exp.submittedBy}
+                          </td>
+                          <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                            {fmt(exp.amount)}
+                          </td>
+                          <td style={{ padding: '9px 12px' }}>
+                            <StatusBadge status={exp.status} />
+                          </td>
+                          <td style={{ padding: '9px 12px' }}>
+                            {exp.receipt ? (
+                              <a
+                                href={exp.receipt}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
+                              >
+                                📎 View
+                              </a>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: 'var(--bg-sunken)', borderTop: '2px solid var(--border)' }}>
+                        <td colSpan={3} style={{ padding: '10px 12px', fontWeight: 700, fontSize: 12, color: 'var(--text-secondary)' }}>
+                          Total ({expenses.length} claims)
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, fontSize: 14, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+                          {fmt(totalExpense)}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
