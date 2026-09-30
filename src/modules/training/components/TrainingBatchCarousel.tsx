@@ -17,15 +17,16 @@ import { Button, Badge, FilterChip, ProgressBar, SearchInput } from '../../../sh
 import { cleanBatchCode } from '../utils/batch-formatter';
 
 export interface BatchAction {
-  id: 'daily' | 'student' | 'final' | 'attendance' | 'assessments' | 'documents';
+  id: 'daily' | 'student' | 'final' | 'attendance' | 'assessments' | 'documents' | 'expense-details';
   label: string;
   icon: string;
 }
 
 const ACTIONS: BatchAction[] = [
-  { id: 'student',     label: 'Student Data',       icon: '👨‍🎓' },
-  { id: 'daily',       label: 'Daily Report',       icon: '📊' },
-  { id: 'documents',   label: 'Certificate Receipt', icon: '📜' },
+  { id: 'student',          label: 'Student Data',        icon: '👨‍🎓' },
+  { id: 'daily',            label: 'Daily Report',        icon: '📊' },
+  { id: 'documents',        label: 'Certificate Receipt', icon: '📜' },
+  { id: 'expense-details',  label: 'Expense Details',     icon: '💰' },
 ];
 
 /** Phase → tone map */

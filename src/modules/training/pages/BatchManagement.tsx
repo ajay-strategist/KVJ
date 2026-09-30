@@ -22,7 +22,6 @@ import type { DailyReportConfig, DailyReportData, TrainingDeliveryLogItem } from
 import { cleanBatchCode } from '../utils/batch-formatter';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 
-// Decomposed Components & Sub-Tabs
 import { BatchHeaderCard } from '../components/BatchHeaderCard';
 import { StudentsTab } from '../tabs/StudentsTab';
 import { AttendanceMatrixTab } from '../tabs/AttendanceMatrixTab';
@@ -30,6 +29,7 @@ import { ExamScoresTab } from '../tabs/ExamScoresTab';
 import { RegistrationTab } from '../tabs/RegistrationTab';
 import { CertificateDeliveryTab } from '../tabs/CertificateDeliveryTab';
 import { ExamReconciliationDrawers } from '../components/ExamReconciliationDrawers';
+import { BatchExpenseDetailsDrawer } from '../components/BatchExpenseDetailsDrawer';
 import type { StudentRecord, RegistrationRecord, StudentSubTab, SortableCol } from '../types/batch-management.types';
 
 export function BatchManagement() {
@@ -193,6 +193,7 @@ export function BatchManagement() {
   // Reconciliation report
   const [reconciliationReport, setReconciliationReport] = useState<Record<string, any>>({});
   const [reconciliationDrawerOpen, setReconciliationDrawerOpen] = useState(false);
+  const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
 
   // Load students for active batch
   useEffect(() => {
@@ -892,6 +893,7 @@ export function BatchManagement() {
             setEmailSubject('Final Course Report');
             setEmailComposerOpen(true);
           }
+          else if (action.id === 'expense-details') setExpenseDetailsOpen(true);
         }}
         onEditBatch={handleOpenEditBatch}
         onCopyBatch={() => toast({ variant: 'info', title: 'Copy Batch', message: 'Duplicate batch template initiated.' })}
@@ -1521,6 +1523,17 @@ export function BatchManagement() {
           await resolveExamAttemptDiscrepancy(res);
         }}
         toast={toast}
+      />
+
+      {/* Batch Expense Details Drawer */}
+      <BatchExpenseDetailsDrawer
+        open={expenseDetailsOpen}
+        onClose={() => setExpenseDetailsOpen(false)}
+        batchName={activeBatch?.code || activeBatch?.trainingName || ''}
+        batchCode={activeBatch?.code || activeBatch?.trainingName || 'Batch'}
+        studentCount={students.length > 0 ? students.length : (activeBatch?.capacity ?? 0)}
+        startDate={activeBatch?.startDate}
+        endDate={activeBatch?.endDate}
       />
     </AppShell>
   );

@@ -104,6 +104,7 @@ export function ExpenseClaims() {
   const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
 
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [batchEntryMode, setBatchEntryMode] = useState(false);
   const [rateModalOpen, setRateModalOpen] = useState(false);
   const [travelRates, setTravelRates] = useState<TravelRate[]>(() => {
     try {
@@ -980,7 +981,14 @@ export function ExpenseClaims() {
                 </Button>
               </>
             )}
-            <Button onClick={() => setExpenseOpen(true)} style={{ whiteSpace: 'nowrap' }}>+ Submit Expense Claim</Button>
+            <Button
+              variant="secondary"
+              onClick={() => { setBatchEntryMode(true); setExpenseOpen(true); }}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              📋 Batch Entry
+            </Button>
+            <Button onClick={() => { setBatchEntryMode(false); setExpenseOpen(true); }} style={{ whiteSpace: 'nowrap' }}>+ Submit Expense Claim</Button>
           </div>
         }
       />
@@ -1474,7 +1482,7 @@ export function ExpenseClaims() {
       {/* Submit Expense Modal */}
       <ExpenseClaimModal
         open={expenseOpen}
-        onClose={() => setExpenseOpen(false)}
+        onClose={() => { setExpenseOpen(false); setBatchEntryMode(false); }}
         onSuccess={() => loadClaims()}
         travelRates={travelRates}
         bikeRate={bikeRate}
@@ -1482,6 +1490,7 @@ export function ExpenseClaims() {
         batches={batches}
         customExpenseTypes={customExpenseTypes}
         onRegisterNewType={handleRegisterNewType}
+        defaultBatchMode={batchEntryMode}
       />
 
       {/* Travel Rates Modal */}
