@@ -981,6 +981,7 @@ export function ExpenseClaims() {
                 </Button>
               </>
             )}
+            {/* Temporarily hidden:
             <Button
               variant="secondary"
               onClick={() => { setBatchEntryMode(true); setExpenseOpen(true); }}
@@ -988,6 +989,7 @@ export function ExpenseClaims() {
             >
               📋 Batch Entry
             </Button>
+            */}
             <Button onClick={() => { setBatchEntryMode(false); setExpenseOpen(true); }} style={{ whiteSpace: 'nowrap' }}>+ Submit Expense Claim</Button>
           </div>
         }
