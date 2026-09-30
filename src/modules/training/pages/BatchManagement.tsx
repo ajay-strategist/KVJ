@@ -485,6 +485,7 @@ export function BatchManagement() {
     collegeCourse: '',
     academicYear: '2026-2027',
     batchName: 'Batch 1',
+    capacity: '',
     trainerId: '',
     coTrainerIds: [] as string[],
     coordinator: '',
@@ -605,6 +606,7 @@ export function BatchManagement() {
     collegeCourse: '',
     academicYear: '2026-2027',
     batchName: 'Batch 1',
+    capacity: '',
     trainerId: '',
     coTrainerIds: [] as string[],
     coordinator: '',
@@ -622,6 +624,7 @@ export function BatchManagement() {
       collegeCourse: '',
       academicYear: '2026-2027',
       batchName: 'Batch 1',
+      capacity: '',
       trainerId: '',
       coTrainerIds: [],
       coordinator: '',
@@ -663,6 +666,7 @@ export function BatchManagement() {
       coordinatorEmail: newBatchForm.coordinatorEmail.trim(),
       academicYear: newBatchForm.academicYear.trim() || '2026-2027',
       batchNo,
+      capacity: newBatchForm.capacity ? Number(newBatchForm.capacity) : 0,
       phase: 'Scheduled',
     });
     if (res.ok) {
@@ -688,6 +692,7 @@ export function BatchManagement() {
       collegeCourse: program,
       academicYear,
       batchName: batchNo,
+      capacity: b.capacity !== undefined && b.capacity !== null ? String(b.capacity) : '',
       trainerId: b.trainerId || '',
       coTrainerIds: b.coTrainerIds || [],
       coordinator: b.coordinator || '',
@@ -732,6 +737,7 @@ export function BatchManagement() {
       coordinatorEmail: editBatchForm.coordinatorEmail.trim(),
       academicYear: editBatchForm.academicYear.trim() || '2026-2027',
       batchNo,
+      capacity: editBatchForm.capacity ? Number(editBatchForm.capacity) : 0,
       phase: editBatchForm.phase,
     });
 
@@ -1185,6 +1191,33 @@ export function BatchManagement() {
               </div>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Academic Year</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  value={newBatchForm.academicYear}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, academicYear: e.target.value })}
+                  placeholder="e.g. 2026-2027"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>No. of Students</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="kvj-input"
+                  value={newBatchForm.capacity}
+                  onChange={(e) => setNewBatchForm({ ...newBatchForm, capacity: e.target.value })}
+                  placeholder="e.g. 60"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
               <Button variant="secondary" type="button" onClick={() => setCreateBatchModalOpen(false)}>Cancel</Button>
               <Button type="submit">➕ Create Batch</Button>
@@ -1291,6 +1324,21 @@ export function BatchManagement() {
               </div>
 
               <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>No. of Students</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="kvj-input"
+                  value={editBatchForm.capacity}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, capacity: e.target.value })}
+                  placeholder="e.g. 60"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Phase / Status</label>
                 <select
                   className="kvj-select"
@@ -1302,6 +1350,18 @@ export function BatchManagement() {
                     <option key={ph} value={ph}>{ph}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Coordinator Name</label>
+                <input
+                  type="text"
+                  className="kvj-input"
+                  value={editBatchForm.coordinator}
+                  onChange={(e) => setEditBatchForm({ ...editBatchForm, coordinator: e.target.value })}
+                  placeholder="e.g. Prof. Name"
+                  style={{ width: '100%' }}
+                />
               </div>
             </div>
 

@@ -55,6 +55,7 @@ export interface BatchCardVM {
   coordinator: string;
   startDate: string;
   endDate: string;
+  capacity?: number;
   completedTasks: number;
   totalTasks: number;
   progress: number; // 0–100
@@ -88,6 +89,7 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
     program,
     academicYear,
     batchNo,
+    capacity:      b.capacity,
     trainer:       trainer ? `${trainer.firstName} ${trainer.lastName}` : (b as any).trainer || '—',
     coordinator:   b.coordinator || '—',
     startDate:     b.startDate || (b as any).start_date || '—',
@@ -330,6 +332,7 @@ const BatchCard = memo(function BatchCard({
             <InfoField label="COURSE"        value={vm.course} />
             <InfoField label="PROGRAM"       value={vm.program} />
             <InfoField label="ACADEMIC YEAR" value={vm.academicYear} />
+            <InfoField label="NO. OF STUDENTS" value={vm.capacity ? `${vm.capacity} Students` : '—'} />
             <InfoField label="COORDINATOR"   value={vm.coordinator} />
 
             <InfoField label="TRAINER"       value={vm.trainer} />
