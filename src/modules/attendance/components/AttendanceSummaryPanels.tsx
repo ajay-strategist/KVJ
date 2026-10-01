@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, SectionHeader, Button, Badge } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, DatePickerField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../attendance.repository';
@@ -11,6 +11,7 @@ import type { Employee } from '../../employee/employee.repository';
 import type { AttendanceRecord } from '../attendance.repository';
 import type { ExpenseClaim } from '../../finance/finance.repository';
 import { supabase } from '../../../shared/integration/supabase';
+import { saveDeclaredHoliday } from '../../../shared/utils/declared-holidays';
 
 export interface AttendanceSummaryPanelsProps {
   startDate: string;
@@ -393,15 +394,37 @@ export function AttendanceSummaryPanels({
       {/* Declare Holiday Modal */}
       <Drawer open={holidayOpen} onClose={() => setHolidayOpen(false)} title="Declare Company / Public Holiday">
         <Form
-          initial={{ date: '', name: '' }}
-          onSubmit={(values) => {
-            if (onDeclareHoliday) onDeclareHoliday(values as any);
-            toast({ variant: 'success', title: 'Holiday Declared', message: `Holiday '${values.name}' declared for ${values.date}` });
+          initial={{ date: '', name: '', type: 'Company Holiday' }}
+          onSubmit={async (values) => {
+            const date = values.date as string;
+            const name = values.name as string;
+            const type = (values.type as string) || 'Company Holiday';
+
+            const res = await saveDeclaredHoliday(date, name, type);
+            if (!res.ok || !res.holiday) {
+              toast({ variant: 'error', title: 'Not Saved', message: res.error || 'Failed to save declared holiday.' });
+              return;
+            }
+
+            if (onDeclareHoliday) {
+              onDeclareHoliday({ date: res.holiday.date, name: res.holiday.name });
+            }
+            setDeclaredHolidays((prev) => Array.from(new Set([...prev, res.holiday!.date])));
+            toast({ variant: 'success', title: 'Holiday Declared', message: `Holiday '${res.holiday.name}' declared for ${res.holiday.date}` });
             setHolidayOpen(false);
           }}
         >
-          <TextField name="date" label="Holiday Date (YYYY-MM-DD)" placeholder="2026-08-15" />
+          <DatePickerField name="date" label="Holiday Date" />
           <TextField name="name" label="Holiday Occasion / Name" placeholder="Independence Day, Onam, Bakrid..." />
+          <SelectField
+            name="type"
+            label="Holiday Type"
+            options={[
+              { value: 'Company Holiday', label: 'Company Holiday' },
+              { value: 'Public Holiday', label: 'Public Holiday' },
+              { value: 'Restricted Holiday', label: 'Restricted Holiday' },
+            ]}
+          />
           <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" type="button" onClick={() => setHolidayOpen(false)}>Cancel</Button>
             <Button type="submit">Declare Holiday</Button>

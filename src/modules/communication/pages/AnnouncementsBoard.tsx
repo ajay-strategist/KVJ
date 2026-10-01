@@ -4,12 +4,14 @@ import { PageHeader, Card, SectionHeader, Button, Badge } from '../../../shared/
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useCommunication } from '../hooks/useCommunication';
 import Drawer from '../../../shared/ui/Drawer';
-import { Form, TextField, SelectField, TextAreaField } from '../../../shared/forms/form';
+import { Form, TextField, SelectField, TextAreaField, DatePickerField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Announcement } from '../communication.repository';
 import { supabase } from '../../../shared/integration/supabase';
 
 import { useAuth } from '../../auth/AuthProvider';
+
+import { saveDeclaredHoliday } from '../../../shared/utils/declared-holidays';
 
 export interface DeclaredHoliday {
   id: string;
@@ -81,44 +83,27 @@ export function AnnouncementsBoard() {
     const name = values.name as string;
     const type = (values.type as string) || 'Company Holiday';
 
-    const newH: DeclaredHoliday = {
-      id: crypto.randomUUID(),
-      date,
-      name,
-      type,
-      status: 'active',
-    };
-
-    setHolidays((prev) => [newH, ...prev]);
-    toast({ variant: 'success', title: 'Holiday Declared', message: `Holiday '${name}' on ${date} has been declared.` });
-
-    try {
-      // Only columns guaranteed by the base declared_holidays schema
-      // (id, date, name). The table has NO `title` column — sending it made the
-      // whole upsert fail, so holidays never persisted and never reached the
-      // attendance calendar. Conflict on the UNIQUE date so re-declaring updates.
-      const { error } = await supabase
-        .from('flwdsk_declared_holidays')
-        .upsert({ id: newH.id, date: newH.date, name: newH.name }, { onConflict: 'date' });
-      if (error) {
-        console.error('Declared holiday save failed:', error);
-        toast({ variant: 'error', title: 'Not Saved', message: `Holiday could not be saved: ${error.message}` });
-      }
-    } catch (e) {
-      console.error('Declared holiday insert error:', e);
+    const res = await saveDeclaredHoliday(date, name, type);
+    if (!res.ok || !res.holiday) {
+      toast({ variant: 'error', title: 'Not Saved', message: res.error || 'Failed to save declared holiday.' });
+      return;
     }
+
+    const savedH: DeclaredHoliday = res.holiday;
+    setHolidays((prev) => [savedH, ...prev.filter((h) => h.id !== savedH.id && h.date !== savedH.date)]);
+    toast({ variant: 'success', title: 'Holiday Declared', message: `Holiday '${savedH.name}' on ${savedH.date} has been declared.` });
 
     // Broadcast announcement & notification
     postAnnouncement({
-      title: `🎉 Company Holiday Notice: ${name}`,
-      content: `Please note that ${date} has been officially declared as a holiday (${name}). Attendance registers have been updated accordingly.`,
+      title: `🎉 Company Holiday Notice: ${savedH.name}`,
+      content: `Please note that ${savedH.date} has been officially declared as a holiday (${savedH.name}). Attendance registers have been updated accordingly.`,
       targetType: 'organization',
       priority: 'high',
     });
 
     addNotification({
-      title: `Holiday Declared: ${name}`,
-      message: `${date} is marked as a holiday. Enjoy your time off!`,
+      title: `Holiday Declared: ${savedH.name}`,
+      message: `${savedH.date} is marked as a holiday. Enjoy your time off!`,
       category: 'system',
       priority: 'high',
     });
@@ -264,7 +249,7 @@ export function AnnouncementsBoard() {
       {/* Declare Holiday Drawer */}
       <Drawer open={holidayOpen} onClose={() => setHolidayOpen(false)} title="Declare Company / Public Holiday">
         <Form initial={{ date: '', name: '', type: 'Company Holiday' }} onSubmit={handleDeclareHoliday}>
-          <TextField name="date" label="Holiday Date (YYYY-MM-DD)" placeholder="2026-08-15" />
+          <DatePickerField name="date" label="Holiday Date" />
           <TextField name="name" label="Holiday Name / Occasion" placeholder="Independence Day, Onam, Bakrid..." />
           <SelectField
             name="type"
