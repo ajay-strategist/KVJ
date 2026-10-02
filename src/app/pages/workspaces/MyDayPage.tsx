@@ -127,6 +127,7 @@ interface AttendancePanelProps {
   timelineEntries?: Array<{ title: string; time: string }>;
   tasks?: TaskItem[];
   onStartBreakWithTask?: (reason: string, updateMsg: string, targetTaskId?: string) => Promise<boolean>;
+  onApplyLeave?: () => void;
 }
 
 export const AttendancePanel = memo(function AttendancePanel({
@@ -140,6 +141,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   timelineEntries = [],
   tasks = [],
   onStartBreakWithTask,
+  onApplyLeave,
 }: AttendancePanelProps) {
   const device = useDevice();
   const isMobile = device === 'mobile';
@@ -773,6 +775,32 @@ export const AttendancePanel = memo(function AttendancePanel({
             </button>
           )}
 
+          {/* Apply for Leave Button */}
+          {onApplyLeave && (
+            <button
+              type="button"
+              className="kvj-btn"
+              onClick={onApplyLeave}
+              style={{
+                background: '#ffffff',
+                color: 'var(--primary-700, #1d4ed8)',
+                border: '2px solid var(--primary-300, #93c5fd)',
+                padding: '10px 22px',
+                fontWeight: 700,
+                fontSize: 13.5,
+                borderRadius: 999,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 2px 6px rgba(37,99,235,0.08)',
+                marginLeft: 'auto',
+              }}
+            >
+              🌴 Apply Leave
+            </button>
+          )}
+
           {/* Always visible action to submit attendance */}
           <button
             type="button"
@@ -791,7 +819,7 @@ export const AttendancePanel = memo(function AttendancePanel({
               alignItems: 'center',
               gap: 6,
               boxShadow: '0 2px 6px rgba(99,102,241,0.08)',
-              marginLeft: 'auto',
+              marginLeft: !onApplyLeave ? 'auto' : undefined,
             }}
           >
             📋 Submit Attendance
@@ -3240,6 +3268,7 @@ export function MyDayPage() {
         timelineEntries={timelineEntries}
         tasks={tasks}
         onStartBreakWithTask={handleStartBreakWithTask}
+        onApplyLeave={() => setApplyLeaveOpen(true)}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>

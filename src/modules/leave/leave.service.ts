@@ -60,7 +60,7 @@ export class LeaveService implements ILeaveService {
       const normalizedType =
         leaveType && leaveType.toLowerCase().includes('medical')
           ? 'Medical Leave'
-          : 'Leave';
+          : leaveType || 'Casual Leave';
 
       const actor: Actor = { id: employeeId || 'emp-user', role: 'Employee' };
       const record = await this.repo.create(

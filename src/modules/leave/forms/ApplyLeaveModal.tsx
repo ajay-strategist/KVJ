@@ -23,8 +23,13 @@ export function calculateWorkingDays(startDate: string, endDate: string, shift: 
   if (shift === 'Morning Half Day' || shift === 'Afternoon Half Day') {
     return 0.5;
   }
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  if (!startDate || !endDate) return 0;
+  const [sY, sM, sD] = startDate.split('-').map(Number);
+  const [eY, eM, eD] = endDate.split('-').map(Number);
+  if (!sY || !sM || !sD || !eY || !eM || !eD) return 0;
+
+  const start = new Date(sY, sM - 1, sD);
+  const end = new Date(eY, eM - 1, eD);
   if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
 
   let count = 0;
@@ -340,7 +345,7 @@ export function ApplyLeaveModal({ open, onClose, onSuccess }: ApplyLeaveModalPro
           <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={submitting || calculatedDays === 0}>
+          <Button type="submit" disabled={submitting || !startDate || (!isHalfDay && effectiveEndDate < startDate)}>
             {submitting ? 'Submitting...' : 'Submit Application'}
           </Button>
         </div>
