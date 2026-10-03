@@ -7,24 +7,30 @@ export interface ProjectCommonFiltersState {
   searchQuery: string;
   selectedProjectId: string;
   selectedEmployeeId: string;
+  selectedTaskName: string;
   selectedStatus: string;
   selectedClient: string;
-  selectedDate: string;
+  fromDate: string;
+  toDate: string;
 }
 
 export interface ProjectCommonFilterHeaderProps {
+  activeTab: string; // 'projects' | 'tasks' | 'worklog'
   filters: ProjectCommonFiltersState;
   onFilterChange: (updated: Partial<ProjectCommonFiltersState>) => void;
   onResetFilters: () => void;
   projects?: any[];
+  tasks?: any[];
   clients?: any[];
 }
 
 export function ProjectCommonFilterHeader({
+  activeTab,
   filters,
   onFilterChange,
   onResetFilters,
   projects = [],
+  tasks = [],
   clients = [],
 }: ProjectCommonFilterHeaderProps) {
   const { user } = useAuth();
@@ -42,7 +48,7 @@ export function ProjectCommonFilterHeader({
     return Array.from(set).sort();
   }, [clients, projects]);
 
-  // Extract unique project list
+  // Extract unique projects
   const projectOptions = useMemo(() => {
     return projects.map((p) => ({
       id: p.id,
@@ -52,15 +58,26 @@ export function ProjectCommonFilterHeader({
     }));
   }, [projects]);
 
+  // Extract unique task names
+  const taskOptions = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach((t) => {
+      const name = t.title || t.name;
+      if (name) set.add(name);
+    });
+    return Array.from(set).sort();
+  }, [tasks]);
+
   // Compute active filters count
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.searchQuery) count++;
     if (filters.selectedProjectId !== 'all') count++;
     if (filters.selectedEmployeeId !== 'all') count++;
+    if (filters.selectedTaskName !== 'all') count++;
     if (filters.selectedStatus !== 'all') count++;
     if (filters.selectedClient !== 'all') count++;
-    if (filters.selectedDate) count++;
+    if (filters.fromDate || filters.toDate) count++;
     return count;
   }, [filters]);
 
@@ -79,10 +96,11 @@ export function ProjectCommonFilterHeader({
 
   return (
     <Card style={{ padding: '14px 18px', marginBottom: 18, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+      {/* Top Title & Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            🔍 Common Filters
+            🔍 Common Filters ({activeTab === 'projects' ? 'Projects' : activeTab === 'tasks' ? 'Tasks' : 'Task Worklog'})
           </span>
           {activeFiltersCount > 0 && (
             <Badge variant="primary" style={{ fontSize: 11 }}>
@@ -98,24 +116,44 @@ export function ProjectCommonFilterHeader({
         )}
       </div>
 
-      {/* Filter Form Controls */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, alignItems: 'end' }}>
-        {/* Search Query */}
+      {/* Common Filter Inputs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, alignItems: 'end' }}>
+        {/* 1. Search Bar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            SEARCH
+            SEARCH BAR
           </label>
           <input
             type="text"
             className="kvj-input"
             value={filters.searchQuery}
             onChange={(e) => onFilterChange({ searchQuery: e.target.value })}
-            placeholder="Search project, task, client…"
+            placeholder="Search code, title, client…"
             style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
           />
         </div>
 
-        {/* Project Name */}
+        {/* 2. Employee Filter (Supervisor or Assigned) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            EMPLOYEE (SUPERVISOR / ASSIGNED)
+          </label>
+          <select
+            className="kvj-select"
+            value={filters.selectedEmployeeId}
+            onChange={(e) => onFilterChange({ selectedEmployeeId: e.target.value })}
+            style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+          >
+            <option value="all">👥 All Employees</option>
+            {user && <option value={user.id}>Me ({user.fullName})</option>}
+            {(employees || []).filter(e => e.id !== user?.id).map((e) => {
+              const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email;
+              return <option key={e.id} value={e.id}>{name}</option>;
+            })}
+          </select>
+        </div>
+
+        {/* 3. Project Name */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             PROJECT NAME
@@ -135,48 +173,27 @@ export function ProjectCommonFilterHeader({
           </select>
         </div>
 
-        {/* Employee Filter */}
+        {/* 4. Task Name */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            EMPLOYEE (SUPERVISOR / MEMBER)
+            TASK NAME
           </label>
           <select
             className="kvj-select"
-            value={filters.selectedEmployeeId}
-            onChange={(e) => onFilterChange({ selectedEmployeeId: e.target.value })}
+            value={filters.selectedTaskName}
+            onChange={(e) => onFilterChange({ selectedTaskName: e.target.value })}
             style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
           >
-            <option value="all">👥 All Employees</option>
-            {user && <option value={user.id}>Me ({user.fullName})</option>}
-            {(employees || []).filter(e => e.id !== user?.id).map((e) => {
-              const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email;
-              return <option key={e.id} value={e.id}>{name}</option>;
-            })}
+            <option value="all">✅ All Tasks</option>
+            {taskOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
         </div>
 
-        {/* Status */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            STATUS
-          </label>
-          <select
-            className="kvj-select"
-            value={filters.selectedStatus}
-            onChange={(e) => onFilterChange({ selectedStatus: e.target.value })}
-            style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
-          >
-            <option value="all">🏷️ All Statuses</option>
-            <option value="Not Started">Not Started</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Pending Approval">Pending Approval</option>
-            <option value="Under Review">Under Review</option>
-            <option value="Completed">Completed</option>
-            <option value="Rework">Rework</option>
-          </select>
-        </div>
-
-        {/* Client */}
+        {/* 5. Client */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             CLIENT
@@ -196,18 +213,65 @@ export function ProjectCommonFilterHeader({
           </select>
         </div>
 
-        {/* Date Filter */}
+        {/* 6. Context-Aware Status Filter */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            DATE / ACTIVITY DATE
+            STATUS ({activeTab.toUpperCase()})
           </label>
-          <input
-            type="date"
-            className="kvj-input"
-            value={filters.selectedDate}
-            onChange={(e) => onFilterChange({ selectedDate: e.target.value })}
-            style={{ width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
-          />
+          <select
+            className="kvj-select"
+            value={filters.selectedStatus}
+            onChange={(e) => onFilterChange({ selectedStatus: e.target.value })}
+            style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+          >
+            <option value="all">🏷️ All Statuses</option>
+            {activeTab === 'projects' ? (
+              <>
+                <option value="Not Started">Not Started</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+              </>
+            ) : activeTab === 'tasks' ? (
+              <>
+                <option value="Pending Approval">Pending Approval</option>
+                <option value="To Do">To Do</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Under Review">Under Review</option>
+                <option value="Completed">Completed</option>
+                <option value="Rework">Rework</option>
+              </>
+            ) : (
+              <>
+                <option value="Approved">Approved</option>
+                <option value="Pending Review">Pending Review</option>
+                <option value="Rework">Rework</option>
+              </>
+            )}
+          </select>
+        </div>
+
+        {/* 7. Custom Date Range (From - To) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: 'span 2' }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            CUSTOM DATE RANGE (FROM - TO)
+          </label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              type="date"
+              className="kvj-input"
+              value={filters.fromDate}
+              onChange={(e) => onFilterChange({ fromDate: e.target.value })}
+              style={{ flex: 1, padding: '6px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
+            <input
+              type="date"
+              className="kvj-input"
+              value={filters.toDate}
+              onChange={(e) => onFilterChange({ toDate: e.target.value })}
+              style={{ flex: 1, padding: '6px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            />
+          </div>
         </div>
       </div>
 
@@ -220,22 +284,22 @@ export function ProjectCommonFilterHeader({
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ searchQuery: '' })}>×</span>
             </Badge>
           )}
-          {filters.selectedProjectId !== 'all' && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Project: {selectedProjTitle}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedProjectId: 'all' })}>×</span>
-            </Badge>
-          )}
           {filters.selectedEmployeeId !== 'all' && (
             <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Employee: {selectedEmpName}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedEmployeeId: 'all' })}>×</span>
             </Badge>
           )}
-          {filters.selectedStatus !== 'all' && (
+          {filters.selectedProjectId !== 'all' && (
             <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Status: {filters.selectedStatus}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedStatus: 'all' })}>×</span>
+              Project: {selectedProjTitle}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedProjectId: 'all' })}>×</span>
+            </Badge>
+          )}
+          {filters.selectedTaskName !== 'all' && (
+            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              Task: {filters.selectedTaskName}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedTaskName: 'all' })}>×</span>
             </Badge>
           )}
           {filters.selectedClient !== 'all' && (
@@ -244,10 +308,16 @@ export function ProjectCommonFilterHeader({
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedClient: 'all' })}>×</span>
             </Badge>
           )}
-          {filters.selectedDate && (
+          {filters.selectedStatus !== 'all' && (
             <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Date: {filters.selectedDate}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedDate: '' })}>×</span>
+              Status: {filters.selectedStatus}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedStatus: 'all' })}>×</span>
+            </Badge>
+          )}
+          {(filters.fromDate || filters.toDate) && (
+            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              Date Range: {filters.fromDate || 'Start'} to {filters.toDate || 'End'}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ fromDate: '', toDate: '' })}>×</span>
             </Badge>
           )}
         </div>

@@ -443,15 +443,24 @@ export function ProjectList({
       }
     }
 
-    // Date matching: Project active range OR task activity on date
-    if (commonFilters?.selectedDate) {
-      const d = commonFilters.selectedDate;
+    if (commonFilters?.selectedTaskName && commonFilters.selectedTaskName !== 'all') {
+      const targetTaskName = commonFilters.selectedTaskName.toLowerCase();
+      list = list.filter((p: any) => {
+        return tasks.some((t: any) => t.projectId === p.id && (t.title || t.name || '').toLowerCase() === targetTaskName);
+      });
+    }
+
+    // Date matching: Project active range OR task activity in date range
+    if (commonFilters?.fromDate || commonFilters?.toDate) {
+      const from = commonFilters.fromDate || '1970-01-01';
+      const to = commonFilters.toDate || '2099-12-31';
       list = list.filter((p: any) => {
         const dbProj = projects.find((dp: any) => dp.id === p.id);
-        const start = (dbProj as any)?.startDate;
-        const end = (dbProj as any)?.endDate;
-        if (start && end && start <= d && d <= end) return true;
-        const hasTaskActivity = tasks.some((t: any) => t.projectId === p.id && (t.dueDate === d || t.startDate === d));
+        const start = (dbProj as any)?.startDate || '1970-01-01';
+        const end = (dbProj as any)?.endDate || '2099-12-31';
+        const isOverlap = start <= to && end >= from;
+        if (isOverlap) return true;
+        const hasTaskActivity = tasks.some((t: any) => t.projectId === p.id && ((t.dueDate && t.dueDate >= from && t.dueDate <= to) || (t.startDate && t.startDate >= from && t.startDate <= to)));
         if (hasTaskActivity) return true;
         return false;
       });
@@ -981,87 +990,7 @@ export function ProjectList({
         <Button onClick={() => setCreateProjectOpen(true)}>+ Create Master Project</Button>
       </div>
 
-      {/* Full Horizontal Filter Bar (Search + 4 Slicers + Clear Action) */}
-      <Card style={{ padding: '14px 18px', overflow: 'visible', position: 'relative', zIndex: 40 }} bodyStyle={{ overflow: 'visible' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Search Project Input */}
-          <div style={{ flex: '1 1 200px', minWidth: 160 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Search Project</label>
-            <SearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search by name, code, client..."
-              style={{ width: '100%' }}
-            />
-          </div>
 
-          {/* Project Name Searchable Slicer */}
-          <div style={{ flex: '1 1 190px', minWidth: 160 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Project Name</label>
-            <SearchableSelect
-              value={selectedProjectFilter}
-              onChange={setSelectedProjectFilter}
-              placeholder="All Projects"
-              allOptionLabel="All Projects"
-              searchPlaceholder="Search project name or code..."
-              options={projectsList.map((p) => ({
-                value: p.id,
-                label: `${p.code} - ${p.title}`,
-                subLabel: p.client ? `Client: ${p.client}` : undefined,
-              }))}
-            />
-          </div>
-
-          {/* Supervisor Slicer */}
-          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Supervisor</label>
-            <select
-              className="kvj-select"
-              value={selectedSupervisor}
-              onChange={(e) => setSelectedSupervisor(e.target.value)}
-              style={{ width: '100%', padding: '6px 10px', fontSize: 12.5, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
-            >
-              <option value="all">All Supervisors</option>
-              {employees.map((e) => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
-            </select>
-          </div>
-
-          {/* Status Checklist Slicer */}
-          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Status</label>
-            <ChecklistMultiSelect
-              options={[
-                { value: 'Not Started', label: 'Not Started' },
-                { value: 'In Progress', label: 'In Progress' },
-                { value: 'Completed', label: 'Completed' },
-              ]}
-              selectedValues={selectedStatuses}
-              onChange={setSelectedStatuses}
-            />
-          </div>
-
-          {/* Client Slicer */}
-          <div style={{ flex: '1 1 160px', minWidth: 140 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Client</label>
-            <select
-              className="kvj-select"
-              value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              style={{ width: '100%', padding: '6px 10px', fontSize: 12.5, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
-            >
-              <option value="all">All Clients</option>
-              {clients.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-          </div>
-
-          {/* Clear Filters Action */}
-          {(searchQuery || selectedSupervisor !== 'all' || selectedClient !== 'all' || selectedProjectFilter !== 'all' || !(selectedStatuses.length === 2 && selectedStatuses.includes('Not Started') && selectedStatuses.includes('In Progress'))) && (
-            <Button size="sm" variant="ghost" onClick={() => { setSearchQuery(''); setSelectedSupervisor('all'); setSelectedStatuses(['Not Started', 'In Progress']); setSelectedClient('all'); setSelectedProjectFilter('all'); }} style={{ alignSelf: 'flex-end', marginBottom: 2 }}>
-              ✕ Clear Filters
-            </Button>
-          )}
-        </div>
-      </Card>
 
       {/* 4 KPI Summary Cards Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 4 }}>

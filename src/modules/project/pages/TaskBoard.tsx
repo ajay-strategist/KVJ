@@ -346,8 +346,20 @@ export function TaskBoard({
         if (!statusFilters.includes('all') && !statusFilters.includes(t.status)) return false;
       }
 
-      // Date Filtering
-      if (commonFilters?.selectedDate) {
+      if (commonFilters?.selectedTaskName && commonFilters.selectedTaskName !== 'all') {
+        const target = commonFilters.selectedTaskName.toLowerCase();
+        if ((t.name || t.title || '').toLowerCase() !== target) return false;
+      }
+
+      // Date Filtering (Custom Date Range or Quick Window)
+      if (commonFilters?.fromDate || commonFilters?.toDate) {
+        const from = commonFilters.fromDate || '1970-01-01';
+        const to = commonFilters.toDate || '2099-12-31';
+        const inDueRange = t.dueDate && t.dueDate >= from && t.dueDate <= to;
+        const inStartRange = t.startDate && t.startDate >= from && t.startDate <= to;
+        const inEntriesRange = Array.isArray(t.dailyTimeEntries) && t.dailyTimeEntries.some((e: any) => e.date >= from && e.date <= to);
+        if (!inDueRange && !inStartRange && !inEntriesRange) return false;
+      } else if (commonFilters?.selectedDate) {
         const d = commonFilters.selectedDate;
         const matchesDueDate = t.dueDate === d || t.startDate === d;
         const matchesEntries = Array.isArray(t.dailyTimeEntries) && t.dailyTimeEntries.some((e: any) => e.date === d);

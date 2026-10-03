@@ -18,13 +18,17 @@ export function ProjectsAndTasks() {
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
 
+  const [activeTab, setActiveTab] = useState<string>('projects');
+
   const initialFilters: ProjectCommonFiltersState = {
     searchQuery: '',
     selectedProjectId: 'all',
     selectedEmployeeId: isMgmt ? 'all' : (user?.id || ''),
+    selectedTaskName: 'all',
     selectedStatus: 'all',
     selectedClient: 'all',
-    selectedDate: '',
+    fromDate: '',
+    toDate: '',
   };
 
   const [commonFilters, setCommonFilters] = useState<ProjectCommonFiltersState>(initialFilters);
@@ -35,6 +39,12 @@ export function ProjectsAndTasks() {
 
   const handleResetFilters = () => {
     setCommonFilters(initialFilters);
+  };
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    // Reset status when switching tabs if active tab changes to prevent invalid status cross-over
+    setCommonFilters((prev) => ({ ...prev, selectedStatus: 'all' }));
   };
 
   return (
@@ -48,14 +58,18 @@ export function ProjectsAndTasks() {
 
       {/* Common Filter Header */}
       <ProjectCommonFilterHeader
+        activeTab={activeTab}
         filters={commonFilters}
         onFilterChange={handleFilterChange}
         onResetFilters={handleResetFilters}
         projects={projectData?.projects || []}
+        tasks={projectData?.tasks || []}
         clients={projectData?.clients || []}
       />
 
       <Tabs
+        defaultTabId={activeTab}
+        onChange={handleTabChange}
         items={[
           { 
             id: 'projects', 

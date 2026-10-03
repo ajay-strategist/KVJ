@@ -470,12 +470,16 @@ export function TaskWorklogView({
       if (effectiveStatus === 'Rework' && l.reviewStatus !== 'Rework') return false;
     }
 
-    if (commonFilters?.selectedProjectId && commonFilters.selectedProjectId !== 'all') {
-      const proj = projects.find((p: any) => p.id === commonFilters.selectedProjectId);
-      if (proj && l.projectName !== proj.title) return false;
+    if (commonFilters?.selectedTaskName && commonFilters.selectedTaskName !== 'all') {
+      const target = commonFilters.selectedTaskName.toLowerCase();
+      if ((l.taskName || '').toLowerCase() !== target) return false;
     }
 
-    if (commonFilters?.selectedDate && l.date !== commonFilters.selectedDate) {
+    if (commonFilters?.fromDate || commonFilters?.toDate) {
+      const from = commonFilters.fromDate || '1970-01-01';
+      const to = commonFilters.toDate || '2099-12-31';
+      if (l.date < from || l.date > to) return false;
+    } else if (commonFilters?.selectedDate && l.date !== commonFilters.selectedDate) {
       return false;
     }
 
@@ -564,7 +568,11 @@ export function TaskWorklogView({
     }
 
     const d = (s.startTime || '').slice(0, 10);
-    if (commonFilters?.selectedDate) {
+    if (commonFilters?.fromDate || commonFilters?.toDate) {
+      const from = commonFilters.fromDate || '1970-01-01';
+      const to = commonFilters.toDate || '2099-12-31';
+      if (d < from || d > to) return false;
+    } else if (commonFilters?.selectedDate) {
       if (d !== commonFilters.selectedDate) return false;
     } else {
       if (sessFrom && d < sessFrom) return false;
