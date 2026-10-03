@@ -867,11 +867,71 @@ export function TaskBoard({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <Button variant="secondary" onClick={handleExportTasksToExcel} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>
-          📥 Export Tasks to Excel
-        </Button>
-        <Button onClick={() => setCreateTaskOpen(true)} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>➕ Create Task</Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as any)}
+            style={{
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="all">📂 All Categories</option>
+            <option value="Office Task">🏢 Office Task</option>
+            <option value="Project Task">🚀 Project Task</option>
+          </select>
+
+          <select
+            value={dateWindowFilter}
+            onChange={(e) => setDateWindowFilter(e.target.value as any)}
+            style={{
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="all">📅 All Window</option>
+            <option value="next_3_days">⏳ Next 3 Days Window</option>
+            <option value="today">📌 Due Today</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as any)}
+            style={{
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="asc">DueDate: Ascending ⬆</option>
+            <option value="desc">DueDate: Descending ⬇</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Button variant="secondary" onClick={handleExportTasksToExcel} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>
+            📥 Export Tasks to Excel
+          </Button>
+          <Button onClick={() => setCreateTaskOpen(true)} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>➕ Create Task</Button>
+        </div>
       </div>
 
       {/* ── Pending Task Assignment Approvals Banner (CEO/Admin only) ── */}
@@ -937,141 +997,7 @@ export function TaskBoard({
         </Card>
       </div>
 
-      {/* Filters Bar */}
-      <Card style={{ padding: '14px 18px', background: 'var(--bg-surface)', overflow: 'visible', position: 'relative', zIndex: 30 }} bodyStyle={{ overflow: 'visible' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-          <div style={{ flex: '1 1 240px', minWidth: 200 }}>
-            <input
-              type="text"
-              placeholder="🔍 Search tasks, assignees, or projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 14px',
-                fontSize: 13,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-sunken)',
-                color: 'var(--text-primary)',
-              }}
-            />
-          </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {isManagement ? (
-              <select
-                value={selectedAssignee}
-                onChange={(e) => setSelectedAssignee(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-surface)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="all">👥 All Employees (Tasks)</option>
-                {user?.fullName && <option value={user.fullName}>👤 My Tasks ({user.fullName})</option>}
-                {employees.map((e) => {
-                  const name = `${e.firstName} ${e.lastName}`;
-                  if (name === user?.fullName) return null;
-                  return <option key={e.id} value={name}>{name}</option>;
-                })}
-              </select>
-            ) : (
-              <span style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-sunken)', border: '1px solid var(--border)', color: 'var(--brand)' }}>
-                👤 {user?.fullName || 'My Tasks Only'}
-              </span>
-            )}
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value as any)}
-              style={{
-                padding: '8px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">📂 All Categories</option>
-              <option value="Office Task">🏢 Office Task</option>
-              <option value="Project Task">🚀 Project Task</option>
-            </select>
-
-            <ChecklistMultiSelect
-              options={[
-                { value: 'Pending Approval', label: '⚡ Pending Approval' },
-                { value: 'To Do', label: '📝 To Do' },
-                { value: 'In Progress', label: '⚙️ In Progress' },
-                { value: 'Under Review', label: '🔍 Under Review' },
-                { value: 'Completed', label: '✅ Completed' },
-              ]}
-              selectedValues={statusFilters}
-              onChange={setStatusFilters}
-              style={{ width: 175 }}
-            />
-
-            <select
-              value={dateWindowFilter}
-              onChange={(e) => setDateWindowFilter(e.target.value as any)}
-              style={{
-                padding: '8px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">📅 All Tasks</option>
-              <option value="next_3_days">⏳ Next 3 Days Window</option>
-              <option value="today">📌 Due Today</option>
-            </select>
-
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as any)}
-              style={{
-                padding: '8px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="asc">DueDate: Ascending ⬆</option>
-              <option value="desc">DueDate: Descending ⬇</option>
-            </select>
-
-            {(searchQuery || categoryFilter !== 'all' || dateWindowFilter !== 'all') && (
-              <Button
-                size="xs"
-                variant="secondary"
-                onClick={() => {
-                  setSearchQuery('');
-                  setCategoryFilter('all');
-                  setDateWindowFilter('all');
-                }}
-              >
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        </div>
-      </Card>
 
       {/* Task List Table View */}
       {(() => {
