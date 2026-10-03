@@ -435,7 +435,7 @@ export function ProjectList({
 
     if (effectiveStatus) {
       list = list.filter((p) => p.status === effectiveStatus || (effectiveStatus === 'In Progress' && p.status === 'In Progress') || (effectiveStatus === 'Completed' && p.status === 'Completed'));
-    } else if (selectedStatuses.length > 0) {
+    } else if (!commonFilters && selectedStatuses.length > 0) {
       if (selectedStatuses.includes('__none__')) {
         list = [];
       } else {
