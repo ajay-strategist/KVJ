@@ -98,8 +98,8 @@ export function ExpenseClaimModal({
   onClose,
   onSuccess,
   travelRates,
-  bikeRate = 5.2,
-  carRate = 8.5,
+  bikeRate = 3.0,
+  carRate = 9.5,
   batches,
   customExpenseTypes,
   onRegisterNewType,
@@ -134,22 +134,25 @@ export function ExpenseClaimModal({
   const kmVal = Number(km || 0);
 
   const availableRates: TravelRate[] = useMemo(() => {
-    if (travelRates && travelRates.length > 0) return travelRates;
+    if (travelRates && travelRates.length > 0) {
+      return travelRates.map((r) => ({ ...r, ratePerKm: Number(r.ratePerKm) }));
+    }
     return [
-      { id: 'bike', name: 'Bike', ratePerKm: bikeRate, icon: '🏍️' },
-      { id: 'car', name: 'Car', ratePerKm: carRate, icon: '🚗' },
+      { id: 'bike', name: 'Bike', ratePerKm: Number(bikeRate), icon: '🏍️' },
+      { id: 'car', name: 'Car', ratePerKm: Number(carRate), icon: '🚗' },
     ];
   }, [travelRates, bikeRate, carRate]);
 
   const selectedRateObj = useMemo(() => {
     return (
       availableRates.find((r) => r.name.toLowerCase() === vehicle.toLowerCase()) ||
+      availableRates.find((r) => r.id === vehicle.toLowerCase()) ||
       availableRates[0]
     );
   }, [availableRates, vehicle]);
 
-  const activeRate = selectedRateObj ? selectedRateObj.ratePerKm : (vehicle.toLowerCase().includes('car') ? carRate : bikeRate);
-  const calculatedTravelAmount = isSelfTravel ? kmVal * activeRate : 0;
+  const activeRate = Number(selectedRateObj ? selectedRateObj.ratePerKm : (vehicle.toLowerCase().includes('car') ? carRate : bikeRate));
+  const calculatedTravelAmount = isSelfTravel ? Number((kmVal * activeRate).toFixed(2)) : 0;
   const finalAmount = isSelfTravel ? calculatedTravelAmount : Number(amount || 0);
 
   const batchOptions = useMemo(() => {

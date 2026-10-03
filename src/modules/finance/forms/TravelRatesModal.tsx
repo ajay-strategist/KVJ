@@ -12,8 +12,8 @@ export interface TravelRate {
 }
 
 export const DEFAULT_TRAVEL_RATES: TravelRate[] = [
-  { id: 'bike', name: 'Bike', ratePerKm: 5.2, icon: '🏍️' },
-  { id: 'car', name: 'Car', ratePerKm: 8.5, icon: '🚗' },
+  { id: 'bike', name: 'Bike', ratePerKm: 3.0, icon: '🏍️' },
+  { id: 'car', name: 'Car', ratePerKm: 9.5, icon: '🚗' },
 ];
 
 export interface TravelRatesModalProps {
@@ -39,8 +39,8 @@ export function TravelRatesModal({
   const [rates, setRates] = useState<TravelRate[]>(() => {
     if (travelRates && travelRates.length > 0) return travelRates;
     return [
-      { id: 'bike', name: 'Bike', ratePerKm: initialBikeRate ?? 5.2, icon: '🏍️' },
-      { id: 'car', name: 'Car', ratePerKm: initialCarRate ?? 8.5, icon: '🚗' },
+      { id: 'bike', name: 'Bike', ratePerKm: initialBikeRate ?? 3.0, icon: '🏍️' },
+      { id: 'car', name: 'Car', ratePerKm: initialCarRate ?? 9.5, icon: '🚗' },
     ];
   });
   const [saving, setSaving] = useState<boolean>(false);
@@ -49,11 +49,11 @@ export function TravelRatesModal({
   useEffect(() => {
     if (open) {
       if (travelRates && travelRates.length > 0) {
-        setRates(travelRates.map((r) => ({ ...r })));
+        setRates(travelRates.map((r) => ({ ...r, ratePerKm: Number(r.ratePerKm) })));
       } else {
         setRates([
-          { id: 'bike', name: 'Bike', ratePerKm: initialBikeRate ?? 5.2, icon: '🏍️' },
-          { id: 'car', name: 'Car', ratePerKm: initialCarRate ?? 8.5, icon: '🚗' },
+          { id: 'bike', name: 'Bike', ratePerKm: initialBikeRate ?? 3.0, icon: '🏍️' },
+          { id: 'car', name: 'Car', ratePerKm: initialCarRate ?? 9.5, icon: '🚗' },
         ]);
       }
     }

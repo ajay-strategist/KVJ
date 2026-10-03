@@ -118,17 +118,17 @@ export function ExpenseClaims() {
   });
   const [bikeRate, setBikeRate] = useState<number>(() => {
     const b = travelRates.find((r) => r.id === 'bike' || r.name.toLowerCase().includes('bike'));
-    return b ? b.ratePerKm : 5.2;
+    return b ? Number(b.ratePerKm) : 3.0;
   });
   const [carRate, setCarRate] = useState<number>(() => {
     const c = travelRates.find((r) => r.id === 'car' || r.name.toLowerCase().includes('car'));
-    return c ? c.ratePerKm : 8.5;
+    return c ? Number(c.ratePerKm) : 9.5;
   });
 
   const getVehicleRate = (vehicleName?: string) => {
     if (!vehicleName) return bikeRate;
     const match = travelRates.find((r) => r.name.toLowerCase() === vehicleName.toLowerCase());
-    if (match) return match.ratePerKm;
+    if (match) return Number(match.ratePerKm);
     return vehicleName.toLowerCase().includes('car') ? carRate : bikeRate;
   };
 
@@ -170,7 +170,7 @@ export function ExpenseClaims() {
           if (ratesRow && ratesRow.value) {
             const val = typeof ratesRow.value === 'string' ? JSON.parse(ratesRow.value) : ratesRow.value;
             if (Array.isArray(val) && val.length > 0) {
-              loadedRates = val;
+              loadedRates = val.map((r: any) => ({ ...r, ratePerKm: Number(r.ratePerKm) }));
             }
           }
 
@@ -184,8 +184,8 @@ export function ExpenseClaims() {
           }
 
           if (bikeRow || carRow) {
-            const bVal = bikeRow ? Number(bikeRow.value) : 5.2;
-            const cVal = carRow ? Number(carRow.value) : 8.5;
+            const bVal = bikeRow ? Number(bikeRow.value) : 3.0;
+            const cVal = carRow ? Number(carRow.value) : 9.5;
             setBikeRate(bVal);
             setCarRate(cVal);
             setTravelRates([
@@ -205,9 +205,10 @@ export function ExpenseClaims() {
         if (storedRates) {
           const parsed = JSON.parse(storedRates);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setTravelRates(parsed);
-            const b = parsed.find((r: any) => r.id === 'bike' || r.name.toLowerCase().includes('bike'));
-            const c = parsed.find((r: any) => r.id === 'car' || r.name.toLowerCase().includes('car'));
+            const numRates = parsed.map((r: any) => ({ ...r, ratePerKm: Number(r.ratePerKm) }));
+            setTravelRates(numRates);
+            const b = numRates.find((r: any) => r.id === 'bike' || r.name.toLowerCase().includes('bike'));
+            const c = numRates.find((r: any) => r.id === 'car' || r.name.toLowerCase().includes('car'));
             if (b) setBikeRate(Number(b.ratePerKm));
             if (c) setCarRate(Number(c.ratePerKm));
             return;
@@ -279,13 +280,20 @@ export function ExpenseClaims() {
               batch = parsed.batchName || batch;
               route = parsed.route || route;
               vehicle = parsed.vehicle || undefined;
-              km = parsed.km || undefined;
-              rate = parsed.rate || undefined;
+              km = parsed.km !== undefined && parsed.km !== null ? Number(parsed.km) : undefined;
+              rate = parsed.rate !== undefined && parsed.rate !== null ? Number(parsed.rate) : undefined;
               userNotes = parsed.userNotes || '';
               expDateVal = parsed.expenseDate || '';
             } catch (e) {
               void e;
             }
+          }
+
+          const numAmount = Number(r.amount || 0);
+
+          // If rate is missing in notes, compute exact rate from amount / km if valid
+          if (rate === undefined && vehicle && km && Number(km) > 0 && numAmount > 0) {
+            rate = Number((numAmount / Number(km)).toFixed(2));
           }
 
           let dateFmt = '—';
@@ -306,7 +314,7 @@ export function ExpenseClaims() {
             vehicle,
             km,
             rate,
-            amount: Number(r.amount || 0),
+            amount: numAmount,
             receipt: r.receipt_url || '',
             status: (r.status || 'submitted').toLowerCase() as any,
             approvedBy: r.approved_by,
@@ -328,24 +336,33 @@ export function ExpenseClaims() {
       const existingIds = new Set(mapped.map((m) => m.id));
       const additionalLocal: ExpenseRecord[] = localClaims
         .filter((lc) => !existingIds.has(lc.id))
-        .map((lc) => ({
-          id: lc.id,
-          date: formatDisplayDateGB(lc.date || lc.createdAt),
-          person: lc.person || 'Employee',
-          category: lc.category || 'Office Expense',
-          type: lc.type || 'Self Travel',
-          batch: lc.batch || '',
-          notes: lc.notes || '',
-          route: lc.route || '',
-          vehicle: lc.vehicle,
-          km: lc.km,
-          rate: lc.rate,
-          amount: Number(lc.amount || 0),
-          receipt: lc.receipt || '',
-          status: lc.status || 'submitted',
-          approvedBy: lc.approvedBy,
-          approvedAt: lc.approvedAt,
-        }));
+        .map((lc) => {
+          const numAmt = Number(lc.amount || 0);
+          const lcKm = lc.km !== undefined && lc.km !== null ? Number(lc.km) : undefined;
+          let lcRate = lc.rate !== undefined && lc.rate !== null ? Number(lc.rate) : undefined;
+          if (lcRate === undefined && lc.vehicle && lcKm && lcKm > 0 && numAmt > 0) {
+            lcRate = Number((numAmt / lcKm).toFixed(2));
+          }
+
+          return {
+            id: lc.id,
+            date: formatDisplayDateGB(lc.date || lc.createdAt),
+            person: lc.person || 'Employee',
+            category: lc.category || 'Office Expense',
+            type: lc.type || 'Self Travel',
+            batch: lc.batch || '',
+            notes: lc.notes || '',
+            route: lc.route || '',
+            vehicle: lc.vehicle,
+            km: lcKm,
+            rate: lcRate,
+            amount: numAmt,
+            receipt: lc.receipt || '',
+            status: lc.status || 'submitted',
+            approvedBy: lc.approvedBy,
+            approvedAt: lc.approvedAt,
+          };
+        });
 
       setExpenses([...mapped, ...additionalLocal]);
     } catch (e) {

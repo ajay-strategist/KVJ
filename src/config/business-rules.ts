@@ -130,7 +130,7 @@ export const businessRules = {
     //   amount = km × ratePerKm[mode].  Rates are CEO-editable per vehicle.
     selfTravel: {
       modes: ['Bike', 'Car'],
-      ratePerKm: { Bike: 5, Car: 10 } as Record<string, number>, // ✅ CONFIRMED seed; CEO edits
+      ratePerKm: { Bike: 3, Car: 9.5 } as Record<string, number>, // ✅ CONFIRMED seed; CEO edits
       rateEditableBy: 'CEO',                      // ✅ CONFIRMED
       amountFormula: 'km * ratePerKm[mode]',      // ✅ CONFIRMED
     },
