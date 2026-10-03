@@ -49,10 +49,29 @@ export function ApprovalsQueue() {
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval' | 'over_7_days'>('all');
   const [taskBatchProcessing, setTaskBatchProcessing] = useState(false);
 
+  const isSupervisorAnyProject = useMemo(() => {
+    if (canApprove) return true;
+    const safeProjects = Array.isArray(projects) ? projects : [];
+    const safeTasks = Array.isArray(tasks) ? tasks : [];
+    return (
+      safeProjects.some((p: any) => p.supervisorId === user?.id) ||
+      safeTasks.some((t: any) => t.supervisorId === user?.id)
+    );
+  }, [canApprove, projects, tasks, user?.id]);
+
   const pendingAssignmentTasks = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
-    return safeTasks.filter((t) => !t.deletedAt && t.approvalStatus === 'pending_assignment_approval');
-  }, [tasks]);
+    return safeTasks.filter((t) => {
+      if (t.deletedAt || t.approvalStatus !== 'pending_assignment_approval') return false;
+      if (!canApprove) {
+        const proj = projects.find((p: any) => p.id === t.projectId);
+        const isProjSup = proj && proj.supervisorId === user?.id;
+        const isTaskSup = t.supervisorId === user?.id;
+        if (!isProjSup && !isTaskSup) return false;
+      }
+      return true;
+    });
+  }, [tasks, projects, user?.id, canApprove]);
 
   const filteredTaskApprovals = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -63,6 +82,14 @@ export function ApprovalsQueue() {
       const isPendingTask = t.approvalStatus === 'pending_task_approval' || t.status === 'review';
       const isPendingAssign = t.approvalStatus === 'pending_assignment_approval';
       if (!isPendingTask && !isPendingAssign) return false;
+
+      if (!canApprove) {
+        const proj = projects.find((p: any) => p.id === t.projectId);
+        const isProjSup = proj && proj.supervisorId === user?.id;
+        const isTaskSup = t.supervisorId === user?.id;
+        if (!isProjSup && !isTaskSup) return false;
+      }
+
       if (taskStatusFilter === 'pending_task_approval') {
         return isPendingTask;
       }
@@ -77,7 +104,7 @@ export function ApprovalsQueue() {
       }
       return true;
     });
-  }, [tasks, taskStatusFilter]);
+  }, [tasks, projects, user?.id, canApprove, taskStatusFilter]);
 
   /** Task Completion items that have been waiting in the queue for >= 7 days (used for banner). */
   const over7DaysTasks = useMemo(() => {

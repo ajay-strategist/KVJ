@@ -1,11 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader } from '../../../shared/ui/components';
 import { Tabs } from '../../../shared/ui/Tabs';
 import { ProjectList } from './ProjectList';
 import { TaskBoard } from './TaskBoard';
 import { TaskWorklogView } from './TaskWorklogView';
-import { SupervisorApprovalsView } from './SupervisorApprovalsView';
 import { ProjectCommonFilterHeader, type ProjectCommonFiltersState } from '../components/ProjectCommonFilterHeader';
 import { useProject } from '../hooks/useProject';
 import { useEmployee } from '../../employee/hooks/useEmployee';
@@ -38,26 +37,12 @@ export function ProjectsAndTasks() {
     setCommonFilters(initialFilters);
   };
 
-  // Compute pending approval count for Supervisor Approvals badge
-  const pendingApprovalCount = useMemo(() => {
-    const tasks = projectData?.tasks || [];
-    const projects = projectData?.projects || [];
-    return tasks.filter((t: any) => {
-      const proj = projects.find((p: any) => p.id === t.projectId);
-      const isSupervisor = (proj && proj.supervisorId === user?.id) || t.supervisorId === user?.id || isMgmt;
-      if (!isSupervisor) return false;
-      const isPendingStart = t.approvalStatus === 'pending_assignment_approval' || t.status === 'Pending Approval' || t.status === 'pending_approval';
-      const isPendingReview = t.approvalStatus === 'pending_task_approval' || t.status === 'Under Review' || t.status === 'review';
-      return isPendingStart || isPendingReview;
-    }).length;
-  }, [projectData?.tasks, projectData?.projects, user?.id, isMgmt]);
-
   return (
     <AppShell>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <PageHeader 
           title="Projects & Tasks" 
-          subtitle="Manage projects, schedules, worklogs, and supervisor approvals"
+          subtitle="Manage projects, schedules, worklogs, and tasks"
         />
       </div>
 
@@ -105,16 +90,6 @@ export function ProjectsAndTasks() {
               />
             ) 
           },
-          {
-            id: 'approvals',
-            label: `⚡ Supervisor Approvals ${pendingApprovalCount > 0 ? `(${pendingApprovalCount})` : ''}`,
-            content: (
-              <SupervisorApprovalsView
-                projectData={projectData}
-                commonFilters={commonFilters}
-              />
-            )
-          }
         ]}
       />
     </AppShell>
