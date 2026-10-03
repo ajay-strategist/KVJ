@@ -979,11 +979,63 @@ export function ProjectList({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Top Header Actions (Right Aligned) */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-        <Button variant="secondary" onClick={handleExportProjectsToExcel}>
-          📥 Export Projects to Excel
-        </Button>
-        <Button onClick={() => setCreateProjectOpen(true)}>+ Create Master Project</Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+          📁 Projects Directory
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Prominent View Mode Segmented Control */}
+          <div style={{ display: 'inline-flex', background: 'var(--bg-sunken, #f1f5f9)', border: '1px solid var(--border, #cbd5e1)', borderRadius: 10, padding: 3, gap: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('card')}
+              style={{
+                padding: '7px 16px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                borderRadius: 8,
+                border: 'none',
+                background: viewMode === 'card' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
+                color: viewMode === 'card' ? '#ffffff' : 'var(--text-secondary, #475569)',
+                boxShadow: viewMode === 'card' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              🎴 Card View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              style={{
+                padding: '7px 16px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                borderRadius: 8,
+                border: 'none',
+                background: viewMode === 'table' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
+                color: viewMode === 'table' ? '#ffffff' : 'var(--text-secondary, #475569)',
+                boxShadow: viewMode === 'table' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              📊 Table View
+            </button>
+          </div>
+
+          <Button variant="secondary" onClick={handleExportProjectsToExcel}>
+            📥 Export Projects to Excel
+          </Button>
+          <Button onClick={() => setCreateProjectOpen(true)}>+ Create Master Project</Button>
+        </div>
       </div>
 
 

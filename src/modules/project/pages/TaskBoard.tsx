@@ -275,6 +275,7 @@ export function TaskBoard({
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
   const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
   const [selectedAssignee, setSelectedAssignee] = useState<string>(isManagement ? 'all' : (user?.fullName || 'me'));
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   const windowEnd = useMemo(() => addDaysISO(3), []);
 
@@ -919,6 +920,52 @@ export function TaskBoard({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* Prominent View Mode Segmented Control */}
+          <div style={{ display: 'inline-flex', background: 'var(--bg-sunken, #f1f5f9)', border: '1px solid var(--border, #cbd5e1)', borderRadius: 10, padding: 3, gap: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('card')}
+              style={{
+                padding: '7px 16px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                borderRadius: 8,
+                border: 'none',
+                background: viewMode === 'card' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
+                color: viewMode === 'card' ? '#ffffff' : 'var(--text-secondary, #475569)',
+                boxShadow: viewMode === 'card' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              🎴 Card View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              style={{
+                padding: '7px 16px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                borderRadius: 8,
+                border: 'none',
+                background: viewMode === 'table' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
+                color: viewMode === 'table' ? '#ffffff' : 'var(--text-secondary, #475569)',
+                boxShadow: viewMode === 'table' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              📊 Table View
+            </button>
+          </div>
+
           <Button variant="secondary" onClick={handleExportTasksToExcel} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>
             📥 Export Tasks to Excel
           </Button>
@@ -1007,7 +1054,7 @@ export function TaskBoard({
           }
         };
 
-        if (isMobile) {
+        if (isMobile || viewMode === 'card') {
           if (sortedTasks.length === 0) {
             return (
               <Card style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
