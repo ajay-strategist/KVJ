@@ -123,7 +123,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const { pushRecent } = useNavPrefs();
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const { items: notifItems, unreadCount, markRead, markAllRead, dismissNotification } = useNotifications();
+  const { items: notifItems, unreadCount, markRead, markAllRead, clearAllNotifications, dismissNotification } = useNotifications();
   const { setOpen: setCmdOpen } = useCommandPalette();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -518,15 +518,26 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Notifications</span>
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={markAllRead}
-                    style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
-                  >
-                    Mark all read
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={markAllRead}
+                      style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  {notifItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAllNotifications}
+                      style={{ background: 'none', border: 'none', color: 'var(--status-danger)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
               </div>
               <div style={{
                 display: 'flex',

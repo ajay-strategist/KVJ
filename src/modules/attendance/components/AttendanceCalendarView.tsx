@@ -125,7 +125,7 @@ export function AttendanceCalendarView({
           if (leaveData) setFyLeaves(leaveData);
           if (expData) {
             const sumExp = expData
-              .filter((c: any) => c.status !== 'rejected')
+              .filter((c: any) => c.status === 'approved')
               .reduce((acc: number, c: any) => acc + (Number(c.amount) || 0), 0);
             setFyExpenses(sumExp);
           }
@@ -570,7 +570,7 @@ export function AttendanceCalendarView({
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-xs)' }}>
               <span style={{ color: 'var(--text-muted)' }}>FY Total Hours Worked:</span> <strong>{fyStats.totalHoursWorkedFY} hrs</strong>
             </div>
-            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(95, 211, 232, 0.12)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(95, 211, 232, 0.12)', borderRadius: 'var(--radius-xs)', borderLeft: '3px solid var(--accent)' }}>
               <span style={{ fontWeight: 600 }}>FY Total Expenses:</span> <strong style={{ color: 'var(--accent)', fontSize: 13 }}>₹ {fyStats.totalExpensesFY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>

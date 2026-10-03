@@ -8,6 +8,7 @@ import { PROJECT_REPOSITORY_TOKEN, type Project } from '../project.repository';
 import { PROJECT_SERVICE_TOKEN } from '../project.service';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../../employee/employee.repository';
 
+import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
 export interface TaskFormModalProps {
   open: boolean;
   onClose: () => void;
@@ -286,25 +287,27 @@ export function TaskFormModal({
             />
           </div>
 
-          {/* Category (Office Task vs Project) */}
-          <div>
-            <label className="kvj-label">Category</label>
-            <select
-              className="kvj-select"
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              style={{ width: '100%' }}
-            >
-              <option value="Office Task">🏢 Office Task (General Company Task)</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  📁 Project: {p.title}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          {/* Assignee & Supervisor Grid */}
+
+          {/* Category (Office Task vs Project with Search) */}
+          <div>
+            <label className="kvj-label">Category / Project</label>
+            <SearchableSelect
+              options={[
+                { value: 'Office Task', label: '🏢 Office Task (General Company Task)' },
+                ...projects.map((p) => ({
+                  value: p.id,
+                  label: `📁 [${p.code || 'PRJ'}] ${p.title}`,
+                  subLabel: p.category ? `Category: ${p.category}` : undefined,
+                })),
+              ]}
+              value={form.category}
+              onChange={(val) => setForm({ ...form, category: val || 'Office Task' })}
+              placeholder="Select Category or Project"
+              searchPlaceholder="Search projects by title or code..."
+              allOptionLabel="🏢 Office Task (General Company Task)"
+            />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
             <div>
               <label className="kvj-label">Assignee</label>

@@ -8,6 +8,17 @@ import { supabase } from '../../../shared/integration/supabase';
 import type { TravelRate } from './TravelRatesModal';
 import { parseExpenseDateToYMD, formatDisplayDateGB } from '../pages/ExpenseClaims';
 
+export function cleanBatchNameForDisplay(val?: string | null): string {
+  if (!val || val === '—') return '—';
+  let clean = String(val).trim();
+  // Strip leading "Batch (" and trailing ")" if present
+  clean = clean.replace(/^Batch\s*\(/i, '').replace(/\)$/, '').replace(/^Batch\s+-\s+/i, '').trim();
+  if (clean.toLowerCase().startsWith('batch ') && !clean.toLowerCase().includes('batch 1') && !clean.toLowerCase().includes('batch 2') && !clean.toLowerCase().includes('batch 3')) {
+    clean = clean.slice(6).trim();
+  }
+  return clean || '—';
+}
+
 export interface ExpenseClaimModalProps {
   open: boolean;
   onClose: () => void;
@@ -129,6 +140,8 @@ export function ExpenseClaimModal({
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const isSelfTravel = expenseType === 'Self Travel';
+  const isBusOrTransport = ['Bus Travelling / Fare', 'Bus Travelling', 'Public Transport', 'Bus Fare'].includes(expenseType) || expenseType.toLowerCase().includes('bus');
+  const isTravelRelated = isSelfTravel || isBusOrTransport || expenseType.toLowerCase().includes('travel');
   const isTraining = categoryType === 'Training Expense';
 
   const kmVal = Number(km || 0);
@@ -158,24 +171,39 @@ export function ExpenseClaimModal({
   const batchOptions = useMemo(() => {
     if (batches && batches.length > 0) {
       return batches.map((b: any) => {
-        const name = b.name || 'Batch';
-        const code = b.batchCode || b.code || '';
+        let label = b.batchCode || b.code || b.name || b.title || '';
+        const acadYear = b.academicYear || b.academic_year || '';
+
+        label = cleanBatchNameForDisplay(label);
+        if (label === '—' || label.toLowerCase() === 'batch') {
+          const parts = [b.college, b.program || b.trainingName, acadYear, b.batchNo].filter(Boolean);
+          label = parts.length > 0 ? parts.join(' - ') : 'Training Batch';
+        } else if (acadYear && !label.includes(acadYear)) {
+          if (/Batch\s*\d+/i.test(label)) {
+            label = label.replace(/(Batch\s*\d+)/i, `${acadYear} - $1`);
+          } else {
+            label = `${label} - ${acadYear}`;
+          }
+        }
+
         return {
-          value: code ? `${name} (${code})` : name,
-          label: code ? `${name} (${code})` : name,
+          value: label,
+          label: label,
         };
       });
     }
     return [
-      { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
-      { value: 'SB College MBA Batch 1', label: 'SB College MBA Batch 1' },
-      { value: 'Vimala College Batch 2', label: 'Vimala College Batch 2' },
+      { value: 'Christ 3BBA Data Analytics - 2026-2027 - Batch 1', label: 'Christ 3BBA Data Analytics - 2026-2027 - Batch 1' },
+      { value: 'SB College - 2 MBA - 2026-2027 - Batch 1', label: 'SB College - 2 MBA - 2026-2027 - Batch 1' },
+      { value: 'Vimala College - UG - 2026-2027 - Batch 2', label: 'Vimala College - UG - 2026-2027 - Batch 2' },
     ];
   }, [batches]);
 
   const expenseTypeOptions = useMemo(() => {
     const defaults = [
       'Self Travel',
+      'Bus Travelling / Fare',
+      'Public Transport',
       'Morning Tea',
       'Lunch & Refreshments',
       'Evening Tea',
@@ -186,7 +214,7 @@ export function ExpenseClaimModal({
     const combined = Array.from(new Set([...defaults, ...customExpenseTypes]));
     const opts = combined.map((t) => ({
       value: t,
-      label: t === 'Self Travel' ? '🚗 Self Travel (Bike / Car KM Reimbursement)' : t,
+      label: t === 'Self Travel' ? '🚗 Self Travel (Bike / Car KM Reimbursement)' : (t === 'Bus Travelling / Fare' ? '🚌 Bus Travelling / Fare' : t),
     }));
     opts.push({ value: '__NEW_TYPE__', label: '➕ Register New Expense Type...' });
     return opts;
@@ -202,7 +230,6 @@ export function ExpenseClaimModal({
     }
   };
 
-  // ── Validation helper (shared by Add-to-Batch & Submit) ─────────────────
   function validateCurrentForm(): string | null {
     if (isTraining && !batchName) return 'Training Batch is mandatory for Training Expenses.';
     if (isSelfTravel) {
@@ -210,6 +237,7 @@ export function ExpenseClaimModal({
       if (!route.trim()) return 'Please specify the travel route.';
     } else {
       if (!finalAmount || finalAmount <= 0) return 'Please enter a valid expense amount.';
+      if (isTravelRelated && !route.trim()) return 'Please specify the travel route.';
     }
     return null;
   }
@@ -662,23 +690,41 @@ export function ExpenseClaimModal({
               </div>
             </div>
           ) : (
-            /* NON-TRAVEL EXPENSE */
-            <div>
-              <label className="kvj-label">
-                Expense Amount (₹) <span style={{ color: 'var(--status-danger)' }}>*</span>
-              </label>
-              <input
-                type="number"
-                required={!batchMode}
-                min="1"
-                step="1"
-                placeholder="e.g. 250"
-                className="kvj-input"
+            /* NON-SELF-TRAVEL EXPENSE (e.g. Bus Travelling, Refreshments, Supplies) */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {isTravelRelated && (
+                <div>
+                  <label className="kvj-label">
+                    Travel Route <span style={{ color: 'var(--status-danger)' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required={!batchMode}
+                    placeholder="e.g. Kottayam -> Changanassery -> Return"
+                    className="kvj-input"
+                    value={route}
+                    onChange={(e) => setRoute(e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="kvj-label">
+                  Expense Amount (₹) <span style={{ color: 'var(--status-danger)' }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  required={!batchMode}
+                  min="1"
+                  step="1"
+                  placeholder="e.g. 250"
+                  className="kvj-input"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 style={{ width: '100%' }}
               />
             </div>
+          </div>
           )}
 
           {/* Receipt Upload (only in single mode — batch skips file upload) */}

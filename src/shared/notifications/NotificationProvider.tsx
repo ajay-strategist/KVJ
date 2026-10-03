@@ -49,6 +49,7 @@ interface NotificationContextValue {
   grouped: Record<NotificationCategory, NotificationItem[]>;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  clearAllNotifications: () => void;
   dismissNotification: (id: string) => void;
   addNotification: (n: { title: string; message?: string; category: NotificationCategory; priority?: NotificationPriority; recipientUserId?: string }) => void;
   toasts: Toast[];
@@ -297,6 +298,7 @@ export function NotificationProvider({ children, service = defaultNotificationSe
 
   const markRead = useCallback((id: string) => setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n))), []);
   const markAllRead = useCallback(() => setItems((prev) => prev.map((n) => ({ ...n, read: true }))), []);
+  const clearAllNotifications = useCallback(() => setItems([]), []);
   const dismissNotification = useCallback((id: string) => setItems((prev) => prev.filter((n) => n.id !== id)), []);
 
 
@@ -307,9 +309,9 @@ export function NotificationProvider({ children, service = defaultNotificationSe
     }, {} as Record<NotificationCategory, NotificationItem[]>);
     return {
       items, unreadCount: items.filter((n) => !n.read).length, grouped,
-      markRead, markAllRead, dismissNotification, addNotification, toasts, toast, dismissToast,
+      markRead, markAllRead, clearAllNotifications, dismissNotification, addNotification, toasts, toast, dismissToast,
     };
-  }, [items, toasts, markRead, markAllRead, dismissNotification, addNotification, toast, dismissToast]);
+  }, [items, toasts, markRead, markAllRead, clearAllNotifications, dismissNotification, addNotification, toast, dismissToast]);
 
   return (
     <NotificationContext.Provider value={value}>

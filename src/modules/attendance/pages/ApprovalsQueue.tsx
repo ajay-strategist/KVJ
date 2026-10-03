@@ -376,6 +376,34 @@ export function ApprovalsQueue() {
     refreshProjects();
   };
 
+  const handleApproveAllPendingTasks = async () => {
+    if (filteredTaskApprovals.length === 0) return;
+    const ok = await confirm({
+      title: `Bulk Approve All ${filteredTaskApprovals.length} Pending Tasks?`,
+      message: `Are you sure you want to approve all ${filteredTaskApprovals.length} pending task(s) in this list?`,
+    });
+    if (!ok) return;
+
+    setTaskBatchProcessing(true);
+    let successCount = 0;
+    for (const task of filteredTaskApprovals) {
+      if (task.approvalStatus === 'pending_assignment_approval') {
+        const res = await approveTaskAssignment(task.id);
+        if (res.ok) successCount++;
+      } else {
+        const res = await approveTaskSubmission(task.id);
+        if (res.ok) successCount++;
+      }
+    }
+    setTaskBatchProcessing(false);
+    toast({
+      variant: 'success',
+      title: 'Bulk Task Approval Complete',
+      message: `${successCount} task approval(s) processed successfully.`,
+    });
+    refreshProjects();
+  };
+
   const taskApprovalColumns: Column<any>[] = [
     {
       key: 'task',
@@ -764,19 +792,31 @@ export function ApprovalsQueue() {
               </Button>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, alignSelf: 'flex-end' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>🔍 Filter Status:</span>
-            <select
-              className="kvj-select"
-              value={taskStatusFilter}
-              onChange={(e) => setTaskStatusFilter(e.target.value as any)}
-              style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 200 }}
-            >
-              <option value="all">👥 All Approvals</option>
-              <option value="pending_task_approval">📝 Task Completion Approvals</option>
-              <option value="pending_assignment_approval">📌 Assignment Approvals</option>
-              <option value="over_7_days">⏰ Waiting &gt; 7 Days</option>
-            </select>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, alignSelf: 'flex-end', flexWrap: 'wrap' }}>
+            {canApprove && filteredTaskApprovals.length > 0 && (
+              <Button
+                size="sm"
+                style={{ background: 'var(--status-success)', color: 'white', fontWeight: 700 }}
+                onClick={handleApproveAllPendingTasks}
+                disabled={taskBatchProcessing}
+              >
+                {taskBatchProcessing ? '⏳ Approving...' : `⚡ Bulk Approve All Pending Tasks (${filteredTaskApprovals.length})`}
+              </Button>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>🔍 Filter Status:</span>
+              <select
+                className="kvj-select"
+                value={taskStatusFilter}
+                onChange={(e) => setTaskStatusFilter(e.target.value as any)}
+                style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 200 }}
+              >
+                <option value="all">👥 All Approvals</option>
+                <option value="pending_task_approval">📝 Task Completion Approvals</option>
+                <option value="pending_assignment_approval">📌 Assignment Approvals</option>
+                <option value="over_7_days">⏰ Waiting &gt; 7 Days</option>
+              </select>
+            </div>
           </div>
           <DataTable
             columns={taskApprovalColumns}

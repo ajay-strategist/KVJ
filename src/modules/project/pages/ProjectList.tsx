@@ -114,9 +114,11 @@ interface TaskItem {
 export function ProjectList({
   projectData,
   selectedEmployeeId,
+  commonFilters,
 }: {
   projectData?: any;
   selectedEmployeeId?: string;
+  commonFilters?: any;
 }) {
   const { toast } = useNotifications();
   const { confirm } = useDialog();
@@ -368,58 +370,95 @@ export function ProjectList({
     }
   }, [mappedProjects, selectedProject]);
 
-  // Filter based on selected checkboxes and selectedEmployeeId
+  // Filter based on selected checkboxes, commonFilters and selectedEmployeeId
   const filteredProjects = useMemo(() => {
     let list = projectsList;
-    if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+    const effectiveEmpId = (commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all') 
+      ? commonFilters.selectedEmployeeId 
+      : selectedEmployeeId;
+
+    if (effectiveEmpId && effectiveEmpId !== 'all') {
       list = list.filter((p: any) => {
         const dbProj = projects.find((dp: any) => dp.id === p.id);
-        if (dbProj && (dbProj as any).supervisorId === selectedEmployeeId) {
+        if (dbProj && (dbProj as any).supervisorId === effectiveEmpId) {
           return true;
         }
         const isAllocated = allocations.some(
-          (a: any) => a.projectId === p.id && a.employeeId === selectedEmployeeId
+          (a: any) => a.projectId === p.id && a.employeeId === effectiveEmpId
         );
         if (isAllocated) return true;
         const hasTask = tasks.some(
-          (t: any) => t.projectId === p.id && t.assigneeId === selectedEmployeeId
+          (t: any) => t.projectId === p.id && t.assigneeId === effectiveEmpId
         );
         if (hasTask) return true;
         return false;
       });
     }
 
-    if (selectedProjectFilter !== 'all') {
-      list = list.filter((p) => p.id === selectedProjectFilter);
+    const effectiveProjId = commonFilters?.selectedProjectId && commonFilters.selectedProjectId !== 'all'
+      ? commonFilters.selectedProjectId
+      : selectedProjectFilter;
+
+    if (effectiveProjId !== 'all') {
+      list = list.filter((p) => p.id === effectiveProjId);
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
+
+    const effectiveSearch = (commonFilters?.searchQuery || searchQuery).trim().toLowerCase();
+    if (effectiveSearch) {
       list = list.filter((p) =>
-        (p.title || '').toLowerCase().includes(q) ||
-        (p.code || '').toLowerCase().includes(q) ||
-        (p.client || '').toLowerCase().includes(q) ||
-        (p.supervisor || '').toLowerCase().includes(q) ||
-        (p.status || '').toLowerCase().includes(q) ||
-        p.members.some((m) => (m.name || '').toLowerCase().includes(q))
+        (p.title || '').toLowerCase().includes(effectiveSearch) ||
+        (p.code || '').toLowerCase().includes(effectiveSearch) ||
+        (p.client || '').toLowerCase().includes(effectiveSearch) ||
+        (p.supervisor || '').toLowerCase().includes(effectiveSearch) ||
+        (p.status || '').toLowerCase().includes(effectiveSearch) ||
+        p.members.some((m) => (m.name || '').toLowerCase().includes(effectiveSearch))
       );
     }
+
     if (selectedSupervisor !== 'all') {
       const supEmp = employees.find((e) => e.id === selectedSupervisor);
       const supName = supEmp ? `${supEmp.firstName} ${supEmp.lastName}` : '';
       list = list.filter((p: any) => p.supervisorId === selectedSupervisor || (supName && p.supervisor === supName));
     }
-    if (selectedClient !== 'all') {
-      list = list.filter((p) => p.client === selectedClient);
+
+    const effectiveClient = commonFilters?.selectedClient && commonFilters.selectedClient !== 'all'
+      ? commonFilters.selectedClient
+      : selectedClient;
+
+    if (effectiveClient !== 'all') {
+      list = list.filter((p) => p.client === effectiveClient);
     }
-    if (selectedStatuses.length > 0) {
+
+    const effectiveStatus = commonFilters?.selectedStatus && commonFilters.selectedStatus !== 'all'
+      ? commonFilters.selectedStatus
+      : null;
+
+    if (effectiveStatus) {
+      list = list.filter((p) => p.status === effectiveStatus || (effectiveStatus === 'In Progress' && p.status === 'In Progress') || (effectiveStatus === 'Completed' && p.status === 'Completed'));
+    } else if (selectedStatuses.length > 0) {
       if (selectedStatuses.includes('__none__')) {
         list = [];
       } else {
         list = list.filter((p) => selectedStatuses.includes(p.status));
       }
     }
+
+    // Date matching: Project active range OR task activity on date
+    if (commonFilters?.selectedDate) {
+      const d = commonFilters.selectedDate;
+      list = list.filter((p: any) => {
+        const dbProj = projects.find((dp: any) => dp.id === p.id);
+        const start = (dbProj as any)?.startDate;
+        const end = (dbProj as any)?.endDate;
+        if (start && end && start <= d && d <= end) return true;
+        const hasTaskActivity = tasks.some((t: any) => t.projectId === p.id && (t.dueDate === d || t.startDate === d));
+        if (hasTaskActivity) return true;
+        return false;
+      });
+    }
+
     return list;
-  }, [projectsList, selectedEmployeeId, projects, allocations, tasks, selectedStatuses, selectedProjectFilter, searchQuery, selectedSupervisor, selectedClient, employees]);
+  }, [projectsList, selectedEmployeeId, commonFilters, projects, allocations, tasks, selectedStatuses, selectedProjectFilter, searchQuery, selectedSupervisor, selectedClient, employees]);
 
   const totalTasksCount = useMemo(() => filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0), [filteredProjects]);
   const completedTasksCount = useMemo(() => filteredProjects.reduce((acc, p) => acc + p.tasksCompleted, 0), [filteredProjects]);

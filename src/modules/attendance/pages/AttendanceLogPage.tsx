@@ -1445,7 +1445,7 @@ export function AttendanceLogPage() {
       const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
 
       const record = recList.find(r => r && r.workDate === dateStr);
-      const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
+      const dayClaims = claimList.filter(c => c && (c.status || '').toLowerCase() === 'approved' && (c.createdAt || '').slice(0, 10) === dateStr);
       const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
       const decHoliday = holList.find((h: any) => h && h.date === dateStr);
       const activeLeave = leaveList.find(l =>

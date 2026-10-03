@@ -69,9 +69,11 @@ export interface TaskItem {
 export function TaskBoard({
   projectData,
   selectedEmployeeId,
+  commonFilters,
 }: {
   projectData?: any;
   selectedEmployeeId?: string;
+  commonFilters?: any;
 }) {
   const { user } = useAuth();
   const device = useDevice();
@@ -282,15 +284,32 @@ export function TaskBoard({
   );
 
   const sortedTasks = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const effectiveSearch = (commonFilters?.searchQuery || searchQuery).trim().toLowerCase();
     const myName = (user?.fullName || '').toLowerCase();
 
     const filtered = tasksList.filter((t: any) => {
       if (t.status === 'Pending Approval') return false;
 
+      // Project filter
+      if (commonFilters?.selectedProjectId && commonFilters.selectedProjectId !== 'all') {
+        const rawTask = tasks.find((raw: any) => raw.id === t.id);
+        if (!rawTask || rawTask.projectId !== commonFilters.selectedProjectId) return false;
+      }
+
+      // Client filter
+      if (commonFilters?.selectedClient && commonFilters.selectedClient !== 'all') {
+        const rawTask = tasks.find((raw: any) => raw.id === t.id);
+        const proj = projects.find((p: any) => p.id === rawTask?.projectId);
+        if (!proj || proj.client !== commonFilters.selectedClient) return false;
+      }
+
       // User-level filtering: Supervisors and assignees both see tasks
-      if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-        const isTarget = t.assigneeId === selectedEmployeeId || t.supervisorId === selectedEmployeeId || t.assignedByEmployeeId === selectedEmployeeId;
+      const effectiveEmpId = (commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all')
+        ? commonFilters.selectedEmployeeId
+        : selectedEmployeeId;
+
+      if (effectiveEmpId && effectiveEmpId !== 'all') {
+        const isTarget = t.assigneeId === effectiveEmpId || t.supervisorId === effectiveEmpId || t.assignedByEmployeeId === effectiveEmpId;
         if (!isTarget) return false;
       } else if (!isManagement) {
         const isMyTask =
@@ -311,21 +330,39 @@ export function TaskBoard({
       }
 
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
-      if (statusFilters.length > 0) {
+
+      const effectiveStatus = commonFilters?.selectedStatus && commonFilters.selectedStatus !== 'all'
+        ? commonFilters.selectedStatus
+        : null;
+
+      if (effectiveStatus) {
+        if (effectiveStatus === 'Pending Approval' && t.status !== 'Pending Approval') return false;
+        if (effectiveStatus === 'Under Review' && t.status !== 'Under Review' && t.approvalStatus !== 'pending_task_approval') return false;
+        if (effectiveStatus === 'Rework' && t.approvalStatus !== 'rework') return false;
+        if (effectiveStatus === 'In Progress' && t.status !== 'In Progress') return false;
+        if (effectiveStatus === 'Completed' && t.status !== 'Completed') return false;
+      } else if (statusFilters.length > 0) {
         if (statusFilters.includes('__none__')) return false;
         if (!statusFilters.includes('all') && !statusFilters.includes(t.status)) return false;
       }
-      // Date Window Filtering
-      if (dateWindowFilter === 'today') {
+
+      // Date Filtering
+      if (commonFilters?.selectedDate) {
+        const d = commonFilters.selectedDate;
+        const matchesDueDate = t.dueDate === d || t.startDate === d;
+        const matchesEntries = Array.isArray(t.dailyTimeEntries) && t.dailyTimeEntries.some((e: any) => e.date === d);
+        if (!matchesDueDate && !matchesEntries) return false;
+      } else if (dateWindowFilter === 'today') {
         if (t.dueDate !== todayStr) return false;
-        if (t.status === 'Completed' || t.status === 'Under Review') return false; // Hide submitted/completed tasks from "Due Today" list
+        if (t.status === 'Completed' || t.status === 'Under Review') return false;
       } else if (dateWindowFilter === 'next_3_days') {
         if (t.dueDate < todayStr || t.dueDate > windowEnd) return false;
       }
-      if (query) {
-        const matchesName = t.name.toLowerCase().includes(query);
-        const matchesAssignee = t.assignee.toLowerCase().includes(query);
-        const matchesProj = (t.projectName || '').toLowerCase().includes(query);
+
+      if (effectiveSearch) {
+        const matchesName = t.name.toLowerCase().includes(effectiveSearch);
+        const matchesAssignee = t.assignee.toLowerCase().includes(effectiveSearch);
+        const matchesProj = (t.projectName || '').toLowerCase().includes(effectiveSearch);
         if (!matchesName && !matchesAssignee && !matchesProj) return false;
       }
       return true;
@@ -334,7 +371,7 @@ export function TaskBoard({
     return filtered.sort((a, b) =>
       sortOrder === 'asc' ? a.dueDate.localeCompare(b.dueDate) : b.dueDate.localeCompare(a.dueDate)
     );
-  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, statusFilters, dateWindowFilter, sortOrder, searchQuery, todayStr, windowEnd]);
+  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, statusFilters, dateWindowFilter, sortOrder, searchQuery, commonFilters, tasks, projects, selectedEmployeeId, todayStr, windowEnd]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
     const categoryVal = (values.category as string) || 'Office Task';

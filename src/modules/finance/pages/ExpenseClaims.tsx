@@ -22,7 +22,7 @@ import { supabase } from '../../../shared/integration/supabase';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 import { googleIntegration } from '../../../shared/integration/google';
-import { ExpenseClaimModal } from '../forms/ExpenseClaimModal';
+import { ExpenseClaimModal, cleanBatchNameForDisplay } from '../forms/ExpenseClaimModal';
 import { TravelRatesModal, type TravelRate, DEFAULT_TRAVEL_RATES } from '../forms/TravelRatesModal';
 
 export interface ExpenseRecord {
@@ -141,10 +141,12 @@ export function ExpenseClaims() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Expense' | 'Training Expense'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'submitted' | 'approved' | 'rejected'>('all');
+  const [maxAmountFilter, setMaxAmountFilter] = useState<string>('');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'person' | 'category'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [highlightedClaimId, setHighlightedClaimId] = useState<string | null>(null);
 
   // Async lock states
   const [submittingClaim, setSubmittingClaim] = useState(false);
@@ -277,7 +279,7 @@ export function ExpenseClaims() {
               const parsed = JSON.parse(r.notes);
               person = parsed.personName || person;
               type = parsed.expenseType || type;
-              batch = parsed.batchName || batch;
+              batch = cleanBatchNameForDisplay(parsed.batchName || batch);
               route = parsed.route || route;
               vehicle = parsed.vehicle || undefined;
               km = parsed.km !== undefined && parsed.km !== null ? Number(parsed.km) : undefined;
@@ -350,7 +352,7 @@ export function ExpenseClaims() {
             person: lc.person || 'Employee',
             category: lc.category || 'Office Expense',
             type: lc.type || 'Self Travel',
-            batch: lc.batch || '',
+            batch: cleanBatchNameForDisplay(lc.batch),
             notes: lc.notes || '',
             route: lc.route || '',
             vehicle: lc.vehicle,
@@ -436,6 +438,11 @@ export function ExpenseClaims() {
           if (!matchName && !matchType && !matchBatch && !matchRoute) return false;
         }
 
+        if (maxAmountFilter && !isNaN(Number(maxAmountFilter))) {
+          const maxVal = Number(maxAmountFilter);
+          if (exp.amount > maxVal) return false;
+        }
+
         if (startDateFilter) {
           const expDateStr = parseExpenseDateToYMD(exp.date);
           if (expDateStr < startDateFilter) return false;
@@ -448,6 +455,11 @@ export function ExpenseClaims() {
         return true;
       })
       .sort((a, b) => {
+        if (highlightedClaimId) {
+          if (a.id === highlightedClaimId) return -1;
+          if (b.id === highlightedClaimId) return 1;
+        }
+
         let valA: any = a[sortBy];
         let valB: any = b[sortBy];
 
@@ -470,11 +482,13 @@ export function ExpenseClaims() {
     selectedPersonFilter,
     categoryFilter,
     statusFilter,
+    maxAmountFilter,
     searchQuery,
     startDateFilter,
     endDateFilter,
     sortBy,
     sortOrder,
+    highlightedClaimId,
     user?.fullName
   ]);
 
@@ -640,6 +654,10 @@ export function ExpenseClaims() {
       } catch {}
 
       setExpenses((prev) => [newRecord, ...(Array.isArray(prev) ? prev.filter((x) => x.id !== newRecord.id) : [])]);
+      setHighlightedClaimId(newRecord.id);
+      setStatusFilter('all');
+      if (isManagement) setSelectedPersonFilter('all');
+      setTimeout(() => setHighlightedClaimId(null), 15000);
       loadClaims();
 
       const parts = normalizedYMD.split('-');
@@ -1027,6 +1045,7 @@ export function ExpenseClaims() {
       {/* Filters Row */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Row 1: Search, Filter Employee, Classification, Status */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ flex: 1, minWidth: 200 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Search Description, Type, Batch or Route</label>
@@ -1038,6 +1057,28 @@ export function ExpenseClaims() {
                 className="kvj-input"
                 style={{ padding: '6px 12px', fontSize: 13 }}
               />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Filter Employee</label>
+              {isManagement ? (
+                <select
+                  className="kvj-select"
+                  value={selectedPersonFilter}
+                  onChange={(e) => setSelectedPersonFilter(e.target.value)}
+                  style={{ padding: '6px 12px', fontSize: 13, minWidth: 180 }}
+                >
+                  <option value="all">👥 All Employees (Expenses)</option>
+                  {user?.fullName && <option value={user.fullName}>👤 My Claims ({user.fullName})</option>}
+                  {Array.from(new Set(expenses.map((e) => e.person))).map((person) => {
+                    if (person === user?.fullName) return null;
+                    return <option key={person} value={person}>{person}</option>;
+                  })}
+                </select>
+              ) : (
+                <span style={{ fontSize: 13, fontWeight: 700, padding: '6px 12px', borderRadius: 'var(--radius-xs)', background: 'var(--bg-sunken)', border: '1px solid var(--border)', color: 'var(--brand)', display: 'inline-block' }}>
+                  👤 {user?.fullName || 'My Claims Only'}
+                </span>
+              )}
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Classification</label>
@@ -1066,69 +1107,98 @@ export function ExpenseClaims() {
                 <option value="rejected">Rejected</option>
               </select>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Sort By</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="kvj-select"
-                style={{ padding: '6px 12px', fontSize: 13, minWidth: 130 }}
-              >
-                <option value="date">Date</option>
-                <option value="amount">Amount</option>
-                <option value="person">Employee</option>
-                <option value="category">Classification</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Order</label>
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as any)}
-                className="kvj-select"
-                style={{ padding: '6px 12px', fontSize: 13, minWidth: 100 }}
-              >
-                <option value="desc">Descending</option>
-                <option value="asc">Ascending</option>
-              </select>
-            </div>
           </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Start Date</label>
-              <input
-                type="date"
-                value={startDateFilter}
-                onChange={(e) => setStartDateFilter(e.target.value)}
-                className="kvj-input"
-                style={{ padding: '6px 12px', fontSize: 13 }}
-              />
+
+          {/* Row 2: Max Amount, Start Date, End Date, Sort By, Order, Reset, Export to Excel */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Max Amount (≤ ₹)</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 500"
+                  value={maxAmountFilter}
+                  onChange={(e) => setMaxAmountFilter(e.target.value)}
+                  className="kvj-input"
+                  style={{ padding: '6px 12px', fontSize: 13, width: 120 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Start Date</label>
+                <input
+                  type="date"
+                  value={startDateFilter}
+                  onChange={(e) => setStartDateFilter(e.target.value)}
+                  className="kvj-input"
+                  style={{ padding: '6px 12px', fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>End Date</label>
+                <input
+                  type="date"
+                  value={endDateFilter}
+                  onChange={(e) => setEndDateFilter(e.target.value)}
+                  className="kvj-input"
+                  style={{ padding: '6px 12px', fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="kvj-select"
+                  style={{ padding: '6px 12px', fontSize: 13, minWidth: 110 }}
+                >
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                  <option value="person">Employee</option>
+                  <option value="category">Classification</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>Order</label>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as any)}
+                  className="kvj-select"
+                  style={{ padding: '6px 12px', fontSize: 13, minWidth: 100 }}
+                >
+                  <option value="desc">Descending</option>
+                  <option value="asc">Ascending</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignSelf: 'flex-end', height: '36px', alignItems: 'center' }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedPersonFilter(isManagement ? 'all' : (user?.fullName || 'me'));
+                    setCategoryFilter('all');
+                    setStatusFilter('all');
+                    setMaxAmountFilter('');
+                    setStartDateFilter('');
+                    setEndDateFilter('');
+                    setSortBy('date');
+                    setSortOrder('desc');
+                  }}
+                >
+                  Reset Filters
+                </Button>
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-secondary)' }}>End Date</label>
-              <input
-                type="date"
-                value={endDateFilter}
-                onChange={(e) => setEndDateFilter(e.target.value)}
-                className="kvj-input"
-                style={{ padding: '6px 12px', fontSize: 13 }}
-              />
-            </div>
+
             <div style={{ display: 'flex', alignSelf: 'flex-end', height: '36px', alignItems: 'center' }}>
               <Button
-                variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setSearchQuery('');
-                  setCategoryFilter('all');
-                  setStatusFilter('all');
-                  setStartDateFilter('');
-                  setEndDateFilter('');
-                  setSortBy('date');
-                  setSortOrder('desc');
-                }}
+                variant="secondary"
+                onClick={handleExportExcel}
+                disabled={filteredExpenses.length === 0}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700 }}
               >
-                Reset Filters
+                📥 Export to Excel
               </Button>
             </div>
           </div>
@@ -1138,42 +1208,9 @@ export function ExpenseClaims() {
       {/* Expense Claims Table */}
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-              📋 Expense Claims ({filteredExpenses.length})
-            </span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleExportExcel}
-              disabled={filteredExpenses.length === 0}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700 }}
-            >
-              📥 Export to Excel
-            </Button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Filter Employee:</span>
-            {isManagement ? (
-              <select
-                className="kvj-select"
-                value={selectedPersonFilter}
-                onChange={(e) => setSelectedPersonFilter(e.target.value)}
-                style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
-              >
-                <option value="all">👥 All Employees (Expenses)</option>
-                {user?.fullName && <option value={user.fullName}>👤 My Claims ({user.fullName})</option>}
-                {Array.from(new Set(expenses.map((e) => e.person))).map((person) => {
-                  if (person === user?.fullName) return null;
-                  return <option key={person} value={person}>{person}</option>;
-                })}
-              </select>
-            ) : (
-              <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-xs)', background: 'var(--bg-sunken)', border: '1px solid var(--border)', color: 'var(--brand)' }}>
-                👤 {user?.fullName || 'My Claims Only'}
-              </span>
-            )}
-          </div>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+            📋 Expense Claims ({filteredExpenses.length})
+          </span>
         </div>
 
         {isLoadingClaims ? (
@@ -1339,8 +1376,16 @@ export function ExpenseClaims() {
               <tbody>
                 {filteredExpenses.map((exp) => {
                   const isLocked = exp.status === 'approved';
+                  const isHighlighted = exp.id === highlightedClaimId;
                   return (
-                    <tr key={exp.id}>
+                    <tr
+                      key={exp.id}
+                      style={{
+                        background: isHighlighted ? 'rgba(99, 102, 241, 0.14)' : undefined,
+                        boxShadow: isHighlighted ? 'inset 4px 0 0 var(--brand)' : undefined,
+                        transition: 'background 400ms ease, box-shadow 400ms ease',
+                      }}
+                    >
                       {isManagement && (
                         <td>
                           <input
@@ -1350,7 +1395,12 @@ export function ExpenseClaims() {
                           />
                         </td>
                       )}
-                      <td style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{exp.date || '—'}</td>
+                      <td style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                        {exp.date || '—'}
+                        {isHighlighted && (
+                          <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand)', textTransform: 'uppercase' }}>🆕 Fresh Submission</div>
+                        )}
+                      </td>
                       <td>{exp.person || 'Employee'}</td>
                       <td>
                         <Badge tone={(exp.category || '').includes('Training') ? 'info' : 'neutral'}>
@@ -1447,7 +1497,7 @@ export function ExpenseClaims() {
                       </td>
                       <td>
                         <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
-                          {isLocked ? '🔒 Approved' : (exp.status || 'submitted')}
+                          {isLocked ? '🔒 Approved' : exp.status === 'submitted' ? '⏳ Submitted (Pending)' : exp.status}
                         </Badge>
                         {exp.approvedBy && (
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>

@@ -42,7 +42,9 @@ export interface WorklogRecord {
   role: 'Assignee' | 'Supervisor';
   durationHrs: number;
   description: string;
-  reviewStatus: 'Approved' | 'Pending Review';
+  reviewStatus: 'Approved' | 'Pending Review' | 'Rework';
+  isRework?: boolean;
+  reworkNotes?: string;
   supervisorName: string;
   // synthetic flag — came from task actualHours rather than a timesheet row
   isSynthetic?: boolean;
@@ -51,9 +53,11 @@ export interface WorklogRecord {
 export function TaskWorklogView({
   projectData,
   selectedEmployeeId,
+  commonFilters,
 }: {
   projectData?: any;
   selectedEmployeeId?: string;
+  commonFilters?: any;
 }) {
   const { user } = useAuth();
   const { toast } = useNotifications();
@@ -313,6 +317,8 @@ export function TaskWorklogView({
             emp.designation.toLowerCase().includes('ceo') ||
             emp.designation.toLowerCase().includes('lead')
           : false;
+        const isRework = task?.approvalStatus === 'rework' || ts.approvalStatus === 'rework' || (ts.notes || '').toLowerCase().includes('[rework]');
+        const reworkNotes = task?.reworkNotes || ts.reworkNotes || '';
 
         return {
           id: ts.id,
@@ -323,8 +329,10 @@ export function TaskWorklogView({
           employeeName: empName,
           role: isSuper ? ('Supervisor' as const) : ('Assignee' as const),
           durationHrs: Number(ts.hoursLogged || 0),
-          description: ts.notes || 'Daily work progress entry',
-          reviewStatus: ts.status === 'approved' ? ('Approved' as const) : ('Pending Review' as const),
+          description: isRework ? `🔄 [Rework] ${ts.notes || reworkNotes || 'Task returned for rework'}` : (ts.notes || 'Daily work progress entry'),
+          reviewStatus: isRework ? ('Rework' as const) : ts.status === 'approved' ? ('Approved' as const) : ('Pending Review' as const),
+          isRework,
+          reworkNotes,
           supervisorName,
           isSynthetic: false,
         };
@@ -388,6 +396,7 @@ export function TaskWorklogView({
         const isApproved =
           t.status === 'done' ||
           t.status === 'completed';
+        const isRework = t.approvalStatus === 'rework';
 
         return {
           id: `synth-${t.id}`,
@@ -399,12 +408,16 @@ export function TaskWorklogView({
           role: 'Assignee' as const,
           durationHrs: actualSec / 3600,
           description:
-            t.status === 'in_progress'
+            isRework
+              ? `🔄 [Rework] ${t.reworkNotes || 'Task returned for rework by Supervisor'}`
+              : t.status === 'in_progress'
               ? '⏱ Task is currently in progress (timer running)'
               : t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval'
               ? '🔍 Submitted for manager review'
               : 'Task work recorded today',
-          reviewStatus: isApproved ? ('Approved' as const) : ('Pending Review' as const),
+          reviewStatus: isRework ? ('Rework' as const) : isApproved ? ('Approved' as const) : ('Pending Review' as const),
+          isRework,
+          reworkNotes: t.reworkNotes || '',
           supervisorName: supervisorEmp
             ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}`
             : '',
@@ -446,7 +459,35 @@ export function TaskWorklogView({
   const filteredLogs = logs.filter((l) => {
     if (filterRole !== 'all' && l.role !== filterRole) return false;
     if (filterCategory !== 'all' && l.category !== filterCategory) return false;
-    if (filterStatus !== 'all' && l.reviewStatus !== filterStatus) return false;
+
+    const effectiveStatus = commonFilters?.selectedStatus && commonFilters.selectedStatus !== 'all'
+      ? commonFilters.selectedStatus
+      : filterStatus;
+
+    if (effectiveStatus !== 'all') {
+      if (effectiveStatus === 'Approved' && l.reviewStatus !== 'Approved') return false;
+      if (effectiveStatus === 'Pending Review' && l.reviewStatus !== 'Pending Review') return false;
+      if (effectiveStatus === 'Rework' && l.reviewStatus !== 'Rework') return false;
+    }
+
+    if (commonFilters?.selectedProjectId && commonFilters.selectedProjectId !== 'all') {
+      const proj = projects.find((p: any) => p.id === commonFilters.selectedProjectId);
+      if (proj && l.projectName !== proj.title) return false;
+    }
+
+    if (commonFilters?.selectedDate && l.date !== commonFilters.selectedDate) {
+      return false;
+    }
+
+    if (commonFilters?.searchQuery) {
+      const q = commonFilters.searchQuery.toLowerCase();
+      const match = (l.taskName || '').toLowerCase().includes(q) ||
+                    (l.projectName || '').toLowerCase().includes(q) ||
+                    (l.employeeName || '').toLowerCase().includes(q) ||
+                    (l.description || '').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+
     return true;
   });
 
@@ -502,19 +543,42 @@ export function TaskWorklogView({
     st === 'running' ? 'success' : st === 'paused' ? 'warning' : 'neutral';
 
   const filteredSessions = sessions.filter((s) => {
-    if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-      if (s.employeeId !== selectedEmployeeId) return false;
+    const effectiveEmpId = (commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all')
+      ? commonFilters.selectedEmployeeId
+      : selectedEmployeeId;
+
+    if (effectiveEmpId && effectiveEmpId !== 'all') {
+      if (s.employeeId !== effectiveEmpId) return false;
     }
-    if (selectedProjectId !== 'all') {
-      if (selectedProjectId === 'OFFICE_TASK') {
+
+    const effectiveProjId = (commonFilters?.selectedProjectId && commonFilters.selectedProjectId !== 'all')
+      ? commonFilters.selectedProjectId
+      : selectedProjectId;
+
+    if (effectiveProjId !== 'all') {
+      if (effectiveProjId === 'OFFICE_TASK') {
         if (s.projectId && s.projectId !== 'OFFICE_TASK') return false;
-      } else if (s.projectId !== selectedProjectId) {
+      } else if (s.projectId !== effectiveProjId) {
         return false;
       }
     }
+
     const d = (s.startTime || '').slice(0, 10);
-    if (sessFrom && d < sessFrom) return false;
-    if (sessTo && d > sessTo) return false;
+    if (commonFilters?.selectedDate) {
+      if (d !== commonFilters.selectedDate) return false;
+    } else {
+      if (sessFrom && d < sessFrom) return false;
+      if (sessTo && d > sessTo) return false;
+    }
+
+    if (commonFilters?.searchQuery) {
+      const q = commonFilters.searchQuery.toLowerCase();
+      const pTitle = (projName(s.projectId) || '').toLowerCase();
+      const eName = (empName(s.employeeId) || '').toLowerCase();
+      const note = (s.notes || '').toLowerCase();
+      if (!pTitle.includes(q) && !eName.includes(q) && !note.includes(q)) return false;
+    }
+
     return true;
   });
 
@@ -902,10 +966,16 @@ export function TaskWorklogView({
                       </span>
                     )}
                   </div>
-                  <Badge tone={log.reviewStatus === 'Approved' ? 'success' : 'warning'}>
-                    {log.reviewStatus}
+                  <Badge tone={log.reviewStatus === 'Approved' ? 'success' : log.isRework ? 'danger' : 'warning'}>
+                    {log.isRework ? '🔄 [Rework]' : log.reviewStatus}
                   </Badge>
                 </div>
+
+                {log.isRework && log.reworkNotes && (
+                  <div style={{ padding: '6px 10px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: 6, border: '1px solid rgba(239, 68, 68, 0.25)', fontSize: 12, color: 'var(--status-danger)', fontWeight: 600 }}>
+                    ⚠️ Supervisor Rework Notes: {log.reworkNotes}
+                  </div>
+                )}
 
                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--brand)' }}>
                   {log.taskName} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({log.projectName})</span>
