@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Card, Button, Badge } from '../../../shared/ui/components';
+import { Button, Badge } from '../../../shared/ui/components';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import { useAuth } from '../../auth/AuthProvider';
 
@@ -101,13 +101,22 @@ export function ProjectCommonFilterHeader({
   }, [filters.selectedProjectId, safeProjects]);
 
   return (
-    <Card style={{ padding: '16px 20px', marginBottom: 20, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+    <div
+      style={{
+        padding: '16px 20px',
+        marginBottom: 20,
+        background: 'var(--bg-surface, #ffffff)',
+        border: '1px solid var(--border, #e2e8f0)',
+        borderRadius: '16px',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+      }}
+    >
       {/* Top Header Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary, #0f172a)', display: 'flex', alignItems: 'center', gap: 6 }}>
             🔍 Common Filters
-            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted, #64748b)' }}>
               ({activeTab === 'projects' ? 'Projects View' : activeTab === 'tasks' ? 'Tasks View' : 'Task Worklog View'})
             </span>
           </span>
@@ -125,11 +134,11 @@ export function ProjectCommonFilterHeader({
         )}
       </div>
 
-      {/* Filter Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, alignItems: 'end' }}>
+      {/* Filter Items Flex Layout */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
         {/* 1. Search Bar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Search Bar
           </label>
           <input
@@ -138,20 +147,20 @@ export function ProjectCommonFilterHeader({
             value={filters.searchQuery || ''}
             onChange={(e) => onFilterChange({ searchQuery: e.target.value })}
             placeholder="Search title, code, client…"
-            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
           />
         </div>
 
         {/* 2. Employee (Supervisor / Member) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Employee (Supervisor / Member)
           </label>
           <select
             className="kvj-select"
             value={filters.selectedEmployeeId || 'all'}
             onChange={(e) => onFilterChange({ selectedEmployeeId: e.target.value })}
-            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
           >
             <option value="all">👥 All Employees</option>
             {user && <option value={user.id}>Me ({user.fullName})</option>}
@@ -163,15 +172,15 @@ export function ProjectCommonFilterHeader({
         </div>
 
         {/* 3. Project Name */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Project Name
           </label>
           <select
             className="kvj-select"
             value={filters.selectedProjectId || 'all'}
             onChange={(e) => onFilterChange({ selectedProjectId: e.target.value })}
-            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
           >
             <option value="all">📁 All Projects</option>
             {projectOptions.map((p) => (
@@ -183,15 +192,15 @@ export function ProjectCommonFilterHeader({
         </div>
 
         {/* 4. Task Name */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Task Name
           </label>
           <select
             className="kvj-select"
             value={filters.selectedTaskName || 'all'}
             onChange={(e) => onFilterChange({ selectedTaskName: e.target.value })}
-            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
           >
             <option value="all">✅ All Tasks</option>
             {taskOptions.map((name) => (
@@ -203,15 +212,15 @@ export function ProjectCommonFilterHeader({
         </div>
 
         {/* 5. Client */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 160px', minWidth: 140 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Client
           </label>
           <select
             className="kvj-select"
             value={filters.selectedClient || 'all'}
             onChange={(e) => onFilterChange({ selectedClient: e.target.value })}
-            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
           >
             <option value="all">🏢 All Clients</option>
             {clientOptions.map((c) => (
@@ -223,15 +232,15 @@ export function ProjectCommonFilterHeader({
         </div>
 
         {/* 6. Context-Aware Status */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 160px', minWidth: 140 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Status ({activeTab.toUpperCase()})
           </label>
           <select
             className="kvj-select"
             value={filters.selectedStatus || 'all'}
             onChange={(e) => onFilterChange({ selectedStatus: e.target.value })}
-            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
           >
             <option value="all">🏷️ All Statuses</option>
             {activeTab === 'projects' ? (
@@ -260,8 +269,8 @@ export function ProjectCommonFilterHeader({
         </div>
 
         {/* 7. Custom Date Range (From - To) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: 'span 2' }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '2 1 260px', minWidth: 240 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Custom Date Range (From - To)
           </label>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -270,15 +279,15 @@ export function ProjectCommonFilterHeader({
               className="kvj-input"
               value={filters.fromDate || ''}
               onChange={(e) => onFilterChange({ fromDate: e.target.value })}
-              style={{ flex: 1, padding: '7px 10px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+              style={{ flex: 1, padding: '7px 10px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
             />
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted, #64748b)' }}>to</span>
             <input
               type="date"
               className="kvj-input"
               value={filters.toDate || ''}
               onChange={(e) => onFilterChange({ toDate: e.target.value })}
-              style={{ flex: 1, padding: '7px 10px', fontSize: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+              style={{ flex: 1, padding: '7px 10px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
             />
           </div>
         </div>
@@ -286,7 +295,7 @@ export function ProjectCommonFilterHeader({
 
       {/* Active Filter Chips */}
       {activeFiltersCount > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border, #e2e8f0)' }}>
           {filters.searchQuery && (
             <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Search: "{filters.searchQuery}"
@@ -331,6 +340,6 @@ export function ProjectCommonFilterHeader({
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
