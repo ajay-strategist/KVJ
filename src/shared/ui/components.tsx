@@ -127,15 +127,19 @@ export function Badge({
   tone = 'neutral',
   dot,
   size,
+  style,
+  className = '',
   children,
 }: {
   tone?: StatusTone;
   dot?: boolean;
   size?: 'sm' | 'lg';
+  style?: React.CSSProperties;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <span className={`kvj-badge kvj-badge--${tone} ${size ? `kvj-badge--${size}` : ''}`}>
+    <span className={`kvj-badge kvj-badge--${tone} ${size ? `kvj-badge--${size}` : ''} ${className}`} style={style}>
       {dot && <span className="kvj-badge__dot" />}
       {children}
     </span>

@@ -103,7 +103,7 @@ export function ProjectCommonFilterHeader({
             🔍 Common Filters ({activeTab === 'projects' ? 'Projects' : activeTab === 'tasks' ? 'Tasks' : 'Task Worklog'})
           </span>
           {activeFiltersCount > 0 && (
-            <Badge variant="primary" style={{ fontSize: 11 }}>
+            <Badge tone="brand" style={{ fontSize: 11 }}>
               {activeFiltersCount} Active
             </Badge>
           )}
@@ -279,43 +279,43 @@ export function ProjectCommonFilterHeader({
       {activeFiltersCount > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 8, borderTop: '1px dashed var(--border)' }}>
           {filters.searchQuery && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Search: "{filters.searchQuery}"
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ searchQuery: '' })}>×</span>
             </Badge>
           )}
           {filters.selectedEmployeeId !== 'all' && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Employee: {selectedEmpName}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedEmployeeId: 'all' })}>×</span>
             </Badge>
           )}
           {filters.selectedProjectId !== 'all' && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Project: {selectedProjTitle}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedProjectId: 'all' })}>×</span>
             </Badge>
           )}
           {filters.selectedTaskName !== 'all' && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Task: {filters.selectedTaskName}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedTaskName: 'all' })}>×</span>
             </Badge>
           )}
           {filters.selectedClient !== 'all' && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Client: {filters.selectedClient}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedClient: 'all' })}>×</span>
             </Badge>
           )}
           {filters.selectedStatus !== 'all' && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Status: {filters.selectedStatus}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedStatus: 'all' })}>×</span>
             </Badge>
           )}
           {(filters.fromDate || filters.toDate) && (
-            <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Date Range: {filters.fromDate || 'Start'} to {filters.toDate || 'End'}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ fromDate: '', toDate: '' })}>×</span>
             </Badge>
