@@ -30,9 +30,6 @@ export function ProjectCommonFilterHeader({
   const { user } = useAuth();
   const { employees = [] } = useEmployee() || {};
 
-  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
-  const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
-
   // Extract unique clients
   const clientOptions = useMemo(() => {
     const set = new Set<string>();
@@ -81,10 +78,10 @@ export function ProjectCommonFilterHeader({
   }, [filters.selectedProjectId, projects]);
 
   return (
-    <Card style={{ padding: '16px 20px', marginBottom: 20, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+    <Card style={{ padding: '14px 18px', marginBottom: 18, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
             🔍 Common Filters
           </span>
           {activeFiltersCount > 0 && (
@@ -102,7 +99,7 @@ export function ProjectCommonFilterHeader({
       </div>
 
       {/* Filter Form Controls */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'end' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, alignItems: 'end' }}>
         {/* Search Query */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -216,7 +213,7 @@ export function ProjectCommonFilterHeader({
 
       {/* Active Filter Chips */}
       {activeFiltersCount > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 8, borderTop: '1px dashed var(--border)' }}>
           {filters.searchQuery && (
             <Badge variant="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Search: "{filters.searchQuery}"
