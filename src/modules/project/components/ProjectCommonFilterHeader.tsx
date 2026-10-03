@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Button, Badge } from '../../../shared/ui/components';
+import { ChecklistMultiSelect, type ChecklistOption } from '../../../shared/ui/ChecklistMultiSelect';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import { useAuth } from '../../auth/AuthProvider';
 
@@ -8,7 +9,7 @@ export interface ProjectCommonFiltersState {
   selectedProjectId: string;
   selectedEmployeeId: string;
   selectedTaskName: string;
-  selectedStatus: string;
+  selectedStatuses: string[];
   selectedClient: string;
   fromDate: string;
   toDate: string;
@@ -40,6 +41,32 @@ export function ProjectCommonFilterHeader({
   const safeProjects = Array.isArray(projects) ? projects : [];
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const safeClients = Array.isArray(clients) ? clients : [];
+
+  // Options for ChecklistMultiSelect based on active tab
+  const statusOptions: ChecklistOption[] = useMemo(() => {
+    if (activeTab === 'projects') {
+      return [
+        { value: 'Not Started', label: 'Not Started' },
+        { value: 'In Progress', label: 'In Progress' },
+        { value: 'Completed', label: 'Completed' },
+      ];
+    }
+    if (activeTab === 'tasks') {
+      return [
+        { value: 'Pending Approval', label: '⚡ Pending Approval' },
+        { value: 'To Do', label: '📝 To Do' },
+        { value: 'In Progress', label: '⚙️ In Progress' },
+        { value: 'Under Review', label: '🔍 Under Review' },
+        { value: 'Completed', label: '✅ Completed' },
+        { value: 'Rework', label: '🔄 Rework' },
+      ];
+    }
+    return [
+      { value: 'Approved', label: 'Approved' },
+      { value: 'Pending Review', label: 'Pending Review' },
+      { value: 'Rework', label: 'Rework' },
+    ];
+  }, [activeTab]);
 
   // Extract unique clients
   const clientOptions = useMemo(() => {
@@ -74,6 +101,8 @@ export function ProjectCommonFilterHeader({
     return Array.from(set).sort();
   }, [safeTasks]);
 
+  const currentStatuses = Array.isArray(filters.selectedStatuses) ? filters.selectedStatuses : [];
+
   // Compute active filters count
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -81,11 +110,11 @@ export function ProjectCommonFilterHeader({
     if (filters.selectedProjectId && filters.selectedProjectId !== 'all') count++;
     if (filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all') count++;
     if (filters.selectedTaskName && filters.selectedTaskName !== 'all') count++;
-    if (filters.selectedStatus && filters.selectedStatus !== 'all') count++;
+    if (currentStatuses.length > 0 && !currentStatuses.includes('all')) count++;
     if (filters.selectedClient && filters.selectedClient !== 'all') count++;
     if (filters.fromDate || filters.toDate) count++;
     return count;
-  }, [filters]);
+  }, [filters, currentStatuses]);
 
   const selectedEmpName = useMemo(() => {
     if (!filters.selectedEmployeeId || filters.selectedEmployeeId === 'all') return null;
@@ -231,41 +260,18 @@ export function ProjectCommonFilterHeader({
           </select>
         </div>
 
-        {/* 6. Context-Aware Status */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 160px', minWidth: 140 }}>
+        {/* 6. Context-Aware Status Checklist MultiSelect */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Status ({activeTab.toUpperCase()})
           </label>
-          <select
-            className="kvj-select"
-            value={filters.selectedStatus || 'all'}
-            onChange={(e) => onFilterChange({ selectedStatus: e.target.value })}
-            style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: '8px', border: '1px solid var(--border, #cbd5e1)', background: 'var(--bg-surface, #ffffff)', color: 'var(--text-primary, #0f172a)' }}
-          >
-            <option value="all">🏷️ All Statuses</option>
-            {activeTab === 'projects' ? (
-              <>
-                <option value="Not Started">Not Started</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-              </>
-            ) : activeTab === 'tasks' ? (
-              <>
-                <option value="Pending Approval">Pending Approval</option>
-                <option value="To Do">To Do</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Under Review">Under Review</option>
-                <option value="Completed">Completed</option>
-                <option value="Rework">Rework</option>
-              </>
-            ) : (
-              <>
-                <option value="Approved">Approved</option>
-                <option value="Pending Review">Pending Review</option>
-                <option value="Rework">Rework</option>
-              </>
-            )}
-          </select>
+          <ChecklistMultiSelect
+            options={statusOptions}
+            selectedValues={currentStatuses}
+            onChange={(vals) => onFilterChange({ selectedStatuses: vals })}
+            placeholder="All Statuses"
+            style={{ width: '100%' }}
+          />
         </div>
 
         {/* 7. Custom Date Range (From - To) */}
@@ -326,10 +332,10 @@ export function ProjectCommonFilterHeader({
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedClient: 'all' })}>×</span>
             </Badge>
           )}
-          {filters.selectedStatus && filters.selectedStatus !== 'all' && (
+          {currentStatuses.length > 0 && !currentStatuses.includes('all') && (
             <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Status: {filters.selectedStatus}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedStatus: 'all' })}>×</span>
+              Status: {currentStatuses.join(', ')}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedStatuses: [] })}>×</span>
             </Badge>
           )}
           {(filters.fromDate || filters.toDate) && (

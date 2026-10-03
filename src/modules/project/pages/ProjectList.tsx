@@ -429,17 +429,13 @@ export function ProjectList({
       list = list.filter((p) => p.client === effectiveClient);
     }
 
-    const effectiveStatus = commonFilters?.selectedStatus && commonFilters.selectedStatus !== 'all'
-      ? commonFilters.selectedStatus
-      : null;
+    const effectiveStatuses = commonFilters?.selectedStatuses ?? selectedStatuses;
 
-    if (effectiveStatus) {
-      list = list.filter((p) => p.status === effectiveStatus || (effectiveStatus === 'In Progress' && p.status === 'In Progress') || (effectiveStatus === 'Completed' && p.status === 'Completed'));
-    } else if (!commonFilters && selectedStatuses.length > 0) {
-      if (selectedStatuses.includes('__none__')) {
+    if (effectiveStatuses && effectiveStatuses.length > 0) {
+      if (effectiveStatuses.includes('__none__')) {
         list = [];
-      } else {
-        list = list.filter((p) => selectedStatuses.includes(p.status));
+      } else if (!effectiveStatuses.includes('all')) {
+        list = list.filter((p) => effectiveStatuses.includes(p.status));
       }
     }
 

@@ -331,19 +331,11 @@ export function TaskBoard({
 
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
 
-      const effectiveStatus = commonFilters?.selectedStatus && commonFilters.selectedStatus !== 'all'
-        ? commonFilters.selectedStatus
-        : null;
+      const effectiveStatuses = commonFilters?.selectedStatuses ?? statusFilters;
 
-      if (effectiveStatus) {
-        if (effectiveStatus === 'Pending Approval' && t.status !== 'Pending Approval') return false;
-        if (effectiveStatus === 'Under Review' && t.status !== 'Under Review' && t.approvalStatus !== 'pending_task_approval') return false;
-        if (effectiveStatus === 'Rework' && t.approvalStatus !== 'rework') return false;
-        if (effectiveStatus === 'In Progress' && t.status !== 'In Progress') return false;
-        if (effectiveStatus === 'Completed' && t.status !== 'Completed') return false;
-      } else if (statusFilters.length > 0) {
-        if (statusFilters.includes('__none__')) return false;
-        if (!statusFilters.includes('all') && !statusFilters.includes(t.status)) return false;
+      if (effectiveStatuses && effectiveStatuses.length > 0) {
+        if (effectiveStatuses.includes('__none__')) return false;
+        if (!effectiveStatuses.includes('all') && !effectiveStatuses.includes(t.status)) return false;
       }
 
       if (commonFilters?.selectedTaskName && commonFilters.selectedTaskName !== 'all') {

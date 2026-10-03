@@ -25,7 +25,7 @@ export function ProjectsAndTasks() {
     selectedProjectId: 'all',
     selectedEmployeeId: isMgmt ? 'all' : (user?.id || ''),
     selectedTaskName: 'all',
-    selectedStatus: 'all',
+    selectedStatuses: ['Not Started', 'In Progress'],
     selectedClient: 'all',
     fromDate: '',
     toDate: '',
@@ -43,8 +43,12 @@ export function ProjectsAndTasks() {
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
-    // Reset status when switching tabs if active tab changes to prevent invalid status cross-over
-    setCommonFilters((prev) => ({ ...prev, selectedStatus: 'all' }));
+    // Set appropriate default status selection per tab
+    if (tabId === 'projects') {
+      setCommonFilters((prev) => ({ ...prev, selectedStatuses: ['Not Started', 'In Progress'] }));
+    } else {
+      setCommonFilters((prev) => ({ ...prev, selectedStatuses: [] }));
+    }
   };
 
   return (

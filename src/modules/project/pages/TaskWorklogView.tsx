@@ -579,6 +579,16 @@ export function TaskWorklogView({
       if (sessTo && d > sessTo) return false;
     }
 
+    if (commonFilters?.selectedStatuses && commonFilters.selectedStatuses.length > 0) {
+      if (commonFilters.selectedStatuses.includes('__none__')) return false;
+      if (!commonFilters.selectedStatuses.includes('all')) {
+        const sStatus = s.status || 'completed';
+        if (!commonFilters.selectedStatuses.includes(sStatus) && !commonFilters.selectedStatuses.includes((s as any).approvalStatus || '')) {
+          return false;
+        }
+      }
+    }
+
     if (commonFilters?.searchQuery) {
       const q = commonFilters.searchQuery.toLowerCase();
       const pTitle = (projName(s.projectId) || '').toLowerCase();
