@@ -161,8 +161,9 @@ export class AttendanceService implements IAttendanceService {
         extraBreakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
       }
 
-      const totalWorkingMins = Math.max(0, Math.floor(totalWorkingMs / 60000));
       const totalBreakMins = (record.totalBreakMinutes || 0) + Math.round(extraBreakMs / 60000);
+      const grossWorkingMins = Math.max(0, Math.floor(totalWorkingMs / 60000));
+      const totalWorkingMins = Math.max(0, grossWorkingMins - totalBreakMins);
 
       const patch: Partial<AttendanceRecord> = {
         status: 'clocked_out',

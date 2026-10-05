@@ -73,6 +73,19 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       const sessionIds = (sessions || []).map((s) => s.id);
       if (sessionIds.length > 0) {
         await supabase.from('flwdsk_break_records').delete().in('work_session_id', sessionIds);
+      } else {
+        const { data: createdWs } = await supabase
+          .from('flwdsk_work_sessions')
+          .insert({
+            attendance_record_id: attendanceRecordId,
+            clock_in: breaks[0]?.startTime || new Date().toISOString(),
+            work_type: 'Office',
+          })
+          .select('id')
+          .single();
+        if (createdWs?.id) {
+          sessionIds.push(createdWs.id);
+        }
       }
 
       const fallbackSessionId = sessionIds.length > 0 ? sessionIds[sessionIds.length - 1] : null;

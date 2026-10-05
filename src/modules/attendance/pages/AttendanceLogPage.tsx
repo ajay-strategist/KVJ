@@ -953,7 +953,25 @@ export function AttendanceLogPage() {
             }
 
             workMins += r.totalWorkingMinutes || 0;
-            breakMins += r.totalBreakMinutes || 0;
+            let rBreakMins = 0;
+            if (Array.isArray(r.breaks) && r.breaks.length > 0) {
+              rBreakMins = r.breaks.reduce((sum: number, b: any) => {
+                const s = b.startTime || (b as any).start_time;
+                const e = b.endTime || (b as any).end_time;
+                if (s && e) {
+                  const d = new Date(e).getTime() - new Date(s).getTime();
+                  return sum + (d > 0 ? Math.round(d / 60000) : 0);
+                } else if (s && r.status === 'on_break') {
+                  const d = Date.now() - new Date(s).getTime();
+                  return sum + (d > 0 ? Math.round(d / 60000) : 0);
+                }
+                return sum;
+              }, 0);
+            }
+            if (rBreakMins === 0) {
+              rBreakMins = r.totalBreakMinutes || (r as any).total_break_minutes || 0;
+            }
+            breakMins += rBreakMins;
           }
         });
 
@@ -1579,14 +1597,20 @@ export function AttendanceLogPage() {
         let breakMins = 0;
         if (record.breaks && record.breaks.length > 0) {
           breakMins = record.breaks.reduce((sum, b) => {
-            if (b.startTime && b.endTime) {
-              const diff = new Date(b.endTime).getTime() - new Date(b.startTime).getTime();
+            const sTime = b.startTime || (b as any).start_time;
+            const eTime = b.endTime || (b as any).end_time;
+            if (sTime && eTime) {
+              const diff = new Date(eTime).getTime() - new Date(sTime).getTime();
+              return sum + (diff > 0 ? Math.round(diff / 60000) : 0);
+            } else if (sTime && record.status === 'on_break') {
+              const diff = Date.now() - new Date(sTime).getTime();
               return sum + (diff > 0 ? Math.round(diff / 60000) : 0);
             }
             return sum;
           }, 0);
-        } else {
-          breakMins = record.totalBreakMinutes || 0;
+        }
+        if (breakMins === 0) {
+          breakMins = record.totalBreakMinutes || (record as any).total_break_minutes || 0;
         }
 
         if (record.firstClockIn) {
@@ -1669,16 +1693,45 @@ export function AttendanceLogPage() {
           } else {
             // EMIT SEPARATE ROW FOR EACH VALID SESSION
             uniqueSessions.forEach((s, idx) => {
+              // Calculate breaks specifically belonging to this session
+              let sBreakMins = 0;
+              if (record.breaks && record.breaks.length > 0) {
+                sBreakMins = record.breaks.reduce((sum, b) => {
+                  const bStart = b.startTime || (b as any).start_time;
+                  const bEnd = b.endTime || (b as any).end_time;
+                  if (!bStart) return sum;
+                  const matchesSessionId = b.workSessionId && b.workSessionId === s.id;
+                  const sInTs = new Date(s.clockIn).getTime();
+                  const sOutTs = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                  const bStartTs = new Date(bStart).getTime();
+                  const fallsInSession = !isNaN(sInTs) && bStartTs >= sInTs && (isNaN(sOutTs) || bStartTs <= sOutTs);
+
+                  if (matchesSessionId || fallsInSession || uniqueSessions.length === 1) {
+                    if (bEnd) {
+                      const diff = new Date(bEnd).getTime() - bStartTs;
+                      return sum + (diff > 0 ? Math.round(diff / 60000) : 0);
+                    } else if (record.status === 'on_break') {
+                      const diff = Date.now() - bStartTs;
+                      return sum + (diff > 0 ? Math.round(diff / 60000) : 0);
+                    }
+                  }
+                  return sum;
+                }, 0);
+              } else {
+                sBreakMins = uniqueSessions.length === 1 || idx === 0 ? breakMins : 0;
+              }
+
               let sMins = 0;
               if (s.clockIn) {
                 const t1 = new Date(s.clockIn).getTime();
                 const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
                 if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
                   const grossS = Math.round((t2 - t1) / (1000 * 60));
-                  sMins = Math.max(0, grossS);
+                  sMins = Math.max(0, grossS - sBreakMins);
                 }
               }
               const sDuration = `${Math.floor(sMins / 60)}h ${sMins % 60}m`;
+              const sBreakTime = `${Math.floor(sBreakMins / 60)}h ${sBreakMins % 60}m`;
 
               const sWorkType = s.workType || 'Office';
               const sBatchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
@@ -1701,7 +1754,7 @@ export function AttendanceLogPage() {
               duration: sDuration,
               expenses: idx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
               note: formatCleanNote(s.notes || (record as any).notes, sWorkType),
-              break: idx === 0 ? breakTime : '0h 0m',
+              break: sBreakTime,
               tasks: s.notes ? [s.notes] : [],
             });
           });

@@ -491,7 +491,6 @@ export const AttendancePanel = memo(function AttendancePanel({
         const success = await onStartBreakWithTask('Official Break', '');
         if (success) {
           toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
-          if (onActivityLog) onActivityLog('Started official break', 'info');
         }
       } else {
         const res = await startBreak('Official Break');
@@ -2120,6 +2119,31 @@ const getEntryDate = (e: { id: string; date?: string }): string => {
   return toLocalISODate(new Date());
 };
 
+const parseTimeToMinutes = (tStr: string): number => {
+  if (!tStr) return 0;
+  const m = tStr.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (!m) return 0;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ampm = m[3]?.toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+};
+
+const getEntryTimestamp = (e: { id: string; time: string; date?: string; timestamp?: number }): number => {
+  if (e.timestamp && !isNaN(e.timestamp)) return e.timestamp;
+  const ts = Number(e.id);
+  if (!isNaN(ts) && ts > 1600000000000) {
+    return ts;
+  }
+  const dateStr = getEntryDate(e);
+  const mins = parseTimeToMinutes(e.time);
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setMinutes(d.getMinutes() + mins);
+  return d.getTime();
+};
+
 const dateNavBtnStyle: React.CSSProperties = {
   background: 'var(--bg-panel)',
   border: '1px solid var(--border)',
@@ -2141,7 +2165,7 @@ export const TimelineWidget = memo(function TimelineWidget({
   onEmpIdChange,
   employeeList = [],
 }: {
-  entries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral'; date?: string }>;
+  entries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral'; date?: string; timestamp?: number }>;
   selectedEmpId?: string;
   onEmpIdChange?: (empId: string) => void;
   employeeList?: Array<{ id: string; name: string }>;
@@ -2153,6 +2177,9 @@ export const TimelineWidget = memo(function TimelineWidget({
 
   const cleanEntries = entries.filter((e) => !e.title?.includes('System initialized'));
   const filteredEntries = cleanEntries.filter((e) => getEntryDate(e) === selectedDate);
+  const sortedEntries = useMemo(() => {
+    return [...filteredEntries].sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
+  }, [filteredEntries]);
 
   const isToday = selectedDate === todayDate;
 
@@ -2318,7 +2345,7 @@ export const TimelineWidget = memo(function TimelineWidget({
           )}
         </div>
       ) : (
-        <Timeline entries={filteredEntries} />
+        <Timeline entries={sortedEntries} />
       )}
     </Card>
   );
@@ -2551,7 +2578,7 @@ export function MyDayPage() {
     })();
 
     // Synthesize database attendance events from `record`
-    const dbEntries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral'; date?: string }> = [];
+    const dbEntries: Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral'; date?: string; timestamp?: number }> = [];
 
     if (record) {
       const recDate = record.workDate || toLocalISODate(new Date());
@@ -2559,62 +2586,137 @@ export function MyDayPage() {
       // 1. First Clock In Event
       if (record.firstClockIn) {
         const formattedTime = formatDisplayTime(record.firstClockIn);
-        const workType = (record.sessions?.[0]?.workType || (record as any).workType || 'Office');
-        dbEntries.push({
-          id: `db-clockin-${record.id || recDate}`,
-          title: `Clocked in for ${workType}`,
-          time: formattedTime,
-          tone: 'success',
-          date: recDate,
+        const cInMins = parseTimeToMinutes(formattedTime);
+        const existingClockIn = localEntries.find((le: any) => {
+          const leDate = le.date || getEntryDate(le);
+          if (leDate !== recDate) return false;
+          if (!(le.title || '').toLowerCase().includes('clocked in')) return false;
+          return Math.abs(parseTimeToMinutes(le.time) - cInMins) <= 2;
         });
+        if (!existingClockIn) {
+          const workType = (record.sessions?.[0]?.workType || (record as any).workType || 'Office');
+          dbEntries.push({
+            id: `db-clockin-${record.id || recDate}`,
+            title: `Clocked in for ${workType}`,
+            time: formattedTime,
+            tone: 'success',
+            date: recDate,
+            timestamp: new Date(record.firstClockIn).getTime(),
+          });
+        }
       }
 
       // 2. Break Events
       if (Array.isArray(record.breaks)) {
         record.breaks.forEach((b: any, idx: number) => {
           if (b.startTime) {
-            dbEntries.push({
-              id: `db-break-start-${record.id || recDate}-${idx}`,
-              title: `Started Break: ${b.reason || 'Rest Break'}`,
-              time: formatDisplayTime(b.startTime),
-              tone: 'info',
-              date: recDate,
+            const bStartFmt = formatDisplayTime(b.startTime);
+            const bStartMins = parseTimeToMinutes(bStartFmt);
+            // Check if localEntries already has a break start entry around this time
+            const existingLocalStart = localEntries.find((le: any) => {
+              const leDate = le.date || getEntryDate(le);
+              if (leDate !== recDate) return false;
+              const leTitle = (le.title || '').toLowerCase();
+              if (!leTitle.includes('started break') && !leTitle.includes('started official break')) return false;
+              return Math.abs(parseTimeToMinutes(le.time) - bStartMins) <= 2;
             });
+
+            if (!existingLocalStart) {
+              dbEntries.push({
+                id: `db-break-start-${record.id || recDate}-${idx}`,
+                title: `Started Break: ${b.reason || 'Rest Break'}`,
+                time: bStartFmt,
+                tone: 'info',
+                date: recDate,
+                timestamp: new Date(b.startTime).getTime(),
+              });
+            }
           }
           if (b.endTime) {
-            dbEntries.push({
-              id: `db-break-end-${record.id || recDate}-${idx}`,
-              title: `Ended Break`,
-              time: formatDisplayTime(b.endTime),
-              tone: 'info',
-              date: recDate,
+            const bEndFmt = formatDisplayTime(b.endTime);
+            const bEndMins = parseTimeToMinutes(bEndFmt);
+            // Check if localEntries already has a resumed/ended break entry around this time
+            const existingLocalEnd = localEntries.find((le: any) => {
+              const leDate = le.date || getEntryDate(le);
+              if (leDate !== recDate) return false;
+              const leTitle = (le.title || '').toLowerCase();
+              if (!leTitle.includes('resumed work session') && !leTitle.includes('ended break')) return false;
+              return Math.abs(parseTimeToMinutes(le.time) - bEndMins) <= 2;
             });
+
+            if (!existingLocalEnd) {
+              dbEntries.push({
+                id: `db-break-end-${record.id || recDate}-${idx}`,
+                title: `Ended Break`,
+                time: bEndFmt,
+                tone: 'info',
+                date: recDate,
+                timestamp: new Date(b.endTime).getTime(),
+              });
+            }
           }
         });
       }
 
       // 3. Clock Out Event
       if (record.lastClockOut) {
-        dbEntries.push({
-          id: `db-clockout-${record.id || recDate}`,
-          title: `Clocked out work session`,
-          time: formatDisplayTime(record.lastClockOut),
-          tone: 'neutral',
-          date: recDate,
+        const formattedTime = formatDisplayTime(record.lastClockOut);
+        const cOutMins = parseTimeToMinutes(formattedTime);
+        const existingClockOut = localEntries.find((le: any) => {
+          const leDate = le.date || getEntryDate(le);
+          if (leDate !== recDate) return false;
+          if (!(le.title || '').toLowerCase().includes('clocked out')) return false;
+          return Math.abs(parseTimeToMinutes(le.time) - cOutMins) <= 2;
         });
+        if (!existingClockOut) {
+          dbEntries.push({
+            id: `db-clockout-${record.id || recDate}`,
+            title: `Clocked out work session`,
+            time: formattedTime,
+            tone: 'neutral',
+            date: recDate,
+            timestamp: new Date(record.lastClockOut).getTime(),
+          });
+        }
       }
     }
 
-    // Merge local entries + db entries, deduplicating by title + time
+    // Clean up localEntries: remove redundant duplicate break-start entries at same time
+    const deduplicatedLocal: any[] = [];
+    localEntries.forEach((le: any) => {
+      const leTitle = (le.title || '').toLowerCase();
+      const isGenericBreakStart = leTitle === 'started official break' || leTitle.startsWith('started break (');
+      if (isGenericBreakStart) {
+        const leMins = parseTimeToMinutes(le.time);
+        const leDate = le.date || getEntryDate(le);
+        // If there is another break entry with "on task:" at the same minute, prefer the one with task
+        const hasSpecific = localEntries.some((other: any) => {
+          if (other === le) return false;
+          const oDate = other.date || getEntryDate(other);
+          if (oDate !== leDate) return false;
+          const oTitle = (other.title || '').toLowerCase();
+          return oTitle.includes('on task:') && Math.abs(parseTimeToMinutes(other.time) - leMins) <= 1;
+        });
+        if (hasSpecific) return;
+      }
+      deduplicatedLocal.push(le);
+    });
+
+    // Merge local entries + db entries, deduplicating by normalized title + time
     const mergedMap = new Map<string, any>();
-    [...dbEntries, ...localEntries].forEach((entry) => {
-      const key = `${entry.date || ''}_${entry.title}_${entry.time}`;
+    [...dbEntries, ...deduplicatedLocal].forEach((entry) => {
+      const eDate = entry.date || getEntryDate(entry);
+      const key = `${eDate}_${entry.title}_${entry.time}`;
       if (!mergedMap.has(key)) {
         mergedMap.set(key, entry);
       }
     });
 
-    setTimelineEntries(Array.from(mergedMap.values()));
+    const sortedMerged = Array.from(mergedMap.values()).sort(
+      (a, b) => getEntryTimestamp(a) - getEntryTimestamp(b)
+    );
+
+    setTimelineEntries(sortedMerged);
   }, [userTimelineKey, record]);
 
   const handleSyncTask = useCallback((id: string, secondsToday: number, active: boolean, underReview?: boolean) => {
