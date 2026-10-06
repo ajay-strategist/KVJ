@@ -1,5 +1,5 @@
 import { container, createToken } from '../../core/registry';
-import { todayISO, localDateTimeToUtcIso } from '../../shared/utils/date';
+import { todayISO, localDateTimeToUtcIso, calculateMergedBreakMinutes } from '../../shared/utils/date';
 import { AppError, Err, Ok, type Result } from '../../core/result';
 import type { Actor, GeoPoint, UUID, DateRange } from '../../core/types';
 import { eventBus } from '../../core/event-bus';
@@ -151,18 +151,13 @@ export class AttendanceService implements IAttendanceService {
         }
       });
 
-      const openBreak = record.breaks?.find((b) => !b.endTime);
-      let updatedBreaks = record.breaks ?? [];
-      let extraBreakMs = 0;
-      if (openBreak) {
-        updatedBreaks = updatedBreaks.map((b) =>
-          b.id === openBreak.id ? { ...b, endTime: ts } : b
-        );
-        extraBreakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
-      }
+      // Close ALL open breaks (never leave orphaned breaks open)
+      const updatedBreaks = (record.breaks ?? []).map((b) =>
+        !b.endTime ? { ...b, endTime: ts } : b
+      );
 
-      const totalBreakMins = (record.totalBreakMinutes || 0) + Math.round(extraBreakMs / 60000);
       const grossWorkingMins = Math.max(0, Math.floor(totalWorkingMs / 60000));
+      const totalBreakMins = calculateMergedBreakMinutes(updatedBreaks, { maxGrossMinutes: grossWorkingMins });
       const totalWorkingMins = Math.max(0, grossWorkingMins - totalBreakMins);
 
       const patch: Partial<AttendanceRecord> = {
@@ -192,6 +187,20 @@ export class AttendanceService implements IAttendanceService {
 
       if (!record || record.status !== 'present') {
         return Err(AppError.businessRule('Must be actively clocked in to start a break.'));
+      }
+
+      // Concurrency guard: Check if break is already open or was started within last 4 seconds
+      const hasOpenBreak = (record.breaks ?? []).some((b) => !b.endTime);
+      const lastBreak = record.breaks && record.breaks.length > 0 ? record.breaks[record.breaks.length - 1] : null;
+      const lastBreakStartMs = lastBreak ? new Date(lastBreak.startTime).getTime() : 0;
+      const nowMs = new Date(ts).getTime();
+
+      if (hasOpenBreak || (lastBreak && nowMs - lastBreakStartMs < 4000)) {
+        console.warn('startBreak: duplicate break request ignored for employee', employeeId);
+        if (record.status !== 'on_break') {
+          await this.repo.update(record.id, { status: 'on_break', updatedAt: ts }, { id: employeeId, role: 'Employee' });
+        }
+        return Ok(record);
       }
 
       let activeSession = record.sessions?.find((s) => !s.clockOut);
@@ -237,24 +246,18 @@ export class AttendanceService implements IAttendanceService {
         return Err(AppError.businessRule('Not currently on break.'));
       }
 
-      const openBreak = record.breaks?.find((b) => !b.endTime);
-      let breakMins = 0;
+      const hasOpenBreak = (record.breaks ?? []).some((b) => !b.endTime);
       let updatedBreaks = record.breaks ?? [];
 
-      if (openBreak) {
-        const breakMs = new Date(ts).getTime() - new Date(openBreak.startTime).getTime();
-        breakMins = Math.max(0, Math.round(breakMs / 60000));
+      if (hasOpenBreak) {
+        // Close ALL open breaks so no orphaned breaks linger in the background
         updatedBreaks = (record.breaks ?? []).map((b) =>
-          b.id === openBreak.id ? { ...b, endTime: ts } : b
+          !b.endTime ? { ...b, endTime: ts } : b
         );
       } else {
-        // Self-healing: If status is 'on_break' but open break record is missing in array,
-        // estimate break time using record.updatedAt timestamp so break duration is not lost.
+        // Self-healing: If status is 'on_break' but open break record is missing in array
         console.warn('endBreak: No open break record found for employee', employeeId, '- creating fallback break record.');
         const breakStart = record.updatedAt || ts;
-        const breakMs = new Date(ts).getTime() - new Date(breakStart).getTime();
-        breakMins = Math.max(0, Math.round(breakMs / 60000));
-        
         const activeSession = record.sessions?.find((s) => !s.clockOut) || record.sessions?.[record.sessions.length - 1];
         const healedBreak: BreakRecord = {
           id: this.uuid(),
@@ -266,9 +269,12 @@ export class AttendanceService implements IAttendanceService {
         updatedBreaks = [...(record.breaks ?? []), healedBreak];
       }
 
+      // Recompute total break minutes using merged intervals
+      const totalBreakMins = calculateMergedBreakMinutes(updatedBreaks);
+
       const patch: Partial<AttendanceRecord> = {
         status: 'present',
-        totalBreakMinutes: (record.totalBreakMinutes || 0) + breakMins,
+        totalBreakMinutes: totalBreakMins,
         breaks: updatedBreaks,
         updatedAt: ts,
         updatedBy: employeeId,
@@ -281,6 +287,7 @@ export class AttendanceService implements IAttendanceService {
       return Err(AppError.internal((e as any)?.message));
     }
   }
+
 
   async listPendingCorrections(): Promise<Result<any[]>> {
     try {
@@ -646,16 +653,6 @@ export class AttendanceService implements IAttendanceService {
       const workDate = record.workDate || todayStr();
       const outTs = localDateTimeToUtcIso(workDate, clockOutTime || '17:30');
 
-      let totalMins = record.totalWorkingMinutes || 0;
-      if (record.firstClockIn) {
-        const startMs = new Date(record.firstClockIn).getTime();
-        const endMs = new Date(outTs).getTime();
-        if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
-          totalMins = Math.round((endMs - startMs) / 60000) - (record.totalBreakMinutes || 0);
-          totalMins = Math.max(0, totalMins);
-        }
-      }
-
       const updatedSessions = (record.sessions || []).map((s) => {
         if (!s.clockOut) {
           return { ...s, clockOut: outTs, notes: notes ? `${s.notes || ''} [Force Closed: ${notes}]` : s.notes };
@@ -670,10 +667,23 @@ export class AttendanceService implements IAttendanceService {
         return b;
       });
 
+      const totalBreakMins = calculateMergedBreakMinutes(updatedBreaks);
+
+      let totalMins = 0;
+      if (record.firstClockIn) {
+        const startMs = new Date(record.firstClockIn).getTime();
+        const endMs = new Date(outTs).getTime();
+        if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+          const grossMins = Math.round((endMs - startMs) / 60000);
+          totalMins = Math.max(0, grossMins - totalBreakMins);
+        }
+      }
+
       const patch: Partial<AttendanceRecord> = {
         status: 'clocked_out',
         lastClockOut: outTs,
         totalWorkingMinutes: totalMins > 0 ? totalMins : 480,
+        totalBreakMinutes: totalBreakMins,
         sessions: updatedSessions,
         breaks: updatedBreaks,
         updatedAt: nowIso(),

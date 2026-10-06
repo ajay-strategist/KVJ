@@ -463,6 +463,8 @@ export const AttendancePanel = memo(function AttendancePanel({
   const [breakReason, setBreakReason] = useState('Official Break');
   const [breakStatusUpdate, setBreakStatusUpdate] = useState('');
   const [selectedBreakTaskId, setSelectedBreakTaskId] = useState('');
+  const [submittingBreak, setSubmittingBreak] = useState(false);
+  const [endingBreak, setEndingBreak] = useState(false);
 
   // Sync selected break task when modal opens or active task changes
   useEffect(() => {
@@ -476,6 +478,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   }, [breakModalOpen, activeRunningTask, tasks, selectedBreakTaskId]);
 
   const handleBreakClick = useCallback(async () => {
+    if (submittingBreak) return;
     if (activeRunningTask) {
       setBreakReason('Official Break');
       setBreakStatusUpdate('');
@@ -487,25 +490,32 @@ export const AttendancePanel = memo(function AttendancePanel({
       });
       if (!ok) return;
 
-      if (onStartBreakWithTask) {
-        const success = await onStartBreakWithTask('Official Break', '');
-        if (success) {
-          toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
-        }
-      } else {
-        const res = await startBreak('Official Break');
-        if (res.ok) {
-          toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
-          if (onActivityLog) onActivityLog('Started official break', 'info');
+      setSubmittingBreak(true);
+      try {
+        if (onStartBreakWithTask) {
+          const success = await onStartBreakWithTask('Official Break', '');
+          if (success) {
+            toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
+          }
         } else {
-          toast({ variant: 'error', title: 'Break Failed', message: res.error });
+          const res = await startBreak('Official Break');
+          if (res.ok) {
+            toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
+            if (onActivityLog) onActivityLog('Started official break', 'info');
+          } else {
+            toast({ variant: 'error', title: 'Break Failed', message: res.error });
+          }
         }
+      } finally {
+        setSubmittingBreak(false);
       }
     }
-  }, [activeRunningTask, confirm, onStartBreakWithTask, startBreak, toast, onActivityLog]);
+  }, [activeRunningTask, confirm, onStartBreakWithTask, startBreak, toast, onActivityLog, submittingBreak]);
 
   const handleConfirmBreak = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingBreak) return;
+
     const reasonText = breakReason || 'Official Break';
     const updateMsg = breakStatusUpdate.trim();
 
@@ -516,39 +526,50 @@ export const AttendancePanel = memo(function AttendancePanel({
 
     const targetTaskId = activeRunningTask?.id || selectedBreakTaskId || undefined;
 
-    if (onStartBreakWithTask) {
-      const ok = await onStartBreakWithTask(reasonText, updateMsg, targetTaskId);
-      if (ok) {
+    setSubmittingBreak(true);
+    try {
+      if (onStartBreakWithTask) {
+        const ok = await onStartBreakWithTask(reasonText, updateMsg, targetTaskId);
+        if (ok) {
+          setBreakModalOpen(false);
+          setBreakStatusUpdate('');
+        }
+        return;
+      }
+
+      const res = await startBreak(reasonText);
+      if (res.ok) {
+        if (updateMsg && onActivityLog) {
+          onActivityLog(`Started break (${reasonText}). Work status: ${updateMsg}`, 'info');
+        } else if (onActivityLog) {
+          onActivityLog(`Started official break (${reasonText})`, 'info');
+        }
+        toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
         setBreakModalOpen(false);
         setBreakStatusUpdate('');
+      } else {
+        toast({ variant: 'error', title: 'Break Failed', message: res.error });
       }
-      return;
+    } finally {
+      setSubmittingBreak(false);
     }
-
-    const res = await startBreak(reasonText);
-    if (res.ok) {
-      if (updateMsg && onActivityLog) {
-        onActivityLog(`Started break (${reasonText}). Work status: ${updateMsg}`, 'info');
-      } else if (onActivityLog) {
-        onActivityLog(`Started official break (${reasonText})`, 'info');
-      }
-      toast({ variant: 'info', title: 'On Break', message: 'Enjoy your break.' });
-      setBreakModalOpen(false);
-      setBreakStatusUpdate('');
-    } else {
-      toast({ variant: 'error', title: 'Break Failed', message: res.error });
-    }
-  }, [breakReason, breakStatusUpdate, activeRunningTask, selectedBreakTaskId, onStartBreakWithTask, startBreak, toast, onActivityLog]);
+  }, [breakReason, breakStatusUpdate, activeRunningTask, selectedBreakTaskId, onStartBreakWithTask, startBreak, toast, onActivityLog, submittingBreak]);
 
   const handleEndBreak = useCallback(async () => {
-    const res = await endBreak();
-    if (res.ok) {
-      toast({ variant: 'success', title: 'Back to Work', message: 'Work session resumed.' });
-      if (onActivityLog) onActivityLog('Resumed work session after break', 'progress');
-    } else {
-      toast({ variant: 'error', title: 'End Break Failed', message: res.error });
+    if (endingBreak) return;
+    setEndingBreak(true);
+    try {
+      const res = await endBreak();
+      if (res.ok) {
+        toast({ variant: 'success', title: 'Back to Work', message: 'Work session resumed.' });
+        if (onActivityLog) onActivityLog('Resumed work session after break', 'progress');
+      } else {
+        toast({ variant: 'error', title: 'End Break Failed', message: res.error });
+      }
+    } finally {
+      setEndingBreak(false);
     }
-  }, [endBreak, toast, onActivityLog]);
+  }, [endBreak, toast, onActivityLog, endingBreak]);
 
   const sampleBatches = [
     { value: 'Christ 3BBA Data Analytics B1', label: 'Christ 3BBA Data Analytics B1' },
@@ -705,7 +726,7 @@ export const AttendancePanel = memo(function AttendancePanel({
               <button
                 type="button"
                 className="kvj-btn"
-                disabled={loading}
+                disabled={loading || submittingBreak}
                 onClick={handleBreakClick}
                 style={{
                   background: 'var(--status-warning)',
@@ -715,7 +736,8 @@ export const AttendancePanel = memo(function AttendancePanel({
                   fontWeight: 700,
                   fontSize: 13.5,
                   borderRadius: 999,
-                  cursor: 'pointer',
+                  cursor: loading || submittingBreak ? 'not-allowed' : 'pointer',
+                  opacity: loading || submittingBreak ? 0.6 : 1,
                   boxShadow: '0 4px 12px rgba(245,158,11,0.25)',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -753,7 +775,7 @@ export const AttendancePanel = memo(function AttendancePanel({
             <button
               type="button"
               className="kvj-btn"
-              disabled={loading}
+              disabled={loading || endingBreak}
               onClick={handleEndBreak}
               style={{
                 background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
@@ -763,14 +785,15 @@ export const AttendancePanel = memo(function AttendancePanel({
                 fontWeight: 700,
                 fontSize: 13.5,
                 borderRadius: 10,
-                cursor: 'pointer',
+                cursor: loading || endingBreak ? 'not-allowed' : 'pointer',
+                opacity: loading || endingBreak ? 0.6 : 1,
                 boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
               }}
             >
-              ▶️ Resume Work Session
+              {endingBreak ? 'Resuming Work...' : '▶️ Resume Work Session'}
             </button>
           )}
 
@@ -1145,8 +1168,17 @@ export const AttendancePanel = memo(function AttendancePanel({
             <Button variant="secondary" type="button" onClick={() => setBreakModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" style={{ background: 'var(--status-warning)', color: 'white' }}>
-              ☕ Confirm &amp; Start Break
+            <Button
+              type="submit"
+              disabled={submittingBreak}
+              style={{
+                background: 'var(--status-warning)',
+                color: 'white',
+                opacity: submittingBreak ? 0.6 : 1,
+                cursor: submittingBreak ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {submittingBreak ? 'Starting Break...' : '☕ Confirm & Start Break'}
             </Button>
           </div>
         </form>

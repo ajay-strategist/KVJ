@@ -172,3 +172,74 @@ export function localDateTimeToUtcIso(dateStr?: string, timeStr?: string): strin
   return localDate.toISOString();
 }
 
+/**
+ * Calculates total break minutes by merging overlapping intervals to prevent double-counting.
+ * If multiple break records exist for the same period (e.g. from concurrent submissions),
+ * their union of time is computed rather than summing durations naively.
+ */
+export function calculateMergedBreakMinutes(
+  breaks?: Array<{ startTime?: string; start_time?: string; endTime?: string; end_time?: string }>,
+  options?: {
+    isCurrentlyOnBreak?: boolean;
+    maxGrossMinutes?: number;
+    referenceNow?: number;
+  }
+): number {
+  if (!breaks || breaks.length === 0) return 0;
+
+  const now = options?.referenceNow ?? Date.now();
+  const intervals: Array<[number, number]> = [];
+
+  for (const b of breaks) {
+    const s = b.startTime || (b as any).start_time;
+    const e = b.endTime || (b as any).end_time;
+    if (!s) continue;
+    const sMs = new Date(s).getTime();
+    if (isNaN(sMs)) continue;
+
+    let eMs = e ? new Date(e).getTime() : NaN;
+    if (isNaN(eMs) || !e) {
+      if (options?.isCurrentlyOnBreak) {
+        eMs = now;
+      } else {
+        continue;
+      }
+    }
+
+    if (eMs > sMs) {
+      intervals.push([sMs, eMs]);
+    }
+  }
+
+  if (intervals.length === 0) return 0;
+
+  // Sort by start time
+  intervals.sort((a, b) => a[0] - b[0]);
+
+  // Merge overlapping or adjacent intervals
+  const merged: Array<[number, number]> = [intervals[0]];
+  for (let i = 1; i < intervals.length; i++) {
+    const current = intervals[i];
+    const prev = merged[merged.length - 1];
+
+    if (current[0] <= prev[1]) {
+      prev[1] = Math.max(prev[1], current[1]);
+    } else {
+      merged.push(current);
+    }
+  }
+
+  // Sum merged intervals in ms
+  let totalMs = 0;
+  for (const [start, end] of merged) {
+    totalMs += (end - start);
+  }
+
+  let totalMins = Math.max(0, Math.round(totalMs / 60000));
+  if (options?.maxGrossMinutes !== undefined && options.maxGrossMinutes >= 0) {
+    totalMins = Math.min(totalMins, options.maxGrossMinutes);
+  }
+
+  return totalMins;
+}
+
