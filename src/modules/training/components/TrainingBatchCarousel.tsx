@@ -31,13 +31,14 @@ const ACTIONS: BatchAction[] = [
 
 /** Phase → tone map */
 const PHASE_TONE: Record<TrainingPhase, { bg: string; fg: string; border: string }> = {
-  Preparation:  { bg: 'var(--status-neutral-bg)',  fg: 'var(--status-neutral)',  border: 'var(--status-neutral-border)' },
+  'Not Started': { bg: 'var(--status-neutral-bg, rgba(148,163,184,0.14))', fg: 'var(--status-neutral, #64748b)', border: 'var(--status-neutral-border, rgba(148,163,184,0.3))' },
   Scheduled:    { bg: 'var(--status-info-bg)',     fg: 'var(--status-info)',     border: 'var(--status-info-border)' },
+  Preparation:  { bg: 'var(--status-neutral-bg)',  fg: 'var(--status-neutral)',  border: 'var(--status-neutral-border)' },
   'In Progress':{ bg: 'var(--status-progress-bg)', fg: 'var(--status-progress)', border: 'var(--status-progress-border)' },
   Assessment:   { bg: 'var(--status-warning-bg)',  fg: 'var(--status-warning)',  border: 'var(--status-warning-border)' },
   Feedback:     { bg: 'var(--status-info-bg)',     fg: 'var(--status-info)',     border: 'var(--status-info-border)' },
   Certificate:  { bg: 'var(--status-purple-bg)',   fg: 'var(--status-purple)',   border: 'var(--status-purple-border)' },
-  Completed:    { bg: 'var(--status-success-bg)',  fg: 'var(--status-success)',  border: 'var(--status-success-border)' },
+  Completed:    { bg: 'var(--status-success-bg, #ecfdf5)',  fg: 'var(--status-success, #059669)',  border: 'var(--status-success-border, #a7f3d0)' },
 };
 
 export interface BatchCardVM {
@@ -138,7 +139,7 @@ function saveChecklistDoneState(batchId: string, state: Record<string, boolean>)
 // ── Individual Batch Card Component (Side-by-Side with Right Checklist Panel) ──
 const BatchCard = memo(function BatchCard({
   vm, active, pinned, favourite,
-  onSelect, onTogglePin, onToggleFav, onAction, onEdit, onCopy, onDelete,
+  onSelect, onTogglePin, onToggleFav, onAction, onEdit, onCopy, onDelete, onToggleComplete,
 }: {
   vm: BatchCardVM;
   active: boolean;
@@ -151,8 +152,9 @@ const BatchCard = memo(function BatchCard({
   onEdit?: (id: string) => void;
   onCopy?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onToggleComplete?: (id: string) => void;
 }) {
-  const [showAllChecklist, setShowAllChecklist] = useState(true);
+  const [showAllChecklist, setShowAllChecklist] = useState(false);
   const [checklist, setChecklist] = useState(() => {
     const base = getBatchChecklist(vm.id, vm.courseChecklist);
     const saved = loadChecklistDoneState(vm.id);
@@ -378,34 +380,62 @@ const BatchCard = memo(function BatchCard({
               </button>
             ))}
           </div>
-          {onDelete && (
-            <button
-              type="button"
-              title="Delete this batch permanently"
-              onClick={(e) => { e.stopPropagation(); onDelete(vm.id); }}
-              style={{
-                fontSize: 12, fontWeight: 700,
-                padding: '6px 14px', borderRadius: 'var(--radius-sm, 8px)',
-                border: '1px solid var(--status-danger, var(--status-danger))',
-                background: 'transparent',
-                color: 'var(--status-danger, var(--status-danger))',
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                display: 'flex', alignItems: 'center', gap: 5,
-                fontFamily: 'var(--font-ui)',
-                transition: 'background 150ms, color 150ms',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'var(--status-danger, var(--status-danger))';
-                (e.currentTarget as HTMLButtonElement).style.color = '#fff';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                (e.currentTarget as HTMLButtonElement).style.color = 'var(--status-danger, var(--status-danger))';
-              }}
-            >
-              🗑️ Delete Batch
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {onToggleComplete && (
+              <button
+                type="button"
+                title={vm.phase === 'Completed' ? 'Reopen this batch (set to In Progress)' : 'Close this batch (mark as Completed)'}
+                onClick={(e) => { e.stopPropagation(); onToggleComplete(vm.id); }}
+                style={{
+                  fontSize: 12, fontWeight: 700,
+                  padding: '6px 14px', borderRadius: 'var(--radius-sm, 8px)',
+                  border: vm.phase === 'Completed'
+                    ? '1px solid var(--border)'
+                    : '1px solid var(--status-success, #10b981)',
+                  background: vm.phase === 'Completed'
+                    ? 'var(--bg-sunken)'
+                    : 'rgba(16, 185, 129, 0.1)',
+                  color: vm.phase === 'Completed'
+                    ? 'var(--text-secondary)'
+                    : 'var(--status-success, #059669)',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  fontFamily: 'var(--font-ui)',
+                  transition: 'all 150ms',
+                }}
+              >
+                {vm.phase === 'Completed' ? '↩️ Reopen Batch' : '✅ Close Batch'}
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                title="Delete this batch permanently"
+                onClick={(e) => { e.stopPropagation(); onDelete(vm.id); }}
+                style={{
+                  fontSize: 12, fontWeight: 700,
+                  padding: '6px 14px', borderRadius: 'var(--radius-sm, 8px)',
+                  border: '1px solid var(--status-danger, var(--status-danger))',
+                  background: 'transparent',
+                  color: 'var(--status-danger, var(--status-danger))',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  fontFamily: 'var(--font-ui)',
+                  transition: 'background 150ms, color 150ms',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--status-danger, var(--status-danger))';
+                  (e.currentTarget as HTMLButtonElement).style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--status-danger, var(--status-danger))';
+                }}
+              >
+                🗑️ Delete Batch
+              </button>
+            )}
+          </div>
         </div>
       </article>
 
@@ -430,7 +460,7 @@ const BatchCard = memo(function BatchCard({
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               CHECKLIST
             </span>
-            {checklist.length > 0 && (
+            {checklist.length > 0 && (showAllChecklist || doneCount > 0) && (
               <button
                 type="button"
                 onClick={() => setShowAllChecklist((s) => !s)}
@@ -454,6 +484,26 @@ const BatchCard = memo(function BatchCard({
             }}>
               <span style={{ fontSize: 20 }}>📋</span>
               <span>No checklist configured.<br />Add tasks in <strong>Course Catalog</strong>.</span>
+            </div>
+          ) : visibleChecklist.length === 0 ? (
+            <div style={{
+              fontSize: 12, color: 'var(--text-muted)',
+              textAlign: 'center', padding: '20px 8px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ fontSize: 22 }}>🎉</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>All checklist tasks completed!</span>
+              <button
+                type="button"
+                onClick={() => setShowAllChecklist(true)}
+                style={{
+                  background: 'none', border: 'none', color: 'var(--brand)',
+                  cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0, marginTop: 4,
+                  fontWeight: 600,
+                }}
+              >
+                View completed tasks ({doneCount})
+              </button>
             </div>
           ) : (
             <ul style={{
@@ -518,7 +568,7 @@ function InfoField({ label, value, mono }: { label: string; value: string; mono?
 const PREFS_KEY_STORE = 'kvj.batchCards.prefs.v3';
 
 export function TrainingBatchCarousel({
-  batches, courses, trainers, activeId, onSelect, onAction, onEdit, onCopy, onDelete,
+  batches, courses, trainers, activeId, onSelect, onAction, onEdit, onCopy, onDelete, onToggleComplete,
 }: {
   batches: Batch[];
   courses: Course[];
@@ -529,15 +579,21 @@ export function TrainingBatchCarousel({
   onEdit?: (batchId: string) => void;
   onCopy?: (batchId: string) => void;
   onDelete?: (batchId: string) => void;
+  onToggleComplete?: (batchId: string) => void;
 }) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [query, setQuery] = useState('');
   const [fCollege, setFCollege] = useState('all');
-  const [fPhase, setFPhase] = useState('all');
+  const [fPhase, setFPhase] = useState('active');
   const [fCourse, setFCourse] = useState('all');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'progress' | 'name'>('newest');
 
   const vms = useMemo(() => batches.map((b) => toCardVM(b, courses, trainers)), [batches, courses, trainers]);
+
+  const completedCount = useMemo(() => vms.filter((v) => v.phase === 'Completed').length, [vms]);
+  const notStartedCount = useMemo(() => vms.filter((v) => v.phase === 'Not Started' || v.phase === 'Scheduled' || v.phase === 'Preparation').length, [vms]);
+  const inProgressCount = useMemo(() => vms.filter((v) => v.phase === 'In Progress' || v.phase === 'Assessment' || v.phase === 'Feedback' || v.phase === 'Certificate').length, [vms]);
+  const activeCount = useMemo(() => vms.filter((v) => v.phase !== 'Completed').length, [vms]);
 
   const filterOptions = useMemo(() => ({
     colleges: [...new Set(vms.map((v) => v.college))].sort(),
@@ -550,8 +606,20 @@ export function TrainingBatchCarousel({
     const filtered = vms.filter((v) => {
       if (q && !`${v.trainingName} ${v.college} ${v.batchNo} ${v.course} ${v.trainer} ${v.coordinator}`.toLowerCase().includes(q)) return false;
       if (fCollege !== 'all' && v.college !== fCollege) return false;
-      if (fPhase !== 'all' && v.phase !== fPhase) return false;
       if (fCourse !== 'all' && v.course !== fCourse) return false;
+
+      if (fPhase === 'active') {
+        // Default: show only In Progress and Not Started batches (hide Completed)
+        if (v.phase === 'Completed') return false;
+      } else if (fPhase === 'Not Started') {
+        if (v.phase !== 'Not Started' && v.phase !== 'Scheduled' && v.phase !== 'Preparation') return false;
+      } else if (fPhase === 'In Progress') {
+        if (v.phase !== 'In Progress' && v.phase !== 'Assessment' && v.phase !== 'Feedback' && v.phase !== 'Certificate') return false;
+      } else if (fPhase === 'Completed') {
+        if (v.phase !== 'Completed') return false;
+      } else if (fPhase !== 'all') {
+        if (v.phase !== fPhase) return false;
+      }
       return true;
     });
 
@@ -610,8 +678,14 @@ export function TrainingBatchCarousel({
           {filterOptions.courses.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select aria-label="Filter by status" value={fPhase} onChange={(e) => setFPhase(e.target.value)} style={selectStyle}>
-          <option value="all">All Status</option>
-          {filterOptions.phases.map((p) => <option key={p} value={p}>{p}</option>)}
+          <option value="active">Active (In Progress & Not Started) ({activeCount})</option>
+          <option value="all">All Batches ({vms.length})</option>
+          <option value="In Progress">In Progress ({inProgressCount})</option>
+          <option value="Not Started">Not Started ({notStartedCount})</option>
+          <option value="Completed">Completed ({completedCount})</option>
+          {filterOptions.phases
+            .filter((p) => !['In Progress', 'Not Started', 'Completed'].includes(p))
+            .map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <select aria-label="Sort batches" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} style={selectStyle}>
           <option value="newest">Newest</option>
@@ -624,6 +698,7 @@ export function TrainingBatchCarousel({
       {/* ── Batch count summary ── */}
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
         Showing {visibleList.length} of {vms.length} batch{vms.length === 1 ? '' : 'es'}
+        {fPhase === 'active' && completedCount > 0 && ` (${completedCount} completed hidden)`}
         {prefs.pinned.length > 0 && ` · ${prefs.pinned.length} pinned`}
         {prefs.favourites.length > 0 && ` · ${prefs.favourites.length} starred`}
       </div>
@@ -638,7 +713,7 @@ export function TrainingBatchCarousel({
           <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>No batches found</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>
-            {query ? 'Try adjusting your search or filters.' : 'No training batches have been created yet.'}
+            {query ? 'Try adjusting your search or filters.' : 'No training batches match the selected filter.'}
           </div>
         </div>
       ) : (
@@ -657,6 +732,7 @@ export function TrainingBatchCarousel({
               onEdit={onEdit}
               onCopy={onCopy}
               onDelete={onDelete}
+              onToggleComplete={onToggleComplete}
             />
           ))}
         </div>

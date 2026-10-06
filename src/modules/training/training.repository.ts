@@ -49,18 +49,25 @@ export interface Course extends Entity {
   checklist?: string[];
 }
 
-/** Lifecycle phase of a training batch, shown as a coloured badge. */
 export type TrainingPhase =
-  | 'Preparation'
-  | 'Scheduled'
+  | 'Not Started'
   | 'In Progress'
+  | 'Completed'
+  | 'Scheduled'
+  | 'Preparation'
   | 'Assessment'
   | 'Feedback'
-  | 'Certificate'
-  | 'Completed';
+  | 'Certificate';
 
 export const TRAINING_PHASES: TrainingPhase[] = [
-  'Preparation', 'Scheduled', 'In Progress', 'Assessment', 'Feedback', 'Certificate', 'Completed',
+  'Not Started',
+  'In Progress',
+  'Completed',
+  'Scheduled',
+  'Preparation',
+  'Assessment',
+  'Feedback',
+  'Certificate',
 ];
 
 export interface Batch extends Entity {

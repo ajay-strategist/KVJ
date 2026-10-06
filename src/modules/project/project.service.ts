@@ -247,8 +247,16 @@ export class ProjectService implements IProjectService {
         taskCode = `${prjPrefix}-T${Math.floor(100 + Math.random() * 900)}`;
       }
 
+      const hours = data.proposedHours !== undefined && data.proposedHours !== null && (data.proposedHours as any) !== ''
+        ? Number(data.proposedHours)
+        : data.estimatedHours !== undefined && data.estimatedHours !== null && (data.estimatedHours as any) !== ''
+        ? Number(data.estimatedHours)
+        : undefined;
+
       const payload: Partial<Task> = {
         ...data,
+        proposedHours: hours,
+        estimatedHours: hours,
         code: taskCode,
         projectId,
         supervisorId,
@@ -279,6 +287,19 @@ export class ProjectService implements IProjectService {
       const roleUpper = (actor.role || '').toUpperCase();
       const isCeo = roleUpper === 'CEO';
       const existing = await this.taskRepo.findById(taskId);
+
+      if (patch.proposedHours !== undefined || patch.estimatedHours !== undefined) {
+        const patchHours = patch.proposedHours !== undefined && patch.proposedHours !== null && (patch.proposedHours as any) !== ''
+          ? Number(patch.proposedHours)
+          : patch.estimatedHours !== undefined && patch.estimatedHours !== null && (patch.estimatedHours as any) !== ''
+          ? Number(patch.estimatedHours)
+          : undefined;
+        patch = {
+          ...patch,
+          proposedHours: patchHours,
+          estimatedHours: patchHours,
+        };
+      }
 
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
         // Self-re-assignment (actor assigns to themselves) never needs approval

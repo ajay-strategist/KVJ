@@ -515,6 +515,9 @@ export function ProjectList({
       else if (t.status === 'in_progress' || (t.status as any) === 'In Progress') status = 'In Progress';
       else if (t.status === 'review' || (t.status as any) === 'Under Review') status = 'Under Review';
 
+      const rawProposed = t.proposedHours ?? t.estimatedHours ?? (t as any).proposed_hours ?? (t as any).estimated_hours;
+      const proposedHours = rawProposed !== undefined && rawProposed !== null && rawProposed !== '' ? Number(rawProposed) : 0;
+
       return {
         id: t.id,
         name: t.title,
@@ -523,7 +526,7 @@ export function ProjectList({
         status,
         rawStatus: t.status || 'todo',
         hoursLogged: Math.round(hoursLogged * 10) / 10,
-        proposedHours: t.proposedHours || t.estimatedHours || 0,
+        proposedHours,
         dueDate: t.dueDate || '—',
       };
     });
@@ -614,12 +617,15 @@ export function ProjectList({
     const existingCount = tasks.filter((t: any) => t.projectId === selectedProject.id).length;
     const taskCode = `${selectedProject.code}-T${String(existingCount + 1).padStart(2, '0')}`;
 
+    const estHours = values.proposedHours ? Number(values.proposedHours) : undefined;
+
     const res = await createTask({
       projectId: selectedProject.id as UUID,
       code: taskCode,
       title: values.title as string,
       description: (values.description as string) || undefined,
-      proposedHours: values.proposedHours ? Number(values.proposedHours) : undefined,
+      proposedHours: estHours,
+      estimatedHours: estHours,
       assigneeId,
       supervisorId,
       dueDate: (values.dueDate as string) || undefined,
@@ -1529,8 +1535,59 @@ export function ProjectList({
                                 <option value="done">Completed</option>
                               </select>
                             </td>
-                            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#8b5cf6' }}>
-                              {t.proposedHours || t.estimatedHours ? `${t.proposedHours || t.estimatedHours}` : '—'}
+                            <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                key={`${t.id}-${t.proposedHours}`}
+                                defaultValue={t.proposedHours > 0 ? t.proposedHours : ''}
+                                placeholder="—"
+                                title="Click to edit proposed hours"
+                                onBlur={async (e) => {
+                                  const val = e.target.value.trim() === '' ? undefined : Number(e.target.value);
+                                  if (val !== (t.proposedHours > 0 ? t.proposedHours : undefined)) {
+                                    const res = await updateTask(t.id, { proposedHours: val, estimatedHours: val });
+                                    if (res.ok) {
+                                      toast({ variant: 'success', title: 'Proposed Time Updated', message: val ? `Set to ${val} hrs` : 'Cleared' });
+                                    }
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                                style={{
+                                  width: 64,
+                                  textAlign: 'right',
+                                  fontWeight: 700,
+                                  color: '#8b5cf6',
+                                  background: 'transparent',
+                                  border: '1px solid transparent',
+                                  borderRadius: 6,
+                                  padding: '3px 6px',
+                                  fontSize: 12,
+                                  outline: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--border)';
+                                  (e.currentTarget as HTMLInputElement).style.background = 'var(--bg-sunken)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (document.activeElement !== e.currentTarget) {
+                                    (e.currentTarget as HTMLInputElement).style.borderColor = 'transparent';
+                                    (e.currentTarget as HTMLInputElement).style.background = 'transparent';
+                                  }
+                                }}
+                                onFocus={(e) => {
+                                  (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--brand)';
+                                  (e.currentTarget as HTMLInputElement).style.background = 'var(--bg-card)';
+                                  (e.currentTarget as HTMLInputElement).select();
+                                }}
+                              />
                             </td>
                             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged}</td>
                             <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{formatDisplayDate(t.dueDate)}</td>

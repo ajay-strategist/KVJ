@@ -21,6 +21,7 @@ export interface BatchHeaderCardProps {
   onEditBatch: (batch: Batch) => void;
   onCopyBatch: (batch: Batch) => void;
   onDeleteBatch?: (batchId: string) => void;
+  onToggleCompleteBatch?: (batchId: string) => void;
 }
 
 export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
@@ -39,6 +40,7 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
   onEditBatch,
   onCopyBatch,
   onDeleteBatch,
+  onToggleCompleteBatch,
 }) => {
   return (
     <div style={{ marginBottom: 20 }}>
@@ -100,6 +102,7 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
           if (b) onCopyBatch(b);
         }}
         onDelete={onDeleteBatch}
+        onToggleComplete={onToggleCompleteBatch}
       />
     </div>
   );

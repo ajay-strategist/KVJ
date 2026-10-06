@@ -1,5 +1,5 @@
 import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
-import type { UUID } from '../../core/types';
+import type { UUID, Actor } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 import type {
   Client, IClientRepository,
@@ -73,6 +73,59 @@ export class SupabaseResourceAllocationRepository extends SupabaseRepository<Res
 export class SupabaseTaskRepository extends SupabaseRepository<Task> implements ITaskRepository {
   constructor() { super('flwdsk_tasks'); }
 
+  private mapTask(row: any): Task {
+    const t = toCamelCaseObject(row) as Task;
+    const rawHours = t.estimatedHours ?? (t as any).proposedHours ?? (row as any)?.estimated_hours ?? (row as any)?.proposed_hours;
+    const hoursNum = rawHours !== undefined && rawHours !== null && rawHours !== '' ? Number(rawHours) : undefined;
+    return {
+      ...t,
+      estimatedHours: hoursNum,
+      proposedHours: hoursNum,
+    };
+  }
+
+  override async create(data: Partial<Task>, actor: Actor): Promise<Task> {
+    const hours = data.proposedHours ?? data.estimatedHours;
+    const hoursNum = hours !== undefined && hours !== null && hours !== '' ? Number(hours) : undefined;
+    const normalized: Partial<Task> = {
+      ...data,
+      estimatedHours: hoursNum,
+      proposedHours: hoursNum,
+    };
+    const res = await super.create(normalized, actor);
+    return this.mapTask(res);
+  }
+
+  override async update(id: UUID, patch: Partial<Task>, actor: Actor): Promise<Task> {
+    const hours = patch.proposedHours ?? patch.estimatedHours;
+    const hoursNum = hours !== undefined && hours !== null && hours !== '' ? Number(hours) : undefined;
+    const normalized: Partial<Task> = {
+      ...patch,
+      ...(hours !== undefined ? {
+        estimatedHours: hoursNum,
+        proposedHours: hoursNum,
+      } : {}),
+    };
+    const res = await super.update(id, normalized, actor);
+    return this.mapTask(res);
+  }
+
+  override async findById(id: UUID): Promise<Task | null> {
+    const res = await super.findById(id);
+    return res ? this.mapTask(res) : null;
+  }
+
+  override async findMany(params?: any): Promise<any> {
+    const res = await super.findMany(params);
+    if (res && Array.isArray(res.data)) {
+      return {
+        ...res,
+        data: res.data.map((r: any) => this.mapTask(r)),
+      };
+    }
+    return res;
+  }
+
   async findByProject(projectId: UUID): Promise<Task[]> {
     const { data, error } = await supabase
       .from(this.tableName)
@@ -84,7 +137,7 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
       console.warn(`Supabase findByProject warning on ${this.tableName}:`, error.message);
       return [];
     }
-    return (data ?? []).map((row) => toCamelCaseObject(row) as Task);
+    return (data ?? []).map((row) => this.mapTask(row));
   }
 }
 

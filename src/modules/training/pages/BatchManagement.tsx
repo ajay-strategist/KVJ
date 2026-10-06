@@ -613,6 +613,7 @@ export function BatchManagement() {
     coordinatorEmail: '',
     startDate: '',
     endDate: '',
+    phase: 'Not Started' as TrainingPhase,
   });
 
   const handleOpenCreateBatch = () => {
@@ -631,6 +632,7 @@ export function BatchManagement() {
       coordinatorEmail: '',
       startDate: '',
       endDate: '',
+      phase: 'Not Started',
     });
     setCreateBatchModalOpen(true);
   };
@@ -667,7 +669,7 @@ export function BatchManagement() {
       academicYear: newBatchForm.academicYear.trim() || '2026-2027',
       batchNo,
       capacity: newBatchForm.capacity ? Number(newBatchForm.capacity) : 0,
-      phase: 'Scheduled',
+      phase: newBatchForm.phase || 'Not Started',
     });
     if (res.ok) {
       toast({ variant: 'success', title: 'Batch Created', message: 'New batch created successfully.' });
@@ -747,6 +749,31 @@ export function BatchManagement() {
       refreshBatches();
     } else {
       toast({ variant: 'error', title: 'Update Failed', message: res.error });
+    }
+  };
+
+  const handleToggleCompleteBatch = async (batchId: string) => {
+    const b = safeBatches.find((x) => x.id === batchId) || batches.find((x) => x.id === batchId);
+    if (!b) return;
+    const isCompleted = b.phase === 'Completed';
+    const nextPhase: TrainingPhase = isCompleted ? 'In Progress' : 'Completed';
+
+    const res = await updateBatch(batchId, { phase: nextPhase });
+    if (res.ok) {
+      toast({
+        variant: 'success',
+        title: isCompleted ? 'Batch Reopened' : 'Batch Closed',
+        message: isCompleted
+          ? 'Batch status changed back to In Progress.'
+          : 'Batch successfully marked as Completed.',
+      });
+      refreshBatches();
+    } else {
+      toast({
+        variant: 'error',
+        title: 'Status Update Failed',
+        message: res.error,
+      });
     }
   };
 
@@ -910,6 +937,7 @@ export function BatchManagement() {
             refreshBatches();
           }
         } : undefined}
+        onToggleCompleteBatch={handleToggleCompleteBatch}
       />
 
       {/* ── Quick Action Bar & Summary Stats ── */}
@@ -1216,6 +1244,20 @@ export function BatchManagement() {
                   style={{ width: '100%' }}
                 />
               </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Status</label>
+              <select
+                className="kvj-select"
+                value={newBatchForm.phase}
+                onChange={(e) => setNewBatchForm({ ...newBatchForm, phase: e.target.value as TrainingPhase })}
+                style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
+              >
+                {TRAINING_PHASES.map((ph) => (
+                  <option key={ph} value={ph}>{ph}</option>
+                ))}
+              </select>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
