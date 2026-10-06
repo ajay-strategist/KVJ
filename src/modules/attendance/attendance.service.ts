@@ -197,9 +197,6 @@ export class AttendanceService implements IAttendanceService {
 
       if (hasOpenBreak || (lastBreak && nowMs - lastBreakStartMs < 4000)) {
         console.warn('startBreak: duplicate break request ignored for employee', employeeId);
-        if (record.status !== 'on_break') {
-          await this.repo.update(record.id, { status: 'on_break', updatedAt: ts }, { id: employeeId, role: 'Employee' });
-        }
         return Ok(record);
       }
 
