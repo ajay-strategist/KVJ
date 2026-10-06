@@ -70,13 +70,19 @@ export class SupabaseResourceAllocationRepository extends SupabaseRepository<Res
   }
 }
 
+function parseHours(val: unknown): number | undefined {
+  if (val === undefined || val === null || val === '') return undefined;
+  const num = Number(val);
+  return Number.isFinite(num) ? num : undefined;
+}
+
 export class SupabaseTaskRepository extends SupabaseRepository<Task> implements ITaskRepository {
   constructor() { super('flwdsk_tasks'); }
 
   private mapTask(row: any): Task {
     const t = toCamelCaseObject(row) as Task;
     const rawHours = t.estimatedHours ?? (t as any).proposedHours ?? (row as any)?.estimated_hours ?? (row as any)?.proposed_hours;
-    const hoursNum = rawHours !== undefined && rawHours !== null && rawHours !== '' ? Number(rawHours) : undefined;
+    const hoursNum = parseHours(rawHours);
     return {
       ...t,
       estimatedHours: hoursNum,
@@ -85,8 +91,7 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
   }
 
   override async create(data: Partial<Task>, actor: Actor): Promise<Task> {
-    const hours = data.proposedHours ?? data.estimatedHours;
-    const hoursNum = hours !== undefined && hours !== null && (hours as any) !== '' ? Number(hours) : undefined;
+    const hoursNum = parseHours(data.proposedHours ?? data.estimatedHours);
     const normalized: Partial<Task> = {
       ...data,
       estimatedHours: hoursNum,
@@ -97,11 +102,10 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
   }
 
   override async update(id: UUID, patch: Partial<Task>, actor: Actor): Promise<Task> {
-    const hours = patch.proposedHours ?? patch.estimatedHours;
-    const hoursNum = hours !== undefined && hours !== null && (hours as any) !== '' ? Number(hours) : undefined;
+    const hoursNum = parseHours(patch.proposedHours ?? patch.estimatedHours);
     const normalized: Partial<Task> = {
       ...patch,
-      ...(hours !== undefined ? {
+      ...((patch.proposedHours !== undefined || patch.estimatedHours !== undefined) ? {
         estimatedHours: hoursNum,
         proposedHours: hoursNum,
       } : {}),
