@@ -86,7 +86,7 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
 
   override async create(data: Partial<Task>, actor: Actor): Promise<Task> {
     const hours = data.proposedHours ?? data.estimatedHours;
-    const hoursNum = hours !== undefined && hours !== null && hours !== '' ? Number(hours) : undefined;
+    const hoursNum = hours !== undefined && hours !== null && (hours as any) !== '' ? Number(hours) : undefined;
     const normalized: Partial<Task> = {
       ...data,
       estimatedHours: hoursNum,
@@ -98,7 +98,7 @@ export class SupabaseTaskRepository extends SupabaseRepository<Task> implements 
 
   override async update(id: UUID, patch: Partial<Task>, actor: Actor): Promise<Task> {
     const hours = patch.proposedHours ?? patch.estimatedHours;
-    const hoursNum = hours !== undefined && hours !== null && hours !== '' ? Number(hours) : undefined;
+    const hoursNum = hours !== undefined && hours !== null && (hours as any) !== '' ? Number(hours) : undefined;
     const normalized: Partial<Task> = {
       ...patch,
       ...(hours !== undefined ? {

@@ -56,11 +56,31 @@ export interface BatchCardVM {
   coordinator: string;
   startDate: string;
   endDate: string;
+  createdAt: string;
   capacity?: number;
   completedTasks: number;
   totalTasks: number;
   progress: number; // 0–100
   courseChecklist?: string[];
+}
+
+function parseDateMs(d?: string | null): number {
+  if (!d || d === '—' || String(d).trim() === '') return 0;
+  const ms = new Date(d).getTime();
+  return isNaN(ms) ? 0 : ms;
+}
+
+function getBatchDateMs(vm: BatchCardVM): number {
+  const cMs = parseDateMs(vm.createdAt);
+  if (cMs > 0) return cMs;
+  return parseDateMs(vm.startDate);
+}
+
+function compareDates(dateA: number, dateB: number, dir: 'asc' | 'desc'): number {
+  if (dateA === 0 && dateB === 0) return 0;
+  if (dateA === 0) return 1;
+  if (dateB === 0) return -1;
+  return dir === 'desc' ? dateB - dateA : dateA - dateB;
 }
 
 export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): BatchCardVM {
@@ -95,6 +115,7 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
     coordinator:   b.coordinator || '—',
     startDate:     b.startDate || (b as any).start_date || '—',
     endDate:       b.endDate || (b as any).end_date || '—',
+    createdAt:     b.createdAt || (b as any).created_at || (b.startDate && b.startDate !== '—' ? b.startDate : '') || '',
     completedTasks: done,
     totalTasks:     total,
     progress:       total > 0 ? Math.round((done / total) * 100) : 0,
@@ -625,10 +646,24 @@ export function TrainingBatchCarousel({
 
     const sorted = [...filtered].sort((a, b) => {
       switch (sort) {
-        case 'oldest':   return a.startDate.localeCompare(b.startDate);
-        case 'progress': return b.progress - a.progress;
-        case 'name':     return a.trainingName.localeCompare(b.trainingName);
-        default:         return b.startDate.localeCompare(a.startDate);
+        case 'oldest': {
+          const diff = compareDates(getBatchDateMs(a), getBatchDateMs(b), 'asc');
+          if (diff !== 0) return diff;
+          return (a.batchCode || a.trainingName).localeCompare(b.batchCode || b.trainingName);
+        }
+        case 'progress': {
+          const diff = b.progress - a.progress;
+          if (diff !== 0) return diff;
+          return compareDates(getBatchDateMs(a), getBatchDateMs(b), 'desc');
+        }
+        case 'name':
+          return (a.batchCode || a.trainingName).localeCompare(b.batchCode || b.trainingName);
+        case 'newest':
+        default: {
+          const diff = compareDates(getBatchDateMs(a), getBatchDateMs(b), 'desc');
+          if (diff !== 0) return diff;
+          return (a.batchCode || a.trainingName).localeCompare(b.batchCode || b.trainingName);
+        }
       }
     });
 
