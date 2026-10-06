@@ -45,6 +45,18 @@ function safeFormatTime(raw?: string): string {
   return formatDisplayTime(raw);
 }
 
+function parseDisplayTimeToMinutes(tStr?: string): number | null {
+  if (!tStr || tStr === '—') return null;
+  const match = tStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return null;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const ampm = match[3]?.toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+}
+
 function formatCleanNote(rawNote?: string, workType?: string): string {
   if (!rawNote) return '—';
   const str = rawNote.trim();
@@ -1645,12 +1657,20 @@ export function AttendanceLogPage() {
           const classOrWorkInfo = resolveClassOrWorkValue(workType, primarySession?.notes, (record as any).notes, batchId);
 
           let fallbackMins = 0;
-          const cInTime = record.firstClockIn || primarySession?.clockIn;
-          const cOutTime = record.lastClockOut || primarySession?.clockOut;
-          if (cInTime) {
-            const endMs = cOutTime ? new Date(cOutTime).getTime() : Date.now();
-            const grossMs = Math.max(0, endMs - new Date(cInTime).getTime());
-            fallbackMins = Math.max(0, Math.round(grossMs / 60000));
+          const sTimeStr = safeFormatTime(record.firstClockIn || primarySession?.clockIn);
+          const eTimeStr = safeFormatTime(record.lastClockOut || primarySession?.clockOut);
+          const sMinVal = parseDisplayTimeToMinutes(sTimeStr);
+          const eMinVal = parseDisplayTimeToMinutes(eTimeStr);
+          if (sMinVal !== null && eMinVal !== null && eMinVal >= sMinVal) {
+            fallbackMins = eMinVal - sMinVal;
+          } else {
+            const cInTime = record.firstClockIn || primarySession?.clockIn;
+            const cOutTime = record.lastClockOut || primarySession?.clockOut;
+            if (cInTime) {
+              const endMs = cOutTime ? new Date(cOutTime).getTime() : Date.now();
+              const grossMs = Math.max(0, endMs - new Date(cInTime).getTime());
+              fallbackMins = Math.max(0, Math.round(grossMs / 60000));
+            }
           }
           const fallbackDur = `${Math.floor(fallbackMins / 60)}h ${fallbackMins % 60}m`;
 
@@ -1664,8 +1684,8 @@ export function AttendanceLogPage() {
               type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
               isTraining: isLeave ? false : classOrWorkInfo.isTraining,
               mode: isHoliday ? 'Holiday' : isLeave ? leaveModeLabel : (workType === 'Training' ? 'Training' : isPrimaryRemote ? 'Remote' : 'Offline'),
-              start: isLeave ? '—' : safeFormatTime(record.firstClockIn || primarySession?.clockIn),
-              end: isLeave ? '—' : safeFormatTime(record.lastClockOut || primarySession?.clockOut),
+              start: isLeave ? '—' : sTimeStr,
+              end: isLeave ? '—' : eTimeStr,
               duration: isLeave ? '0h 0m' : fallbackDur,
               expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
               note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : formatCleanNote(primarySession?.notes || (record as any).notes, workType),
@@ -1675,8 +1695,15 @@ export function AttendanceLogPage() {
           } else {
             // EMIT SEPARATE ROW FOR EACH VALID SESSION
             uniqueSessions.forEach((s, idx) => {
+              const sStartStr = safeFormatTime(s.clockIn);
+              const sEndStr = safeFormatTime(s.clockOut);
+              const sStartMins = parseDisplayTimeToMinutes(sStartStr);
+              const sEndMins = parseDisplayTimeToMinutes(sEndStr);
+
               let sGrossMins = 0;
-              if (s.clockIn) {
+              if (sStartMins !== null && sEndMins !== null && sEndMins >= sStartMins) {
+                sGrossMins = sEndMins - sStartMins;
+              } else if (s.clockIn) {
                 const t1 = new Date(s.clockIn).getTime();
                 const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
                 if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
@@ -1706,8 +1733,8 @@ export function AttendanceLogPage() {
                 sBreakMins = Math.min(uniqueSessions.length === 1 || idx === 0 ? breakMins : 0, sGrossMins);
               }
 
-              const sMins = Math.max(0, sGrossMins - sBreakMins);
-              const sDuration = `${Math.floor(sMins / 60)}h ${sMins % 60}m`;
+              // Duration in the attendance table is Clock out - Clock in (gross elapsed session time)
+              const sDuration = `${Math.floor(sGrossMins / 60)}h ${sGrossMins % 60}m`;
               const sBreakTime = `${Math.floor(sBreakMins / 60)}h ${sBreakMins % 60}m`;
 
               const sWorkType = s.workType || 'Office';
@@ -1726,16 +1753,16 @@ export function AttendanceLogPage() {
                 type: sClass.value,
                 isTraining: sClass.isTraining,
                 mode: sWorkType === 'Training' ? 'Training' : (isSessionRemote ? 'Remote' : 'Offline'),
-              start: safeFormatTime(s.clockIn),
-              end: safeFormatTime(s.clockOut),
-              duration: sDuration,
-              expenses: idx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-              note: formatCleanNote(s.notes || (record as any).notes, sWorkType),
-              break: sBreakTime,
-              tasks: s.notes ? [s.notes] : [],
+                start: sStartStr,
+                end: sEndStr,
+                duration: sDuration,
+                expenses: idx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+                note: formatCleanNote(s.notes || (record as any).notes, sWorkType),
+                break: sBreakTime,
+                tasks: s.notes ? [s.notes] : [],
+              });
             });
-          });
-        }
+          }
       } else {
         const isSunday = d.getDay() === 0;
         const isHoliday = !!decHoliday || isSunday;
