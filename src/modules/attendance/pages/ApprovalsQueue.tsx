@@ -19,6 +19,8 @@ import { formatDateTime, formatDisplayDate, localDateTimeToUtcIso } from '../../
 import { supabase } from '../../../shared/integration/supabase';
 import { ForceClockOutModal } from '../forms/ForceClockOutModal';
 import { useBreakpoint } from '../../../shared/hooks/responsive';
+import { useTaskSessions, getSessionNotesMap } from '../../project/hooks/useTaskSessions';
+import { TaskWorklogUpdatesDrawer } from '../../project/components/TaskWorklogUpdatesDrawer';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
@@ -40,7 +42,45 @@ export function ApprovalsQueue() {
   
   const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
   const [selectedCorrection, setSelectedCorrection] = useState<any | null>(null);
+  const [selectedReviewTask, setSelectedReviewTask] = useState<any | null>(null);
   const [notes, setNotes] = useState('');
+  
+  // Worklog updates from task sessions
+  const { listSessions } = useTaskSessions();
+  const [taskSessions, setTaskSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    listSessions().then((sessions) => {
+      if (active && Array.isArray(sessions)) setTaskSessions(sessions);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [listSessions]);
+
+  const getTaskUpdates = useCallback((taskId: string) => {
+    const sessionNotesMap = getSessionNotesMap();
+    const sessions = (taskSessions || []).filter(
+      (s: any) => s.taskId === taskId || s.task_id === taskId
+    );
+    sessions.sort((a: any, b: any) => {
+      const tA = new Date(a.startTime || a.start_time || 0).getTime();
+      const tB = new Date(b.startTime || b.start_time || 0).getTime();
+      return tB - tA;
+    });
+    return sessions.map((s: any) => {
+      const note = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s as any).description || '';
+      return {
+        ...s,
+        resolvedNote: note,
+      };
+    });
+  }, [taskSessions]);
+
+  const getLatestTaskUpdate = useCallback((taskId: string) => {
+    const updates = getTaskUpdates(taskId);
+    const withNote = updates.find((u) => Boolean(u.resolvedNote));
+    return withNote ? withNote.resolvedNote : '';
+  }, [getTaskUpdates]);
   
   const userRole = user?.role || 'EMPLOYEE';
   const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole.toUpperCase());
@@ -347,9 +387,10 @@ export function ApprovalsQueue() {
   const handleApproveTaskInline = async (task: any) => {
     const proj = projects.find((p) => p.id === task.projectId);
     const projTitle = proj ? proj.title : 'Office Task';
+    const latestNote = getLatestTaskUpdate(task.id);
     const ok = await confirm({
       title: 'Evaluate Task Completion?',
-      message: `Evaluate and approve completed work for task "${projTitle}: ${task.title}"?`,
+      message: `Evaluate and approve completed work for task "${projTitle}: ${task.title}"?${latestNote ? `\n\n📝 Assignee Update: "${latestNote}"` : ''}`,
     });
     if (!ok) return;
 
@@ -511,6 +552,52 @@ export function ApprovalsQueue() {
       },
     },
     {
+      key: 'update',
+      header: 'Assignee Update',
+      render: (r) => {
+        const latest = getLatestTaskUpdate(r.id);
+        const updates = getTaskUpdates(r.id);
+        const hasNote = Boolean(latest && latest.trim());
+        return (
+          <div style={{ maxWidth: 220 }}>
+            {hasNote ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedReviewTask(r);
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 8px',
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  maxWidth: 200,
+                  textAlign: 'left',
+                }}
+                title={`Click to view all worklog updates (${updates.length} session${updates.length > 1 ? 's' : ''}): ${latest}`}
+              >
+                <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  📝 {latest}
+                </span>
+                {updates.length > 1 && (
+                  <span style={{ fontSize: 10, background: 'var(--brand)', color: '#fff', borderRadius: 10, padding: '1px 5px', fontWeight: 700 }}>
+                    {updates.length}
+                  </span>
+                )}
+              </button>
+            ) : (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: 'requestedBy',
       header: 'Requested By',
       render: (r) => {
@@ -546,8 +633,19 @@ export function ApprovalsQueue() {
       key: 'actions',
       header: 'Action',
       render: (r) => {
-        if (!canApprove) {
-          return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required (Admin/CEO/Manager)</span>;
+        const proj = projects.find((p) => p.id === r.projectId);
+        const isTaskSupervisor = r.supervisorId === user?.id || (proj && (proj as any).supervisorId === user?.id);
+        const canApproveThis = canApprove || isTaskSupervisor;
+
+        if (!canApproveThis) {
+          return (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+              <Button size="sm" variant="secondary" onClick={() => setSelectedReviewTask(r)}>
+                View Updates
+              </Button>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>
+            </div>
+          );
         }
         if (r.approvalStatus === 'pending_assignment_approval') {
           return (
@@ -557,7 +655,10 @@ export function ApprovalsQueue() {
           );
         }
         return (
-          <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="secondary" onClick={() => setSelectedReviewTask(r)}>
+              📋 Updates
+            </Button>
             <Button size="sm" variant="evaluate" onClick={() => handleApproveTaskInline(r)}>Evaluate</Button>
             <Button size="sm" variant="danger" onClick={() => handleReworkTaskInline(r)}>Rework</Button>
           </div>
@@ -849,6 +950,7 @@ export function ApprovalsQueue() {
             columns={taskApprovalColumns}
             rows={filteredTaskApprovals}
             rowKey={(r) => r.id}
+            onRowClick={(r) => setSelectedReviewTask(r)}
           />
         </div>
       ),
@@ -1180,6 +1282,38 @@ export function ApprovalsQueue() {
         onSuccess={() => {
           setSelectedUnclosedRecord(null);
           fetchUnclosedSessions();
+        }}
+      />
+
+      {/* Task Worklog Updates & Review Drawer */}
+      <TaskWorklogUpdatesDrawer
+        open={!!selectedReviewTask}
+        onClose={() => setSelectedReviewTask(null)}
+        task={selectedReviewTask}
+        projectName={projects.find((p) => p.id === selectedReviewTask?.projectId)?.title}
+        assigneeName={empName(selectedReviewTask?.assigneeId)}
+        supervisorName={getSupervisorName(selectedReviewTask)}
+        workSessions={taskSessions}
+        canApprove={Boolean(selectedReviewTask && (canApprove || selectedReviewTask.supervisorId === user?.id || (projects.find(p => p.id === selectedReviewTask.projectId) as any)?.supervisorId === user?.id))}
+        onApprove={async (t) => {
+          const res = await approveTaskSubmission(t.id);
+          if (res.ok) {
+            toast({ variant: 'success', title: 'Task Evaluated & Approved' });
+            setSelectedReviewTask(null);
+            refreshProjects();
+          } else {
+            toast({ variant: 'error', title: 'Evaluation Failed', message: res.error });
+          }
+        }}
+        onRequestRework={async (t, notes) => {
+          const res = await requestRework(t.id, notes);
+          if (res.ok) {
+            toast({ variant: 'warning', title: 'Rework Requested', message: 'Task sent back for rework.' });
+            setSelectedReviewTask(null);
+            refreshProjects();
+          } else {
+            toast({ variant: 'error', title: 'Rework Failed', message: res.error });
+          }
         }}
       />
     </AppShell>

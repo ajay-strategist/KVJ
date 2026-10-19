@@ -147,10 +147,11 @@ export function TaskWorklogView({
         const actualSec = stored?.secondsToday || Math.round((t.actualHours || 0) * 3600);
         if (actualSec <= 0) return;
 
-        // Scope: employees only see their own sessions
-        if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
-
         const proj = (projects || []).find((p: any) => p.id === t.projectId);
+        const isSupervising = isSupervisor || t.supervisorId === user?.id || (proj && (proj as any).supervisorId === user?.id);
+
+        // Scope: employees only see their own sessions unless supervising
+        if (!isManagement && !isSupervising && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
         const now = Date.now();
         const isActive = stored?.active;
         const startMs = stored?.lastStartTime
@@ -197,10 +198,9 @@ export function TaskWorklogView({
 
       // Also pick up in_progress tasks not yet in timerStates
       (tasks || []).forEach((t: any) => {
-        if (synth.find((s) => s.taskId === t.id)) return;
-        if (t.status !== 'in_progress' && !((t.actualHours || 0) > 0)) return;
-        if (!isManagement && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
         const proj = (projects || []).find((p: any) => p.id === t.projectId);
+        const isSupervising = isSupervisor || t.supervisorId === user?.id || (proj && (proj as any).supervisorId === user?.id);
+        if (!isManagement && !isSupervising && user && t.assigneeId !== user.id && t.assigneeId !== user.email) return;
         const actualSec = Math.round((t.actualHours || 0) * 3600);
         if (actualSec <= 0) return;
         const startISO = new Date(Date.now() - actualSec * 1000).toISOString();
@@ -345,8 +345,10 @@ export function TaskWorklogView({
         const stored = timerStates[t.id];
         const actualSec = stored?.secondsToday || 0;
         if (actualSec <= 10) return false; // ignore tasks with <10s tracked
-        // Employees only see their own tasks
-        if (!isManagement && user) {
+        const proj = (projects || []).find((p: any) => p.id === t.projectId);
+        const isSupervising = isSupervisor || t.supervisorId === user?.id || (proj && (proj as any).supervisorId === user?.id);
+        // Employees only see their own tasks unless supervising
+        if (!isManagement && !isSupervising && user) {
           const isMyTask =
             t.assigneeId === user.id ||
             t.assigneeId === user.email ||

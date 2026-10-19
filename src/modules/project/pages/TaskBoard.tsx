@@ -25,11 +25,12 @@ import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
 import { useDevice } from '../../../shared/hooks/responsive';
 
 import { useProject } from '../hooks/useProject';
-import { useTaskSessions, saveSessionNote } from '../hooks/useTaskSessions';
+import { useTaskSessions, saveSessionNote, getSessionNotesMap } from '../hooks/useTaskSessions';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
 import { TaskFormModal } from '../forms/TaskFormModal';
+import { TaskWorklogUpdatesDrawer } from '../components/TaskWorklogUpdatesDrawer';
 
 export type TaskStatus = 'Pending Approval' | 'To Do' | 'In Progress' | 'Under Review' | 'Completed';
 
@@ -55,6 +56,8 @@ export interface TaskItem {
   reworkNotes?: string;
   assigneeId?: string;
   assignedByEmployeeId?: string;
+  latestUpdate?: string;
+  worklogUpdatesCount?: number;
   dailyTimeEntries: Array<{
     id: string;
     date: string;
@@ -106,6 +109,7 @@ export function TaskBoard({
   const localProjectData = useProject();
   const { startSession, pauseSession, completeSession, listSessions } = useTaskSessions();
   const [taskSessions, setTaskSessions] = useState<any[]>([]);
+  const [selectedTaskForUpdates, setSelectedTaskForUpdates] = useState<any | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -235,6 +239,25 @@ export function TaskBoard({
         status = 'To Do';
       }
 
+      const taskSessionsForTask = (taskSessions || []).filter(
+        (s: any) => s.taskId === t.id || s.task_id === t.id
+      );
+      taskSessionsForTask.sort((a: any, b: any) => {
+        const tA = new Date(a.startTime || a.start_time || 0).getTime();
+        const tB = new Date(b.startTime || b.start_time || 0).getTime();
+        return tB - tA;
+      });
+      const sessionNotesMap = getSessionNotesMap();
+      const withNote = taskSessionsForTask.find((s: any) => {
+        const n = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s as any).description || '';
+        return Boolean(n);
+      });
+      const latestUpdate = withNote ? ((withNote.notes && withNote.notes.trim()) || sessionNotesMap[withNote.id] || (withNote as any).description || '') : '';
+      const worklogUpdatesCount = taskSessionsForTask.filter((s: any) => {
+        const n = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s as any).description || '';
+        return Boolean(n);
+      }).length;
+
       return {
         id: t.id,
         name: t.title || 'Untitled Task',
@@ -256,6 +279,8 @@ export function TaskBoard({
         dailyTimeEntries,
         approvalStatus: t.approvalStatus,
         reworkNotes: t.reworkNotes,
+        latestUpdate,
+        worklogUpdatesCount,
       };
     });
   }, [tasks, projects, employees, allocations, timesheets, taskSessions, todayStr]);
@@ -1116,6 +1141,36 @@ export function TaskBoard({
                           <strong>🔄 Rework Required:</strong> {t.reworkNotes}
                         </div>
                       )}
+                      {t.latestUpdate && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTaskForUpdates(t);
+                          }}
+                          style={{
+                            marginTop: 6,
+                            padding: '6px 10px',
+                            background: 'rgba(59, 130, 246, 0.08)',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                            borderRadius: 6,
+                            color: 'var(--text-primary)',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 6,
+                          }}
+                          title="Click to view worklog updates collected from Task Work Log"
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <strong>📝 Update:</strong> {t.latestUpdate}
+                          </span>
+                          <span style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'underline', flexShrink: 0 }}>
+                            View ({t.worklogUpdatesCount || 1}) →
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Active Timer Display */}
@@ -1226,6 +1281,9 @@ export function TaskBoard({
                       {/* Supervisor/Manager actions for review */}
                       {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
                         <>
+                          <Button size="sm" variant="secondary" onClick={() => setSelectedTaskForUpdates(t)}>
+                            📋 Updates {t.worklogUpdatesCount ? `(${t.worklogUpdatesCount})` : ''}
+                          </Button>
                           <Button size="sm" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
                             Approve
                           </Button>
@@ -1322,6 +1380,30 @@ export function TaskBoard({
                                   {timers[t.id]?.isRunning ? <span>● Running</span> : <span>Paused</span>}
                                 </div>
                               )}
+                              {t.latestUpdate && (
+                                <div
+                                  onClick={() => setSelectedTaskForUpdates(t)}
+                                  style={{
+                                    marginTop: 4,
+                                    fontSize: 11,
+                                    color: 'var(--brand)',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    background: 'rgba(59, 130, 246, 0.08)',
+                                    padding: '2px 6px',
+                                    borderRadius: 4,
+                                    maxWidth: 240,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={`Click to view all worklog updates: ${t.latestUpdate}`}
+                                >
+                                  <span>📝 {t.latestUpdate}</span>
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td style={{ padding: '12px 16px' }}>{t.supervisor || '—'}</td>
@@ -1403,6 +1485,9 @@ export function TaskBoard({
                               {/* Supervisor/Manager actions for review */}
                               {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
                                 <>
+                                  <Button size="xs" variant="secondary" onClick={() => setSelectedTaskForUpdates(t)}>
+                                    📋 Updates
+                                  </Button>
                                   <Button size="xs" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
                                     Approve
                                   </Button>
@@ -1589,6 +1674,26 @@ export function TaskBoard({
           </div>
         </div>
       </Drawer>
+
+      {/* Task Worklog Updates Drawer */}
+      <TaskWorklogUpdatesDrawer
+        open={!!selectedTaskForUpdates}
+        onClose={() => setSelectedTaskForUpdates(null)}
+        task={selectedTaskForUpdates}
+        projectName={selectedTaskForUpdates?.projectName}
+        assigneeName={selectedTaskForUpdates?.assignee}
+        supervisorName={selectedTaskForUpdates?.supervisor}
+        workSessions={taskSessions}
+        canApprove={isManagement || isSupervisorRole}
+        onApprove={async (t) => {
+          await handleApproveTaskSubmission(t);
+          setSelectedTaskForUpdates(null);
+        }}
+        onRequestRework={async (t, reason) => {
+          await handleRequestRework(t, reason);
+          setSelectedTaskForUpdates(null);
+        }}
+      />
     </div>
   );
 }
