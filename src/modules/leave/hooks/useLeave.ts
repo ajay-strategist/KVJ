@@ -29,7 +29,7 @@ export function useLeave() {
   }, [service, user]);
 
   const fetchPendingApprovals = useCallback(async () => {
-    if (!can(principal, 'leave', 'approve')) return;
+    if (!principal) return;
     setLoading(true);
     const res = await service.listPendingApprovals();
     if (res.ok) {
@@ -43,7 +43,7 @@ export function useLeave() {
   }, [service, principal]);
 
   const fetchAllLeaves = useCallback(async () => {
-    if (!can(principal, 'leave', 'approve')) return;
+    if (!principal) return;
     setLoading(true);
     const res = await service.listAllLeaves();
     if (res.ok) {

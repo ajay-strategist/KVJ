@@ -88,7 +88,7 @@ export function AppRouter() {
           <Route path="/app/employees/:id" element={<ProtectedRoute resource="employee" action="view"><EmployeeProfile /></ProtectedRoute>} />
           <Route path="/app/attendance" element={<ProtectedRoute resource="attendance" action="view"><AttendanceLogPage /></ProtectedRoute>} />
           <Route path="/app/leave" element={<ProtectedRoute resource="leave" action="view"><LeaveBoard /></ProtectedRoute>} />
-          <Route path="/app/approvals" element={<ProtectedRoute resource="leave" action="approve"><ApprovalsQueue /></ProtectedRoute>} />
+          <Route path="/app/approvals" element={<ProtectedRoute><ApprovalsQueue /></ProtectedRoute>} />
           <Route path="/app/showcase" element={<ProtectedRoute><ShowcasePage /></ProtectedRoute>} />
           <Route path="/app/settings" element={<ProtectedRoute resource="settings" action="view"><SettingsPage /></ProtectedRoute>} />
 

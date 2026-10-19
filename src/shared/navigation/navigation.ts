@@ -28,7 +28,7 @@ export const NAV_TREE: NavItem[] = [
   { id: 'employee-status', label: 'Employee Status', path: '/app/employees/status', icon: 'UserCheck', permission: ['employee', 'view'], module: 'employee' },
   { id: 'attendance', label: 'Attendance', path: '/app/attendance', icon: 'Clock', permission: ['attendance', 'view'], module: 'attendance' },
   { id: 'leave', label: 'Leave', path: '/app/leave', icon: 'CalendarDays', permission: ['leave', 'view'], module: 'leave' },
-  { id: 'approvals', label: 'Approvals Queue', path: '/app/approvals', icon: 'CheckSquare', permission: ['leave', 'approve'] },
+  { id: 'approvals', label: 'Approvals Queue', path: '/app/approvals', icon: 'CheckSquare' },
   { id: 'training-courses', label: 'Courses & Colleges', path: '/app/training/courses', icon: 'BookOpen', permission: ['training', 'view'], module: 'training' },
   { id: 'training-details', label: 'Training Details', path: '/app/training/details', icon: 'Layers', permission: ['training', 'view'], module: 'training' },
   { id: 'training-batches', label: 'Batch Management', path: '/app/training/batches', icon: 'LayoutList', permission: ['training', 'view'], module: 'training' },
@@ -107,9 +107,8 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
     if (item.module && !featureFlags.modules[item.module]) return false;
     if (item.page && !featureFlags.pages[item.page]) return false;
 
-    // Employees list and Approvals are hidden from plain employees
+    // Employees list is hidden from plain employees
     if (roleUpper === 'EMPLOYEE' && (
-      item.id === 'approvals' ||
       item.id === 'employees' ||
       item.id === 'employee-status'
     )) {
