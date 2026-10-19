@@ -1236,9 +1236,9 @@ export function ProjectList({
               background: 'var(--bg-card)',
               borderRadius: 20,
               boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(99,102,241,0.15)',
-              width: '100%',
-              maxWidth: 920,
-              maxHeight: '92vh',
+              width: '95vw',
+              maxWidth: 1380,
+              maxHeight: '94vh',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -1451,7 +1451,7 @@ export function ProjectList({
                       <tbody>
                         {selectedProjectTasks.map((t: any, idx: number) => (
                           <tr key={idx} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-sunken)', transition: 'background 0.15s' }}>
-                            <td style={{ padding: '9px 12px', fontWeight: 600, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.name}>{t.name}</td>
+                            <td style={{ padding: '9px 12px', fontWeight: 600, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.name}>{t.name}</td>
                             <td style={{ padding: '6px 8px' }}>
                               <select
                                 value={t.assigneeId || ''}
@@ -1593,7 +1593,7 @@ export function ProjectList({
                               />
                             </td>
                             <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#4f46e5' }}>{t.hoursLogged}</td>
-                            <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{formatDisplayDate(t.dueDate)}</td>
+                            <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{formatDisplayDate(t.dueDate)}</td>
                             <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                               <button
                                 type="button"
