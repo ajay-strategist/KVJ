@@ -1676,24 +1676,26 @@ export function TaskBoard({
       </Drawer>
 
       {/* Task Worklog Updates Drawer */}
-      <TaskWorklogUpdatesDrawer
-        open={!!selectedTaskForUpdates}
-        onClose={() => setSelectedTaskForUpdates(null)}
-        task={selectedTaskForUpdates}
-        projectName={selectedTaskForUpdates?.projectName}
-        assigneeName={selectedTaskForUpdates?.assignee}
-        supervisorName={selectedTaskForUpdates?.supervisor}
-        workSessions={taskSessions}
-        canApprove={isManagement || isSupervisorRole}
-        onApprove={async (t) => {
-          await handleApproveTaskSubmission(t);
-          setSelectedTaskForUpdates(null);
-        }}
-        onRequestRework={async (t, reason) => {
-          await handleRequestRework(t, reason);
-          setSelectedTaskForUpdates(null);
-        }}
-      />
+      {selectedTaskForUpdates && (
+        <TaskWorklogUpdatesDrawer
+          open={!!selectedTaskForUpdates}
+          onClose={() => setSelectedTaskForUpdates(null)}
+          task={selectedTaskForUpdates}
+          projectName={selectedTaskForUpdates.projectName}
+          assigneeName={selectedTaskForUpdates.assignee}
+          supervisorName={selectedTaskForUpdates.supervisor}
+          workSessions={taskSessions}
+          canApprove={isManagement || isSupervisorRole}
+          onApprove={async (t) => {
+            await handleApproveTaskSubmission(t);
+            setSelectedTaskForUpdates(null);
+          }}
+          onRequestRework={async (t, reason) => {
+            await handleRequestRework(t, reason);
+            setSelectedTaskForUpdates(null);
+          }}
+        />
+      )}
     </div>
   );
 }

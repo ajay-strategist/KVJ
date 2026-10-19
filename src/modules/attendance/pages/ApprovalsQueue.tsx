@@ -57,7 +57,8 @@ export function ApprovalsQueue() {
     return () => { active = false; };
   }, [listSessions]);
 
-  const getTaskUpdates = useCallback((taskId: string) => {
+  const getTaskUpdates = useCallback((taskId?: string) => {
+    if (!taskId) return [];
     const sessionNotesMap = getSessionNotesMap();
     const sessions = (taskSessions || []).filter(
       (s: any) => s.taskId === taskId || s.task_id === taskId
@@ -76,7 +77,8 @@ export function ApprovalsQueue() {
     });
   }, [taskSessions]);
 
-  const getLatestTaskUpdate = useCallback((taskId: string) => {
+  const getLatestTaskUpdate = useCallback((taskId?: string) => {
+    if (!taskId) return '';
     const updates = getTaskUpdates(taskId);
     const withNote = updates.find((u) => Boolean(u.resolvedNote));
     return withNote ? withNote.resolvedNote : '';
@@ -206,6 +208,7 @@ export function ApprovalsQueue() {
   };
 
   const getSupervisorName = (t: any) => {
+    if (!t) return '—';
     const supId = t.supervisorId || t.assignedByEmployeeId || t.assigned_by_employee_id || t.supervisor_id;
     if (supId && employees[supId]) {
       const emp = employees[supId];
@@ -217,7 +220,8 @@ export function ApprovalsQueue() {
     if (typeof t.assignedBy === 'string' && t.assignedBy) {
       return t.assignedBy;
     }
-    const proj = projects.find((p) => p.id === t.projectId);
+    const safeProjects = Array.isArray(projects) ? projects : [];
+    const proj = safeProjects.find((p) => p.id === t.projectId);
     if (proj && (proj as any).supervisorId && employees[(proj as any).supervisorId]) {
       const emp = employees[(proj as any).supervisorId];
       return `${emp.firstName} ${emp.lastName}`;
@@ -555,6 +559,7 @@ export function ApprovalsQueue() {
       key: 'update',
       header: 'Assignee Update',
       render: (r) => {
+        if (!r || !r.id) return <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>;
         const latest = getLatestTaskUpdate(r.id);
         const updates = getTaskUpdates(r.id);
         const hasNote = Boolean(latest && latest.trim());
@@ -633,7 +638,9 @@ export function ApprovalsQueue() {
       key: 'actions',
       header: 'Action',
       render: (r) => {
-        const proj = projects.find((p) => p.id === r.projectId);
+        if (!r) return null;
+        const safeProjects = Array.isArray(projects) ? projects : [];
+        const proj = safeProjects.find((p) => p.id === r.projectId);
         const isTaskSupervisor = r.supervisorId === user?.id || (proj && (proj as any).supervisorId === user?.id);
         const canApproveThis = canApprove || isTaskSupervisor;
 
@@ -1286,36 +1293,42 @@ export function ApprovalsQueue() {
       />
 
       {/* Task Worklog Updates & Review Drawer */}
-      <TaskWorklogUpdatesDrawer
-        open={!!selectedReviewTask}
-        onClose={() => setSelectedReviewTask(null)}
-        task={selectedReviewTask}
-        projectName={projects.find((p) => p.id === selectedReviewTask?.projectId)?.title}
-        assigneeName={empName(selectedReviewTask?.assigneeId)}
-        supervisorName={getSupervisorName(selectedReviewTask)}
-        workSessions={taskSessions}
-        canApprove={Boolean(selectedReviewTask && (canApprove || selectedReviewTask.supervisorId === user?.id || (projects.find(p => p.id === selectedReviewTask.projectId) as any)?.supervisorId === user?.id))}
-        onApprove={async (t) => {
-          const res = await approveTaskSubmission(t.id);
-          if (res.ok) {
-            toast({ variant: 'success', title: 'Task Evaluated & Approved' });
-            setSelectedReviewTask(null);
-            refreshProjects();
-          } else {
-            toast({ variant: 'error', title: 'Evaluation Failed', message: res.error });
-          }
-        }}
-        onRequestRework={async (t, notes) => {
-          const res = await requestRework(t.id, notes);
-          if (res.ok) {
-            toast({ variant: 'warning', title: 'Rework Requested', message: 'Task sent back for rework.' });
-            setSelectedReviewTask(null);
-            refreshProjects();
-          } else {
-            toast({ variant: 'error', title: 'Rework Failed', message: res.error });
-          }
-        }}
-      />
+      {selectedReviewTask && (
+        <TaskWorklogUpdatesDrawer
+          open={!!selectedReviewTask}
+          onClose={() => setSelectedReviewTask(null)}
+          task={selectedReviewTask}
+          projectName={Array.isArray(projects) ? projects.find((p) => p.id === selectedReviewTask.projectId)?.title : undefined}
+          assigneeName={empName(selectedReviewTask.assigneeId)}
+          supervisorName={getSupervisorName(selectedReviewTask)}
+          workSessions={taskSessions}
+          canApprove={Boolean(
+            canApprove ||
+            selectedReviewTask.supervisorId === user?.id ||
+            ((Array.isArray(projects) ? projects.find(p => p.id === selectedReviewTask.projectId) : undefined) as any)?.supervisorId === user?.id
+          )}
+          onApprove={async (t) => {
+            const res = await approveTaskSubmission(t.id);
+            if (res.ok) {
+              toast({ variant: 'success', title: 'Task Evaluated & Approved' });
+              setSelectedReviewTask(null);
+              refreshProjects();
+            } else {
+              toast({ variant: 'error', title: 'Evaluation Failed', message: res.error });
+            }
+          }}
+          onRequestRework={async (t, notes) => {
+            const res = await requestRework(t.id, notes);
+            if (res.ok) {
+              toast({ variant: 'warning', title: 'Rework Requested', message: 'Task sent back for rework.' });
+              setSelectedReviewTask(null);
+              refreshProjects();
+            } else {
+              toast({ variant: 'error', title: 'Rework Failed', message: res.error });
+            }
+          }}
+        />
+      )}
     </AppShell>
   );
 }
