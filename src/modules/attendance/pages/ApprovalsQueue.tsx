@@ -84,47 +84,51 @@ export function ApprovalsQueue() {
     return withNote ? withNote.resolvedNote : '';
   }, [getTaskUpdates]);
   
-  const userRole = user?.role || 'EMPLOYEE';
-  const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole.toUpperCase());
+  const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
+  const isExecutive = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
+  const canApprove = isExecutive;
   const isDesktop = useBreakpoint('md');
 
   const canApproveTaskItem = useCallback((t: any) => {
     if (!t) return false;
     const roleUpper = (user?.role || '').toUpperCase();
     if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER') return true;
+    if (!user?.id) return false;
 
     const safeProjects = Array.isArray(projects) ? projects : [];
     const proj = safeProjects.find((p: any) => p.id === t.projectId);
     const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
-    const isProjSupervisor = Boolean(projSupId && projSupId === user?.id);
-    const isTaskSupervisor = Boolean(
-      (t.supervisorId && t.supervisorId === user?.id && t.supervisorId !== t.assigneeId) ||
-      (t.assignedByEmployeeId && t.assignedByEmployeeId === user?.id && t.assignedByEmployeeId !== t.assigneeId)
+    const isProjSupervisor = Boolean(
+      projSupId && (projSupId === user.id || String(projSupId).toLowerCase() === String(user.id).toLowerCase())
     );
 
-    return isProjSupervisor || isTaskSupervisor;
-  }, [user?.id, user?.role, projects]);
+    const isTaskSupervisor = Boolean(
+      (t.supervisorId && (t.supervisorId === user.id || String(t.supervisorId).toLowerCase() === String(user.id).toLowerCase()) && t.supervisorId !== t.assigneeId) ||
+      (t.assignedByEmployeeId && (t.assignedByEmployeeId === user.id || String(t.assignedByEmployeeId).toLowerCase() === String(user.id).toLowerCase()) && t.assignedByEmployeeId !== t.assigneeId)
+    );
+
+    let isNameMatchSupervisor = false;
+    if (!isProjSupervisor && !isTaskSupervisor && typeof t.supervisor === 'string' && t.supervisor && t.supervisor !== '—' && t.supervisor !== 'None') {
+      const myName = (user.fullName || '').trim().toLowerCase();
+      if (myName && t.supervisor.trim().toLowerCase() === myName && t.assigneeId !== user.id) {
+        isNameMatchSupervisor = true;
+      }
+    }
+
+    return isProjSupervisor || isTaskSupervisor || isNameMatchSupervisor;
+  }, [user?.id, user?.role, user?.fullName, projects]);
 
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval' | 'over_7_days'>('all');
   const [taskBatchProcessing, setTaskBatchProcessing] = useState(false);
-
-  const isSupervisorAnyProject = useMemo(() => {
-    if (canApprove) return true;
-    const safeProjects = Array.isArray(projects) ? projects : [];
-    const safeTasks = Array.isArray(tasks) ? tasks : [];
-    return (
-      safeProjects.some((p: any) => p.supervisorId === user?.id || (p as any).supervisor_id === user?.id) ||
-      safeTasks.some((t: any) => t.supervisorId === user?.id && t.supervisorId !== t.assigneeId)
-    );
-  }, [canApprove, projects, tasks, user?.id]);
 
   const pendingAssignmentTasks = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     return safeTasks.filter((t) => {
       if (t.deletedAt || t.approvalStatus !== 'pending_assignment_approval') return false;
-      return true;
+      // Row Level Security: Only tasks under the supervisor's purview
+      return canApproveTaskItem(t);
     });
-  }, [tasks]);
+  }, [tasks, canApproveTaskItem]);
 
   const filteredTaskApprovals = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -132,6 +136,9 @@ export function ApprovalsQueue() {
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     return safeTasks.filter((t) => {
       if (!t || t.deletedAt) return false;
+      // Row Level Security: Non-supervisors cannot see tasks they do not supervise
+      if (!canApproveTaskItem(t)) return false;
+
       const isPendingTask = t.approvalStatus === 'pending_task_approval' || t.status === 'review';
       const isPendingAssign = t.approvalStatus === 'pending_assignment_approval';
       if (!isPendingTask && !isPendingAssign) return false;
@@ -150,7 +157,7 @@ export function ApprovalsQueue() {
       }
       return true;
     });
-  }, [tasks, taskStatusFilter]);
+  }, [tasks, taskStatusFilter, canApproveTaskItem]);
 
   /** Task Completion items that have been waiting in the queue for >= 7 days (used for banner). */
   const over7DaysTasks = useMemo(() => {
@@ -159,13 +166,14 @@ export function ApprovalsQueue() {
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     return safeTasks.filter((t) => {
       if (!t || t.deletedAt) return false;
+      if (!canApproveTaskItem(t)) return false;
       const isPendingTask = t.approvalStatus === 'pending_task_approval' || t.status === 'review';
       if (!isPendingTask) return false;
       const submitted = t.submittedAt || t.createdAt || t.updatedAt;
       if (!submitted) return false;
       return now - new Date(submitted).getTime() >= sevenDaysMs;
     });
-  }, [tasks]);
+  }, [tasks, canApproveTaskItem]);
 
   const fetchUnclosedSessions = useCallback(async () => {
     try {
@@ -186,8 +194,10 @@ export function ApprovalsQueue() {
 
   const fetchCorrectionsAndEmployees = useCallback(async () => {
     try {
-      const cRes = await attService.listPendingCorrections();
-      if (cRes.ok && Array.isArray(cRes.value)) setCorrections(cRes.value);
+      if (isExecutive) {
+        const cRes = await attService.listPendingCorrections();
+        if (cRes.ok && Array.isArray(cRes.value)) setCorrections(cRes.value);
+      }
 
       const eRes = await empService.listEmployees();
       if (eRes.ok && Array.isArray(eRes.value)) {
@@ -195,11 +205,13 @@ export function ApprovalsQueue() {
         eRes.value.forEach((e) => { if (e && e.id) map[e.id] = e; });
         setEmployees(map);
       }
-      fetchUnclosedSessions();
+      if (isExecutive) {
+        fetchUnclosedSessions();
+      }
     } catch (e) {
       console.warn('ApprovalsQueue fetch error:', e);
     }
-  }, [attService, empService, fetchUnclosedSessions]);
+  }, [attService, empService, fetchUnclosedSessions, isExecutive]);
 
   useEffect(() => {
     fetchCorrectionsAndEmployees();
@@ -919,7 +931,7 @@ export function ApprovalsQueue() {
             <div style={{ background: 'var(--brand-muted)', border: '1px solid var(--brand)', borderRadius: 'var(--radius-md)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--brand)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>⚡ Pending Task Creation / Assignment Approvals ({pendingAssignmentTasks.length})</span>
-                <span style={{ fontSize: 11.5, fontWeight: 500 }}>Requires Management Approval before starting timer</span>
+                <span style={{ fontSize: 11.5, fontWeight: 500 }}>Requires Supervisor Approval before starting timer</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {pendingAssignmentTasks.map((t) => {
@@ -943,7 +955,7 @@ export function ApprovalsQueue() {
           )}
 
           {/* Bulk-approve banner for tasks waiting > 7 days */}
-          {taskStatusFilter === 'over_7_days' && over7DaysTasks.length > 0 && canApprove && (
+          {taskStatusFilter === 'over_7_days' && over7DaysTasks.length > 0 && (
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', background: 'rgba(234, 88, 12, 0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(234, 88, 12, 0.35)' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#c2410c', flex: 1 }}>
                 ⏰ {over7DaysTasks.length} Task Completion request(s) have been pending for more than 7 days
@@ -958,7 +970,7 @@ export function ApprovalsQueue() {
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, alignSelf: 'flex-end', flexWrap: 'wrap' }}>
-            {canApprove && filteredTaskApprovals.length > 0 && (
+            {filteredTaskApprovals.length > 0 && (
               <Button
                 size="sm"
                 style={{ background: 'var(--status-success)', color: 'white', fontWeight: 700 }}
@@ -983,18 +995,33 @@ export function ApprovalsQueue() {
               </select>
             </div>
           </div>
-          <DataTable
-            columns={taskApprovalColumns}
-            rows={filteredTaskApprovals}
-            rowKey={(r) => r.id}
-            onRowClick={(r) => setSelectedReviewTask(r)}
-          />
+          {filteredTaskApprovals.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                No Pending Task Approvals
+              </div>
+              <div style={{ fontSize: 13 }}>
+                {isExecutive 
+                  ? 'There are currently no tasks awaiting assignment approval or evaluation across the company.'
+                  : 'You do not have any tasks currently pending under your supervision.'}
+              </div>
+            </div>
+          ) : (
+            <DataTable
+              columns={taskApprovalColumns}
+              rows={filteredTaskApprovals}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => setSelectedReviewTask(r)}
+            />
+          )}
         </div>
       ),
     },
-    {
-      id: 'leaves',
-      label: `Leave Applications (${pendingApprovals.length})`,
+    ...(isExecutive ? [
+      {
+        id: 'leaves',
+        label: `Leave Applications (${pendingApprovals.length})`,
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {selectedLeaveIds.length > 0 && canApprove && (
@@ -1134,15 +1161,19 @@ export function ApprovalsQueue() {
         />
       ),
     },
-  ];
+  ] : []),
+];
 
   return (
     <AppShell>
-      <PageHeader title="Pending Approvals Queue" subtitle="Approve or reject leaves, attendance logs, and project tasks" />
-      {!canApprove && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>🔒</span>
-          <span><strong>Approving Rights Notice:</strong> Only <strong>Admin</strong>, <strong>CEO</strong>, and <strong>Manager</strong> roles have approval rights. You are viewing queue items in read-only mode.</span>
+      <PageHeader 
+        title={isExecutive ? "Pending Approvals Queue" : "Task Approvals Queue"} 
+        subtitle={isExecutive ? "Approve or reject leaves, attendance logs, and project tasks" : "Review and approve task assignments and completions under your supervision"} 
+      />
+      {!isExecutive && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>🛡️</span>
+          <span><strong>Supervisor Queue:</strong> Displaying task approvals under your direct supervision. You have full authorization to evaluate completions, request rework, and approve new assignments.</span>
         </div>
       )}
       <Tabs items={tabs} />
