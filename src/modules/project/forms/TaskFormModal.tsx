@@ -149,8 +149,16 @@ export function TaskFormModal({
       const prjCode = proj?.code || 'TSK';
       const autoTaskCode = `${prjCode}-T${Math.floor(100 + Math.random() * 900)}`;
 
-      const isCeo = user?.role?.toUpperCase() === 'CEO';
-      const approvalStatus = (!isCeo && isAssigningToOther) ? 'pending_assignment_approval' : null;
+      const roleUpper = user?.role?.toUpperCase() || '';
+      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO';
+      const isProjectSupervisor = Boolean(proj && proj.supervisorId && proj.supervisorId === user?.id);
+      const isTeamMemberInProject = Boolean(!isOfficeTask && proj && !isAdminOrCeo && !isProjectSupervisor);
+
+      // Rule: If team member creates a Task in a Project, Project Supervisor approval is required.
+      // Admin/CEO can approve everything and create tasks directly without approval gate.
+      const approvalStatus = (isTeamMemberInProject || (!isAdminOrCeo && isAssigningToOther))
+        ? 'pending_assignment_approval'
+        : null;
 
       const projectService = container.resolve(PROJECT_SERVICE_TOKEN);
       const res = await projectService.createTask(
@@ -175,7 +183,9 @@ export function TaskFormModal({
 
       if (res.ok) {
         const msg = approvalStatus
-          ? `Task "${form.title}" created. Peer assignment sent for Manager/Admin approval.`
+          ? isTeamMemberInProject
+            ? `Task "${form.title}" created in project. Project Supervisor approval is required before work can begin.`
+            : `Task "${form.title}" created. Assignment sent for Supervisor / Admin approval.`
           : `Task "${form.title}" created successfully.`;
 
         toast({

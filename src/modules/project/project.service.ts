@@ -200,23 +200,21 @@ export class ProjectService implements IProjectService {
   async createTask(data: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
       const roleUpper = (actor.role || '').toUpperCase();
+      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO';
       const finalAssigneeId = data.assigneeId || actor.id;
       // Self-assigned: the assignee IS the actor (same id or no assignee specified)
       const isSelfAssigned = finalAssigneeId === actor.id;
-      // Only CEO can assign to colleagues directly without approval; self-assignment never needs approval
-      const needsAssignmentApproval = !isSelfAssigned && roleUpper !== 'CEO';
-
-      // Automatically set supervisor to assigning employee (actor.id) if not specified
-      const supervisorId = data.supervisorId || actor.id;
 
       // Auto-resolve projectId to avoid NULL constraint violations in PostgreSQL.
       // Unspecified project tasks must go to "Office Task".
       let projectId = data.projectId;
+      let proj: any = null;
       if (!projectId) {
         const prjPage = await this.projectRepo.findMany({ pageSize: 100 });
         const existingOffice = prjPage.data?.find((p: any) => p.title === 'Office Task');
         if (existingOffice) {
           projectId = existingOffice.id;
+          proj = existingOffice;
         } else {
           const gen = await this.projectRepo.create(
             {
@@ -230,19 +228,36 @@ export class ProjectService implements IProjectService {
             actor
           );
           projectId = gen.id;
+          proj = gen;
         }
+      } else {
+        try {
+          proj = await this.projectRepo.findById(projectId);
+        } catch (_) {}
       }
+
+      const isOfficeTask = !proj || proj.title === 'Office Task' || proj.category === 'Office';
+      const isProjectSupervisor = Boolean(proj && proj.supervisorId && proj.supervisorId === actor.id);
+
+      // Rule: If a Team member creates a Task in a Project, the Project Supervisor approval is required.
+      // Admin/CEO can approve everything and their created tasks do not require approval.
+      const isTeamMemberInProject = !isOfficeTask && !isAdminOrCeo && !isProjectSupervisor;
+
+      // Automatically set supervisor to project supervisor if in a project, or specified supervisor, or actor
+      const supervisorId = data.supervisorId || (proj && proj.supervisorId ? proj.supervisorId : actor.id);
+
+      // Approval needed if:
+      // 1. Team member creates a task in a project (needs Project Supervisor approval)
+      // 2. Assigning to someone else and actor is not Admin/CEO
+      const needsAssignmentApproval = data.approvalStatus !== undefined
+        ? data.approvalStatus === 'pending_assignment_approval'
+        : (isTeamMemberInProject || (!isSelfAssigned && !isAdminOrCeo));
 
       let taskCode = data.code;
       if (!taskCode) {
         let prjPrefix = 'TSK';
-        if (projectId) {
-          try {
-            const prj = await this.projectRepo.findById(projectId);
-            if (prj && prj.code) {
-              prjPrefix = prj.code;
-            }
-          } catch (_) {}
+        if (projectId && proj?.code) {
+          prjPrefix = proj.code;
         }
         taskCode = `${prjPrefix}-T${Math.floor(100 + Math.random() * 900)}`;
       }
@@ -285,7 +300,7 @@ export class ProjectService implements IProjectService {
   async updateTask(taskId: UUID, patch: Partial<Task>, actor: Actor): Promise<Result<Task>> {
     try {
       const roleUpper = (actor.role || '').toUpperCase();
-      const isCeo = roleUpper === 'CEO';
+      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO';
       const existing = await this.taskRepo.findById(taskId);
 
       if (patch.proposedHours !== undefined || patch.estimatedHours !== undefined) {
@@ -304,8 +319,8 @@ export class ProjectService implements IProjectService {
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
         // Self-re-assignment (actor assigns to themselves) never needs approval
         const isSelfAssigned = patch.assigneeId === actor.id;
-        // Only CEO can assign to anyone directly without approval gate
-        if (!isSelfAssigned && !isCeo) {
+        // Admin or CEO can assign to anyone directly without approval gate
+        if (!isSelfAssigned && !isAdminOrCeo) {
           patch = {
             ...patch,
             approvalStatus: 'pending_assignment_approval',
@@ -358,6 +373,19 @@ export class ProjectService implements IProjectService {
     try {
       const existing = await this.taskRepo.findById(taskId);
       if (!existing) return Err(AppError.notFound('Task not found.'));
+
+      const roleUpper = (actor.role || '').toUpperCase();
+      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
+      const proj = existing.projectId ? await this.projectRepo.findById(existing.projectId).catch(() => null) : null;
+      const isSupervisor = Boolean(
+        (proj && proj.supervisorId === actor.id) ||
+        existing.supervisorId === actor.id ||
+        (existing as any).assignedByEmployeeId === actor.id
+      );
+      if (!isAdminOrCeo && !isSupervisor) {
+        return Err(AppError.forbidden('Only the Project/Task Supervisor or Admin/CEO can request rework for this task.'));
+      }
+
       const updated = await this.taskRepo.update(taskId, {
         status: 'in_progress',
         approvalStatus: 'rework',
@@ -383,6 +411,19 @@ export class ProjectService implements IProjectService {
     try {
       const existing = await this.taskRepo.findById(taskId);
       if (!existing) return Err(AppError.notFound('Task not found.'));
+
+      const roleUpper = (actor.role || '').toUpperCase();
+      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
+      const proj = existing.projectId ? await this.projectRepo.findById(existing.projectId).catch(() => null) : null;
+      const isSupervisor = Boolean(
+        (proj && proj.supervisorId === actor.id) ||
+        existing.supervisorId === actor.id ||
+        (existing as any).assignedByEmployeeId === actor.id
+      );
+      if (!isAdminOrCeo && !isSupervisor) {
+        return Err(AppError.forbidden('Only the Project/Task Supervisor or Admin/CEO can approve this task submission.'));
+      }
+
       const updated = await this.taskRepo.update(taskId, {
         status: 'done',
         approvalStatus: 'approved',
@@ -421,6 +462,19 @@ export class ProjectService implements IProjectService {
     try {
       const existing = await this.taskRepo.findById(taskId);
       if (!existing) return Err(AppError.notFound('Task not found.'));
+
+      const roleUpper = (actor.role || '').toUpperCase();
+      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
+      const proj = existing.projectId ? await this.projectRepo.findById(existing.projectId).catch(() => null) : null;
+      const isSupervisor = Boolean(
+        (proj && proj.supervisorId === actor.id) ||
+        existing.supervisorId === actor.id ||
+        (existing as any).assignedByEmployeeId === actor.id
+      );
+      if (!isAdminOrCeo && !isSupervisor) {
+        return Err(AppError.forbidden('Only the Project/Task Supervisor or Admin/CEO can approve this task assignment.'));
+      }
+
       const updated = await this.taskRepo.update(taskId, {
         status: 'todo',
         approvalStatus: null,

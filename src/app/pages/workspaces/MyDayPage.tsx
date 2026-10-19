@@ -3250,15 +3250,15 @@ export function MyDayPage() {
     toast({
       variant: 'success',
       title: 'Routed to Approvals Queue',
-      message: `Task '${taskTitle}' submitted and requires CEO/Admin/Manager approval to complete the task (Review and Approve).`,
+      message: `Task '${taskTitle}' submitted for Supervisor / Admin review and approval.`,
     });
     addNotification({
       title: 'Task Submitted for Review',
-      message: `'${taskTitle}' submitted and requires CEO/Admin/Manager approval to complete the task (Review and Approve).`,
+      message: `'${taskTitle}' submitted for Supervisor / Admin review and approval.`,
       category: 'task',
       priority: 'high',
     });
-    handleActivityLog(`Submitted & requires CEO/Admin/Manager Approval: ${taskTitle}`, 'success');
+    handleActivityLog(`Submitted for Supervisor / Admin Approval: ${taskTitle}`, 'success');
   };
 
   const projectOptions = useMemo(() => {

@@ -11,7 +11,7 @@
  *  - Workflow status pipeline strip rendered on every task card.
  */
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { PageHeader, Card, Button, Badge, WorkflowStrip } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
 import { Form, TextField, SelectField, TextAreaField, DatePickerField } from '../../../shared/forms/form';
@@ -146,6 +146,35 @@ export function TaskBoard({
       p.status !== 'closed'
     );
   }, [projects]);
+
+  /**
+   * Evaluates if the current user has approval authority for a task:
+   * 1. Admin/CEO can approve everything
+   * 2. Project Supervisor can approve tasks in their project
+   * 3. Task Supervisor can approve their supervised tasks
+   */
+  const canUserApproveTask = useCallback((taskItem: any) => {
+    if (!taskItem) return false;
+    const roleUpper = (user?.role || '').toUpperCase();
+    if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER') return true;
+
+    // Check Project Supervisor
+    const safeProjects = Array.isArray(projects) ? projects : [];
+    const proj = safeProjects.find((p: any) => p.id === taskItem.projectId);
+    if (proj && (proj as any).supervisorId && (proj as any).supervisorId === user?.id) {
+      return true;
+    }
+
+    // Check Task Supervisor or Assignor
+    if (taskItem.supervisorId && taskItem.supervisorId === user?.id) {
+      return true;
+    }
+    if ((taskItem as any).assignedByEmployeeId && (taskItem as any).assignedByEmployeeId === user?.id) {
+      return true;
+    }
+
+    return false;
+  }, [user?.id, user?.role, projects]);
 
   // Active timers tracking synced with taskTimerStore
   const [timers, setTimers] = useState<Record<string, { startTime: number; elapsedMs: number; isRunning: boolean }>>(() => {
@@ -420,10 +449,19 @@ export function TaskBoard({
     }
 
     const proj = isOfficeTask ? null : projects.find((p: any) => p.id === categoryVal);
-    const finalSupervisorId = supervisor ? supervisor.id : user?.id;
+    const finalSupervisorId = supervisor ? supervisor.id : (proj?.supervisorId || user?.id);
 
     const isSelfAssigned = assignee?.id === user?.id || (!assignee && !values.assignee);
-    const approvalStatus = (!isSelfAssigned && user?.role?.toUpperCase() !== 'CEO') ? 'pending_assignment_approval' : null;
+    const roleUpper = (user?.role || '').toUpperCase();
+    const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO';
+    const isProjectSupervisor = Boolean(proj && proj.supervisorId && proj.supervisorId === user?.id);
+    const isTeamMemberInProject = Boolean(!isOfficeTask && proj && !isAdminOrCeo && !isProjectSupervisor);
+
+    // Rule: If team member creates a Task in a Project, Project Supervisor approval is required.
+    // Admin/CEO can approve everything and create tasks directly.
+    const approvalStatus = (isTeamMemberInProject || (!isSelfAssigned && !isAdminOrCeo))
+      ? 'pending_assignment_approval'
+      : null;
 
     const res = await createTask({
       projectId: proj?.id || null,
@@ -1224,28 +1262,12 @@ export function TaskBoard({
 
                     {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
-                      {/* Assignment approval for management */}
-                      {t.approvalStatus === 'pending_assignment_approval' && (() => {
-                        const creator = employees.find(e => e.id === t.assignedByEmployeeId);
-                        const creatorRole = ((creator as any)?.role || '').toUpperCase();
-                        const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
-                        if (needsCeoOnly) {
-                          if (user?.role?.toUpperCase() === 'CEO') {
-                            return (
-                              <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
-                                Approve Assignment
-                              </Button>
-                            );
-                          }
-                        } else if (isManagement) {
-                          return (
-                            <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
-                              Approve Assignment
-                            </Button>
-                          );
-                        }
-                        return null;
-                      })()}
+                      {/* Assignment approval for Project Supervisor / Management */}
+                      {t.approvalStatus === 'pending_assignment_approval' && canUserApproveTask(t) && (
+                        <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
+                          Approve Assignment
+                        </Button>
+                      )}
 
                       {/* Assignee options */}
                       {isAssignee && !isPendingAssignment && (
@@ -1279,24 +1301,32 @@ export function TaskBoard({
                       )}
 
                       {/* Supervisor/Manager actions for review */}
-                      {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
+                      {t.status === 'Under Review' && (
                         <>
                           <Button size="sm" variant="secondary" onClick={() => setSelectedTaskForUpdates(t)}>
                             📋 Updates {t.worklogUpdatesCount ? `(${t.worklogUpdatesCount})` : ''}
                           </Button>
-                          <Button size="sm" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
-                            Approve
-                          </Button>
-                          <Button size="sm" variant="danger" onClick={async () => {
-                            const { ok, reason } = await prompt({
-                              title: 'Request rework',
-                              message: 'Enter the reason this task needs rework:',
-                              variant: 'confirm',
-                            });
-                            if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
-                          }}>
-                            Rework
-                          </Button>
+                          {canUserApproveTask(t) ? (
+                            <>
+                              <Button size="sm" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="danger" onClick={async () => {
+                                const { ok, reason } = await prompt({
+                                  title: 'Request rework',
+                                  message: 'Enter the reason this task needs rework:',
+                                  variant: 'confirm',
+                                });
+                                if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
+                              }}>
+                                Rework
+                              </Button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', alignSelf: 'center' }}>
+                              Supervisor Approval Required
+                            </span>
+                          )}
                         </>
                       )}
 
@@ -1428,28 +1458,12 @@ export function TaskBoard({
                           </td>
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-                              {/* Assignment approval for management */}
-                              {t.approvalStatus === 'pending_assignment_approval' && (() => {
-                                const creator = employees.find(e => e.id === t.assignedByEmployeeId);
-                                const creatorRole = ((creator as any)?.role || '').toUpperCase();
-                                const needsCeoOnly = creatorRole === 'ADMIN' || creatorRole === 'MANAGER';
-                                if (needsCeoOnly) {
-                                  if (user?.role?.toUpperCase() === 'CEO') {
-                                    return (
-                                      <Button size="xs" variant="success" onClick={() => handleApproveTask(t.id)}>
-                                        Approve Assignment
-                                      </Button>
-                                    );
-                                  }
-                                } else if (isManagement) {
-                                  return (
-                                    <Button size="xs" variant="success" onClick={() => handleApproveTask(t.id)}>
-                                      Approve Assignment
-                                    </Button>
-                                  );
-                                }
-                                return null;
-                              })()}
+                              {/* Assignment approval for Project Supervisor / Management */}
+                              {t.approvalStatus === 'pending_assignment_approval' && canUserApproveTask(t) && (
+                                <Button size="xs" variant="success" onClick={() => handleApproveTask(t.id)}>
+                                  Approve Assignment
+                                </Button>
+                              )}
 
                               {/* Assignee options */}
                               {isAssignee && !isPendingAssignment && (
@@ -1483,24 +1497,32 @@ export function TaskBoard({
                               )}
 
                               {/* Supervisor/Manager actions for review */}
-                              {t.status === 'Under Review' && (isManagement || isSupervisorRole) && (
+                              {t.status === 'Under Review' && (
                                 <>
                                   <Button size="xs" variant="secondary" onClick={() => setSelectedTaskForUpdates(t)}>
                                     📋 Updates
                                   </Button>
-                                  <Button size="xs" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
-                                    Approve
-                                  </Button>
-                                  <Button size="xs" variant="danger" onClick={async () => {
-                                    const { ok, reason } = await prompt({
-                                      title: 'Request rework',
-                                      message: 'Enter the reason this task needs rework:',
-                                      variant: 'confirm',
-                                    });
-                                    if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
-                                  }}>
-                                    Rework
-                                  </Button>
+                                  {canUserApproveTask(t) ? (
+                                    <>
+                                      <Button size="xs" variant="success" onClick={() => handleApproveTaskSubmission(t)}>
+                                        Approve
+                                      </Button>
+                                      <Button size="xs" variant="danger" onClick={async () => {
+                                        const { ok, reason } = await prompt({
+                                          title: 'Request rework',
+                                          message: 'Enter the reason this task needs rework:',
+                                          variant: 'confirm',
+                                        });
+                                        if (ok && reason && reason.trim()) handleRequestRework(t, reason.trim());
+                                      }}>
+                                        Rework
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', alignSelf: 'center' }}>
+                                      Supervisor Approval Required
+                                    </span>
+                                  )}
                                 </>
                               )}
 
@@ -1685,7 +1707,7 @@ export function TaskBoard({
           assigneeName={selectedTaskForUpdates.assignee}
           supervisorName={selectedTaskForUpdates.supervisor}
           workSessions={taskSessions}
-          canApprove={isManagement || isSupervisorRole}
+          canApprove={canUserApproveTask(selectedTaskForUpdates)}
           onApprove={async (t) => {
             await handleApproveTaskSubmission(t);
             setSelectedTaskForUpdates(null);

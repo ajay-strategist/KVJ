@@ -88,6 +88,22 @@ export function ApprovalsQueue() {
   const canApprove = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole.toUpperCase());
   const isDesktop = useBreakpoint('md');
 
+  const canApproveTaskItem = useCallback((t: any) => {
+    if (!t) return false;
+    const roleUpper = (user?.role || '').toUpperCase();
+    if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER') return true;
+
+    const safeProjects = Array.isArray(projects) ? projects : [];
+    const proj = safeProjects.find((p: any) => p.id === t.projectId);
+    const isProjSupervisor = Boolean(proj && (proj as any).supervisorId && (proj as any).supervisorId === user?.id);
+    const isTaskSupervisor = Boolean(
+      (t.supervisorId && t.supervisorId === user?.id) ||
+      (t.assignedByEmployeeId && t.assignedByEmployeeId === user?.id)
+    );
+
+    return isProjSupervisor || isTaskSupervisor;
+  }, [user?.id, user?.role, projects]);
+
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval' | 'over_7_days'>('all');
   const [taskBatchProcessing, setTaskBatchProcessing] = useState(false);
 
@@ -626,10 +642,7 @@ export function ApprovalsQueue() {
       header: 'Action',
       render: (r) => {
         if (!r) return null;
-        const safeProjects = Array.isArray(projects) ? projects : [];
-        const proj = safeProjects.find((p) => p.id === r.projectId);
-        const isTaskSupervisor = r.supervisorId === user?.id || (proj && (proj as any).supervisorId === user?.id);
-        const canApproveThis = canApprove || isTaskSupervisor;
+        const canApproveThis = canApproveTaskItem(r);
 
         if (!canApproveThis) {
           return (
@@ -637,7 +650,7 @@ export function ApprovalsQueue() {
               <Button size="sm" variant="secondary" onClick={() => setSelectedReviewTask(r)}>
                 View Updates
               </Button>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Approval Rights Required</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Supervisor / Admin Rights Required</span>
             </div>
           );
         }
@@ -882,19 +895,22 @@ export function ApprovalsQueue() {
                 <span style={{ fontSize: 11.5, fontWeight: 500 }}>Requires Management Approval before starting timer</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {pendingAssignmentTasks.map((t) => (
-                  <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 13 }}>
-                      <strong>{projects.find((p) => p.id === t.projectId)?.title || 'Office Task'}:</strong> {t.title}{' '}
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Supervisor: {getSupervisorName(t)} · Assigned to: {empName(t.assigneeId)})</span>
+                {pendingAssignmentTasks.map((t) => {
+                  const canApproveThis = canApproveTaskItem(t);
+                  return (
+                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 13 }}>
+                        <strong>{projects.find((p) => p.id === t.projectId)?.title || 'Office Task'}:</strong> {t.title}{' '}
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Supervisor: {getSupervisorName(t)} · Assigned to: {empName(t.assigneeId)})</span>
+                      </div>
+                      {canApproveThis && (
+                        <Button size="sm" onClick={() => handleApproveAssignmentInline(t)}>
+                          Approve Task
+                        </Button>
+                      )}
                     </div>
-                    {canApprove && (
-                      <Button size="sm" onClick={() => handleApproveAssignmentInline(t)}>
-                        Approve Task
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1289,11 +1305,7 @@ export function ApprovalsQueue() {
           assigneeName={empName(selectedReviewTask.assigneeId)}
           supervisorName={getSupervisorName(selectedReviewTask)}
           workSessions={taskSessions}
-          canApprove={Boolean(
-            canApprove ||
-            selectedReviewTask.supervisorId === user?.id ||
-            ((Array.isArray(projects) ? projects.find(p => p.id === selectedReviewTask.projectId) : undefined) as any)?.supervisorId === user?.id
-          )}
+          canApprove={canApproveTaskItem(selectedReviewTask)}
           onApprove={async (t) => {
             const res = await approveTaskSubmission(t.id);
             if (res.ok) {

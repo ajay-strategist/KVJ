@@ -640,7 +640,7 @@ export function ProjectList({
         variant: pending ? 'warning' : 'success',
         title: pending ? 'Task Sent for Approval' : 'New Task Created',
         message: pending
-          ? `Assigning "${values.title}" to another member needs CEO approval — request sent.`
+          ? `Task "${values.title}" created. Project Supervisor approval is required before starting.`
           : `Task "${values.title}" added to project ${selectedProject.code}.`,
       });
       setAddTaskOpen(false);
