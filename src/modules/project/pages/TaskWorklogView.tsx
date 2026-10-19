@@ -170,12 +170,18 @@ export function TaskWorklogView({
           ? employees.find((e) => e.id === supervisorAlloc.employeeId)
           : null;
 
+        const pSupId = proj ? ((proj as any).supervisorId || (proj as any).supervisor_id) : null;
+        const tSupId = (t.supervisorId && t.supervisorId !== t.assigneeId)
+          ? t.supervisorId
+          : ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId)
+            ? (t as any).assignedByEmployeeId
+            : null;
         synth.push({
           id: `local-${t.id}`,
           taskId: t.id,
           projectId: t.projectId,
           employeeId: t.assigneeId || user?.id,
-          supervisorId: t.supervisorId || supervisorAlloc?.employeeId,
+          supervisorId: pSupId || tSupId || supervisorAlloc?.employeeId,
           supervisorName: supervisorEmp
             ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}`
             : undefined,
@@ -214,12 +220,18 @@ export function TaskWorklogView({
         const supervisorEmp = supervisorAlloc
           ? employees.find((e) => e.id === supervisorAlloc.employeeId)
           : null;
+        const pSupId = proj ? ((proj as any).supervisorId || (proj as any).supervisor_id) : null;
+        const tSupId = (t.supervisorId && t.supervisorId !== t.assigneeId)
+          ? t.supervisorId
+          : ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId)
+            ? (t as any).assignedByEmployeeId
+            : null;
         synth.push({
           id: `local-db-${t.id}`,
           taskId: t.id,
           projectId: t.projectId,
           employeeId: t.assigneeId || user?.id,
-          supervisorId: supervisorAlloc?.employeeId,
+          supervisorId: pSupId || tSupId || supervisorAlloc?.employeeId,
           supervisorName: supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : undefined,
           workTitle: t.title || t.name || 'Task',
           workCode: ((t.title || t.name || 'TASK') as string).split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 6),
@@ -729,10 +741,18 @@ export function TaskWorklogView({
               ) : filteredSessions.map((s) => {
                 const project = s.projectId && s.projectId !== 'OFFICE_TASK' ? (projects || []).find((p: any) => p.id === s.projectId) : null;
                 const task = (tasks || []).find((tk: any) => tk.id === s.taskId);
-                const pSupervisorId = project ? (project as any).supervisorId : null;
-                const tSupervisorId = task?.supervisorId || (task as any)?.assignedByEmployeeId;
-                const resolvedSupervisorId = pSupervisorId || tSupervisorId || s.supervisorId;
-                const resolvedSupervisorName = s.supervisorName || empName(resolvedSupervisorId);
+                const pSupervisorId = project ? ((project as any).supervisorId || (project as any).supervisor_id) : null;
+                const tSupervisorId = (task?.supervisorId && task.supervisorId !== task.assigneeId)
+                  ? task.supervisorId
+                  : ((task as any)?.assignedByEmployeeId && (task as any).assignedByEmployeeId !== task?.assigneeId)
+                    ? (task as any).assignedByEmployeeId
+                    : null;
+                const sessionSupId = (s.supervisorId && s.supervisorId !== s.employeeId) ? s.supervisorId : null;
+                const resolvedSupervisorId = pSupervisorId || tSupervisorId || sessionSupId;
+                const employeeFullName = empName(s.employeeId);
+                const resolvedSupervisorName = (s.supervisorName && s.supervisorName !== employeeFullName && s.supervisorName !== '—')
+                  ? s.supervisorName
+                  : empName(resolvedSupervisorId);
 
                 const sessionNotesMap = getSessionNotesMap();
                 const directNote = (s.notes && s.notes.trim()) || sessionNotesMap[s.id] || (s as any).description || '';

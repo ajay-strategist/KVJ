@@ -105,13 +105,14 @@ export function TaskFormModal({
   const resolvedSupervisorId = useMemo(() => {
     if (!isOfficeTask) {
       const p = projects.find((proj) => proj.id === form.category);
-      if (p?.supervisorId) return p.supervisorId;
+      const pSupId = p?.supervisorId || (p as any)?.supervisor_id;
+      if (pSupId) return pSupId;
     }
     if (isAssigningToOther) {
       return user?.id || '';
     }
-    return form.supervisorId;
-  }, [isOfficeTask, form.category, projects, isAssigningToOther, user?.id, form.supervisorId]);
+    return (form.supervisorId && form.supervisorId !== form.assigneeId) ? form.supervisorId : '';
+  }, [isOfficeTask, form.category, projects, isAssigningToOther, user?.id, form.supervisorId, form.assigneeId]);
 
   if (!open) return null;
 

@@ -1917,8 +1917,13 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
         }
 
         const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
-        const pSupervisorId = projectObj ? (projectObj as any).supervisorId : null;
-        const resolvedSupervisorId = pSupervisorId || t.supervisorId || (t as any).assignedByEmployeeId;
+        const pSupervisorId = projectObj ? ((projectObj as any).supervisorId || (projectObj as any).supervisor_id) : null;
+        const tSupervisorId = (t.supervisorId && t.supervisorId !== t.assigneeId)
+          ? t.supervisorId
+          : ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId)
+            ? (t as any).assignedByEmployeeId
+            : null;
+        const resolvedSupervisorId = pSupervisorId || tSupervisorId;
 
         if (!isManagement) {
           // Employees see tasks assigned to them PLUS tasks they supervise.
@@ -1935,8 +1940,13 @@ export const UpcomingEventsWidget = memo(function UpcomingEventsWidget() {
         return taskDate === isoDate;
       }).map((t) => {
         const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
-        const pSupervisorId = projectObj ? (projectObj as any).supervisorId : null;
-        const resolvedSupervisorId = pSupervisorId || t.supervisorId || (t as any).assignedByEmployeeId;
+        const pSupervisorId = projectObj ? ((projectObj as any).supervisorId || (projectObj as any).supervisor_id) : null;
+        const tSupervisorId = (t.supervisorId && t.supervisorId !== t.assigneeId)
+          ? t.supervisorId
+          : ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId)
+            ? (t as any).assignedByEmployeeId
+            : null;
+        const resolvedSupervisorId = pSupervisorId || tSupervisorId;
 
         const projName = projTitle(t.projectId);
         const displayTitle = projName && projName !== 'Office Task' ? `${projName}: ${t.title}` : `Office Task: ${t.title}`;
@@ -2799,14 +2809,18 @@ export function MyDayPage() {
           }
         });
 
+        const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
+        const pSupervisorId = (projectObj ? ((projectObj as any).supervisorId || (projectObj as any).supervisor_id || '') : '').toLowerCase();
         const tAssigneeId = (t.assigneeId || '').toLowerCase();
         const tAssigneeName = (typeof (t as any).assignee === 'string' ? (t as any).assignee : '').toLowerCase();
-        const tSupervisorId = (t.supervisorId || (t as any).assignedByEmployeeId || '').toLowerCase();
+        const tSupervisorId = ((t.supervisorId && t.supervisorId !== t.assigneeId ? t.supervisorId : '') ||
+          ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId ? (t as any).assignedByEmployeeId : '')).toLowerCase();
+        const effectiveSupervisorId = pSupervisorId || tSupervisorId;
         const tSupervisorName = (typeof (t as any).supervisor === 'string' ? (t as any).supervisor : (t as any).supervisorName || '').toLowerCase();
 
         const isMyTask =
           (tAssigneeId && myIdentifiers.has(tAssigneeId)) ||
-          (tSupervisorId && myIdentifiers.has(tSupervisorId)) ||
+          (effectiveSupervisorId && myIdentifiers.has(effectiveSupervisorId)) ||
           (tAssigneeName && myName && (tAssigneeName === myName || tAssigneeName.includes(myName) || myName.includes(tAssigneeName))) ||
           (tSupervisorName && myName && (tSupervisorName === myName || tSupervisorName.includes(myName) || myName.includes(tSupervisorName)));
 
@@ -2901,8 +2915,13 @@ export function MyDayPage() {
         // Resolve UUID IDs to display names using the employees list
         const assigneeEmp = employees?.find((e) => e.id === t.assigneeId);
         const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
-        const pSupervisorId = projectObj ? (projectObj as any).supervisorId : null;
-        const supervisorEmpId = pSupervisorId || t.supervisorId || (t as any).assignedByEmployeeId;
+        const pSupervisorId = projectObj ? ((projectObj as any).supervisorId || (projectObj as any).supervisor_id) : null;
+        const tSupervisorId = (t.supervisorId && t.supervisorId !== t.assigneeId)
+          ? t.supervisorId
+          : ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId)
+            ? (t as any).assignedByEmployeeId
+            : null;
+        const supervisorEmpId = pSupervisorId || tSupervisorId;
         const supervisorEmp = supervisorEmpId ? employees?.find((e) => e.id === supervisorEmpId) : null;
         const assigneeName = assigneeEmp
           ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}`
@@ -3098,8 +3117,12 @@ export function MyDayPage() {
 
       const raw = (projectTasks || []).find((t) => t.id === id);
       const project = raw?.projectId && raw.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === raw.projectId) : null;
-      const pSupervisorId = project ? (project as any).supervisorId : null;
-      const tSupervisorId = raw?.supervisorId || (raw as any)?.assignedByEmployeeId;
+      const pSupervisorId = project ? ((project as any).supervisorId || (project as any).supervisor_id) : null;
+      const tSupervisorId = (raw?.supervisorId && raw.supervisorId !== raw.assigneeId)
+        ? raw.supervisorId
+        : ((raw as any)?.assignedByEmployeeId && (raw as any).assignedByEmployeeId !== raw?.assigneeId)
+          ? (raw as any).assignedByEmployeeId
+          : null;
       const supervisorId = pSupervisorId || tSupervisorId;
 
       await startSession({

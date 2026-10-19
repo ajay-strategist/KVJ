@@ -268,13 +268,22 @@ export function useTaskSessions() {
         // 2. Pause any other tasks currently running for this employee
         await closeOtherOpenSessions(input.taskId, 'paused');
 
-        // 3. Create the single fresh running row
+        // 3. Resolve supervisor (avoid assignee self-supervising; resolve from project if needed)
+        let resolvedSupId = input.supervisorId && input.supervisorId !== user.id ? input.supervisorId : undefined;
+        if (!resolvedSupId && input.projectId && input.projectId !== 'OFFICE_TASK') {
+          try {
+            const { data: pData } = await supabase.from('flwdsk_projects').select('supervisor_id').eq('id', input.projectId).single();
+            if (pData?.supervisor_id) resolvedSupId = pData.supervisor_id;
+          } catch {}
+        }
+
+        // 4. Create the single fresh running row
         await repo.create(
           {
             taskId: input.taskId,
             projectId: input.projectId,
             employeeId: user.id,
-            supervisorId: input.supervisorId,
+            supervisorId: resolvedSupId,
             supervisorName: input.supervisorName,
             workTitle: input.workTitle,
             workCode: input.workCode || deriveWorkCode(input.workTitle),

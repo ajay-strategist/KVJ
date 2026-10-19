@@ -95,10 +95,11 @@ export function ApprovalsQueue() {
 
     const safeProjects = Array.isArray(projects) ? projects : [];
     const proj = safeProjects.find((p: any) => p.id === t.projectId);
-    const isProjSupervisor = Boolean(proj && (proj as any).supervisorId && (proj as any).supervisorId === user?.id);
+    const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
+    const isProjSupervisor = Boolean(projSupId && projSupId === user?.id);
     const isTaskSupervisor = Boolean(
-      (t.supervisorId && t.supervisorId === user?.id) ||
-      (t.assignedByEmployeeId && t.assignedByEmployeeId === user?.id)
+      (t.supervisorId && t.supervisorId === user?.id && t.supervisorId !== t.assigneeId) ||
+      (t.assignedByEmployeeId && t.assignedByEmployeeId === user?.id && t.assignedByEmployeeId !== t.assigneeId)
     );
 
     return isProjSupervisor || isTaskSupervisor;
@@ -112,8 +113,8 @@ export function ApprovalsQueue() {
     const safeProjects = Array.isArray(projects) ? projects : [];
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     return (
-      safeProjects.some((p: any) => p.supervisorId === user?.id) ||
-      safeTasks.some((t: any) => t.supervisorId === user?.id)
+      safeProjects.some((p: any) => p.supervisorId === user?.id || (p as any).supervisor_id === user?.id) ||
+      safeTasks.some((t: any) => t.supervisorId === user?.id && t.supervisorId !== t.assigneeId)
     );
   }, [canApprove, projects, tasks, user?.id]);
 
@@ -212,25 +213,51 @@ export function ApprovalsQueue() {
 
   const getSupervisorName = (t: any) => {
     if (!t) return '—';
-    const supId = t.supervisorId || t.assignedByEmployeeId || t.assigned_by_employee_id || t.supervisor_id;
-    if (supId && employees[supId]) {
-      const emp = employees[supId];
-      return `${emp.firstName} ${emp.lastName}`;
-    }
-    if (typeof t.supervisor === 'string' && t.supervisor && t.supervisor !== '—' && t.supervisor !== 'None') {
-      return t.supervisor;
-    }
-    if (typeof t.assignedBy === 'string' && t.assignedBy) {
-      return t.assignedBy;
-    }
     const safeProjects = Array.isArray(projects) ? projects : [];
     const proj = safeProjects.find((p) => p.id === t.projectId);
-    if (proj && (proj as any).supervisorId && employees[(proj as any).supervisorId]) {
-      const emp = employees[(proj as any).supervisorId];
+    const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
+
+    // 1. Project Supervisor takes primary precedence for project tasks
+    if (projSupId && employees[projSupId]) {
+      const emp = employees[projSupId];
       return `${emp.firstName} ${emp.lastName}`;
     }
-    const fallback = empName(supId);
-    return fallback !== 'Unknown Employee' ? fallback : 'Supervisor';
+
+    // 2. Task-level supervisor ID (if assigned and NOT the assignee themselves)
+    const taskSupId = t.supervisorId || t.supervisor_id;
+    if (taskSupId && taskSupId !== t.assigneeId && employees[taskSupId]) {
+      const emp = employees[taskSupId];
+      return `${emp.firstName} ${emp.lastName}`;
+    }
+
+    // 3. String supervisor on task (if valid and NOT the assignee's name)
+    const assigneeEmp = employees[t.assigneeId];
+    const assigneeName = assigneeEmp ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}`.trim().toLowerCase() : '';
+    if (typeof t.supervisor === 'string' && t.supervisor && t.supervisor !== '—' && t.supervisor !== 'None') {
+      if (!assigneeName || t.supervisor.trim().toLowerCase() !== assigneeName) {
+        return t.supervisor;
+      }
+    }
+
+    // 4. Assigned by employee (only if assignor is NOT the assignee)
+    const assignorId = t.assignedByEmployeeId || t.assigned_by_employee_id;
+    if (assignorId && assignorId !== t.assigneeId && employees[assignorId]) {
+      const emp = employees[assignorId];
+      return `${emp.firstName} ${emp.lastName}`;
+    }
+    if (typeof t.assignedBy === 'string' && t.assignedBy) {
+      if (!assigneeName || t.assignedBy.trim().toLowerCase() !== assigneeName) {
+        return t.assignedBy;
+      }
+    }
+
+    // 5. Fallback project supervisor if empName resolves
+    if (projSupId) {
+      const fallback = empName(projSupId);
+      if (fallback !== 'Unknown Employee') return fallback;
+    }
+
+    return '—';
   };
 
   const [selectedLeaveIds, setSelectedLeaveIds] = useState<string[]>([]);

@@ -53,7 +53,7 @@ export function useProject() {
       let allTimesheets = Array.isArray(tsPage?.data) ? tsPage.data : [];
 
       if (user && !isFullControl(user.role as any)) {
-        const supervisedProjectIds = new Set(allProjects.filter(p => (p as any).supervisorId === user.id).map(p => p.id));
+        const supervisedProjectIds = new Set(allProjects.filter(p => (p as any).supervisorId === user.id || (p as any).supervisor_id === user.id).map(p => p.id));
         const userAllocations = allAllocations.filter(a => a.employeeId === user.id);
         const allocatedProjectIds = new Set(userAllocations.map(a => a.projectId));
         

@@ -161,15 +161,20 @@ export function TaskBoard({
     // Check Project Supervisor
     const safeProjects = Array.isArray(projects) ? projects : [];
     const proj = safeProjects.find((p: any) => p.id === taskItem.projectId);
-    if (proj && (proj as any).supervisorId && (proj as any).supervisorId === user?.id) {
+    const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
+    if (projSupId && projSupId === user?.id) {
       return true;
     }
 
-    // Check Task Supervisor or Assignor
-    if (taskItem.supervisorId && taskItem.supervisorId === user?.id) {
+    // Check Task Supervisor or Assignor (only if not assignee themselves)
+    if (taskItem.supervisorId && taskItem.supervisorId === user?.id && taskItem.supervisorId !== taskItem.assigneeId) {
       return true;
     }
-    if ((taskItem as any).assignedByEmployeeId && (taskItem as any).assignedByEmployeeId === user?.id) {
+    if (
+      (taskItem as any).assignedByEmployeeId &&
+      (taskItem as any).assignedByEmployeeId === user?.id &&
+      (taskItem as any).assignedByEmployeeId !== taskItem.assigneeId
+    ) {
       return true;
     }
 
@@ -225,8 +230,12 @@ export function TaskBoard({
       const project = projects.find((p: any) => p.id === t.projectId);
       const assignee = employees.find((e) => e.id === t.assigneeId);
       
-      const pSupervisorId = project ? (project as any).supervisorId : null;
-      const tSupervisorId = t.supervisorId || t.assignedByEmployeeId;
+      const pSupervisorId = project ? ((project as any).supervisorId || (project as any).supervisor_id) : null;
+      const tSupervisorId = (t.supervisorId && t.supervisorId !== t.assigneeId)
+        ? t.supervisorId
+        : ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId)
+          ? (t as any).assignedByEmployeeId
+          : null;
       const supervisorId = pSupervisorId || tSupervisorId;
       const supervisorEmp = supervisorId ? employees.find((e) => e.id === supervisorId) : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : (t.supervisorName || '');
@@ -557,11 +566,18 @@ export function TaskBoard({
         await updateTask(task.id as UUID, { status: 'in_progress', approvalStatus: null });
         
         const raw = (tasks || []).find((t: any) => t.id === task.id);
+        const pObj = raw?.projectId ? (projects || []).find((p: any) => p.id === raw.projectId) : null;
+        const pSupId = pObj ? ((pObj as any).supervisorId || (pObj as any).supervisor_id) : null;
+        const tSupId = (raw?.supervisorId && raw.supervisorId !== raw.assigneeId)
+          ? raw.supervisorId
+          : ((raw as any)?.assignedByEmployeeId && (raw as any).assignedByEmployeeId !== raw?.assigneeId)
+            ? (raw as any).assignedByEmployeeId
+            : null;
         await startSession({
           taskId: task.id as UUID,
           projectId: raw?.projectId,
           workTitle: task.name,
-          supervisorId: (raw as any)?.supervisorId,
+          supervisorId: pSupId || tSupId,
         });
       } catch (e) {
         console.warn('Update task error:', e);

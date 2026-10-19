@@ -378,9 +378,9 @@ export class ProjectService implements IProjectService {
       const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
       const proj = existing.projectId ? await this.projectRepo.findById(existing.projectId).catch(() => null) : null;
       const isSupervisor = Boolean(
-        (proj && proj.supervisorId === actor.id) ||
-        existing.supervisorId === actor.id ||
-        (existing as any).assignedByEmployeeId === actor.id
+        (proj && (proj.supervisorId === actor.id || (proj as any).supervisor_id === actor.id)) ||
+        (existing.supervisorId && existing.supervisorId === actor.id && existing.supervisorId !== existing.assigneeId) ||
+        ((existing as any).assignedByEmployeeId === actor.id && (existing as any).assignedByEmployeeId !== existing.assigneeId)
       );
       if (!isAdminOrCeo && !isSupervisor) {
         return Err(AppError.forbidden('Only the Project/Task Supervisor or Admin/CEO can request rework for this task.'));
@@ -416,9 +416,9 @@ export class ProjectService implements IProjectService {
       const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
       const proj = existing.projectId ? await this.projectRepo.findById(existing.projectId).catch(() => null) : null;
       const isSupervisor = Boolean(
-        (proj && proj.supervisorId === actor.id) ||
-        existing.supervisorId === actor.id ||
-        (existing as any).assignedByEmployeeId === actor.id
+        (proj && (proj.supervisorId === actor.id || (proj as any).supervisor_id === actor.id)) ||
+        (existing.supervisorId && existing.supervisorId === actor.id && existing.supervisorId !== existing.assigneeId) ||
+        ((existing as any).assignedByEmployeeId === actor.id && (existing as any).assignedByEmployeeId !== existing.assigneeId)
       );
       if (!isAdminOrCeo && !isSupervisor) {
         return Err(AppError.forbidden('Only the Project/Task Supervisor or Admin/CEO can approve this task submission.'));
@@ -467,9 +467,9 @@ export class ProjectService implements IProjectService {
       const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
       const proj = existing.projectId ? await this.projectRepo.findById(existing.projectId).catch(() => null) : null;
       const isSupervisor = Boolean(
-        (proj && proj.supervisorId === actor.id) ||
-        existing.supervisorId === actor.id ||
-        (existing as any).assignedByEmployeeId === actor.id
+        (proj && (proj.supervisorId === actor.id || (proj as any).supervisor_id === actor.id)) ||
+        (existing.supervisorId && existing.supervisorId === actor.id && existing.supervisorId !== existing.assigneeId) ||
+        ((existing as any).assignedByEmployeeId === actor.id && (existing as any).assignedByEmployeeId !== existing.assigneeId)
       );
       if (!isAdminOrCeo && !isSupervisor) {
         return Err(AppError.forbidden('Only the Project/Task Supervisor or Admin/CEO can approve this task assignment.'));

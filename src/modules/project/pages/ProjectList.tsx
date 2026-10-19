@@ -260,8 +260,9 @@ export function ProjectList({
       // project had none, the first manager/lead allocated to it was displayed
       // as the supervisor — which is why projects with no supervisor still
       // showed one. If there is no supervisor, show nothing.
-      const supervisorEmp = (p as any).supervisorId
-        ? employees.find((e) => e.id === (p as any).supervisorId)
+      const projSupId = (p as any).supervisorId || (p as any).supervisor_id;
+      const supervisorEmp = projSupId
+        ? employees.find((e) => e.id === projSupId)
         : null;
       const supervisorName = supervisorEmp ? `${supervisorEmp.firstName} ${supervisorEmp.lastName}` : '';
 
@@ -279,7 +280,7 @@ export function ProjectList({
       const membersMap = new Map<string, { name: string; hours: number; avatarUrl?: string }>();
 
       // 1. Add Project Supervisor
-      const superId = p.supervisorId;
+      const superId = p.supervisorId || (p as any).supervisor_id;
       if (superId) {
         const emp = employees.find((e) => e.id === superId);
         if (emp) {
@@ -380,7 +381,8 @@ export function ProjectList({
     if (effectiveEmpId && effectiveEmpId !== 'all') {
       list = list.filter((p: any) => {
         const dbProj = projects.find((dp: any) => dp.id === p.id);
-        if (dbProj && (dbProj as any).supervisorId === effectiveEmpId) {
+        const dbSupId = (dbProj as any)?.supervisorId || (dbProj as any)?.supervisor_id;
+        if (dbProj && dbSupId === effectiveEmpId) {
           return true;
         }
         const isAllocated = allocations.some(
@@ -477,7 +479,8 @@ export function ProjectList({
     if (selectedEmployeeId && selectedEmployeeId !== 'all') {
       list = list.filter((p: any) => {
         const dbProj = projects.find((dp: any) => dp.id === p.id);
-        if (dbProj && (dbProj as any).supervisorId === selectedEmployeeId) {
+        const dbSupId = (dbProj as any)?.supervisorId || (dbProj as any)?.supervisor_id;
+        if (dbProj && dbSupId === selectedEmployeeId) {
           return true;
         }
         const isAllocated = allocations.some(
@@ -1808,7 +1811,10 @@ export function ProjectList({
               code: selectedProject.code,
               title: selectedProject.title,
               status: projectStatusLabelToValue(selectedProject.status),
-              supervisorId: projects.find((p: any) => p.id === selectedProject.id)?.supervisorId || '',
+              supervisorId: (() => {
+                const found = projects.find((p: any) => p.id === selectedProject.id);
+                return found?.supervisorId || (found as any)?.supervisor_id || '';
+              })(),
               memberIds: allocations.filter((a: any) => a.projectId === selectedProject.id).map((a: any) => a.employeeId),
             }}
             onSubmit={handleEditProject}
