@@ -262,7 +262,6 @@ export function PageHeader({
     </div>
   );
 }
-
 export function SectionHeader({
   title,
   action,
@@ -273,7 +272,7 @@ export function SectionHeader({
   subtitle?: string;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: subtitle ? 'flex-start' : 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: subtitle ? 'flex-start' : 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
       <div>
         <h2
           style={{
@@ -282,7 +281,6 @@ export function SectionHeader({
             fontWeight: 'var(--font-weight-semibold)',
             color: 'var(--text-primary)',
             letterSpacing: 'var(--letter-spacing-tight)',
-            whiteSpace: 'nowrap',
           }}
         >
           {title}
@@ -297,7 +295,6 @@ export function SectionHeader({
     </div>
   );
 }
-
 // ── StatCard ─────────────────────────────────────────────────────────────────
 export function StatCard({
   label,
@@ -452,16 +449,18 @@ export function SearchInput({
   onChange,
   placeholder = 'Search…',
   style,
+  onClear,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   style?: React.CSSProperties;
+  onClear?: () => void;
 }) {
   return (
     <div style={{ position: 'relative', ...style }}>
       <svg
-        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
+        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}
         width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor"
         strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
       >
@@ -469,11 +468,41 @@ export function SearchInput({
       </svg>
       <input
         className="kvj-input"
-        style={{ paddingLeft: 36 }}
+        style={{ paddingLeft: 36, paddingRight: value ? 28 : undefined }}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
+      {value ? (
+        <button
+          type="button"
+          onClick={() => {
+            onChange('');
+            onClear?.();
+          }}
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            padding: '2px 6px',
+            fontSize: 12,
+            lineHeight: 1,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          aria-label="Clear search"
+          title="Clear search"
+        >
+          ✕
+        </button>
+      ) : null}
     </div>
   );
 }

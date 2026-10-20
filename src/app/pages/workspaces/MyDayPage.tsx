@@ -3,7 +3,7 @@ import { AppShell } from '../../../shared/layout/AppShell';
 import { useDevice, useBreakpoint } from '../../../shared/hooks/responsive';
 import { WorkspaceShell, type WorkspaceRole } from '../../../shared/workspace/WorkspaceShell';
 import { DashboardGrid } from '../../../shared/dashboard/dashboard';
-import { PageHeader, Card, SectionHeader, StatCard, QuickActionCard, Badge, Timeline, ActivityCard, Button } from '../../../shared/ui/components';
+import { PageHeader, Card, SectionHeader, SearchInput, StatCard, QuickActionCard, Badge, Timeline, ActivityCard, Button } from '../../../shared/ui/components';
 import { useAuth } from '../../../modules/auth/AuthProvider';
 import { ROLES } from '../../../shared/permissions/roles';
 import { useAttendance } from '../../../modules/attendance/hooks/useAttendance';
@@ -1339,6 +1339,7 @@ export const TaskWidget = memo(function TaskWidget({
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const [showSubmitted, setShowSubmitted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>({});
 
   const toggleExpand = (taskId: string) => {
@@ -1404,12 +1405,17 @@ export const TaskWidget = memo(function TaskWidget({
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
+    if (searchQuery.trim()) {
+      e.preventDefault();
+      return;
+    }
     setDraggedTaskId(id);
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent, id: string) => {
+    if (searchQuery.trim()) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dragOverTaskId !== id) {
@@ -1418,6 +1424,11 @@ export const TaskWidget = memo(function TaskWidget({
   };
 
   const handleDrop = (e: React.DragEvent, targetId: string) => {
+    if (searchQuery.trim()) {
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
 
@@ -1457,26 +1468,43 @@ export const TaskWidget = memo(function TaskWidget({
     if (!showSubmitted) {
       list = list.filter((t) => !t.underReview);
     }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((t) => {
+        const titleMatch = t.title?.toLowerCase().includes(q);
+        const projMatch = t.project?.toLowerCase().includes(q);
+        return Boolean(titleMatch || projMatch);
+      });
+    }
     return [...list].sort((a, b) => {
       if (a.active && !b.active) return -1;
       if (!a.active && b.active) return 1;
       return 0;
     });
-  }, [tasks, showSubmitted]);
+  }, [tasks, showSubmitted, searchQuery]);
 
   return (
     <Card>
       <SectionHeader 
-        title="Today's Tasks (Drag & Drop Reorder)" 
+        title={searchQuery.trim() ? "Today's Tasks" : "Today's Tasks (Drag & Drop Reorder)"} 
+        subtitle={searchQuery.trim() ? `Showing results for "${searchQuery.trim()}" (Drag & drop reordering paused)` : undefined}
         action={
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setShowSubmitted(!showSubmitted)}
-            style={{ fontSize: 11.5 }}
-          >
-            {showSubmitted ? '🙈 Hide Submitted' : '👁️ Show Submitted'}
-          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <SearchInput 
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search tasks..."
+              style={{ width: isDesktop ? 200 : '100%', minWidth: 150 }}
+            />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowSubmitted(!showSubmitted)}
+              style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
+            >
+              {showSubmitted ? '🙈 Hide Submitted' : '👁️ Show Submitted'}
+            </Button>
+          </div>
         }
       />
       <style>{`
@@ -1499,7 +1527,21 @@ export const TaskWidget = memo(function TaskWidget({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {activeTasks.length === 0 ? (
           <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-            📋 No pending or active tasks for today. Click <strong>Add Task</strong> to create a new task.
+            {searchQuery.trim() ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <span>🔍 No tasks found matching <strong>"{searchQuery.trim()}"</strong></span>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => setSearchQuery('')}
+                  style={{ fontSize: 12, marginTop: 4 }}
+                >
+                  Clear Search
+                </Button>
+              </div>
+            ) : (
+              <span>📋 No pending or active tasks for today. Click <strong>Add Task</strong> to create a new task.</span>
+            )}
           </div>
         ) : (
           activeTasks.map((t) => {
@@ -1508,7 +1550,7 @@ export const TaskWidget = memo(function TaskWidget({
             return (
               <div
                 key={t.id}
-                draggable
+                draggable={!searchQuery.trim()}
                 onDragStart={(e) => handleDragStart(e, t.id)}
                 onDragOver={(e) => handleDragOver(e, t.id)}
                 onDrop={(e) => handleDrop(e, t.id)}
@@ -1527,7 +1569,7 @@ export const TaskWidget = memo(function TaskWidget({
                   border: '1px solid var(--border)',
                   background: 'var(--bg-surface)',
                   borderRadius: 10,
-                  cursor: 'grab',
+                  cursor: searchQuery.trim() ? 'default' : 'grab',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 12,
@@ -1538,7 +1580,18 @@ export const TaskWidget = memo(function TaskWidget({
                  {isDesktop ? (
                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 0 }}>
-                       <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4, flexShrink: 0 }}>⣿</span>
+                       <span 
+                         style={{ 
+                           fontSize: 18, 
+                           color: searchQuery.trim() ? 'var(--border)' : 'var(--text-muted)', 
+                           cursor: searchQuery.trim() ? 'default' : 'grab', 
+                           marginRight: 4, 
+                           flexShrink: 0 
+                         }}
+                         title={searchQuery.trim() ? 'Reordering disabled during search' : 'Drag to reorder'}
+                       >
+                         ⣿
+                       </span>
                        <button
                          type="button"
                          onClick={(e) => {
@@ -1646,7 +1699,18 @@ export const TaskWidget = memo(function TaskWidget({
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                      {/* Row 1: Drag handle + expand + title */}
                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                       <span style={{ fontSize: 18, color: 'var(--text-muted)', cursor: 'grab', marginRight: 4, flexShrink: 0 }}>⣿</span>
+                       <span 
+                         style={{ 
+                           fontSize: 18, 
+                           color: searchQuery.trim() ? 'var(--border)' : 'var(--text-muted)', 
+                           cursor: searchQuery.trim() ? 'default' : 'grab', 
+                           marginRight: 4, 
+                           flexShrink: 0 
+                         }}
+                         title={searchQuery.trim() ? 'Reordering disabled during search' : 'Drag to reorder'}
+                       >
+                         ⣿
+                       </span>
                        <button
                          type="button"
                          onClick={(e) => {
