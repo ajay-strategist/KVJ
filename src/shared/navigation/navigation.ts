@@ -48,6 +48,7 @@ export const NAV_TREE: NavItem[] = [
   { id: 'project-timesheets', label: 'Timesheets Tracker', path: '/app/project/timesheets', icon: 'Clock', permission: ['project', 'view'], module: 'project', page: 'timesheets' },
 
   { id: 'finance-expenses', label: 'Expenses & Travel', path: '/app/finance/expenses', icon: 'Receipt', permission: ['expense', 'view'], module: 'finance' },
+  { id: 'finance-analytics', label: 'Expense Analytics', path: '/app/finance/expense-analytics', icon: 'BarChart3', permission: ['expense', 'view'], module: 'finance' },
   { id: 'finance-procurement', label: 'Procurement Board', path: '/app/finance/procurement', icon: 'ShoppingCart', permission: ['expense', 'view'], module: 'finance', page: 'procurement' },
   { id: 'finance-assets', label: 'Asset Inventory', path: '/app/finance/assets', icon: 'Package', permission: ['expense', 'view'], module: 'finance', page: 'assets' },
   { id: 'finance-budgets', label: 'Budgets Console', path: '/app/finance/budgets', icon: 'Calculator', permission: ['expense', 'view'], module: 'finance', page: 'budgets' },
@@ -89,6 +90,7 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
     'projects-tasks',
     // Finance
     'finance-expenses',
+    'finance-analytics',
     // Communication
     'comm-chat',
     'comm-announcements',

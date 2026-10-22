@@ -47,6 +47,7 @@ const TimesheetTracker = lazy(() => import('../modules/project/pages/TimesheetTr
 
 // Finance & Operations Management
 const ExpenseClaims = lazy(() => import('../modules/finance/pages/ExpenseClaims').then((m) => ({ default: m.ExpenseClaims })));
+const ExpenseAnalyticsPage = lazy(() => import('../modules/finance/pages/ExpenseAnalyticsPage').then((m) => ({ default: m.ExpenseAnalyticsPage })));
 const ProcurementBoard = lazy(() => import('../modules/finance/pages/ProcurementBoard').then((m) => ({ default: m.ProcurementBoard })));
 const AssetInventory = lazy(() => import('../modules/finance/pages/AssetInventory').then((m) => ({ default: m.AssetInventory })));
 const BudgetsConsole = lazy(() => import('../modules/finance/pages/BudgetsConsole').then((m) => ({ default: m.BudgetsConsole })));
@@ -113,6 +114,7 @@ export function AppRouter() {
 
           {/* Finance & Operations Management */}
           <Route path="/app/finance/expenses" element={<ProtectedRoute resource="expense" action="view"><ExpenseClaims /></ProtectedRoute>} />
+          <Route path="/app/finance/expense-analytics" element={<ProtectedRoute resource="expense" action="view"><ExpenseAnalyticsPage /></ProtectedRoute>} />
           <Route path="/app/finance/procurement" element={<ProtectedRoute resource="expense" action="view"><ProcurementBoard /></ProtectedRoute>} />
           <Route path="/app/finance/assets" element={<ProtectedRoute resource="expense" action="view"><AssetInventory /></ProtectedRoute>} />
           <Route path="/app/finance/budgets" element={<ProtectedRoute resource="expense" action="view"><BudgetsConsole /></ProtectedRoute>} />
