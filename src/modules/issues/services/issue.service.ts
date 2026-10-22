@@ -213,7 +213,7 @@ class IssueService {
         module: newTicket.module,
         user_id: user.id,
         created_at: newTicket.createdAt,
-      }).then(() => {}).catch(() => {});
+      }).then(() => {}, () => {});
     } catch {
       // Ignore background persistence errors
     }
