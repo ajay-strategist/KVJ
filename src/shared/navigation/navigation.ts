@@ -96,8 +96,8 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
     // Communication
     'comm-chat',
     'comm-announcements',
-    // Support & Helpdesk
-    'support-issues',
+    // Support & Helpdesk (temporarily hidden per user request)
+    // 'support-issues',
     'settings',
   ];
 
