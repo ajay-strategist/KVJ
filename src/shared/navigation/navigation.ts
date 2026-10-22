@@ -59,6 +59,8 @@ export const NAV_TREE: NavItem[] = [
   { id: 'comm-emails', label: 'Email Center', path: '/app/communication/emails', icon: 'Mail', permission: ['chat', 'view'], module: 'communication', page: 'emailCenter' },
   { id: 'comm-reminders', label: 'Reminders Center', path: '/app/communication/reminders', icon: 'Bell', permission: ['chat', 'view'], module: 'communication', page: 'reminders' },
 
+  { id: 'support-issues', label: 'Raise Issue', path: '/app/issues', icon: 'LifeBuoy' },
+
   { id: 'analytics-exec', label: 'Executive Console', path: '/app/analytics/executive', icon: 'BarChart3', permission: ['analytics', 'view'], module: 'analytics', page: 'executiveConsole' },
   { id: 'analytics-builder', label: 'Report Builder', path: '/app/analytics/builder', icon: 'LayoutGrid', permission: ['analytics', 'view'], module: 'analytics', page: 'reportBuilder' },
   { id: 'analytics-kpis', label: 'KPI Registry', path: '/app/analytics/kpis', icon: 'LineChart', permission: ['analytics', 'view'], module: 'analytics', page: 'kpiRegistry' },
@@ -94,6 +96,8 @@ export function visibleNav(canFn: (r: Resource, a: Action) => boolean, userRole?
     // Communication
     'comm-chat',
     'comm-announcements',
+    // Support & Helpdesk
+    'support-issues',
     'settings',
   ];
 

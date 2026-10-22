@@ -58,6 +58,7 @@ const ChatChannels = lazy(() => import('../modules/communication/pages/ChatChann
 const AnnouncementsBoard = lazy(() => import('../modules/communication/pages/AnnouncementsBoard').then((m) => ({ default: m.AnnouncementsBoard })));
 const EmailCenter = lazy(() => import('../modules/communication/pages/EmailCenter').then((m) => ({ default: m.EmailCenter })));
 const ReminderCenter = lazy(() => import('../modules/communication/pages/ReminderCenter').then((m) => ({ default: m.ReminderCenter })));
+const IssuesPage = lazy(() => import('../modules/issues/pages/IssuesPage').then((m) => ({ default: m.IssuesPage })));
 
 // Executive Analytics & BI Platform
 const ExecutiveConsole = lazy(() => import('../modules/analytics/pages/ExecutiveConsole').then((m) => ({ default: m.ExecutiveConsole })));
@@ -125,6 +126,9 @@ export function AppRouter() {
           <Route path="/app/communication/announcements" element={<ProtectedRoute resource="chat" action="view"><AnnouncementsBoard /></ProtectedRoute>} />
           <Route path="/app/communication/emails" element={<ProtectedRoute resource="chat" action="view"><EmailCenter /></ProtectedRoute>} />
           <Route path="/app/communication/reminders" element={<ProtectedRoute resource="chat" action="view"><ReminderCenter /></ProtectedRoute>} />
+
+          {/* Support & Issue Tracking */}
+          <Route path="/app/issues" element={<ProtectedRoute><IssuesPage /></ProtectedRoute>} />
 
           {/* Executive Analytics & BI Platform */}
           <Route path="/app/analytics/executive" element={<ProtectedRoute resource="analytics" action="view"><ExecutiveConsole /></ProtectedRoute>} />

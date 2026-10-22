@@ -61,6 +61,7 @@ const ICON_PATHS: Record<string, string> = {
   User: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
   UserCheck: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 11l2 2 4-4',
   Star: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
+  LifeBuoy: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 15a5 5 0 1 1 5-5 5 5 0 0 1-5 5zm7.07-9.93l-3.54 3.54M8.47 15.53l-3.54 3.54M4.93 8.07l3.54 3.54M15.53 15.53l3.54 3.54',
 };
 
 function Icon({ name, size = 18 }: { name: string; size?: number }) {
@@ -110,6 +111,7 @@ function timeAgo(iso: string): string {
 function AppShellFrame({ children }: { children: ReactNode }) {
   const device = useDevice();
   const [collapsed, setCollapsed] = useState(false);
+  const [collapseHovered, setCollapseHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -165,6 +167,13 @@ function AppShellFrame({ children }: { children: ReactNode }) {
         setUserOpen(false);
         setNotifOpen(false);
         setMobileOpen(false);
+      }
+      // Toggle sidebar collapse with [ when not typing inside an input
+      const targetTag = (e.target as HTMLElement)?.tagName;
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag) || (e.target as HTMLElement)?.isContentEditable;
+      if (!isInput && (e.key === '[' || ((e.metaKey || e.ctrlKey) && e.key === '['))) {
+        e.preventDefault();
+        setCollapsed((c) => !c);
       }
     };
     document.addEventListener('keydown', onKey);
@@ -467,24 +476,63 @@ function AppShellFrame({ children }: { children: ReactNode }) {
 
             </div>
 
-            {/* Collapse toggle (desktop only) */}
+            {/* Collapse toggle (desktop only) — Redesigned for high noticeability and clarity */}
             {!isMobile && (
               <button
+                type="button"
                 onClick={() => setCollapsed((c) => !c)}
-                aria-label="Toggle sidebar"
+                onMouseEnter={() => setCollapseHovered(true)}
+                onMouseLeave={() => setCollapseHovered(false)}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!collapsed}
+                title={collapsed ? 'Expand sidebar ( [ )' : 'Collapse sidebar ( [ )'}
                 style={{
-                  margin: '0 10px 10px', padding: 7,
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-sunken)',
-                  color: 'var(--text-muted)',
+                  margin: '0 10px 10px',
+                  padding: collapsed ? '8px 0' : '8px 12px',
+                  height: 38,
+                  borderRadius: 'var(--radius-md)',
+                  border: collapseHovered
+                    ? '1px solid rgba(59, 130, 246, 0.45)'
+                    : '1px solid var(--border)',
+                  background: collapseHovered
+                    ? 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.08))'
+                    : 'var(--bg-sunken)',
+                  color: collapseHovered ? 'var(--brand)' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 180ms',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: collapsed ? 'center' : 'space-between',
+                  gap: 8,
+                  transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  boxShadow: collapseHovered ? '0 2px 10px rgba(59, 130, 246, 0.12)' : 'none',
                   flexShrink: 0,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-ui)',
                 }}
               >
-                <Icon name={collapsed ? 'ChevronRight' : 'ChevronLeft'} size={14} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <Icon name={collapsed ? 'ChevronRight' : 'ChevronLeft'} size={15} />
+                  {!collapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Collapse Sidebar</span>}
+                </div>
+                {!collapsed && (
+                  <kbd
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
+                      color: collapseHovered ? 'var(--brand)' : 'var(--text-muted)',
+                      lineHeight: 1.2,
+                      fontFamily: 'inherit',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    }}
+                  >
+                    [
+                  </kbd>
+                )}
               </button>
             )}
           </aside>
