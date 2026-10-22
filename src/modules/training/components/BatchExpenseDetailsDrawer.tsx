@@ -77,17 +77,18 @@ function formatDate(val?: string | null): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
-export function normalizeBatchToken(str?: string | null): string {
+export function normalizeBatchKey(str?: string | null): string {
   if (!str) return '';
   return String(str)
+    .toLowerCase()
     .replace(/^batch\s*\(/i, '')
     .replace(/\)$/, '')
     .replace(/^batch\s*-\s*/i, '')
-    // remove academic year (e.g. 2026-2027) so year presence/absence doesn't break matching
+    // Remove academic years like 2026-2027
     .replace(/20\d\d\s*-\s*20\d\d/g, '')
-    .replace(/[^a-z0-9]/gi, ' ')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
+    // Standardize batch number
+    .replace(/batch\s*(\d+)/gi, 'b$1')
+    .replace(/[^a-z0-9]/gi, '')
     .trim();
 }
 
@@ -119,36 +120,30 @@ export function isBatchMatch(
 
   if (!expBatch) return false;
 
-  // 2. Candidate targets from props
-  const candidates: string[] = [
-    targetBatchName,
-    targetBatchCode || '',
-    batchObj?.code || '',
-    batchObj?.trainingName || '',
-    batchObj?.batchNo || '',
-  ].filter(Boolean);
+  const kExp = normalizeBatchKey(expBatch);
+  if (!kExp) return false;
 
-  // Construct composite variations if batchObj is provided
+  // 2. Candidate target keys from batch identifiers
+  const candidateKeys = new Set<string>();
+  if (targetBatchName) candidateKeys.add(normalizeBatchKey(targetBatchName));
+  if (targetBatchCode) candidateKeys.add(normalizeBatchKey(targetBatchCode));
+  if (batchObj?.code) candidateKeys.add(normalizeBatchKey(batchObj.code));
+  if (batchObj?.trainingName) candidateKeys.add(normalizeBatchKey(batchObj.trainingName));
+
   if (batchObj) {
     const col = batchObj.college || '';
     const prog = (batchObj.program && batchObj.program !== 'undefined') ? batchObj.program : '';
     const yr = batchObj.academicYear || (batchObj as any).academic_year || '';
     const bNo = batchObj.batchNo || (batchObj as any).batch_no || '';
     if (col && bNo) {
-      candidates.push(`${col} - ${prog} - ${bNo}`);
-      candidates.push(`${col} - ${prog} - ${yr} - ${bNo}`);
-      candidates.push(`${col} - ${bNo}`);
-      candidates.push(`${col} ${prog} ${bNo}`);
+      candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${bNo}`));
+      candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${yr} ${bNo}`));
     }
   }
 
-  const nExp = normalizeBatchToken(expBatch);
-  if (!nExp) return false;
-
-  for (const c of candidates) {
-    const nCand = normalizeBatchToken(c);
-    if (!nCand) continue;
-    if (nExp === nCand || nExp.includes(nCand) || nCand.includes(nExp)) {
+  // Exact normalized key equality check to prevent cross-batch leakage
+  for (const k of candidateKeys) {
+    if (k && kExp === k) {
       return true;
     }
   }
