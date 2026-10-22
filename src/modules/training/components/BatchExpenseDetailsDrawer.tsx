@@ -15,6 +15,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../../shared/integration/supabase';
 
+import type { Batch } from '../training.repository';
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface RawExpenseClaim {
@@ -53,6 +55,7 @@ export interface BatchExpenseDetailsDrawerProps {
   studentCount: number;
   startDate?: string;
   endDate?: string;
+  batch?: Batch | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -74,18 +77,83 @@ function formatDate(val?: string | null): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
-function isBatchMatch(notes: string | undefined, batchName: string): boolean {
-  if (!batchName || !notes) return false;
-  const lower = notes.toLowerCase();
-  const target = batchName.toLowerCase();
-  if (lower.includes(target)) return true;
+export function normalizeBatchToken(str?: string | null): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/^batch\s*\(/i, '')
+    .replace(/\)$/, '')
+    .replace(/^batch\s*-\s*/i, '')
+    // remove academic year (e.g. 2026-2027) so year presence/absence doesn't break matching
+    .replace(/20\d\d\s*-\s*20\d\d/g, '')
+    .replace(/[^a-z0-9]/gi, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isBatchMatch(
+  notes: string | undefined,
+  targetBatchName: string,
+  targetBatchCode?: string,
+  batchObj?: Batch | null
+): boolean {
+  if (!notes) return false;
+
+  let expBatch = '';
+  let expBatchId = '';
   try {
-    const parsed = JSON.parse(notes);
-    const nb: string = parsed?.batchName || '';
-    return nb.toLowerCase().includes(target) || target.includes(nb.toLowerCase());
+    const parsed = typeof notes === 'string' ? JSON.parse(notes) : notes;
+    expBatch = parsed?.batchName || parsed?.batch || parsed?.batch_name || '';
+    expBatchId = parsed?.batchId || parsed?.batch_id || '';
+    if (!expBatch && typeof notes === 'string' && !notes.trim().startsWith('{')) {
+      expBatch = notes;
+    }
   } catch {
-    return false;
+    expBatch = notes;
   }
+
+  // 1. Direct Batch ID match if present
+  if (batchObj?.id && expBatchId && batchObj.id === expBatchId) {
+    return true;
+  }
+
+  if (!expBatch) return false;
+
+  // 2. Candidate targets from props
+  const candidates: string[] = [
+    targetBatchName,
+    targetBatchCode || '',
+    batchObj?.code || '',
+    batchObj?.trainingName || '',
+    batchObj?.batchNo || '',
+  ].filter(Boolean);
+
+  // Construct composite variations if batchObj is provided
+  if (batchObj) {
+    const col = batchObj.college || '';
+    const prog = (batchObj.program && batchObj.program !== 'undefined') ? batchObj.program : '';
+    const yr = batchObj.academicYear || (batchObj as any).academic_year || '';
+    const bNo = batchObj.batchNo || (batchObj as any).batch_no || '';
+    if (col && bNo) {
+      candidates.push(`${col} - ${prog} - ${bNo}`);
+      candidates.push(`${col} - ${prog} - ${yr} - ${bNo}`);
+      candidates.push(`${col} - ${bNo}`);
+      candidates.push(`${col} ${prog} ${bNo}`);
+    }
+  }
+
+  const nExp = normalizeBatchToken(expBatch);
+  if (!nExp) return false;
+
+  for (const c of candidates) {
+    const nCand = normalizeBatchToken(c);
+    if (!nCand) continue;
+    if (nExp === nCand || nExp.includes(nCand) || nCand.includes(nExp)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function parseExpenseRow(raw: RawExpenseClaim): ExpenseRow {
@@ -176,6 +244,7 @@ export function BatchExpenseDetailsDrawer({
   batchName,
   batchCode,
   studentCount,
+  batch,
 }: BatchExpenseDetailsDrawerProps) {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -184,7 +253,7 @@ export function BatchExpenseDetailsDrawer({
 
   // ── Load expense data ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!open || !batchName) return;
+    if (!open || (!batchName && !batchCode && !batch)) return;
 
     setLoading(true);
     const fetched: ExpenseRow[] = [];
@@ -195,11 +264,12 @@ export function BatchExpenseDetailsDrawer({
         const { data } = await supabase
           .from('flwdsk_expense_claims')
           .select('id, amount, category, status, receipt_url, created_at, notes, employee_id')
-          .eq('category', 'Training Expense');
+          .ilike('category', '%Training%')
+          .is('deleted_at', null);
 
         if (data && data.length > 0) {
           data
-            .filter((r: RawExpenseClaim) => isBatchMatch(r.notes, batchName))
+            .filter((r: RawExpenseClaim) => isBatchMatch(r.notes, batchName, batchCode, batch))
             .forEach((r: RawExpenseClaim) => fetched.push(parseExpenseRow(r)));
         }
       } catch { /* fall through to localStorage */ }
@@ -210,11 +280,8 @@ export function BatchExpenseDetailsDrawer({
         if (Array.isArray(local)) {
           local
             .filter((r: any) => {
-              const batchField: string = r.batch || '';
-              return (
-                batchField.toLowerCase().includes(batchName.toLowerCase()) ||
-                batchName.toLowerCase().includes(batchField.toLowerCase())
-              ) && batchField;
+              const notesField = r.notes || r.batch || '';
+              return isBatchMatch(r.batch || notesField, batchName, batchCode, batch);
             })
             .forEach((r: any) => {
               if (!fetched.find((f) => f.id === r.id)) {
@@ -239,7 +306,7 @@ export function BatchExpenseDetailsDrawer({
       setExpenses(fetched);
       setLoading(false);
     })();
-  }, [open, batchName]);
+  }, [open, batchName, batchCode, batch]);
 
   // ── Analytics ────────────────────────────────────────────────────────────
   const totalExpense = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);

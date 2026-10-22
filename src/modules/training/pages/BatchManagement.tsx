@@ -23,6 +23,7 @@ import { cleanBatchCode } from '../utils/batch-formatter';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 import { BatchHeaderCard } from '../components/BatchHeaderCard';
+import { toCardVM } from '../components/TrainingBatchCarousel';
 import { StudentsTab } from '../tabs/StudentsTab';
 import { AttendanceMatrixTab } from '../tabs/AttendanceMatrixTab';
 import { ExamScoresTab } from '../tabs/ExamScoresTab';
@@ -194,6 +195,17 @@ export function BatchManagement() {
   const [reconciliationReport, setReconciliationReport] = useState<Record<string, any>>({});
   const [reconciliationDrawerOpen, setReconciliationDrawerOpen] = useState(false);
   const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
+  const [expenseBatchId, setExpenseBatchId] = useState<string | null>(null);
+
+  const expenseBatch = useMemo(
+    () => (expenseBatchId ? safeBatches.find((b) => b.id === expenseBatchId) : null) || activeBatch,
+    [safeBatches, expenseBatchId, activeBatch]
+  );
+
+  const expenseBatchCardVM = useMemo(() => {
+    if (!expenseBatch) return null;
+    return toCardVM(expenseBatch, courses, trainers);
+  }, [expenseBatch, courses, trainers]);
 
   // Load students for active batch
   useEffect(() => {
@@ -926,7 +938,10 @@ export function BatchManagement() {
             setEmailSubject('Final Course Report');
             setEmailComposerOpen(true);
           }
-          else if (action.id === 'expense-details') setExpenseDetailsOpen(true);
+          else if (action.id === 'expense-details') {
+            setExpenseBatchId(batchId);
+            setExpenseDetailsOpen(true);
+          }
         }}
         onEditBatch={handleOpenEditBatch}
         onCopyBatch={() => toast({ variant: 'info', title: 'Copy Batch', message: 'Duplicate batch template initiated.' })}
@@ -1630,12 +1645,16 @@ export function BatchManagement() {
       {/* Batch Expense Details Drawer */}
       <BatchExpenseDetailsDrawer
         open={expenseDetailsOpen}
-        onClose={() => setExpenseDetailsOpen(false)}
-        batchName={activeBatch?.code || activeBatch?.trainingName || ''}
-        batchCode={activeBatch?.code || activeBatch?.trainingName || 'Batch'}
-        studentCount={students.length > 0 ? students.length : (activeBatch?.capacity ?? 0)}
-        startDate={activeBatch?.startDate}
-        endDate={activeBatch?.endDate}
+        onClose={() => {
+          setExpenseDetailsOpen(false);
+          setExpenseBatchId(null);
+        }}
+        batch={expenseBatch}
+        batchName={expenseBatch?.code || expenseBatch?.trainingName || ''}
+        batchCode={expenseBatchCardVM?.batchCode || cleanBatchCode(expenseBatch?.code, expenseBatch?.batchNo) || expenseBatch?.trainingName || 'Batch'}
+        studentCount={students.length > 0 ? students.length : (expenseBatch?.capacity ?? 0)}
+        startDate={expenseBatch?.startDate}
+        endDate={expenseBatch?.endDate}
       />
     </AppShell>
   );
