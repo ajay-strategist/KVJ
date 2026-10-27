@@ -151,15 +151,18 @@ export function TaskFormModal({
       const autoTaskCode = `${prjCode}-T${Math.floor(100 + Math.random() * 900)}`;
 
       const roleUpper = user?.role?.toUpperCase() || '';
-      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO';
-      const isProjectSupervisor = Boolean(proj && proj.supervisorId && proj.supervisorId === user?.id);
-      const isTeamMemberInProject = Boolean(!isOfficeTask && proj && !isAdminOrCeo && !isProjectSupervisor);
+      const isCeo = roleUpper === 'CEO';
 
-      // Rule: If team member creates a Task in a Project, Project Supervisor approval is required.
-      // Admin/CEO can approve everything and create tasks directly without approval gate.
-      const approvalStatus = (isTeamMemberInProject || (!isAdminOrCeo && isAssigningToOther))
-        ? 'pending_assignment_approval'
-        : null;
+      // Task Approval Rules:
+      // 1. CEO can assign tasks to anyone without approval.
+      // 2. If assigning to another employee (isAssigningToOther), Admin/CEO/Manager approval is required (for both Project & Office Tasks).
+      // 3. If self-assigned (!isAssigningToOther):
+      //    - Office Task: No approval is required.
+      //    - Project Task: Project Supervisor / Admin / CEO / Manager approval is required.
+      const approvalStatus: 'pending_assignment_approval' | null =
+        !isCeo && (isAssigningToOther || !isOfficeTask)
+          ? 'pending_assignment_approval'
+          : null;
 
       const projectService = container.resolve(PROJECT_SERVICE_TOKEN);
       const res = await projectService.createTask(
@@ -184,9 +187,9 @@ export function TaskFormModal({
 
       if (res.ok) {
         const msg = approvalStatus
-          ? isTeamMemberInProject
-            ? `Task "${form.title}" created in project. Project Supervisor approval is required before work can begin.`
-            : `Task "${form.title}" created. Assignment sent for Supervisor / Admin approval.`
+          ? isAssigningToOther
+            ? `Task "${form.title}" created. Admin/CEO/Manager approval is required for task assignment.`
+            : `Task "${form.title}" created in project. Project Supervisor / Admin / CEO / Manager approval is required before work can begin.`
           : `Task "${form.title}" created successfully.`;
 
         toast({
@@ -376,7 +379,23 @@ export function TaskFormModal({
                 color: 'var(--status-warning-text, #92400e)',
               }}
             >
-              ℹ️ Peer Delegation: Assigning to a colleague requires Manager sign-off before entering "To Do".
+              ℹ️ Peer Assignment: Assigning a task to a colleague requires Admin, CEO, or Manager approval before work can begin.
+            </div>
+          )}
+
+          {/* Project Task Self-Creation Notice */}
+          {!isOfficeTask && !isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: 6,
+                background: 'var(--status-info-bg, #eff6ff)',
+                border: '1px solid var(--status-info, #3b82f6)',
+                fontSize: 11,
+                color: 'var(--status-info-text, #1e40af)',
+              }}
+            >
+              ℹ️ Project Task: Tasks created in a project require Project Supervisor / Admin / CEO / Manager approval before work can begin.
             </div>
           )}
 

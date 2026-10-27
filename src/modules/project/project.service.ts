@@ -237,21 +237,20 @@ export class ProjectService implements IProjectService {
       }
 
       const isOfficeTask = !proj || proj.title === 'Office Task' || proj.category === 'Office';
-      const isProjectSupervisor = Boolean(proj && proj.supervisorId && proj.supervisorId === actor.id);
-
-      // Rule: If a Team member creates a Task in a Project, the Project Supervisor approval is required.
-      // Admin/CEO can approve everything and their created tasks do not require approval.
-      const isTeamMemberInProject = !isOfficeTask && !isAdminOrCeo && !isProjectSupervisor;
 
       // Automatically set supervisor to project supervisor if in a project, or specified supervisor, or actor
       const supervisorId = data.supervisorId || (proj && proj.supervisorId ? proj.supervisorId : actor.id);
 
-      // Approval needed if:
-      // 1. Team member creates a task in a project (needs Project Supervisor approval)
-      // 2. Assigning to someone else and actor is not Admin/CEO
+      // Task Approval Rules:
+      // 1. CEO can assign task to anyone without approval.
+      // 2. If assigning to another employee (!isSelfAssigned), Admin/CEO/Manager approval is required (for both Project & Office Tasks).
+      // 3. If self-assigned (isSelfAssigned):
+      //    - Office Task: No approval is required.
+      //    - Project Task: Project Supervisor / Admin / CEO / Manager approval is required.
+      const isCeo = roleUpper === 'CEO';
       const needsAssignmentApproval = data.approvalStatus !== undefined
         ? data.approvalStatus === 'pending_assignment_approval'
-        : (isTeamMemberInProject || (!isSelfAssigned && !isAdminOrCeo));
+        : (!isCeo && (!isSelfAssigned || !isOfficeTask));
 
       let taskCode = data.code;
       if (!taskCode) {
@@ -317,10 +316,11 @@ export class ProjectService implements IProjectService {
       }
 
       if (existing && patch.assigneeId && patch.assigneeId !== existing.assigneeId) {
-        // Self-re-assignment (actor assigns to themselves) never needs approval
+        // Self-re-assignment (actor assigns to themselves)
         const isSelfAssigned = patch.assigneeId === actor.id;
-        // Admin or CEO can assign to anyone directly without approval gate
-        if (!isSelfAssigned && !isAdminOrCeo) {
+        const isCeo = roleUpper === 'CEO';
+        // Only CEO can assign without approval. If non-CEO assigns to another employee, Admin/CEO/Manager approval is required.
+        if (!isSelfAssigned && !isCeo) {
           patch = {
             ...patch,
             approvalStatus: 'pending_assignment_approval',
@@ -464,15 +464,37 @@ export class ProjectService implements IProjectService {
       if (!existing) return Err(AppError.notFound('Task not found.'));
 
       const roleUpper = (actor.role || '').toUpperCase();
-      const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
+      const isAdminCeoOrManager = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
       const proj = existing.projectId ? await this.projectRepo.findById(existing.projectId).catch(() => null) : null;
-      const isSupervisor = Boolean(
-        (proj && (proj.supervisorId === actor.id || (proj as any).supervisor_id === actor.id)) ||
-        (existing.supervisorId && existing.supervisorId === actor.id && existing.supervisorId !== existing.assigneeId) ||
-        ((existing as any).assignedByEmployeeId === actor.id && (existing as any).assignedByEmployeeId !== existing.assigneeId)
+
+      const isPeerAssignment = Boolean(
+        existing.assignedByEmployeeId &&
+        existing.assigneeId &&
+        existing.assignedByEmployeeId !== existing.assigneeId
       );
-      if (!isAdminOrCeo && !isSupervisor) {
-        return Err(AppError.forbidden('Only the Project/Task Supervisor or Admin/CEO can approve this task assignment.'));
+
+      // Task Approval Authority:
+      // - If an employee assigned a task to another employee (peer assignment):
+      //   ONLY Admin / CEO / Manager can approve (Project Supervisor cannot approve peer assignments).
+      // - If it's a self-assigned Project task:
+      //   Project Supervisor of that project OR Admin / CEO / Manager can approve.
+      const isProjectSupervisor = Boolean(
+        proj && (proj.supervisorId === actor.id || (proj as any).supervisor_id === actor.id)
+      );
+
+      let canApprove = false;
+      if (isAdminCeoOrManager) {
+        canApprove = true;
+      } else if (!isPeerAssignment && isProjectSupervisor && actor.id !== existing.assigneeId) {
+        canApprove = true;
+      }
+
+      if (!canApprove) {
+        return Err(AppError.forbidden(
+          isPeerAssignment
+            ? 'Only Admin, CEO, or Manager can approve task assignments to other employees.'
+            : 'Only the Project Supervisor, Admin, CEO, or Manager can approve this task.'
+        ));
       }
 
       const updated = await this.taskRepo.update(taskId, {

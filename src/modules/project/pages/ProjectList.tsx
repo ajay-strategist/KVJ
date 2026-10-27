@@ -630,6 +630,7 @@ export function ProjectList({
       proposedHours: estHours,
       estimatedHours: estHours,
       assigneeId,
+      assignedByEmployeeId: user?.id,
       supervisorId,
       dueDate: (values.dueDate as string) || undefined,
       startDate: (values.startDate as string) || (values.dueDate as string) || undefined,
@@ -639,11 +640,14 @@ export function ProjectList({
 
     if (res.ok) {
       const pending = (res.value as any)?.approvalStatus === 'pending_assignment_approval';
+      const isAssignedToOther = Boolean(assigneeId && user?.id && assigneeId !== user.id);
       toast({
         variant: pending ? 'warning' : 'success',
         title: pending ? 'Task Sent for Approval' : 'New Task Created',
         message: pending
-          ? `Task "${values.title}" created. Project Supervisor approval is required before starting.`
+          ? isAssignedToOther
+            ? `Task "${values.title}" created. Admin / CEO / Manager approval is required for task assignment.`
+            : `Task "${values.title}" created. Project Supervisor / Admin / CEO / Manager approval is required before starting.`
           : `Task "${values.title}" added to project ${selectedProject.code}.`,
       });
       setAddTaskOpen(false);

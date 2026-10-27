@@ -146,9 +146,14 @@ export const businessRules = {
     gstDefaultPercent: 18,                        // ⚠️ CONFIRM (GST optional on a claim)
   },
 
-  // ── Task approval (project work) ──────────────────────────────────────────
+  // ── Task approval (project work & assignments) ───────────────────────────
+  // ✅ CONFIRMED Task Approval Rules:
+  //   1. If an Employee creates a Task in a Project, Project Supervisor / Admin / CEO / Manager approval is required.
+  //   2. If an Employee creates a Task in Office Task for themselves, NO approval is required.
+  //   3. If an Employee assigns a task to another employee, Admin / CEO / Manager approval is required.
+  //   4. CEO can assign tasks to anyone without requiring approval.
   task: {
-    approvalChain: ['Supervisor', 'Manager', 'CEO'], // ✅ CONFIRMED (3-step)
+    approvalChain: ['Supervisor', 'Manager', 'CEO'], // ✅ CONFIRMED
   },
 
   // ── Management reports ────────────────────────────────────────────────────

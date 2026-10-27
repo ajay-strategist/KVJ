@@ -25,7 +25,7 @@ import { TaskWorklogUpdatesDrawer } from '../../project/components/TaskWorklogUp
 export function ApprovalsQueue() {
   const { user } = useAuth();
   const { pendingApprovals, allLeaves, approveLeave, rejectLeave, refreshPending } = useLeave();
-  const { tasks, projects, approveTaskSubmission, requestRework, approveTaskAssignment, refresh: refreshProjects } = useProject();
+  const { tasks, projects, approveTaskSubmission, requestRework, approveTaskAssignment, deleteTask, refresh: refreshProjects } = useProject();
   const [reworkTask, setReworkTask] = useState<any | null>(null);
   const [reworkNotes, setReworkNotes] = useState('');
   const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
@@ -92,8 +92,39 @@ export function ApprovalsQueue() {
   const canApproveTaskItem = useCallback((t: any) => {
     if (!t) return false;
     const roleUpper = (user?.role || '').toUpperCase();
-    if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER') return true;
+    const isAdminCeoOrManager = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
     if (!user?.id) return false;
+
+    // 1. Assignment approval
+    if (t.approvalStatus === 'pending_assignment_approval') {
+      const isPeerAssignment = Boolean(
+        t.assignedByEmployeeId &&
+        t.assigneeId &&
+        t.assignedByEmployeeId !== t.assigneeId
+      );
+
+      // Rule: If an employee assigned a task to another employee, ONLY Admin / CEO / Manager can approve.
+      // (Project Supervisor cannot approve peer assignments).
+      if (isPeerAssignment) {
+        return isAdminCeoOrManager;
+      }
+
+      // Self-assigned Project Task: Project Supervisor OR Admin / CEO / Manager can approve
+      if (isAdminCeoOrManager) return true;
+
+      const safeProjects = Array.isArray(projects) ? projects : [];
+      const proj = safeProjects.find((p: any) => p.id === t.projectId);
+      const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
+      const isProjSupervisor = Boolean(
+        projSupId && (projSupId === user.id || String(projSupId).toLowerCase() === String(user.id).toLowerCase()) &&
+        user.id !== t.assigneeId
+      );
+
+      return isProjSupervisor;
+    }
+
+    // 2. Task completion / review approval
+    if (isAdminCeoOrManager) return true;
 
     const safeProjects = Array.isArray(projects) ? projects : [];
     const proj = safeProjects.find((p: any) => p.id === t.projectId);
@@ -103,8 +134,7 @@ export function ApprovalsQueue() {
     );
 
     const isTaskSupervisor = Boolean(
-      (t.supervisorId && (t.supervisorId === user.id || String(t.supervisorId).toLowerCase() === String(user.id).toLowerCase()) && t.supervisorId !== t.assigneeId) ||
-      (t.assignedByEmployeeId && (t.assignedByEmployeeId === user.id || String(t.assignedByEmployeeId).toLowerCase() === String(user.id).toLowerCase()) && t.assignedByEmployeeId !== t.assigneeId)
+      (t.supervisorId && (t.supervisorId === user.id || String(t.supervisorId).toLowerCase() === String(user.id).toLowerCase()) && t.supervisorId !== t.assigneeId)
     );
 
     let isNameMatchSupervisor = false;
@@ -430,6 +460,24 @@ export function ApprovalsQueue() {
     }
   };
 
+  const handleRejectAssignmentInline = async (task: any) => {
+    const proj = projects.find((p) => p.id === task.projectId);
+    const projTitle = proj ? proj.title : 'Office Task';
+    const ok = await confirm({
+      title: 'Reject Assignment?',
+      message: `Confirm rejecting task "${projTitle}: ${task.title}"?`,
+    });
+    if (!ok) return;
+
+    const res = await deleteTask(task.id);
+    if (res.ok) {
+      toast({ variant: 'warning', title: 'Assignment Rejected', message: `Task "${task.title}" was rejected and removed.` });
+      refreshProjects();
+    } else {
+      toast({ variant: 'error', title: 'Rejection Failed', message: res.error });
+    }
+  };
+
   const handleApproveTaskInline = async (task: any) => {
     const proj = projects.find((p) => p.id === task.projectId);
     const projTitle = proj ? proj.title : 'Office Task';
@@ -697,6 +745,7 @@ export function ApprovalsQueue() {
           return (
             <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
               <Button size="sm" onClick={() => handleApproveAssignmentInline(r)}>Approve Assignment</Button>
+              <Button size="sm" variant="danger" onClick={() => handleRejectAssignmentInline(r)}>Reject</Button>
             </div>
           );
         }
@@ -943,9 +992,14 @@ export function ApprovalsQueue() {
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Supervisor: {getSupervisorName(t)} · Assigned to: {empName(t.assigneeId)})</span>
                       </div>
                       {canApproveThis && (
-                        <Button size="sm" onClick={() => handleApproveAssignmentInline(t)}>
-                          Approve Task
-                        </Button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <Button size="sm" onClick={() => handleApproveAssignmentInline(t)}>
+                            Approve Task
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => handleRejectAssignmentInline(t)}>
+                            Reject
+                          </Button>
+                        </div>
                       )}
                     </div>
                   );

@@ -149,32 +149,57 @@ export function TaskBoard({
 
   /**
    * Evaluates if the current user has approval authority for a task:
-   * 1. Admin/CEO can approve everything
-   * 2. Project Supervisor can approve tasks in their project
-   * 3. Task Supervisor can approve their supervised tasks
+   * 1. If pending_assignment_approval:
+   *    - Peer assignment (assignedByEmployeeId !== assigneeId): Only Admin / CEO / Manager can approve.
+   *    - Self-assigned Project task: Project Supervisor OR Admin / CEO / Manager can approve.
+   * 2. If review / task completion:
+   *    - Admin / CEO / Manager, Project Supervisor, or Task Supervisor can evaluate and approve.
    */
   const canUserApproveTask = useCallback((taskItem: any) => {
     if (!taskItem) return false;
     const roleUpper = (user?.role || '').toUpperCase();
-    if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER') return true;
+    const isAdminCeoOrManager = roleUpper === 'ADMIN' || roleUpper === 'CEO' || roleUpper === 'MANAGER';
+
+    // 1. Assignment approval
+    if (taskItem.approvalStatus === 'pending_assignment_approval') {
+      const isPeerAssignment = Boolean(
+        taskItem.assignedByEmployeeId &&
+        taskItem.assigneeId &&
+        taskItem.assignedByEmployeeId !== taskItem.assigneeId
+      );
+
+      // Rule: If an employee assigned a task to another employee, ONLY Admin / CEO / Manager can approve.
+      // (Project Supervisor cannot approve peer assignments).
+      if (isPeerAssignment) {
+        return isAdminCeoOrManager;
+      }
+
+      // Self-assigned task in a project: Project Supervisor OR Admin / CEO / Manager can approve
+      if (isAdminCeoOrManager) return true;
+
+      const safeProjects = Array.isArray(projects) ? projects : [];
+      const proj = safeProjects.find((p: any) => p.id === taskItem.projectId);
+      const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
+      if (projSupId && projSupId === user?.id && user?.id !== taskItem.assigneeId) {
+        return true;
+      }
+
+      return false;
+    }
+
+    // 2. Task completion / review approval
+    if (isAdminCeoOrManager) return true;
 
     // Check Project Supervisor
     const safeProjects = Array.isArray(projects) ? projects : [];
     const proj = safeProjects.find((p: any) => p.id === taskItem.projectId);
     const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
-    if (projSupId && projSupId === user?.id) {
+    if (projSupId && projSupId === user?.id && user?.id !== taskItem.assigneeId) {
       return true;
     }
 
-    // Check Task Supervisor or Assignor (only if not assignee themselves)
+    // Check Task Supervisor (only if not assignee themselves)
     if (taskItem.supervisorId && taskItem.supervisorId === user?.id && taskItem.supervisorId !== taskItem.assigneeId) {
-      return true;
-    }
-    if (
-      (taskItem as any).assignedByEmployeeId &&
-      (taskItem as any).assignedByEmployeeId === user?.id &&
-      (taskItem as any).assignedByEmployeeId !== taskItem.assigneeId
-    ) {
       return true;
     }
 
@@ -462,15 +487,18 @@ export function TaskBoard({
 
     const isSelfAssigned = assignee?.id === user?.id || (!assignee && !values.assignee);
     const roleUpper = (user?.role || '').toUpperCase();
-    const isAdminOrCeo = roleUpper === 'ADMIN' || roleUpper === 'CEO';
-    const isProjectSupervisor = Boolean(proj && proj.supervisorId && proj.supervisorId === user?.id);
-    const isTeamMemberInProject = Boolean(!isOfficeTask && proj && !isAdminOrCeo && !isProjectSupervisor);
+    const isCeo = roleUpper === 'CEO';
 
-    // Rule: If team member creates a Task in a Project, Project Supervisor approval is required.
-    // Admin/CEO can approve everything and create tasks directly.
-    const approvalStatus = (isTeamMemberInProject || (!isSelfAssigned && !isAdminOrCeo))
-      ? 'pending_assignment_approval'
-      : null;
+    // Task Approval Rules:
+    // 1. CEO can create/assign any task without approval.
+    // 2. If assigning to another employee (!isSelfAssigned) -> Admin/CEO/Manager approval is required.
+    // 3. If self-assigned (isSelfAssigned):
+    //    - In Office Task: No approval is required.
+    //    - In Project Task: Project Supervisor / Admin / CEO / Manager approval is required.
+    const approvalStatus: 'pending_assignment_approval' | null =
+      !isCeo && (!isSelfAssigned || !isOfficeTask)
+        ? 'pending_assignment_approval'
+        : null;
 
     const res = await createTask({
       projectId: proj?.id || null,
@@ -514,7 +542,9 @@ export function TaskBoard({
         variant: approvalStatus ? 'warning' : 'success', 
         title: approvalStatus ? 'Assignment Pending Approval' : 'Task Created', 
         message: approvalStatus
-          ? `Assignment sent for Admin/Manager approval.`
+          ? !isSelfAssigned
+            ? `Assignment sent for Admin / CEO / Manager approval.`
+            : `Project task sent for Project Supervisor / Admin / CEO / Manager approval.`
           : `Task "${values.name}" created successfully.`
       });
       setCreateTaskOpen(false);
@@ -541,7 +571,12 @@ export function TaskBoard({
 
   const handleRejectTask = async (id: string) => {
     setTasksList((prev) => prev.filter((x) => x.id !== id));
-    toast({ variant: 'warning', title: 'Task Rejected', message: 'Task creation request rejected.' });
+    try {
+      await deleteTask(id as any);
+      toast({ variant: 'warning', title: 'Task Rejected', message: 'Task assignment request was rejected and removed.' });
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Rejection Failed', message: e.message });
+    }
   };
 
   const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
@@ -1280,9 +1315,14 @@ export function TaskBoard({
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
                       {/* Assignment approval for Project Supervisor / Management */}
                       {t.approvalStatus === 'pending_assignment_approval' && canUserApproveTask(t) && (
-                        <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
-                          Approve Assignment
-                        </Button>
+                        <>
+                          <Button size="sm" variant="success" onClick={() => handleApproveTask(t.id)}>
+                            Approve Assignment
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => handleRejectTask(t.id)}>
+                            Reject
+                          </Button>
+                        </>
                       )}
 
                       {/* Assignee options */}
@@ -1476,9 +1516,14 @@ export function TaskBoard({
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                               {/* Assignment approval for Project Supervisor / Management */}
                               {t.approvalStatus === 'pending_assignment_approval' && canUserApproveTask(t) && (
-                                <Button size="xs" variant="success" onClick={() => handleApproveTask(t.id)}>
-                                  Approve Assignment
-                                </Button>
+                                <>
+                                  <Button size="xs" variant="success" onClick={() => handleApproveTask(t.id)}>
+                                    Approve
+                                  </Button>
+                                  <Button size="xs" variant="danger" onClick={() => handleRejectTask(t.id)}>
+                                    Reject
+                                  </Button>
+                                </>
                               )}
 
                               {/* Assignee options */}
