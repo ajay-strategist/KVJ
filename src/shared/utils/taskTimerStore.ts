@@ -1,6 +1,11 @@
 /**
  * Global Task Timer Store — synchronizes task work timer state across
  * MyDay dashboard, TaskBoard, and all workspace pages in real-time.
+ * 
+ * Continuous Task Duration Accumulation:
+ * - Timers continuously accumulate across multiple Start, Pause, and Resume operations.
+ * - Resuming a task starts from the previously accumulated duration mark, not zero.
+ * - Multi-day continuity is preserved without artificial midnight resets.
  */
 
 export interface TaskTimerState {
@@ -16,47 +21,22 @@ const MY_DAY_KEY = 'kvj_task_timer_state_v1';
 type TimerListener = (timers: Record<string, TaskTimerState>) => void;
 const listeners = new Set<TimerListener>();
 
-function getTodayDateStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function isSameDay(timestampMs: number): boolean {
-  const d = new Date(timestampMs);
-  const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  return ds === getTodayDateStr();
-}
-
 function loadTimers(): Record<string, TaskTimerState> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const result: Record<string, TaskTimerState> = raw ? JSON.parse(raw) : {};
 
-    // Guard: if a running timer's startTime is from a previous day, reset it
-    // so stale elapsed time is not carried over into today's counter.
-    Object.keys(result).forEach((id) => {
-      const t = result[id];
-      if (t.isRunning && t.startTime && !isSameDay(t.startTime)) {
-        result[id] = { ...t, isRunning: false, elapsedMs: 0 };
-      }
-    });
-
     // Merge from MyDay storage key if present
     const rawMyDay = localStorage.getItem(MY_DAY_KEY);
     if (rawMyDay) {
       const myDayData: Record<string, { secondsToday: number; active: boolean; lastStartTime?: number; date?: string }> = JSON.parse(rawMyDay);
-      const todayStr = getTodayDateStr();
       Object.entries(myDayData).forEach(([id, val]) => {
-        // Skip stale entries from a previous day
-        const isStale = val.date && val.date !== todayStr;
-        if (isStale) return;
-
         if (!result[id]) {
-          const isRunning = !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime));
+          const isRunning = !!val.active;
           let elapsed = (val.secondsToday || 0) * 1000;
           if (isRunning && val.lastStartTime) {
             // Subtract active session duration to prevent double-counting
-            const activeSessionDuration = Date.now() - val.lastStartTime;
+            const activeSessionDuration = Math.max(0, Date.now() - val.lastStartTime);
             elapsed = Math.max(0, elapsed - activeSessionDuration);
           }
           result[id] = {
@@ -67,7 +47,7 @@ function loadTimers(): Record<string, TaskTimerState> {
           };
         } else {
           const wasRunning = result[id].isRunning;
-          const isRunning = !!val.active && !!(val.lastStartTime && isSameDay(val.lastStartTime));
+          const isRunning = !!val.active;
           result[id].isRunning = isRunning;
           if (isRunning) {
             // If the task is running, do NOT overwrite elapsedMs with ticking val.secondsToday
@@ -75,7 +55,7 @@ function loadTimers(): Record<string, TaskTimerState> {
               result[id].startTime = val.lastStartTime || Date.now();
             }
           } else {
-            // If the task is paused, update elapsedMs from the stored secondsToday
+            // If the task is paused, update elapsedMs from stored value if higher
             if (val.secondsToday && val.secondsToday * 1000 > result[id].elapsedMs) {
               result[id].elapsedMs = val.secondsToday * 1000;
             }
@@ -148,7 +128,7 @@ export const taskTimerStore = {
     } catch {}
   },
 
-  startTask(taskId: string) {
+  startTask(taskId: string, initialElapsedMs?: number) {
     const current = loadTimers();
     const now = Date.now();
 
@@ -172,10 +152,14 @@ export const taskTimerStore = {
       // Already running; avoid resetting startTime or triggering redundant updates
       return;
     }
+    const baseElapsed = Math.max(
+      existing ? existing.elapsedMs : 0,
+      initialElapsedMs || 0
+    );
     current[taskId] = {
       taskId,
       startTime: now,
-      elapsedMs: existing ? existing.elapsedMs : 0,
+      elapsedMs: baseElapsed,
       isRunning: true,
     };
     saveTimers(current);
@@ -226,7 +210,7 @@ export const taskTimerStore = {
       };
       saveTimers(current);
       this.notify();
-    } else if (!existing.isRunning && existing.elapsedMs !== dbMs) {
+    } else if (!existing.isRunning && dbMs > existing.elapsedMs) {
       current[taskId] = {
         ...existing,
         elapsedMs: dbMs,

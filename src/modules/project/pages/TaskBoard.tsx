@@ -29,6 +29,7 @@ import { useTaskSessions, saveSessionNote, getSessionNotesMap } from '../hooks/u
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import type { UUID } from '../../../core/types';
 import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
+import { formatHoursMinutes } from '../../../shared/utils/taskDuration';
 import { TaskFormModal } from '../forms/TaskFormModal';
 import { TaskWorklogUpdatesDrawer } from '../components/TaskWorklogUpdatesDrawer';
 
@@ -227,27 +228,38 @@ export function TaskBoard({
     return () => clearInterval(interval);
   }, []);
 
-  const getTaskDurationString = (taskId: string) => {
+  const getTaskDurationString = (taskId: string, t?: any) => {
     const timer = timers[taskId];
-    if (!timer) return '00:00:00';
-    let totalMs = timer.elapsedMs;
-    if (timer.isRunning) {
-      totalMs += Date.now() - timer.startTime;
+    const targetTask = t || (tasks || []).find((item: any) => item.id === taskId);
+    const dbHours = Number((targetTask as any)?.actualHours || (targetTask as any)?.hoursWorked || 0);
+    const dbSecs = Math.round(dbHours * 3600);
+
+    let timerSecs = 0;
+    if (timer) {
+      let totalMs = timer.elapsedMs;
+      if (timer.isRunning) {
+        totalMs += Math.max(0, Date.now() - timer.startTime);
+      }
+      timerSecs = Math.floor(totalMs / 1000);
     }
-    const totalSecs = Math.floor(totalMs / 1000);
-    const hrs = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
-    const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
-    return `${hrs}h ${mins}m`;
+    const finalSecs = Math.max(timerSecs, dbSecs);
+    return formatHoursMinutes(finalSecs);
   };
 
-  const getTaskDurationHours = (taskId: string) => {
+  const getTaskDurationHours = (taskId: string, t?: any) => {
     const timer = timers[taskId];
-    if (!timer) return 0;
-    let totalMs = timer.elapsedMs;
-    if (timer.isRunning) {
-      totalMs += Date.now() - timer.startTime;
+    const targetTask = t || (tasks || []).find((item: any) => item.id === taskId);
+    const dbHours = Number((targetTask as any)?.actualHours || (targetTask as any)?.hoursWorked || 0);
+
+    let timerMs = 0;
+    if (timer) {
+      timerMs = timer.elapsedMs;
+      if (timer.isRunning) {
+        timerMs += Math.max(0, Date.now() - timer.startTime);
+      }
     }
-    return Math.round((totalMs / 3600000) * 10) / 10;
+    const timerHours = timerMs / 3600000;
+    return Math.round(Math.max(timerHours, dbHours) * 10) / 10;
   };
   const { employees = [] } = useEmployee() || {};
 
@@ -602,11 +614,12 @@ export function TaskBoard({
         })
       );
 
-      taskTimerStore.startTask(task.id);
+      const raw = (tasks || []).find((t: any) => t.id === task.id);
+      const initialSec = Math.round(Number((task as any).hoursWorked || raw?.actualHours || 0) * 3600);
+      taskTimerStore.startTask(task.id, initialSec * 1000);
       try {
         await updateTask(task.id as UUID, { status: 'in_progress', approvalStatus: null });
         
-        const raw = (tasks || []).find((t: any) => t.id === task.id);
         const pObj = raw?.projectId ? (projects || []).find((p: any) => p.id === raw.projectId) : null;
         const pSupId = pObj ? ((pObj as any).supervisorId || (pObj as any).supervisor_id) : null;
         const tSupId = (raw?.supervisorId && raw.supervisorId !== raw.assigneeId)

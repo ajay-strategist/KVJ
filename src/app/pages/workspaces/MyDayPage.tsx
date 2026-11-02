@@ -1100,7 +1100,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                   🟢 Currently Running Task
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                  ⏱ {Math.floor(activeRunningTask.secondsToday / 3600)}h {Math.floor((activeRunningTask.secondsToday % 3600) / 60)}m today
+                  ⏱ {Math.floor(activeRunningTask.secondsToday / 3600)}h {Math.floor((activeRunningTask.secondsToday % 3600) / 60)}m
                 </span>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -1212,7 +1212,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                   🔴 Active Task Being Paused
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                  ⏱ {Math.floor(activeRunningTask.secondsToday / 3600)}h {Math.floor((activeRunningTask.secondsToday % 3600) / 60)}m today
+                  ⏱ {Math.floor(activeRunningTask.secondsToday / 3600)}h {Math.floor((activeRunningTask.secondsToday % 3600) / 60)}m
                 </span>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -1631,39 +1631,22 @@ export const TaskWidget = memo(function TaskWidget({
                        {t.isRework && <span style={{ flexShrink: 0 }}><Badge tone="warning">🔄 Rework</Badge></span>}
                      </div>
                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-                       {(() => {
-                         const isMyAssignee = Boolean(
-                           user?.id && (
-                             (t as any).assigneeId === user.id ||
-                             (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
-                           )
-                         );
-                         const totalTaskSec = calculateTaskTotalSeconds({
-                           historicalHours: t.totalHoursWorked,
-                           timerElapsedMs: (t.secondsToday || 0) * 1000,
-                           isRunning: t.active,
-                         });
-                         const totalHrsFormatted = formatHoursMinutes(totalTaskSec);
-                         const totalHrsNum = totalTaskSec / 3600;
+                        {(() => {
+                          const accumulatedSec = Math.max(
+                            t.secondsToday || 0,
+                            Math.round((t.totalHoursWorked || 0) * 3600)
+                          );
+                          const durationFormatted = formatSec(accumulatedSec);
 
-                         if (!isMyAssignee) {
-                           return (
-                             <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title="Total Hours Worked">
-                               ⏱ Total: {totalHrsFormatted}
-                             </span>
-                           );
-                         }
-                         return (
-                           <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={`Today: ${formatSec(t.secondsToday)}${totalHrsNum > 0 ? ` · Total: ${totalHrsFormatted}` : ''}`}>
-                             ⏱ {formatSec(t.secondsToday)}
-                             {totalHrsNum > ((t.secondsToday || 0) / 3600) && (
-                               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginLeft: 6 }}>
-                                 (Total: {totalHrsFormatted})
-                               </span>
-                             )}
-                           </span>
-                         );
-                       })()}
+                          return (
+                            <span
+                              style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
+                              title="Accumulated Duration"
+                            >
+                              ⏱ {durationFormatted}
+                            </span>
+                          );
+                        })()}
                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                          {t.isApproved ? (
                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1757,39 +1740,22 @@ export const TaskWidget = memo(function TaskWidget({
                      {/* Row 2: Timer + Actions */}
                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingLeft: 32, flexWrap: 'wrap' }}>
                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                         {(() => {
-                           const isMyAssignee = Boolean(
-                             user?.id && (
-                               (t as any).assigneeId === user.id ||
-                               (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
-                             )
-                           );
-                           const totalTaskSec = calculateTaskTotalSeconds({
-                             historicalHours: t.totalHoursWorked,
-                             timerElapsedMs: (t.secondsToday || 0) * 1000,
-                             isRunning: t.active,
-                           });
-                           const totalHrsFormatted = formatHoursMinutes(totalTaskSec);
-                           const totalHrsNum = totalTaskSec / 3600;
+                          {(() => {
+                            const accumulatedSec = Math.max(
+                              t.secondsToday || 0,
+                              Math.round((t.totalHoursWorked || 0) * 3600)
+                            );
+                            const durationFormatted = formatSec(accumulatedSec);
 
-                           if (!isMyAssignee) {
-                             return (
-                               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title="Total Hours Worked">
-                                 ⏱ Total: {totalHrsFormatted}
-                               </span>
-                             );
-                           }
-                           return (
-                             <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={`Today: ${formatSec(t.secondsToday)}${totalHrsNum > 0 ? ` · Total: ${totalHrsFormatted}` : ''}`}>
-                               ⏱ {formatSec(t.secondsToday)}
-                               {totalHrsNum > ((t.secondsToday || 0) / 3600) && (
-                                 <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginLeft: 6 }}>
-                                   (Total: {totalHrsFormatted})
-                                 </span>
-                               )}
-                             </span>
-                           );
-                         })()}
+                            return (
+                              <span
+                                style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
+                                title="Accumulated Duration"
+                              >
+                                ⏱ {durationFormatted}
+                              </span>
+                            );
+                          })()}
                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                            {t.isApproved ? (
                              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -2243,32 +2209,18 @@ export function MyDayPage() {
         }
 
         if (stored) {
-          // If the stored state is from a previous day, reset the daily timer to zero
-          // and mark the task as paused — this prevents cross-midnight elapsed time
-          // from being incorrectly added to today's counter.
-          const storedDate = stored.date || '';
-          const isStaleDay = storedDate && storedDate !== todayStr;
-
-          if (isStaleDay) {
-            // New day: discard yesterday's secondsToday and active flag
-            secondsToday = 0;
-            active = false;
+          // Continuous Task Accumulation: trust accumulated stored seconds or DB actualHours.
+          // When resuming or reloading, start from previously accumulated mark rather than resetting to zero.
+          if (stored.active && stored.lastStartTime) {
+            const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
+            if (elapsed > 0 && elapsed < 86400 * 30) {
+              secondsToday = Math.max(secondsToday, (stored.secondsToday || 0) + elapsed);
+            }
+            active = true;
           } else {
-            // Trust the database actualHours as the primary source of truth.
-            // If the task was active, compute elapsed time since lastStartTime and add it.
-            if (stored.active && stored.lastStartTime) {
-              // Only add elapsed time if lastStartTime is from today
-              const lastStartDate = new Date(stored.lastStartTime);
-              const lastStartDateStr = `${lastStartDate.getFullYear()}-${String(lastStartDate.getMonth() + 1).padStart(2, '0')}-${String(lastStartDate.getDate()).padStart(2, '0')}`;
-              if (lastStartDateStr === todayStr) {
-                const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
-                if (elapsed > 0 && elapsed < 86400) {
-                  secondsToday += elapsed;
-                }
-              }
-              active = true;
-            } else {
-              active = stored.active;
+            active = stored.active;
+            if (stored.secondsToday && stored.secondsToday > secondsToday) {
+              secondsToday = stored.secondsToday;
             }
           }
           const dbUnderReview = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval';
@@ -2279,10 +2231,7 @@ export function MyDayPage() {
           }
         }
 
-        // Sanity guard against corrupted inflated values (> 24 hours)
-        if (secondsToday > 86400) {
-          secondsToday = 0;
-        }
+        // Continuous task duration accumulation: no artificial daily resets
 
         updatedStates[t.id] = {
           secondsToday,
@@ -2508,9 +2457,12 @@ export function MyDayPage() {
     setTogglingTaskId(id);
     try {
       const now = Date.now();
-      taskTimerStore.startTask(id);
+      const existingTaskItem = tasks.find((t) => t.id === id);
+      const existingRaw = (projectTasks || []).find((t) => t.id === id);
+      const initialSec = existingTaskItem?.secondsToday ?? Math.round(((existingRaw as any)?.actualHours || 0) * 3600);
+      taskTimerStore.startTask(id, initialSec * 1000);
       const timer = taskTimerStore.getTimer(id);
-      const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+      const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : initialSec;
 
       setTasks((prev) => {
         const updated = prev.map((t) => {
