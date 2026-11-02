@@ -14,6 +14,7 @@ import { can as engineCan, canAny, canAll } from './permission-engine';
 import type { Action, Resource } from './permissions';
 import type { RoleKey } from './roles';
 import { useAuth } from '../../modules/auth/AuthProvider';
+import { ErrorBoundary } from '../../app/ErrorBoundary';
 
 /** Centered loading indicator shown while the session resolves (never a blank screen). */
 function AuthSplash() {
@@ -93,5 +94,9 @@ export function ProtectedRoute({ resource, action, featureFlag, redirectTo = '/l
   if (status === 'unauthenticated') return <Navigate to={redirectTo} replace />;
   if (featureFlag === false) return <Navigate to="/app" replace />;
   if (resource && action && !can(resource, action)) return <Navigate to="/403" replace />;
-  return <>{children}</>;
+  return (
+    <ErrorBoundary>
+      {children}
+    </ErrorBoundary>
+  );
 }

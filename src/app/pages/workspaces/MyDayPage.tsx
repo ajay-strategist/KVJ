@@ -64,8 +64,9 @@ function ConditionalAttendanceFields() {
   const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
   
   if (values.classification === 'Training') {
-    const options = batches.length > 0
-      ? batches.map((b) => {
+    const batchList = batches || [];
+    const options = batchList.length > 0
+      ? batchList.map((b) => {
           // Canonical batch label (corrects a stale generated code's batch number
           // from the batch's Batch-No field) — same as everywhere else, so no
           // duplicate/missing batch appears here.
@@ -170,18 +171,24 @@ export const AttendancePanel = memo(function AttendancePanel({
 
   useEffect(() => {
     let cancelled = false;
-    supabase
-      .from('flwdsk_enrollments')
-      .select('batch_id')
-      .is('deleted_at', null)
-      .then(({ data }) => {
+    async function loadBatchCounts() {
+      try {
+        const { data } = await supabase
+          .from('flwdsk_enrollments')
+          .select('batch_id')
+          .is('deleted_at', null);
+
         if (cancelled) return;
         const counts: Record<string, number> = {};
         (data || []).forEach((e: any) => {
           if (e.batch_id) counts[e.batch_id] = (counts[e.batch_id] || 0) + 1;
         });
         setBatchStudentCounts(counts);
-      });
+      } catch (e) {
+        console.warn('Failed to load batch enrollment counts:', e);
+      }
+    }
+    loadBatchCounts();
     return () => { cancelled = true; };
   }, []);
 
@@ -228,8 +235,8 @@ export const AttendancePanel = memo(function AttendancePanel({
   const availableBatches = useMemo(() => {
     if (!batches || batches.length === 0) return [];
 
-    const mapped = batches.map((b) => {
-      const courseObj = courses.find((c) => c.id === b.courseId);
+    const mapped = (batches || []).map((b) => {
+      const courseObj = (courses || []).find((c) => c.id === b.courseId);
       // cleanBatchCode(code, batchNo) syncs a stale generated code's "Batch N" to
       // the batch's current Batch-No field, so each batch shows its correct,
       // distinct number (matches Batch Management). This is the single canonical
@@ -2703,7 +2710,7 @@ export function MyDayPage() {
       targetProjectId = projRes.value.id;
       projName = newProjName;
     } else if (targetProjectId && targetProjectId !== 'OFFICE_TASK') {
-      const projObj = projects.find((p) => p.id === targetProjectId);
+      const projObj = (projects || []).find((p) => p.id === targetProjectId);
       projName = projObj?.title || 'Office Task';
     } else {
       targetProjectId = undefined;

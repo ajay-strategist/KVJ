@@ -140,13 +140,15 @@ export class AttendanceService implements IAttendanceService {
       }
 
       let totalWorkingMs = 0;
+      let openSessionFound = false;
       const updatedSessions = (record.sessions ?? []).map((s) => {
         if (!s.clockOut) {
+          openSessionFound = true;
           const finished: WorkSession = { ...s, clockOut: ts, clockOutGeo: geo };
-          totalWorkingMs += new Date(ts).getTime() - new Date(s.clockIn).getTime();
+          totalWorkingMs += Math.max(0, new Date(ts).getTime() - new Date(s.clockIn).getTime());
           return finished;
         } else {
-          totalWorkingMs += new Date(s.clockOut).getTime() - new Date(s.clockIn).getTime();
+          totalWorkingMs += Math.max(0, new Date(s.clockOut).getTime() - new Date(s.clockIn).getTime());
           return s;
         }
       });
@@ -155,6 +157,21 @@ export class AttendanceService implements IAttendanceService {
       const updatedBreaks = (record.breaks ?? []).map((b) =>
         !b.endTime ? { ...b, endTime: ts } : b
       );
+
+      // Defensive guarantee: if marked present/on_break but sessions array had no unclosed session,
+      // synthesize and close the session using firstClockIn so shift duration is never lost
+      if (!openSessionFound) {
+        const fallbackClockIn = record.firstClockIn || record.createdAt || ts;
+        const dur = Math.max(0, new Date(ts).getTime() - new Date(fallbackClockIn).getTime());
+        totalWorkingMs += dur;
+        updatedSessions.push({
+          id: this.uuid(),
+          clockIn: fallbackClockIn,
+          clockOut: ts,
+          workType: 'Office',
+          clockOutGeo: geo,
+        });
+      }
 
       const grossWorkingMins = Math.max(0, Math.floor(totalWorkingMs / 60000));
       const totalBreakMins = calculateMergedBreakMinutes(updatedBreaks, { maxGrossMinutes: grossWorkingMins });

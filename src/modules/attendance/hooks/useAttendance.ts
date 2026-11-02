@@ -150,7 +150,11 @@ export function useAttendance() {
       console.warn('Geolocation failed. Clocking out without coordinates.');
     }
     // Auto-pause any running tasks BEFORE clocking out, attaching the progress note
-    await pauseRunningTasks(taskNote);
+    try {
+      await pauseRunningTasks(taskNote);
+    } catch (e) {
+      console.warn('Auto-pause running tasks on clock-out failed:', e);
+    }
 
     const res = await service.clockOut(user.id, geo);
     setLoading(false);

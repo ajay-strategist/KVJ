@@ -115,11 +115,21 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
 
         const currentBreakIds = rows.map((r: any) => r.id).filter(Boolean);
         if (currentBreakIds.length > 0 && sessionIds.length > 0) {
-          await supabase
+          const { data: existingBreaks } = await supabase
             .from('flwdsk_break_records')
-            .delete()
-            .in('work_session_id', sessionIds)
-            .not('id', 'in', `(${currentBreakIds.join(',')})`);
+            .select('id')
+            .in('work_session_id', sessionIds);
+
+          const breaksToRemove = (existingBreaks || [])
+            .map((eb: any) => eb.id)
+            .filter((bid: string) => !currentBreakIds.includes(bid));
+
+          if (breaksToRemove.length > 0) {
+            await supabase
+              .from('flwdsk_break_records')
+              .delete()
+              .in('id', breaksToRemove);
+          }
         }
       }
     } catch (e) {
@@ -246,17 +256,9 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       const withBreaks = await this.attachBreaksToRecords(attached);
       const activeCandidate = withBreaks[0];
 
-      const hasRealOpenSession = activeCandidate?.sessions?.some((s) => !s.clockOut);
-      if (hasRealOpenSession || activeCandidate?.workDate === dateStr) {
-        return activeCandidate;
-      } else {
-        // Self-heal: the record status was left as 'present'/'on_break' on a past date despite all sessions being closed
-        try {
-          await supabase.from(this.tableName).update({ status: 'clocked_out' }).eq('id', openData.id);
-        } catch (e) {
-          console.warn('Failed to self-heal stale attendance status:', e);
-        }
-      }
+      // If an active session is currently open (present or on_break), always return it so
+      // employee can clock out or manage breaks reliably, even across midnight rollover.
+      return activeCandidate;
     }
 
     // 2. If no open session, query for the record on dateStr

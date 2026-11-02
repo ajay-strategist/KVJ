@@ -27,14 +27,27 @@ export function Forbidden() {
 }
 export function ServerError({ onRetry }: { onRetry?: () => void }) {
   const handleRetry = () => {
-    if (onRetry) onRetry();
+    if (onRetry) {
+      try { onRetry(); } catch (_) {}
+    }
     window.location.reload();
   };
+
+  const handleResetSession = () => {
+    try {
+      localStorage.removeItem('kvj_app_session');
+      localStorage.removeItem('kvj_jwt');
+      localStorage.removeItem('kvj_refresh');
+    } catch (_) {}
+    window.location.href = '/login';
+  };
+
   return (
-    <Shell code="500" title="Something went wrong" message="An unexpected error occurred. You can retry, or head back to your workspace.">
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+    <Shell code="500" title="Something went wrong" message="An unexpected error occurred during page load. You can retry, head to your workspace, or sign in again.">
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
         <Button onClick={handleRetry}>Retry</Button>
-        <Link to="/app"><Button variant="secondary">Go home</Button></Link>
+        <Link to="/app"><Button variant="secondary">Go to Workspace</Button></Link>
+        <Button variant="ghost" onClick={handleResetSession}>Sign In Again</Button>
       </div>
     </Shell>
   );

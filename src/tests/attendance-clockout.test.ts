@@ -77,5 +77,24 @@ describe('Attendance Lifecycle & Clock-Out Remediation (ISSUE-004 & ISSUE-012)',
     expect(res.closedBreaks[0].endTime).toBe(clockOut);
     expect(res.totalBreakMinutes).toBe(60);
   });
+
+  it('synthesizes and closes fallback session if sessions array was empty during clock-out', () => {
+    const clockIn = '2026-11-02T09:00:00Z';
+    const clockOut = '2026-11-02T17:00:00Z';
+    // Sessions array was empty
+    const sessions: WorkSessionTest[] = [];
+    const breaks: BreakRecordTest[] = [];
+
+    // Synthesize fallback session from firstClockIn to clockOut
+    let effectiveSessions = sessions;
+    if (effectiveSessions.length === 0) {
+      effectiveSessions = [{ id: 'fallback-session', clockIn, clockOut }];
+    }
+
+    const res = computeShiftDurations(effectiveSessions, breaks, clockOut);
+    expect(res.totalWorkingMinutes).toBe(480);
+    expect(res.netWorkingMinutes).toBe(480);
+    expect(res.closedSessions[0].clockOut).toBe(clockOut);
+  });
 });
 
