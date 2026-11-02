@@ -21,11 +21,12 @@ import { ForceClockOutModal } from '../forms/ForceClockOutModal';
 import { useBreakpoint } from '../../../shared/hooks/responsive';
 import { useTaskSessions, getSessionNotesMap } from '../../project/hooks/useTaskSessions';
 import { TaskWorklogUpdatesDrawer } from '../../project/components/TaskWorklogUpdatesDrawer';
+import { determineTaskRejectionAction } from '../../../shared/utils/taskRejection';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
   const { pendingApprovals, allLeaves, approveLeave, rejectLeave, refreshPending } = useLeave();
-  const { tasks, projects, approveTaskSubmission, requestRework, approveTaskAssignment, deleteTask, refresh: refreshProjects } = useProject();
+  const { tasks, projects, approveTaskSubmission, requestRework, approveTaskAssignment, updateTask, deleteTask, refresh: refreshProjects } = useProject();
   const [reworkTask, setReworkTask] = useState<any | null>(null);
   const [reworkNotes, setReworkNotes] = useState('');
   const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
@@ -149,6 +150,9 @@ export function ApprovalsQueue() {
   }, [user?.id, user?.role, user?.fullName, projects]);
 
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval' | 'over_7_days'>('all');
+  const [taskEmployeeFilter, setTaskEmployeeFilter] = useState<string>('all');
+  const [taskSupervisorFilter, setTaskSupervisorFilter] = useState<string>('all');
+  const [leaveEmployeeFilter, setLeaveEmployeeFilter] = useState<string>('all');
   const [taskBatchProcessing, setTaskBatchProcessing] = useState(false);
 
   const pendingAssignmentTasks = useMemo(() => {
@@ -185,9 +189,22 @@ export function ApprovalsQueue() {
         if (!submitted) return false;
         return now - new Date(submitted).getTime() >= sevenDaysMs;
       }
+
+      if (taskEmployeeFilter !== 'all') {
+        if (t.assigneeId !== taskEmployeeFilter) return false;
+      }
+
+      if (taskSupervisorFilter !== 'all') {
+        const supName = getSupervisorName(t);
+        const matchId = t.supervisorId === taskSupervisorFilter;
+        const supObj = employees[taskSupervisorFilter];
+        const matchName = supObj ? `${supObj.firstName} ${supObj.lastName}`.trim().toLowerCase() === (supName || '').toLowerCase() : false;
+        if (!matchId && !matchName) return false;
+      }
+
       return true;
     });
-  }, [tasks, taskStatusFilter, canApproveTaskItem]);
+  }, [tasks, taskStatusFilter, taskEmployeeFilter, taskSupervisorFilter, canApproveTaskItem, employees]);
 
   /** Task Completion items that have been waiting in the queue for >= 7 days (used for banner). */
   const over7DaysTasks = useMemo(() => {
@@ -204,6 +221,12 @@ export function ApprovalsQueue() {
       return now - new Date(submitted).getTime() >= sevenDaysMs;
     });
   }, [tasks, canApproveTaskItem]);
+
+  const filteredPendingLeaves = useMemo(() => {
+    const list = Array.isArray(pendingApprovals) ? pendingApprovals : [];
+    if (leaveEmployeeFilter === 'all') return list;
+    return list.filter((l) => l.employeeId === leaveEmployeeFilter);
+  }, [pendingApprovals, leaveEmployeeFilter]);
 
   const fetchUnclosedSessions = useCallback(async () => {
     try {
@@ -469,12 +492,30 @@ export function ApprovalsQueue() {
     });
     if (!ok) return;
 
-    const res = await deleteTask(task.id);
-    if (res.ok) {
-      toast({ variant: 'warning', title: 'Assignment Rejected', message: `Task "${task.title}" was rejected and removed.` });
-      refreshProjects();
+    const action = determineTaskRejectionAction(task);
+    if (action === 'PRESERVE_AS_REJECTED_CLOSED') {
+      const res = await updateTask(task.id, {
+        status: 'rejected_closed' as any,
+        approvalStatus: 'rejected' as any,
+      });
+      if (res.ok) {
+        toast({
+          variant: 'warning',
+          title: 'Assignment Rejected',
+          message: `Task "${task.title}" was marked as Rejected / Closed to preserve recorded work history.`,
+        });
+        refreshProjects();
+      } else {
+        toast({ variant: 'error', title: 'Rejection Failed', message: res.error });
+      }
     } else {
-      toast({ variant: 'error', title: 'Rejection Failed', message: res.error });
+      const res = await deleteTask(task.id);
+      if (res.ok) {
+        toast({ variant: 'warning', title: 'Assignment Rejected', message: `Task "${task.title}" was rejected and removed.` });
+        refreshProjects();
+      } else {
+        toast({ variant: 'error', title: 'Rejection Failed', message: res.error });
+      }
     }
   };
 
@@ -1035,12 +1076,46 @@ export function ApprovalsQueue() {
               </Button>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Employee:</span>
+              <select
+                className="kvj-select"
+                value={taskEmployeeFilter}
+                onChange={(e) => setTaskEmployeeFilter(e.target.value)}
+                style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
+              >
+                <option value="all">All Employees</option>
+                {Object.values(employees).map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👔 Supervisor:</span>
+              <select
+                className="kvj-select"
+                value={taskSupervisorFilter}
+                onChange={(e) => setTaskSupervisorFilter(e.target.value)}
+                style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
+              >
+                <option value="all">All Supervisors</option>
+                {Object.values(employees).map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>🔍 Filter Status:</span>
               <select
                 className="kvj-select"
                 value={taskStatusFilter}
                 onChange={(e) => setTaskStatusFilter(e.target.value as any)}
-                style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 200 }}
+                style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
               >
                 <option value="all">👥 All Approvals</option>
                 <option value="pending_task_approval">📝 Task Completion Approvals</option>
@@ -1075,22 +1150,40 @@ export function ApprovalsQueue() {
     ...(isExecutive ? [
       {
         id: 'leaves',
-        label: `Leave Applications (${pendingApprovals.length})`,
+        label: `Leave Applications (${filteredPendingLeaves.length})`,
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {selectedLeaveIds.length > 0 && canApprove && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', background: 'var(--brand-muted)', borderRadius: 'var(--radius-md)', border: '1px solid var(--brand)' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
-                {selectedLeaveIds.length} leave request(s) selected
-              </span>
-              <Button size="sm" onClick={handleBatchApproveLeave} disabled={batchProcessing}>
-                {batchProcessing ? '⏳ Approving...' : `✓ Batch Approve Selected (${selectedLeaveIds.length})`}
-              </Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            {selectedLeaveIds.length > 0 && canApprove && (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 12px', background: 'var(--brand-muted)', borderRadius: 'var(--radius-md)', border: '1px solid var(--brand)' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>
+                  {selectedLeaveIds.length} leave request(s) selected
+                </span>
+                <Button size="sm" onClick={handleBatchApproveLeave} disabled={batchProcessing}>
+                  {batchProcessing ? '⏳ Approving...' : `✓ Batch Approve Selected (${selectedLeaveIds.length})`}
+                </Button>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Filter Employee:</span>
+              <select
+                className="kvj-select"
+                value={leaveEmployeeFilter}
+                onChange={(e) => setLeaveEmployeeFilter(e.target.value)}
+                style={{ padding: '4px 10px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
+              >
+                <option value="all">All Employees</option>
+                {Object.values(employees).map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+          </div>
           <DataTable
             columns={leaveColumns}
-            rows={pendingApprovals}
+            rows={filteredPendingLeaves}
             rowKey={(r) => r.id}
             selectable={canApprove}
             onSelectionChange={setSelectedLeaveIds}

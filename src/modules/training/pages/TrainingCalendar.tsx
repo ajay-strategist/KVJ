@@ -104,11 +104,11 @@ export function TrainingCalendar() {
   // not the batch capacity. Keyed by batch id.
   const [batchStudentCounts, setBatchStudentCounts] = useState<Record<string, number>>({});
 
-  // Load schedule sessions from Supabase flwdsk_calendar_sessions table
+  // Load schedule sessions from canonical Supabase flwdsk_schedule_sessions table (CAL-Q01 & ISSUE-005)
   const loadDbSessions = useCallback(async () => {
     try {
       const { data: rows, error } = await supabase
-        .from('flwdsk_calendar_sessions')
+        .from('flwdsk_schedule_sessions')
         .select('*')
         .is('deleted_at', null);
 
@@ -558,6 +558,24 @@ export function TrainingCalendar() {
     const isEdit = Boolean(editingSessionId && UUID_RE.test(editingSessionId));
     const sessId = isEdit && editingSessionId ? editingSessionId : crypto.randomUUID();
 
+    // UIUX-REQ-014: Duplicate Prevention Guard (batch_id, date, start_time)
+    const isDuplicate = combinedSessions.some((s) => {
+      if (isEdit && s.id === editingSessionId) return false;
+      const matchDate = s.date === assignForm.date;
+      const matchBatch = (assocBatch && s.batchCode === finalBatchCode) || (s.name === finalName && s.trainerId === effectiveTrainerId);
+      const matchTime = s.startTime === assignForm.startTime;
+      return matchDate && matchBatch && matchTime;
+    });
+
+    if (isDuplicate) {
+      toast({
+        variant: 'error',
+        title: 'Duplicate Session Detected',
+        message: 'A session is already scheduled for this batch and trainer at this date and time.',
+      });
+      return;
+    }
+
     const validTrainerId = toValidUuid(effectiveTrainerId) || (toValidUuid(user?.id) ?? null);
     const validBatchId = assocBatch ? toValidUuid(assocBatch.id) : null;
 
@@ -637,6 +655,28 @@ export function TrainingCalendar() {
     setEditingSessionId(null);
   };
 
+  const handleCopySession = (session: ScheduleSession) => {
+    setAssignForm({
+      date: session.date,
+      trainerId: session.trainerId,
+      batchId: '',
+      batchCode: session.batchCode,
+      name: session.name,
+      college: session.college,
+      course: session.course,
+      academicYear: session.academicYear,
+      coordinator: session.coordinator,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      venue: session.venue,
+      mode: session.mode,
+      studentCount: session.studentCount,
+    });
+    setEditingSessionId(null); // Fresh copy, new ID on save
+    setIsAssignDrawerOpen(true);
+    toast({ variant: 'info', title: 'Session Copied', message: 'Adjust target date or time and click Save to duplicate.' });
+  };
+
   const handleDeleteSession = async () => {
     if (!editingSessionId || submittingSession) return;
     const deletedId = editingSessionId;
@@ -685,7 +725,7 @@ export function TrainingCalendar() {
       if (UUID_RE.test(sessionId)) {
         const validTrainerId = toValidUuid(newTrainerId) || (toValidUuid(user?.id) ?? null);
         await supabase
-          .from('flwdsk_calendar_sessions')
+          .from('flwdsk_schedule_sessions')
           .update({ date: newDate, trainer_id: validTrainerId })
           .eq('id', sessionId);
       }

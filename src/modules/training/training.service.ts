@@ -2451,15 +2451,30 @@ export class TrainingService implements ITrainingService {
         return Err(AppError.validation('Batch ID and Trainer ID are required.'));
       }
 
+      // Canonical storage target: flwdsk_schedule_sessions (CAL-Q01 & ISSUE-005)
+      const schedulePayload: Record<string, any> = {
+        id: session.id,
+        batch_id: session.batch_id,
+        trainer_id: session.trainer_id,
+        date: session.date,
+        session_title: session.session_title || session.name || 'Training Session',
+        start_time: session.start_time || '09:00',
+        end_time: session.end_time || '17:00',
+        venue: session.venue,
+        mode: session.mode || 'Offline',
+        color: session.color || 'var(--brand)',
+        status: session.status || 'Scheduled',
+      };
+
       const { data: existing } = await supabase
-        .from('flwdsk_calendar_sessions')
+        .from('flwdsk_schedule_sessions')
         .select('*')
         .eq('id', session.id)
         .maybeSingle();
 
       const { data: resultRecord, error: saveError } = await supabase
-        .from('flwdsk_calendar_sessions')
-        .upsert(session)
+        .from('flwdsk_schedule_sessions')
+        .upsert(schedulePayload)
         .select('*')
         .single();
 
@@ -2470,10 +2485,10 @@ export class TrainingService implements ITrainingService {
       await supabase.from('flwdsk_audit_logs').insert({
         actor_id: actor.id,
         action: existing ? 'CALENDAR_SESSION_UPDATED' : 'CALENDAR_SESSION_CREATED',
-        entity_type: 'calendar_sessions',
+        entity_type: 'schedule_sessions',
         entity_id: resultRecord.id,
         new_value: resultRecord,
-        reason: 'Trainer calendar assignment'
+        reason: 'Trainer calendar assignment (canonical schedule_sessions)'
       });
 
       return Ok(resultRecord);
@@ -2492,7 +2507,7 @@ export class TrainingService implements ITrainingService {
       }
 
       const { data: existing } = await supabase
-        .from('flwdsk_calendar_sessions')
+        .from('flwdsk_schedule_sessions')
         .select('*')
         .eq('id', sessionId)
         .maybeSingle();
@@ -2502,7 +2517,7 @@ export class TrainingService implements ITrainingService {
       }
 
       const { error: deleteError } = await supabase
-        .from('flwdsk_calendar_sessions')
+        .from('flwdsk_schedule_sessions')
         .delete()
         .eq('id', sessionId);
 
@@ -2513,10 +2528,10 @@ export class TrainingService implements ITrainingService {
       await supabase.from('flwdsk_audit_logs').insert({
         actor_id: actor.id,
         action: 'CALENDAR_SESSION_DELETED',
-        entity_type: 'calendar_sessions',
+        entity_type: 'schedule_sessions',
         entity_id: sessionId,
         old_value: existing,
-        reason: 'Trainer calendar cancellation'
+        reason: 'Trainer calendar cancellation (canonical schedule_sessions)'
       });
 
       return Ok({ id: sessionId });

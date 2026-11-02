@@ -4,7 +4,6 @@ import { Button, Card, Badge } from '../../../shared/ui/components';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { DailyReportData, DailyReportConfig } from './daily-report.types';
 import { DailyReportDocument } from './DailyReportDocument';
-import { buildReportPdf } from './pdf/buildReport';
 import { DailyReportBuilderModal } from './DailyReportBuilderModal';
 
 interface DailyReportPreviewProps {
@@ -70,6 +69,7 @@ export const DailyReportPreview: React.FC<DailyReportPreviewProps> = ({
     try {
       // Vector A4 document (real selectable text + tables, small file, true
       // pagination with repeating headers). Replaces the old page-image export.
+      const { buildReportPdf } = await import('./pdf/buildReport');
       const doc = buildReportPdf(data, config);
       const now = new Date();
       const dd = String(now.getDate()).padStart(2, '0');

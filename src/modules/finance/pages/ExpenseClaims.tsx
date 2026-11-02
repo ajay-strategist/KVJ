@@ -11,7 +11,6 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import * as XLSX from 'xlsx';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Card, Button, Badge, EmptyState } from '../../../shared/ui/components';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -39,9 +38,12 @@ export interface ExpenseRecord {
   notes?: string;
   amount: number;
   receipt?: string;
-  status: 'submitted' | 'approved' | 'rejected';
+  status: 'submitted' | 'approved' | 'rejected' | 'Cancelled';
   approvedBy?: string;
   approvedAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
 }
 
 export function parseExpenseDateToYMD(val?: string | Date | null): string {
@@ -140,13 +142,20 @@ export function ExpenseClaims() {
   // Filter and Sort states
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'Office Expense' | 'Training Expense'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'submitted' | 'approved' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'submitted' | 'approved' | 'rejected' | 'Cancelled'>('all');
   const [maxAmountFilter, setMaxAmountFilter] = useState<string>('');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'person' | 'category'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [highlightedClaimId, setHighlightedClaimId] = useState<string | null>(null);
+
+  // UIUX-REQ-017: Lightbox preview for receipts
+  const [lightboxReceiptUrl, setLightboxReceiptUrl] = useState<string | null>(null);
+
+  // UIUX-REQ-017: Cancel claim modal state
+  const [cancelModalClaimId, setCancelModalClaimId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Async lock states
   const [submittingClaim, setSubmittingClaim] = useState(false);
@@ -802,6 +811,57 @@ export function ExpenseClaims() {
     }
   };
 
+  // UIUX-REQ-017: Cancel Approved Claim with mandatory reason and audit trail
+  const handleCancelClaim = async (id: string, reason: string) => {
+    if (processingAction) return;
+    if (!reason.trim()) {
+      toast({ variant: 'error', title: 'Reason Required', message: 'Please provide a reason for cancelling this claim.' });
+      return;
+    }
+    setProcessingAction(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const updates: Record<string, any> = {
+        status: 'Cancelled',
+        cancellation_reason: reason.trim(),
+        cancelled_at: nowIso,
+        cancelled_by: user?.id || user?.fullName || 'Admin',
+      };
+
+      const { error } = await supabase
+        .from('flwdsk_expense_claims')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) {
+        console.warn('Database cancellation update error, falling back locally:', error.message);
+      }
+
+      // Update local storage cache
+      try {
+        const stored = localStorage.getItem('kvj_local_expense_claims');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.map((x: any) =>
+              x.id === id ? { ...x, status: 'Cancelled', cancellationReason: reason.trim(), cancelledAt: nowIso } : x
+            );
+            localStorage.setItem('kvj_local_expense_claims', JSON.stringify(updated));
+          }
+        }
+      } catch {}
+
+      toast({ variant: 'warning', title: 'Claim Cancelled', message: `Expense claim has been cancelled with audit log.` });
+      setCancelModalClaimId(null);
+      setCancelReason('');
+      loadClaims();
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Cancellation Failed', message: e.message });
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
   const handleDeleteClaim = async (id: string) => {
     if (processingAction) return;
     setProcessingAction(true);
@@ -948,7 +1008,8 @@ export function ExpenseClaims() {
     }
   };
 
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
+    const XLSX = await import('xlsx');
     const rows = filteredExpenses.map((exp) => ({
       Date: exp.date,
       Employee: exp.person,
@@ -1279,14 +1340,25 @@ export function ExpenseClaims() {
 
                     <div>
                       {isRealUrl ? (
-                        <a
-                          href={r}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg-sunken)', padding: '5px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+                        <button
+                          type="button"
+                          onClick={() => setLightboxReceiptUrl(r)}
+                          style={{
+                            color: 'var(--brand)',
+                            background: 'var(--bg-sunken)',
+                            padding: '5px 10px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border)',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
                         >
-                          📎 View Receipt
-                        </a>
+                          🔍 Preview Receipt
+                        </button>
                       ) : r && r !== 'Uploaded Proof' ? (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📎 {r}</span>
                       ) : exp.vehicle ? (
@@ -1334,8 +1406,22 @@ export function ExpenseClaims() {
                         Delete
                       </Button>
                     )}
+                    {isLocked && isManagement && exp.status !== 'Cancelled' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setCancelModalClaimId(exp.id);
+                          setCancelReason('');
+                        }}
+                      >
+                        Cancel Claim
+                      </Button>
+                    )}
                     {isLocked && (
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Audit Locked</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        {exp.status === 'Cancelled' ? '🚫 Cancelled' : 'Audit Locked'}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1473,14 +1559,24 @@ export function ExpenseClaims() {
                           const isRealUrl = r.startsWith('http://') || r.startsWith('https://') || r.startsWith('data:');
                           if (isRealUrl) {
                             return (
-                              <a
-                                href={r}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                              <button
+                                type="button"
+                                onClick={() => setLightboxReceiptUrl(r)}
+                                style={{
+                                  color: 'var(--brand)',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  padding: 0,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
                               >
-                                📎 View Receipt
-                              </a>
+                                🔍 Preview
+                              </button>
                             );
                           } else if (r && r !== 'Uploaded Proof') {
                             return (
@@ -1532,9 +1628,23 @@ export function ExpenseClaims() {
                             </Button>
                           )}
                           {isLocked && (
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              🔒 Locked
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                {exp.status === 'Cancelled' ? '🚫 Cancelled' : '🔒 Locked'}
+                              </span>
+                              {isManagement && exp.status !== 'Cancelled' && (
+                                <Button
+                                  size="xs"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    setCancelModalClaimId(exp.id);
+                                    setCancelReason('');
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -1575,6 +1685,163 @@ export function ExpenseClaims() {
           if (c !== undefined) setCarRate(c);
         }}
       />
+
+      {/* UIUX-REQ-017: Lightbox Receipt Preview Modal */}
+      {lightboxReceiptUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={() => setLightboxReceiptUrl(null)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              background: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 16,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>Receipt Attachment Preview</span>
+              <button
+                type="button"
+                onClick={() => setLightboxReceiptUrl(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+              <img
+                src={lightboxReceiptUrl}
+                alt="Receipt Zoom Preview"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '75vh',
+                  objectFit: 'contain',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <a
+                href={lightboxReceiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  fontSize: 12,
+                  color: 'var(--brand)',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                }}
+              >
+                Open in Full Window ↗
+              </a>
+              <Button size="sm" onClick={() => setLightboxReceiptUrl(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UIUX-REQ-017: Cancel Claim Modal with Mandatory Reason */}
+      {cancelModalClaimId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={() => setCancelModalClaimId(null)}
+        >
+          <div
+            style={{
+              width: 440,
+              maxWidth: '95vw',
+              background: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 20,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 700, color: 'var(--status-danger)' }}>
+                Cancel Approved Claim
+              </h3>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+                Cancelled claims are preserved in the database for audit integrity. Please provide a mandatory reason for cancellation:
+              </p>
+            </div>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="e.g. Disbursed offline via petty cash / Duplicate booking reimbursement..."
+              rows={3}
+              style={{
+                width: '100%',
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-sunken)',
+                color: 'var(--text-primary)',
+                padding: 10,
+                fontSize: 13,
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Button variant="secondary" onClick={() => setCancelModalClaimId(null)}>
+                Keep Claim
+              </Button>
+              <Button
+                variant="danger"
+                loading={processingAction}
+                onClick={() => handleCancelClaim(cancelModalClaimId, cancelReason)}
+              >
+                Confirm Cancellation
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

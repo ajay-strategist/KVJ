@@ -95,6 +95,7 @@ export function TaskBoard({
   const [dateWindowFilter, setDateWindowFilter] = useState<'next_3_days' | 'today' | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCompleted, setShowCompleted] = useState<boolean>(false);
 
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [timeEntryOpen, setTimeEntryOpen] = useState(false);
@@ -452,6 +453,11 @@ export function TaskBoard({
         if (t.dueDate < todayStr || t.dueDate > windowEnd) return false;
       }
 
+      // UIUX-REQ-016: Active focus view hides Completed & Under Review tasks by default unless toggled
+      if (!showCompleted && (t.status === 'Completed' || t.status === 'Under Review')) {
+        return false;
+      }
+
       if (effectiveSearch) {
         const matchesName = t.name.toLowerCase().includes(effectiveSearch);
         const matchesAssignee = t.assignee.toLowerCase().includes(effectiveSearch);
@@ -464,7 +470,7 @@ export function TaskBoard({
     return filtered.sort((a, b) =>
       sortOrder === 'asc' ? a.dueDate.localeCompare(b.dueDate) : b.dueDate.localeCompare(a.dueDate)
     );
-  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, statusFilters, dateWindowFilter, sortOrder, searchQuery, commonFilters, tasks, projects, selectedEmployeeId, todayStr, windowEnd]);
+  }, [tasksList, isManagement, selectedAssignee, user, categoryFilter, statusFilters, dateWindowFilter, sortOrder, searchQuery, commonFilters, tasks, projects, selectedEmployeeId, todayStr, windowEnd, showCompleted]);
 
   const handleCreateTask = async (values: Record<string, unknown>) => {
     const categoryVal = (values.category as string) || 'Office Task';
@@ -1033,6 +1039,32 @@ export function TaskBoard({
             <option value="asc">DueDate: Ascending ⬆</option>
             <option value="desc">DueDate: Descending ⬇</option>
           </select>
+
+          {/* UIUX-REQ-016: Reveal Toggle for Completed & Under Review tasks */}
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              padding: '6px 10px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)',
+              background: showCompleted ? 'var(--primary-50, #eff6ff)' : 'var(--bg-surface)',
+              color: showCompleted ? 'var(--primary-700, #1d4ed8)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showCompleted}
+              onChange={(e) => setShowCompleted(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>Show Completed / Under Review</span>
+          </label>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -1128,31 +1160,6 @@ export function TaskBoard({
           </div>
         </Card>
       )}
-
-      {/* KPI Stat Cards */}
-      <div style={{ display: 'flex', gap: isMobile ? 8 : 16, flexWrap: 'wrap', marginBottom: 4 }}>
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Tasks Active</div>
-          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{sortedTasks.length} Tasks</div>
-        </Card>
-
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-danger)', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Due Today</div>
-          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--status-danger)', marginTop: 4 }}>📌 {dueTodayCount} Due</div>
-        </Card>
-
-        <Card padding="compact" style={{ borderLeft: '4px solid #8b5cf6', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Proposed Hours</div>
-          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#8b5cf6', marginTop: 4 }}>📋 {totalProposedHoursSum.toFixed(1)}</div>
-        </Card>
-
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--accent)', flex: isMobile ? '1 1 calc(50% - 6px)' : '0 0 200px', minWidth: isMobile ? 135 : 200 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Total Hours Logged</div>
-          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>⏱ {totalHoursSum.toFixed(1)}</div>
-        </Card>
-      </div>
-
-
 
       {/* Task List Table View */}
       {(() => {

@@ -275,6 +275,12 @@ export function useProject() {
     return { ok: false, error: res.error.message };
   }, [service, user]);
 
+  const getSupervisorProjects = useCallback(async (supervisorId: UUID): Promise<CallbackResult<Project[]>> => {
+    const res = await service.getSupervisorProjects(supervisorId);
+    if (res.ok) return { ok: true, value: res.value };
+    return { ok: false, error: res.error.message };
+  }, [service]);
+
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
@@ -303,6 +309,7 @@ export function useProject() {
     approveTaskAssignment,
     logTimesheet,
     approveTimesheet,
+    getSupervisorProjects,
     refresh: fetchAll,
   };
 }

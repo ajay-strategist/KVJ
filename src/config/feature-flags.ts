@@ -41,11 +41,6 @@ export const featureFlags = {
     reportBuilder: false,
     kpiRegistry: false,
     powerBiGateway: false,
-    // Finance extras — hidden (Expenses & Travel stays)
-    procurement: false,
-    assets: false,
-    budgets: false,
-    payroll: false,
     // Training sub-pages — these live as workspace tabs INSIDE Batch Management.
     // Keeping them false removes them from the top-level nav; the routes still work.
     studentLifecycle: false,
@@ -71,7 +66,7 @@ export const featureFlags = {
     leave: true,      // Table public.leave_records
     training: true,   // Table public.courses, batches, student_records, etc.
     project: true,    // Table public.projects, tasks, milestones, etc.
-    finance: true,    // Table public.expense_claims, budgets, assets, etc.
+    finance: true,    // Table public.flwdsk_expense_claims, flwdsk_travel_requests
     communication: true, // Table public.chat_channels, chat_messages, announcements
     analytics: true,  // Table public.kpi_definitions, saved_reports
   },

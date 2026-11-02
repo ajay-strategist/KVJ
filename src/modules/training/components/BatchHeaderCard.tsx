@@ -51,7 +51,7 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
             🎓 Training Batch Management & Analytics
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-            Batch: <strong>{cleanBatchCode(activeBatch?.code, activeBatch?.batchNo) || 'Select a batch'}</strong> ({activeBatch?.college || 'KVJ Analytics'})
+            <strong>{cleanBatchCode(activeBatch?.code, activeBatch?.batchNo) || 'Select a batch'}</strong> ({activeBatch?.college || 'KVJ Analytics'})
           </p>
         </div>
 

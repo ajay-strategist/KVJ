@@ -85,24 +85,14 @@ import {
   SupabaseTaskWorkSessionRepository
 } from '../modules/project/supabase-project.repository';
 
-// Import Phase 5 repositories
+// Import Phase 5 repositories (Expenses & Travel)
 import {
-  BUDGET_REPOSITORY_TOKEN,
   EXPENSE_CLAIM_REPOSITORY_TOKEN,
-  TRAVEL_REQUEST_REPOSITORY_TOKEN,
-  VENDOR_REPOSITORY_TOKEN,
-  PURCHASE_ORDER_REPOSITORY_TOKEN,
-  ASSET_REPOSITORY_TOKEN,
-  SALARY_STRUCTURE_REPOSITORY_TOKEN
+  TRAVEL_REQUEST_REPOSITORY_TOKEN
 } from '../modules/finance/finance.repository';
 import {
-  SupabaseBudgetRepository,
   SupabaseExpenseClaimRepository,
-  SupabaseTravelRequestRepository,
-  SupabaseVendorRepository,
-  SupabasePurchaseOrderRepository,
-  SupabaseAssetRepository,
-  SupabaseSalaryStructureRepository
+  SupabaseTravelRequestRepository
 } from '../modules/finance/supabase-finance.repository';
 
 // Import Phase 6 repositories
@@ -166,14 +156,9 @@ export function bootstrap() {
   container.register(CLIENT_MEETING_REPOSITORY_TOKEN, () => new SupabaseClientMeetingRepository());
   container.register(TASK_WORK_SESSION_REPOSITORY_TOKEN, () => new SupabaseTaskWorkSessionRepository());
 
-  // Finance
-  container.register(BUDGET_REPOSITORY_TOKEN, () => new SupabaseBudgetRepository());
+  // Finance (Expenses & Travel Claims)
   container.register(EXPENSE_CLAIM_REPOSITORY_TOKEN, () => new SupabaseExpenseClaimRepository());
   container.register(TRAVEL_REQUEST_REPOSITORY_TOKEN, () => new SupabaseTravelRequestRepository());
-  container.register(VENDOR_REPOSITORY_TOKEN, () => new SupabaseVendorRepository());
-  container.register(PURCHASE_ORDER_REPOSITORY_TOKEN, () => new SupabasePurchaseOrderRepository());
-  container.register(ASSET_REPOSITORY_TOKEN, () => new SupabaseAssetRepository());
-  container.register(SALARY_STRUCTURE_REPOSITORY_TOKEN, () => new SupabaseSalaryStructureRepository());
 
   // Communication
   container.register(CHAT_CHANNEL_REPOSITORY_TOKEN, () => new SupabaseChatChannelRepository());

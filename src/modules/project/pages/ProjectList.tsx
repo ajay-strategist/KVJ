@@ -17,58 +17,7 @@ import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
 import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
 import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
 import { supabase } from '../../../shared/integration/supabase';
-
-/**
- * Multi-select of project members, bound to the shared Form's `memberIds` value.
- * A member is any employee assigned to the project alongside the supervisor.
- */
-function ProjectMembersField({ employees }: { employees: Array<{ id: string; firstName?: string; lastName?: string; designation?: string }> }) {
-  const { values, setValue } = useForm();
-  const selected: string[] = Array.isArray((values as any).memberIds) ? (values as any).memberIds : [];
-  const [q, setQ] = useState('');
-
-  const toggle = (id: string) => {
-    const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
-    setValue('memberIds', next);
-  };
-
-  const list = employees.filter((e) => {
-    const name = `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase();
-    return !q.trim() || name.includes(q.toLowerCase());
-  });
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        Project Members {selected.length > 0 ? `(${selected.length} selected)` : ''}
-      </label>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search employees to add as members…"
-        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-      />
-      <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {list.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>No matching employees.</div>
-        ) : (
-          list.map((e) => {
-            const on = selected.includes(e.id);
-            return (
-              <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 6, cursor: 'pointer', background: on ? 'var(--bg-sunken)' : 'transparent' }}>
-                <input type="checkbox" checked={on} onChange={() => toggle(e.id)} />
-                <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>
-                  {e.firstName} {e.lastName}
-                  {e.designation ? <span style={{ color: 'var(--text-muted)' }}> · {e.designation}</span> : null}
-                </span>
-              </label>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
+import { ProjectMembersField } from '../components/ProjectMembersField';
 
 export type ProjectStatusLabel = 'Not Started' | 'In Progress' | 'Completed';
 
@@ -1052,75 +1001,6 @@ export function ProjectList({
       </div>
 
 
-
-      {/* 4 KPI Summary Cards Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 4 }}>
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--brand)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>ACTIVE PROJECTS</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>{activeProjectsCount}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Total Projects</div>
-        </Card>
-
-        <Card padding="compact" style={{ borderLeft: '4px solid #2563eb' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>TOTAL TASKS</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#2563eb', marginTop: 4 }}>{totalTasksCount}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>All Tasks</div>
-        </Card>
-
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-success)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>COMPLETED TASKS</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-success)', marginTop: 4 }}>{completedTasksCount}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pctCompleted}% of Total</div>
-        </Card>
-
-        <Card padding="compact" style={{ borderLeft: '4px solid var(--status-warning)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>IN PROGRESS TASKS</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--status-warning)', marginTop: 4 }}>{inProgressTasksCount}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pctInProgress}% of Total</div>
-        </Card>
-      </div>
-
-      {/* Grid Toolbar / View Toggle Line (Directly above Cards Grid) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
-          Showing {filteredProjects.length} Projects
-        </div>
-
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-            <button
-              type="button"
-              onClick={() => setViewMode('card')}
-              style={{
-                padding: '6px 14px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                border: 'none',
-                background: viewMode === 'card' ? 'var(--brand)' : 'var(--bg-surface)',
-                color: viewMode === 'card' ? 'white' : 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              🎴 Card View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              style={{
-                padding: '6px 14px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                border: 'none',
-                background: viewMode === 'table' ? 'var(--brand)' : 'var(--bg-surface)',
-                color: viewMode === 'table' ? 'white' : 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              📊 Table View
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Main View Display: Card View OR Table View */}
       {viewMode === 'card' ? (

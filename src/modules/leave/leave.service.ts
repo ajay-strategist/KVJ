@@ -6,6 +6,7 @@ import { businessRules } from '../../config/business-rules';
 import { LEAVE_REPOSITORY_TOKEN, type LeaveRecord } from './leave.repository';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../employee/employee.repository';
 import { googleIntegration } from '../../shared/integration/google';
+import { calculateEarnedLeaveAllocation } from '../../shared/utils/leaveAccrual';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (val?: string): boolean => !!val && UUID_RE.test(val);
@@ -281,18 +282,18 @@ export class LeaveService implements ILeaveService {
       const emp = await empRepo.findById(employeeId);
       const allocationPerMonth = emp?.leaveAllocationPerMonth ?? 1;
 
-      // Current Financial Year (April 1 to March 31)
+      // Compute earned leave allocation adhering to BR-LEAVE-011 and EMP-Q01 (pro-rata from joining/probation)
+      const totalAllocatedDays = calculateEarnedLeaveAllocation({
+        dateOfJoining: emp?.dateOfJoining,
+        probationEndDate: (emp as any)?.probationEndDate || (emp as any)?.probation_end_date,
+        allocationPerMonth,
+      });
+
+      // Current Financial Year start (April 1) for leaf deduction filtering
       const now = new Date();
       const currentYear = now.getFullYear();
       const fyStartYear = now.getMonth() >= 3 ? currentYear : currentYear - 1;
       const fyStartDate = `${fyStartYear}-04-01`;
-
-      // Months elapsed in current FY (April = month 3 => 1 month, Sept = month 8 => 6 months)
-      const monthsElapsed = now.getMonth() >= 3
-        ? (now.getMonth() - 3 + 1)
-        : (12 - 3 + now.getMonth() + 1);
-
-      const totalAllocatedDays = allocationPerMonth * Math.max(1, monthsElapsed);
 
       // Fetch all leaves for employee
       const leaves = await this.repo.findByEmployeeId(employeeId);

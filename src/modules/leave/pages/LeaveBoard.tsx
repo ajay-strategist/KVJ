@@ -148,6 +148,9 @@ export function LeaveBoard() {
   const isMgmt = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [datePeriod, setDatePeriod] = useState<string>('all');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
 
   const handleApplySubmit = async (values: Record<string, unknown>) => {
     const ok = await confirm({
@@ -480,8 +483,50 @@ export function LeaveBoard() {
     if (statusFilter !== 'all') {
       base = base.filter((l) => l.status === statusFilter);
     }
+
+    // Exact Date Filter Suite (UIUX-REQ-005)
+    if (datePeriod !== 'all') {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+
+      base = base.filter((l) => {
+        const lDateStr = l.startDate || l.createdAt || '';
+        if (!lDateStr) return false;
+        const lDate = new Date(lDateStr);
+
+        switch (datePeriod) {
+          case 'current_month':
+            return lDate.getFullYear() === currentYear && lDate.getMonth() === currentMonth;
+          case 'last_month': {
+            const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+            return lDate.getFullYear() === prevMonthDate.getFullYear() && lDate.getMonth() === prevMonthDate.getMonth();
+          }
+          case 'last_6_months': {
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+            return lDate >= sixMonthsAgo && lDate <= now;
+          }
+          case 'current_fy': {
+            // Financial Year runs Apr 1 to Mar 31
+            const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+            const fyStart = new Date(fyStartYear, 3, 1); // Apr 1
+            const fyEnd = new Date(fyStartYear + 1, 2, 31, 23, 59, 59); // Mar 31 next year
+            return lDate >= fyStart && lDate <= fyEnd;
+          }
+          case 'custom': {
+            if (customStartDate && lDateStr < customStartDate) return false;
+            if (customEndDate && lDateStr > customEndDate) return false;
+            return true;
+          }
+          default:
+            return true;
+        }
+      });
+    }
+
     return base.slice().sort((a, b) => (b.startDate || b.createdAt || '').localeCompare(a.startDate || a.createdAt || ''));
-  }, [leaves, allLeaves, selectedEmployee, isMgmt, statusFilter]);
+  }, [leaves, allLeaves, selectedEmployee, isMgmt, statusFilter, datePeriod, customStartDate, customEndDate]);
 
   const safeLeavesListForStats = isMgmt ? (Array.isArray(allLeaves) ? allLeaves : []) : (Array.isArray(leaves) ? leaves : []);
   const pendingCount = safeLeavesListForStats.filter((l) => l && l.status === 'pending').length;
@@ -494,12 +539,6 @@ export function LeaveBoard() {
         subtitle="Apply for leave, check balances, and view records"
         actions={<Button onClick={() => setApplyOpen(true)}>Request Leave</Button>}
       />
-
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-        <LeaveStatCard label="Pending Applications" value={pendingCount} tone="warning" icon="⚑" />
-        <LeaveStatCard label="Approved Leaves" value={approvedCount} tone="success" icon="✓" />
-        <LeaveStatCard label="Total Leaves Taken" value={approvedCount} icon="🗓" />
-      </div>
 
       <div
         style={{
@@ -515,20 +554,20 @@ export function LeaveBoard() {
           {isMgmt ? 'Employee Leave History' : 'My Leave History'}
         </h2>
 
-        {isMgmt && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              background: 'var(--bg-panel)',
-              padding: '6px 12px',
-              borderRadius: 'var(--radius-md, 10px)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              flexWrap: 'wrap',
-            }}
-          >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            background: 'var(--bg-panel)',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius-md, 10px)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            flexWrap: 'wrap',
+          }}
+        >
+          {isMgmt && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>👤 Employee:</span>
               <select
@@ -543,7 +582,7 @@ export function LeaveBoard() {
                   background: 'var(--bg-surface)',
                   color: 'var(--text-primary)',
                   outline: 'none',
-                  minWidth: 180,
+                  minWidth: 160,
                   cursor: 'pointer',
                 }}
               >
@@ -555,34 +594,93 @@ export function LeaveBoard() {
                 })}
               </select>
             </div>
+          )}
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>📅 Period:</span>
+            <select
+              value={datePeriod}
+              onChange={(e) => setDatePeriod(e.target.value)}
+              style={{
+                padding: '5px 10px',
+                fontSize: 12.5,
+                fontWeight: 600,
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                minWidth: 150,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All Dates</option>
+              <option value="current_month">Current Month</option>
+              <option value="last_month">Last Month</option>
+              <option value="last_6_months">Last 6 Months</option>
+              <option value="current_fy">Current Financial Year (Apr–Mar)</option>
+              <option value="custom">Custom Date Range</option>
+            </select>
+          </div>
+
+          {datePeriod === 'custom' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>📊 Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
                 style={{
-                  padding: '5px 10px',
-                  fontSize: 12.5,
-                  fontWeight: 600,
+                  padding: '4px 8px',
+                  fontSize: 12,
                   borderRadius: 6,
                   border: '1px solid var(--border)',
                   background: 'var(--bg-surface)',
                   color: 'var(--text-primary)',
-                  outline: 'none',
-                  minWidth: 140,
-                  cursor: 'pointer',
                 }}
-              >
-                <option value="all">All Status</option>
-                <option value="pending">⏳ Pending</option>
-                <option value="approved">✅ Approved</option>
-                <option value="rejected">❌ Rejected</option>
-                <option value="cancelled">🚫 Cancelled</option>
-              </select>
+              />
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: 12,
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                }}
+              />
             </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>📊 Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: '5px 10px',
+                fontSize: 12.5,
+                fontWeight: 600,
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                minWidth: 130,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All Status</option>
+              <option value="pending">⏳ Pending</option>
+              <option value="approved">✅ Approved</option>
+              <option value="rejected">❌ Rejected</option>
+              <option value="cancelled">🚫 Cancelled</option>
+            </select>
           </div>
-        )}
+        </div>
       </div>
 
       {isMobile ? (
@@ -764,6 +862,7 @@ export function LeaveBoard() {
           loading={loading}
           maxHeight={380}
           pageSize={20}
+          rowStyle={(r) => r.status === 'pending' ? { background: '#fffbeb', borderLeft: '4px solid #f59e0b' } : undefined}
         />
       )}
 

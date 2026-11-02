@@ -11,7 +11,6 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
   private async syncWorkSessions(attendanceRecordId: UUID, sessions?: WorkSession[]): Promise<void> {
     if (!sessions || sessions.length === 0) return;
     try {
-      await supabase.from('flwdsk_work_sessions').delete().eq('attendance_record_id', attendanceRecordId);
       const rows = sessions.map((s) => ({
         ...(s.id && s.id.length === 36 ? { id: s.id } : {}),
         attendance_record_id: attendanceRecordId,
@@ -20,7 +19,22 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
         work_type: s.workType || 'Office',
         notes: s.notes || null,
       }));
-      await supabase.from('flwdsk_work_sessions').insert(rows);
+
+      // In-place upsert to prevent foreign key constraint violations against flwdsk_break_records
+      await supabase.from('flwdsk_work_sessions').upsert(rows);
+
+      // Clean up removed sessions with strict child-before-parent ordering
+      const currentIds = rows.map((r: any) => r.id).filter(Boolean);
+      const { data: existing } = await supabase
+        .from('flwdsk_work_sessions')
+        .select('id')
+        .eq('attendance_record_id', attendanceRecordId);
+
+      const toRemove = (existing || []).map((e) => e.id).filter((id) => !currentIds.includes(id));
+      if (toRemove.length > 0) {
+        await supabase.from('flwdsk_break_records').delete().in('work_session_id', toRemove);
+        await supabase.from('flwdsk_work_sessions').delete().in('id', toRemove);
+      }
     } catch (e) {
       console.warn('Could not sync work_sessions to Supabase:', e);
     }
@@ -71,9 +85,7 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
         .eq('attendance_record_id', attendanceRecordId);
         
       const sessionIds = (sessions || []).map((s) => s.id);
-      if (sessionIds.length > 0) {
-        await supabase.from('flwdsk_break_records').delete().in('work_session_id', sessionIds);
-      } else {
+      if (sessionIds.length === 0) {
         const { data: createdWs } = await supabase
           .from('flwdsk_work_sessions')
           .insert({
@@ -99,7 +111,16 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       })).filter((row) => !!row.work_session_id);
       
       if (rows.length > 0) {
-        await supabase.from('flwdsk_break_records').insert(rows);
+        await supabase.from('flwdsk_break_records').upsert(rows);
+
+        const currentBreakIds = rows.map((r: any) => r.id).filter(Boolean);
+        if (currentBreakIds.length > 0 && sessionIds.length > 0) {
+          await supabase
+            .from('flwdsk_break_records')
+            .delete()
+            .in('work_session_id', sessionIds)
+            .not('id', 'in', `(${currentBreakIds.join(',')})`);
+        }
       }
     } catch (e) {
       console.warn('Could not sync break_records to Supabase:', e);

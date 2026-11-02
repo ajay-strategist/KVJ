@@ -7,6 +7,30 @@ export type ProjectPriority = 'low' | 'medium' | 'high' | 'critical';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type AllocationStatus = 'active' | 'completed' | 'released';
 
+/**
+ * DISC-003: 7 Canonical Task Lifecycle States
+ */
+export type CanonicalTaskStatus =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'in_review'
+  | 'rework'
+  | 'done'
+  | 'rejected_closed';
+
+export const CANONICAL_TASK_STATUSES: CanonicalTaskStatus[] = [
+  'backlog',
+  'todo',
+  'in_progress',
+  'in_review',
+  'rework',
+  'done',
+  'rejected_closed',
+];
+
+export type TaskStatus = CanonicalTaskStatus | 'review';
+
 export interface Client extends Entity {
   name: string;
   email: string;
@@ -60,7 +84,7 @@ export interface Task extends Entity {
   title: string;
   description?: string;
   priority: TaskPriority;
-  status: 'todo' | 'in_progress' | 'review' | 'done';
+  status: TaskStatus;
   dueDate?: string;
   startDate?: string;
   estimatedHours?: number;

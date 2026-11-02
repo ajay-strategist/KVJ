@@ -12,14 +12,11 @@ import { SUMMARY_ENGINE_TOKEN } from '../../core/engines/ai';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../employee/employee.repository';
 import { COURSE_REPOSITORY_TOKEN } from '../training/training.repository';
 import { PROJECT_REPOSITORY_TOKEN } from '../project/project.repository';
-import { BUDGET_REPOSITORY_TOKEN } from '../finance/finance.repository';
 
 export interface CalculatedMetrics {
   totalEmployees: number;
   activeCourses: number;
   activeProjects: number;
-  totalBudgetsAllocated: number;
-  totalBudgetsSpent: number;
 }
 
 export interface IAnalyticsService {
@@ -80,24 +77,17 @@ export class AnalyticsService implements IAnalyticsService {
       const empRepo = container.resolve(EMPLOYEE_REPOSITORY_TOKEN);
       const courseRepo = container.resolve(COURSE_REPOSITORY_TOKEN);
       const projectRepo = container.resolve(PROJECT_REPOSITORY_TOKEN);
-      const budgetRepo = container.resolve(BUDGET_REPOSITORY_TOKEN);
 
-      const [emps, courses, projects, budgets] = await Promise.all([
+      const [emps, courses, projects] = await Promise.all([
         empRepo.findMany({ pageSize: 1000 }),
         courseRepo.findMany({ pageSize: 1000 }),
-        projectRepo.findMany({ pageSize: 1000 }),
-        budgetRepo.findMany({ pageSize: 1000 })
+        projectRepo.findMany({ pageSize: 1000 })
       ]);
-
-      const totalBudgetsAllocated = budgets.data.reduce((sum, b) => sum + b.allocatedAmount, 0);
-      const totalBudgetsSpent = budgets.data.reduce((sum, b) => sum + b.spentAmount, 0);
 
       return Ok({
         totalEmployees: emps.data.length,
         activeCourses: courses.data.length,
-        activeProjects: projects.data.length,
-        totalBudgetsAllocated,
-        totalBudgetsSpent
+        activeProjects: projects.data.length
       });
     } catch (e: any) {
       return Err(AppError.internal(e.message));
@@ -106,7 +96,7 @@ export class AnalyticsService implements IAnalyticsService {
 
   async generateAiSummary(actor: Actor): Promise<Result<string>> {
     try {
-      const summaryResult = await this.summaryAi.summarizeText('Enterprise operations are stable. Budgets remain within limits, project schedules are on track, and training batches show high student enrollment.', 100);
+      const summaryResult = await this.summaryAi.summarizeText('Enterprise operations are stable. Project schedules are on track, and training batches show high employee and student enrollment.', 100);
       if (summaryResult.ok) {
         return Ok(summaryResult.value);
       }

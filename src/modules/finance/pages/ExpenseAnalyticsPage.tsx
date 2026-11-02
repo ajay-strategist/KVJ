@@ -146,6 +146,7 @@ export function ExpenseAnalyticsPage() {
   const [batches, setBatches] = useState<BatchRecord[]>([]);
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [enrollmentsMap, setEnrollmentsMap] = useState<Record<string, number>>({});
+  const [scheduleDatesMap, setScheduleDatesMap] = useState<Record<string, Set<string>>>({});
 
   // ── Filters State ────────────────────────────────────────────────────────
   const [academicYear, setAcademicYear] = useState<string>('2026-2027');
@@ -205,6 +206,21 @@ export function ExpenseAnalyticsPage() {
         }
       });
       setEnrollmentsMap(enrollCounts);
+
+      // Fetch Canonical Schedule Sessions (Metric 7 Authoritative Source)
+      const { data: schedSessionsData } = await supabase
+        .from('flwdsk_schedule_sessions')
+        .select('batch_id, date')
+        .is('deleted_at', null);
+
+      const batchDates: Record<string, Set<string>> = {};
+      schedSessionsData?.forEach((s: any) => {
+        if (s.batch_id && s.date) {
+          if (!batchDates[s.batch_id]) batchDates[s.batch_id] = new Set();
+          batchDates[s.batch_id].add(s.date);
+        }
+      });
+      setScheduleDatesMap(batchDates);
 
       // Map Batches
       const mappedBatches: BatchRecord[] = (batchesData || []).map((b: any) => {
@@ -504,17 +520,15 @@ export function ExpenseAnalyticsPage() {
     return activeBatchesInScope.reduce((sum, b) => sum + (b.studentCount || b.capacity || 0), 0);
   }, [activeBatchesInScope]);
 
-  // Total Training Days across active batches in scope
+  // Total Training Days across active batches in scope (Metric 4 denominator via flwdsk_schedule_sessions)
   const totalTrainingDaysInScope = useMemo(() => {
     let days = 0;
     activeBatchesInScope.forEach(b => {
-      // Calculate unique expense dates for this batch
-      const bClaims = filteredClaims.filter(c => c.matchedBatchId === b.id);
-      const uniqueDays = new Set(bClaims.map(c => c.expenseDate)).size;
-      days += Math.max(uniqueDays, 1);
+      const canonicalDays = scheduleDatesMap[b.id]?.size || 0;
+      days += canonicalDays > 0 ? canonicalDays : 1;
     });
     return Math.max(days, 1);
-  }, [activeBatchesInScope, filteredClaims]);
+  }, [activeBatchesInScope, scheduleDatesMap]);
 
   // M3: Cost / Student
   const costPerStudent = useMemo(() => {
@@ -563,9 +577,12 @@ export function ExpenseAnalyticsPage() {
       const students = b.studentCount || b.capacity || 0;
       const costPerStudent = students > 0 ? totalExpense / students : 0;
 
-      const uniqueDays = new Set(bClaims.map(c => c.expenseDate)).size;
-      const trainingDays = Math.max(uniqueDays, 1);
+      const distinctCanonicalDates = scheduleDatesMap[b.id]?.size || 0;
+      const hasCanonicalSessions = distinctCanonicalDates > 0;
+      const trainingDays = hasCanonicalSessions ? distinctCanonicalDates : 1;
       const costPerDay = totalExpense / trainingDays;
+      const isPreCommencement = !hasCanonicalSessions && totalExpense > 0;
+      const isMissingData = !hasCanonicalSessions && totalExpense === 0;
 
       const sharePct = trainingExpenses > 0 ? (totalExpense / trainingExpenses) * 100 : 0;
 
@@ -588,6 +605,9 @@ export function ExpenseAnalyticsPage() {
         costPerStudent,
         trainingDays,
         costPerDay,
+        hasCanonicalSessions,
+        isPreCommencement,
+        isMissingData,
         sharePct,
         travelExpense,
         otherExpense,
@@ -931,7 +951,7 @@ export function ExpenseAnalyticsPage() {
   }, [batches, academicYear, comparisonYear, filteredClaims, priorYearClaims]);
 
   // ── 7. Excel Export Handler ──────────────────────────────────────────────
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
     try {
       const payload: ExportPayload = {
         kpis: {
@@ -1008,7 +1028,7 @@ export function ExpenseAnalyticsPage() {
         }),
       };
 
-      exportExpenseAnalyticsToExcel(payload);
+      await exportExpenseAnalyticsToExcel(payload);
       toast({
         variant: 'success',
         title: 'Report Downloaded',
@@ -2081,7 +2101,28 @@ export function ExpenseAnalyticsPage() {
                             </span>
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                            {b.trainingDays}d
+                            {b.hasCanonicalSessions ? (
+                              `${b.trainingDays}d`
+                            ) : b.isPreCommencement ? (
+                              <span
+                                title="No canonical sessions logged in flwdsk_schedule_sessions; fallback of 1 day (pre-commencement) used"
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: 'var(--status-warning, #d97706)',
+                                  background: 'rgba(217, 119, 6, 0.1)',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  cursor: 'help',
+                                }}
+                              >
+                                1d (pre-commencement)
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                Session Data Unavailable
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--text-secondary)' }}>
                             {formatINR(b.costPerDay)}

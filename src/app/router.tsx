@@ -45,13 +45,9 @@ const ResourceScheduler = lazy(() => import('../modules/project/pages/ResourceSc
 const TaskBoard = lazy(() => import('../modules/project/pages/TaskBoard').then((m) => ({ default: m.TaskBoard })));
 const TimesheetTracker = lazy(() => import('../modules/project/pages/TimesheetTracker').then((m) => ({ default: m.TimesheetTracker })));
 
-// Finance & Operations Management
+// Finance Management (Expenses & Travel Claims, Expense Analytics)
 const ExpenseClaims = lazy(() => import('../modules/finance/pages/ExpenseClaims').then((m) => ({ default: m.ExpenseClaims })));
 const ExpenseAnalyticsPage = lazy(() => import('../modules/finance/pages/ExpenseAnalyticsPage').then((m) => ({ default: m.ExpenseAnalyticsPage })));
-const ProcurementBoard = lazy(() => import('../modules/finance/pages/ProcurementBoard').then((m) => ({ default: m.ProcurementBoard })));
-const AssetInventory = lazy(() => import('../modules/finance/pages/AssetInventory').then((m) => ({ default: m.AssetInventory })));
-const BudgetsConsole = lazy(() => import('../modules/finance/pages/BudgetsConsole').then((m) => ({ default: m.BudgetsConsole })));
-const PayrollPrep = lazy(() => import('../modules/finance/pages/PayrollPrep').then((m) => ({ default: m.PayrollPrep })));
 
 // Communication & Collaboration Platform
 const ChatChannels = lazy(() => import('../modules/communication/pages/ChatChannels').then((m) => ({ default: m.ChatChannels })));
@@ -113,13 +109,9 @@ export function AppRouter() {
           <Route path="/app/project/tasks" element={<ProtectedRoute resource="project" action="view"><TaskBoard /></ProtectedRoute>} />
           <Route path="/app/project/timesheets" element={<ProtectedRoute resource="project" action="view"><TimesheetTracker /></ProtectedRoute>} />
 
-          {/* Finance & Operations Management */}
+          {/* Finance Management */}
           <Route path="/app/finance/expenses" element={<ProtectedRoute resource="expense" action="view"><ExpenseClaims /></ProtectedRoute>} />
           <Route path="/app/finance/expense-analytics" element={<ProtectedRoute resource="expense" action="view"><ExpenseAnalyticsPage /></ProtectedRoute>} />
-          <Route path="/app/finance/procurement" element={<ProtectedRoute resource="expense" action="view"><ProcurementBoard /></ProtectedRoute>} />
-          <Route path="/app/finance/assets" element={<ProtectedRoute resource="expense" action="view"><AssetInventory /></ProtectedRoute>} />
-          <Route path="/app/finance/budgets" element={<ProtectedRoute resource="expense" action="view"><BudgetsConsole /></ProtectedRoute>} />
-          <Route path="/app/finance/payroll" element={<ProtectedRoute resource="expense" action="view"><PayrollPrep /></ProtectedRoute>} />
 
           {/* Communication & Collaboration Platform */}
           <Route path="/app/communication/chat" element={<ProtectedRoute resource="chat" action="view"><ChatChannels /></ProtectedRoute>} />

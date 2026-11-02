@@ -205,7 +205,7 @@ ${buildSheet('Employees', empHeaders, empRows)}${buildSheet('Attendance', attHea
 
   const titles: Record<Exclude<WorkspaceRole, 'employee'>, { title: string; subtitle: string }> = {
     supervisor: { title: 'Supervisor Workspace', subtitle: 'Team operations · project milestones · approvals' },
-    manager: { title: 'Manager Workspace', subtitle: 'Department performance · budgets · resource planning' },
+    manager: { title: 'Manager Workspace', subtitle: 'Department performance · approvals · resource planning' },
     ceo: { title: 'Executive Overview', subtitle: 'Company health · strategic goals · financial pulse' },
   };
 

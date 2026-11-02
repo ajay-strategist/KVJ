@@ -7,6 +7,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { BATCH_REPOSITORY_TOKEN } from '../../training/training.repository';
+import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
 
 export type WorkSessionType = 'Office' | 'Remote' | 'Training';
 
@@ -392,23 +393,14 @@ export function AttendanceCorrectionModal({
             {/* Dynamic Batch Selector if Training */}
             {singleType === 'Training' && (
               <div>
-                <label className="kvj-label">
-                  College / Training Batch <span style={{ color: 'var(--status-danger)' }}>*</span>
-                </label>
-                <select
-                  className="kvj-select"
-                  value={singleBatchId}
-                  onChange={(e) => setSingleBatchId(e.target.value)}
-                  style={{ width: '100%' }}
+                <SearchableBatchSelect
+                  label="College / Training Batch"
                   required
-                >
-                  <option value="">Select College Batch...</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} {b.code ? `(${b.code})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  batches={batches as any}
+                  value={singleBatchId}
+                  onChange={(id) => setSingleBatchId(id)}
+                  placeholder="Select College Batch..."
+                />
               </div>
             )}
 
@@ -495,21 +487,14 @@ export function AttendanceCorrectionModal({
 
                   {s.workType === 'Training' ? (
                     <div>
-                      <label className="kvj-label">Batch *</label>
-                      <select
-                        className="kvj-select"
-                        value={s.batchId || ''}
-                        onChange={(e) => handleUpdateSession(s.id, { batchId: e.target.value })}
-                        style={{ width: '100%' }}
+                      <SearchableBatchSelect
+                        label="Batch"
                         required
-                      >
-                        <option value="">Select Batch...</option>
-                        {batches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
+                        batches={batches as any}
+                        value={s.batchId || ''}
+                        onChange={(id) => handleUpdateSession(s.id, { batchId: id })}
+                        placeholder="Select Batch..."
+                      />
                     </div>
                   ) : (
                     <div>

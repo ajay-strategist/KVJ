@@ -10,8 +10,8 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Batch, Course, TrainingPhase } from '../training.repository';
-import { TRAINING_PHASES } from '../training.repository';
+import type { Batch, Course, TrainingPhase, ApprovedBatchStatus } from '../training.repository';
+import { TRAINING_PHASES, APPROVED_BATCH_STATUSES, normalizeBatchPhase } from '../training.repository';
 import type { Employee } from '../../employee/employee.repository';
 import { Button, Badge, FilterChip, ProgressBar, SearchInput } from '../../../shared/ui/components';
 import { cleanBatchCode } from '../utils/batch-formatter';
@@ -23,9 +23,6 @@ export interface BatchAction {
 }
 
 const ACTIONS: BatchAction[] = [
-  { id: 'student',          label: 'Student Data',        icon: '👨‍🎓' },
-  { id: 'daily',            label: 'Daily Report',        icon: '📊' },
-  { id: 'documents',        label: 'Certificate Receipt', icon: '📜' },
   { id: 'expense-details',  label: 'Expense Details',     icon: '💰' },
 ];
 
@@ -39,6 +36,7 @@ const PHASE_TONE: Record<TrainingPhase, { bg: string; fg: string; border: string
   Feedback:     { bg: 'var(--status-info-bg)',     fg: 'var(--status-info)',     border: 'var(--status-info-border)' },
   Certificate:  { bg: 'var(--status-purple-bg)',   fg: 'var(--status-purple)',   border: 'var(--status-purple-border)' },
   Completed:    { bg: 'var(--status-success-bg, #ecfdf5)',  fg: 'var(--status-success, #059669)',  border: 'var(--status-success-border, #a7f3d0)' },
+  Closed:       { bg: 'rgba(100, 116, 139, 0.18)', fg: '#475569', border: 'rgba(100, 116, 139, 0.4)' },
 };
 
 export interface BatchCardVM {
@@ -104,7 +102,7 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
     id:            b.id,
     trainingName:  b.trainingName || course?.title || b.code,
     batchCode,
-    phase:         b.phase ?? 'Scheduled',
+    phase:         normalizeBatchPhase(b.phase),
     college,
     course:        courseTitle,
     program,
@@ -612,14 +610,15 @@ export function TrainingBatchCarousel({
   const vms = useMemo(() => batches.map((b) => toCardVM(b, courses, trainers)), [batches, courses, trainers]);
 
   const completedCount = useMemo(() => vms.filter((v) => v.phase === 'Completed').length, [vms]);
-  const notStartedCount = useMemo(() => vms.filter((v) => v.phase === 'Not Started' || v.phase === 'Scheduled' || v.phase === 'Preparation').length, [vms]);
-  const inProgressCount = useMemo(() => vms.filter((v) => v.phase === 'In Progress' || v.phase === 'Assessment' || v.phase === 'Feedback' || v.phase === 'Certificate').length, [vms]);
-  const activeCount = useMemo(() => vms.filter((v) => v.phase !== 'Completed').length, [vms]);
+  const closedCount = useMemo(() => vms.filter((v) => v.phase === 'Closed').length, [vms]);
+  const notStartedCount = useMemo(() => vms.filter((v) => v.phase === 'Not Started').length, [vms]);
+  const inProgressCount = useMemo(() => vms.filter((v) => v.phase === 'In Progress').length, [vms]);
+  const activeCount = useMemo(() => vms.filter((v) => v.phase !== 'Completed' && v.phase !== 'Closed').length, [vms]);
 
   const filterOptions = useMemo(() => ({
     colleges: [...new Set(vms.map((v) => v.college))].sort(),
     courses:  [...new Set(vms.map((v) => v.course))].sort(),
-    phases:   TRAINING_PHASES,
+    phases:   APPROVED_BATCH_STATUSES,
   }), [vms]);
 
   const visibleList = useMemo(() => {
@@ -630,14 +629,16 @@ export function TrainingBatchCarousel({
       if (fCourse !== 'all' && v.course !== fCourse) return false;
 
       if (fPhase === 'active') {
-        // Default: show only In Progress and Not Started batches (hide Completed)
-        if (v.phase === 'Completed') return false;
+        // Default: show only In Progress and Not Started batches (hide Completed and Closed)
+        if (v.phase === 'Completed' || v.phase === 'Closed') return false;
       } else if (fPhase === 'Not Started') {
-        if (v.phase !== 'Not Started' && v.phase !== 'Scheduled' && v.phase !== 'Preparation') return false;
+        if (v.phase !== 'Not Started') return false;
       } else if (fPhase === 'In Progress') {
-        if (v.phase !== 'In Progress' && v.phase !== 'Assessment' && v.phase !== 'Feedback' && v.phase !== 'Certificate') return false;
+        if (v.phase !== 'In Progress') return false;
       } else if (fPhase === 'Completed') {
         if (v.phase !== 'Completed') return false;
+      } else if (fPhase === 'Closed') {
+        if (v.phase !== 'Closed') return false;
       } else if (fPhase !== 'all') {
         if (v.phase !== fPhase) return false;
       }
@@ -718,8 +719,9 @@ export function TrainingBatchCarousel({
           <option value="In Progress">In Progress ({inProgressCount})</option>
           <option value="Not Started">Not Started ({notStartedCount})</option>
           <option value="Completed">Completed ({completedCount})</option>
+          <option value="Closed">Closed ({closedCount})</option>
           {filterOptions.phases
-            .filter((p) => !['In Progress', 'Not Started', 'Completed'].includes(p))
+            .filter((p) => !['In Progress', 'Not Started', 'Completed', 'Closed'].includes(p))
             .map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <select aria-label="Sort batches" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} style={selectStyle}>

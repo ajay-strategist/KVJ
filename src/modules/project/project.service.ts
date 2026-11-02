@@ -34,6 +34,7 @@ export interface IProjectService {
   approveTaskAssignment(taskId: UUID, actor: Actor): Promise<Result<Task>>;
   logTimesheet(data: Partial<TimesheetRecord>, actor: Actor): Promise<Result<TimesheetRecord>>;
   approveTimesheet(timesheetId: UUID, actor: Actor): Promise<Result<TimesheetRecord>>;
+  getSupervisorProjects(supervisorId: UUID): Promise<Result<Project[]>>;
 }
 
 export const PROJECT_SERVICE_TOKEN = createToken<IProjectService>('ProjectService');
@@ -473,27 +474,24 @@ export class ProjectService implements IProjectService {
         existing.assignedByEmployeeId !== existing.assigneeId
       );
 
-      // Task Approval Authority:
-      // - If an employee assigned a task to another employee (peer assignment):
-      //   ONLY Admin / CEO / Manager can approve (Project Supervisor cannot approve peer assignments).
-      // - If it's a self-assigned Project task:
-      //   Project Supervisor of that project OR Admin / CEO / Manager can approve.
-      const isProjectSupervisor = Boolean(
-        proj && (proj.supervisorId === actor.id || (proj as any).supervisor_id === actor.id)
-      );
+      // DISC-004 & PROJECT-Q1: Check supervisor authority via getSupervisorProjects
+      const supProjectsRes = await this.getSupervisorProjects(actor.id);
+      const supProjectIds = new Set(supProjectsRes.ok ? supProjectsRes.value.map((p) => p.id) : []);
+      const isProjectSupervisor = Boolean(proj && supProjectIds.has(proj.id));
 
       let canApprove = false;
       if (isAdminCeoOrManager) {
         canApprove = true;
-      } else if (!isPeerAssignment && isProjectSupervisor && actor.id !== existing.assigneeId) {
+      } else if (isProjectSupervisor && actor.id !== existing.assigneeId) {
+        // Supervisors are permitted to approve all tasks (including peer assignments) within their allocated projects
         canApprove = true;
       }
 
       if (!canApprove) {
         return Err(AppError.forbidden(
           isPeerAssignment
-            ? 'Only Admin, CEO, or Manager can approve task assignments to other employees.'
-            : 'Only the Project Supervisor, Admin, CEO, or Manager can approve this task.'
+            ? 'Only an allocated Project Supervisor or Admin/CEO/Manager can approve task assignments for this project.'
+            : 'Only an allocated Project Supervisor or Admin/CEO/Manager can approve this task.'
         ));
       }
 
@@ -545,6 +543,34 @@ export class ProjectService implements IProjectService {
       return Ok(updated);
     } catch (e: any) {
       return Err(AppError.internal(e.message));
+    }
+  }
+
+  /**
+   * DISC-004 & PROJECT-Q1 Single Authoritative Implementation Owner
+   * Scopes project supervisors strictly to projects where they are allocated as supervisor
+   * on flwdsk_resource_allocations or designated on the project record.
+   */
+  async getSupervisorProjects(supervisorId: UUID): Promise<Result<Project[]>> {
+    try {
+      const allocations = await this.allocationRepo.findByEmployee(supervisorId);
+      const supervisorAllocations = (allocations || []).filter(
+        (a) => a.status === 'active' && a.role?.toLowerCase() === 'supervisor'
+      );
+      const projectIds = new Set(supervisorAllocations.map((a) => a.projectId));
+
+      const allProjectsRes = await this.projectRepo.findMany({ pageSize: 1000 });
+      const allProjects = Array.isArray(allProjectsRes?.data) ? allProjectsRes.data : [];
+      for (const p of allProjects) {
+        if (p.supervisorId === supervisorId || (p as any).supervisor_id === supervisorId) {
+          projectIds.add(p.id);
+        }
+      }
+
+      const matchedProjects = allProjects.filter((p) => projectIds.has(p.id));
+      return Ok(matchedProjects);
+    } catch (err: any) {
+      return Err(AppError.internal(err.message));
     }
   }
 }

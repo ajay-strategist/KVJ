@@ -3,8 +3,6 @@
  * Generates an 8-sheet enterprise workbook covering all 20 analytical metrics and audit trails.
  */
 
-import * as XLSX from 'xlsx';
-
 export interface ExportKpiData {
   academicYear: string;
   comparisonYear: string;
@@ -136,7 +134,8 @@ export interface ExportPayload {
   rawClaims: ExportRawClaimRow[];
 }
 
-export function exportExpenseAnalyticsToExcel(data: ExportPayload) {
+export async function exportExpenseAnalyticsToExcel(data: ExportPayload) {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   // ── Sheet 1: Executive KPI Summary ─────────────────────────────────────────

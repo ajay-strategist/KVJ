@@ -32,6 +32,8 @@ export function AnnouncementsBoard() {
   const [holidayOpen, setHolidayOpen] = useState(false);
 
   const [holidays, setHolidays] = useState<DeclaredHoliday[]>([]);
+  // UIUX-REQ-003 & UIUX-REQ-019: Filter scope: 'current' (current calendar month), 'upcoming' (future), or 'all' / specific month
+  const [filterScope, setFilterScope] = useState<'current' | 'upcoming' | 'all'>('current');
 
   useEffect(() => {
     const fetchHolidays = async () => {
@@ -210,8 +212,47 @@ export function AnnouncementsBoard() {
           </div>
         </Card>
 
-        {/* Announcements Table */}
-        <DataTable columns={columns} rows={announcements} rowKey={(a) => a.id} loading={loading} />
+        {/* Announcements Table with UIUX-REQ-019 Active vs Upcoming & Calendar-Month Filtering */}
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <SectionHeader title="Official Announcements & Circulars" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>View:</span>
+              <select
+                value={filterScope}
+                onChange={(e) => setFilterScope(e.target.value as any)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <option value="current">Current Month (Active)</option>
+                <option value="upcoming">Upcoming Declarations</option>
+                <option value="all">Full Historical Archive</option>
+              </select>
+            </div>
+          </div>
+          <DataTable
+            columns={columns}
+            rows={announcements.filter((a) => {
+              if (filterScope === 'all') return true;
+              const aDate = new Date(a.scheduledAt || a.createdAt);
+              const now = new Date();
+              if (filterScope === 'upcoming') {
+                return aDate.getTime() > now.getTime();
+              }
+              // 'current': active in current calendar month
+              return aDate.getFullYear() === now.getFullYear() && aDate.getMonth() === now.getMonth();
+            })}
+            rowKey={(a) => a.id}
+            loading={loading}
+          />
+        </Card>
       </div>
 
       {/* Post Notice Drawer */}

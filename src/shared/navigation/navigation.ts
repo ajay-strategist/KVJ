@@ -49,10 +49,6 @@ export const NAV_TREE: NavItem[] = [
 
   { id: 'finance-expenses', label: 'Expenses & Travel', path: '/app/finance/expenses', icon: 'Receipt', permission: ['expense', 'view'], module: 'finance' },
   { id: 'finance-analytics', label: 'Expense Analytics', path: '/app/finance/expense-analytics', icon: 'BarChart3', permission: ['expense', 'view'], module: 'finance' },
-  { id: 'finance-procurement', label: 'Procurement Board', path: '/app/finance/procurement', icon: 'ShoppingCart', permission: ['expense', 'view'], module: 'finance', page: 'procurement' },
-  { id: 'finance-assets', label: 'Asset Inventory', path: '/app/finance/assets', icon: 'Package', permission: ['expense', 'view'], module: 'finance', page: 'assets' },
-  { id: 'finance-budgets', label: 'Budgets Console', path: '/app/finance/budgets', icon: 'Calculator', permission: ['expense', 'view'], module: 'finance', page: 'budgets' },
-  { id: 'finance-payroll', label: 'Payroll Prep', path: '/app/finance/payroll', icon: 'Coins', permission: ['expense', 'view'], module: 'finance', page: 'payroll' },
 
   { id: 'comm-chat', label: 'Chat Rooms', path: '/app/communication/chat', icon: 'MessageSquare', permission: ['chat', 'view'], module: 'communication', page: 'chat' },
   { id: 'comm-announcements', label: 'Announcements Board', path: '/app/communication/announcements', icon: 'Megaphone', permission: ['chat', 'view'], module: 'communication', page: 'announcements' },

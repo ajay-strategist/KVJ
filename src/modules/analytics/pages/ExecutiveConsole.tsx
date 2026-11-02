@@ -90,12 +90,6 @@ export function ExecutiveConsole() {
           tone="purple"
           icon="📝"
         />
-        <StatCard
-          label="TOTAL BUDGET ALLOCATED"
-          value={metrics?.totalBudgetsAllocated !== undefined ? `₹${metrics.totalBudgetsAllocated.toLocaleString()}` : 'No data available'}
-          tone="info"
-          icon="📜"
-        />
       </div>
 
       {/* ── Correlation Analysis Panel ── */}
@@ -227,41 +221,8 @@ export function ExecutiveConsole() {
     </div>
   );
 
-  const financeContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-        <StatCard label="TOTAL BUDGET ALLOCATED" value={`₹ ${(metrics?.totalBudgetsAllocated ?? 1250000).toLocaleString()}`} tone="info" icon="💼" />
-        <StatCard label="ACTUAL EXPENSE SPENT" value={`₹ ${(metrics?.totalBudgetsSpent ?? 840000).toLocaleString()}`} tone="warning" icon="💸" />
-        <StatCard label="REIMBURSEMENTS APPROVED" value="₹ 142,500" tone="success" icon="✅" />
-      </div>
-
-      <Card>
-        <SectionHeader title="Budget Allocation Variance Overview" subtitle="Departmental budget vs actual expense tracking" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-          {[
-            { dept: 'Academic Training & Materials', budget: 500000, spent: 340000, pct: 68 },
-            { dept: 'Travel & Mobility Reimbursement', budget: 300000, spent: 210000, pct: 70 },
-            { dept: 'IT Infrastructure & Software', budget: 250000, spent: 180000, pct: 72 },
-            { dept: 'Office Operations & Supplies', budget: 200000, spent: 110000, pct: 55 },
-          ].map((item) => (
-            <div key={item.dept} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600 }}>
-                <span>{item.dept}</span>
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  ₹ {item.spent.toLocaleString()} / ₹ {item.budget.toLocaleString()} ({item.pct}%)
-                </span>
-              </div>
-              <ProgressBar value={item.pct} tone={item.pct > 80 ? 'warning' : 'progress'} />
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
-
   const tabs = [
     { id: 'ceo', label: 'Executive Operations Console', content: ceoContent },
-    { id: 'finance', label: 'Finance & Budget Analytics', content: financeContent },
   ];
 
   return (

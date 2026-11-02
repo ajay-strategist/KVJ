@@ -53,22 +53,51 @@ export type TrainingPhase =
   | 'Not Started'
   | 'In Progress'
   | 'Completed'
+  | 'Closed'
   | 'Scheduled'
   | 'Preparation'
   | 'Assessment'
   | 'Feedback'
   | 'Certificate';
 
+export type ApprovedBatchStatus = 'Not Started' | 'In Progress' | 'Completed' | 'Closed';
+
+export const APPROVED_BATCH_STATUSES: ApprovedBatchStatus[] = [
+  'Not Started',
+  'In Progress',
+  'Completed',
+  'Closed',
+];
+
 export const TRAINING_PHASES: TrainingPhase[] = [
   'Not Started',
   'In Progress',
   'Completed',
+  'Closed',
   'Scheduled',
   'Preparation',
   'Assessment',
   'Feedback',
   'Certificate',
 ];
+
+/**
+ * DISC-002 & ISSUE-013 Bidirectional Status Adapter
+ * Normalizes DB column values into the 4 canonical UI-visible statuses:
+ * 1. Not Started
+ * 2. In Progress
+ * 3. Completed
+ * 4. Closed
+ */
+export function normalizeBatchPhase(dbPhase?: string | null): ApprovedBatchStatus {
+  if (!dbPhase) return 'Not Started';
+  const p = dbPhase.trim();
+  if (p === 'Not Started' || p === 'Scheduled' || p === 'Preparation') return 'Not Started';
+  if (p === 'In Progress' || p === 'Assessment' || p === 'Feedback' || p === 'Certificate') return 'In Progress';
+  if (p === 'Completed') return 'Completed';
+  if (p === 'Closed') return 'Closed';
+  return 'Not Started';
+}
 
 export interface Batch extends Entity {
   courseId: UUID;

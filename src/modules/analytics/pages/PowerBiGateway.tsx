@@ -31,7 +31,7 @@ export function PowerBiGateway() {
           <h3 style={{ marginTop: 0 }}>Dimension Tables Mapping</h3>
           <ul style={{ lineHeight: 1.8 }}>
             <li><code>dim_employees</code>: Role keys, departments, supervisor hierarchy.</li>
-            <li><code>dim_projects</code>: Budgets limits, milestones, client profiles.</li>
+            <li><code>dim_projects</code>: Milestones, client profiles.</li>
             <li><code>dim_dates</code>: Calendar metrics, fiscal quarters, years.</li>
           </ul>
         </Card>

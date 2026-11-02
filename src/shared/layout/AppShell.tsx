@@ -515,24 +515,6 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   <Icon name={collapsed ? 'ChevronRight' : 'ChevronLeft'} size={15} />
                   {!collapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Collapse Sidebar</span>}
                 </div>
-                {!collapsed && (
-                  <kbd
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: '1px 5px',
-                      borderRadius: 4,
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border)',
-                      color: collapseHovered ? 'var(--brand)' : 'var(--text-muted)',
-                      lineHeight: 1.2,
-                      fontFamily: 'inherit',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                    }}
-                  >
-                    [
-                  </kbd>
-                )}
               </button>
             )}
           </aside>

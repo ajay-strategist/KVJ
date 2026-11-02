@@ -282,180 +282,207 @@ export function TaskFormModal({
             padding: '20px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px',
+            gap: '18px',
           }}
         >
-          {/* Task Title */}
-          <div>
-            <label className="kvj-label">
-              Task Title <span style={{ color: 'var(--status-danger)' }}>*</span>
-            </label>
-            <input
-              type="text"
-              required
-              className="kvj-input"
-              placeholder="e.g. Q3 Power BI Syllabus Audit"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              style={{ width: '100%' }}
-            />
-          </div>
-
-
-
-          {/* Category (Office Task vs Project with Search) */}
-          <div>
-            <label className="kvj-label">Category / Project</label>
-            <SearchableSelect
-              options={[
-                { value: 'Office Task', label: '🏢 Office Task (General Company Task)' },
-                ...projects.map((p) => ({
-                  value: p.id,
-                  label: `📁 [${p.code || 'PRJ'}] ${p.title}`,
-                  subLabel: p.category ? `Category: ${p.category}` : undefined,
-                })),
-              ]}
-              value={form.category}
-              onChange={(val) => setForm({ ...form, category: val || 'Office Task' })}
-              placeholder="Select Category or Project"
-              searchPlaceholder="Search projects by title or code..."
-              allOptionLabel="🏢 Office Task (General Company Task)"
-            />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label className="kvj-label">Assignee</label>
-              <select
-                className="kvj-select"
-                value={form.assigneeId}
-                onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
-                style={{ width: '100%' }}
-              >
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
-                    {emp.id === user?.id ? ' (You)' : ''}
-                  </option>
-                ))}
-              </select>
+          {/* Section 1: Core Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
+              1. Core Task Details
             </div>
 
-            <div>
-              <label className="kvj-label">Supervisor</label>
-              <select
-                className="kvj-select"
-                disabled={!isOfficeTask || isAssigningToOther}
-                value={resolvedSupervisorId}
-                onChange={(e) => setForm({ ...form, supervisorId: e.target.value })}
-                style={{
-                  width: '100%',
-                  backgroundColor: (!isOfficeTask || isAssigningToOther) ? 'var(--bg-sunken)' : undefined,
-                }}
-              >
-                <option value="">Select Supervisor...</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
-                  </option>
-                ))}
-              </select>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
-                {!isOfficeTask && 'Auto-linked to Project Lead.'}
-                {isOfficeTask && isAssigningToOther && 'Auto-linked to you (Task Assignor).'}
-                {isOfficeTask && !isAssigningToOther && 'Select your reporting supervisor.'}
-              </div>
-            </div>
-          </div>
-
-          {/* Peer Assignment Notice */}
-          {isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
-            <div
-              style={{
-                padding: '8px 12px',
-                borderRadius: 6,
-                background: 'var(--status-warning-bg, #fffbeb)',
-                border: '1px solid var(--status-warning, #f59e0b)',
-                fontSize: 11,
-                color: 'var(--status-warning-text, #92400e)',
-              }}
-            >
-              ℹ️ Peer Assignment: Assigning a task to a colleague requires Admin, CEO, or Manager approval before work can begin.
-            </div>
-          )}
-
-          {/* Project Task Self-Creation Notice */}
-          {!isOfficeTask && !isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
-            <div
-              style={{
-                padding: '8px 12px',
-                borderRadius: 6,
-                background: 'var(--status-info-bg, #eff6ff)',
-                border: '1px solid var(--status-info, #3b82f6)',
-                fontSize: 11,
-                color: 'var(--status-info-text, #1e40af)',
-              }}
-            >
-              ℹ️ Project Task: Tasks created in a project require Project Supervisor / Admin / CEO / Manager approval before work can begin.
-            </div>
-          )}
-
-          {/* Start Date & Due Date (No Backdating min={todayStr}) */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label className="kvj-label">Start Date</label>
-              <input
-                type="date"
-                className="kvj-input"
-                value={form.startDate}
-                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                style={{ width: '100%' }}
-              />
-            </div>
+            {/* Task Title */}
             <div>
               <label className="kvj-label">
-                Due Date <span style={{ color: 'var(--status-danger)' }}>*</span>
+                Task Title <span style={{ color: 'var(--status-danger)' }}>*</span>
               </label>
               <input
-                type="date"
+                type="text"
                 required
-                min={todayStr}
                 className="kvj-input"
-                value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                placeholder="e.g. Q3 Power BI Syllabus Audit"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            {/* Category (Office Task vs Project with Search) */}
+            <div>
+              <label className="kvj-label">Category / Project</label>
+              <SearchableSelect
+                options={[
+                  { value: 'Office Task', label: '🏢 Office Task (General Company Task)' },
+                  ...projects.map((p) => ({
+                    value: p.id,
+                    label: `📁 [${p.code || 'PRJ'}] ${p.title}`,
+                    subLabel: p.category ? `Category: ${p.category}` : undefined,
+                  })),
+                ]}
+                value={form.category}
+                onChange={(val) => setForm({ ...form, category: val || 'Office Task' })}
+                placeholder="Select Category or Project"
+                searchPlaceholder="Search projects by title or code..."
+                allOptionLabel="🏢 Office Task (General Company Task)"
+              />
+            </div>
+          </div>
+
+          {/* Section 2: Ownership & Supervision */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
+              2. Ownership & Supervision
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label className="kvj-label">Assignee</label>
+                <select
+                  className="kvj-select"
+                  value={form.assigneeId}
+                  onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
+                  style={{ width: '100%' }}
+                >
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
+                      {emp.id === user?.id ? ' (You)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="kvj-label">Supervisor</label>
+                <select
+                  className="kvj-select"
+                  disabled={!isOfficeTask || isAssigningToOther}
+                  value={resolvedSupervisorId}
+                  onChange={(e) => setForm({ ...form, supervisorId: e.target.value })}
+                  style={{
+                    width: '100%',
+                    backgroundColor: (!isOfficeTask || isAssigningToOther) ? 'var(--bg-sunken)' : undefined,
+                  }}
+                >
+                  <option value="">Select Supervisor...</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
+                  {!isOfficeTask && 'Auto-linked to Project Lead.'}
+                  {isOfficeTask && isAssigningToOther && 'Auto-linked to you (Task Assignor).'}
+                  {isOfficeTask && !isAssigningToOther && 'Select your reporting supervisor.'}
+                </div>
+              </div>
+            </div>
+
+            {/* Peer Assignment Notice */}
+            {isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  background: 'var(--status-warning-bg, #fffbeb)',
+                  border: '1px solid var(--status-warning, #f59e0b)',
+                  fontSize: 11,
+                  color: 'var(--status-warning-text, #92400e)',
+                }}
+              >
+                ℹ️ Peer Assignment: Assigning a task to a colleague requires Admin, CEO, or Manager approval before work can begin.
+              </div>
+            )}
+
+            {/* Project Task Self-Creation Notice */}
+            {!isOfficeTask && !isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  background: 'var(--status-info-bg, #eff6ff)',
+                  border: '1px solid var(--status-info, #3b82f6)',
+                  fontSize: 11,
+                  color: 'var(--status-info-text, #1e40af)',
+                }}
+              >
+                ℹ️ Project Task: Tasks created in a project require Project Supervisor / Admin / CEO / Manager approval before work can begin.
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Timeline & Effort Estimation */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
+              3. Timeline & Effort
+            </div>
+
+            {/* Start Date & Due Date (No Backdating min={todayStr}) */}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label className="kvj-label">Start Date</label>
+                <input
+                  type="date"
+                  className="kvj-input"
+                  value={form.startDate}
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div>
+                <label className="kvj-label">
+                  Due Date <span style={{ color: 'var(--status-danger)' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  min={todayStr}
+                  className="kvj-input"
+                  value={form.dueDate}
+                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            {/* Estimated Hours (Mandatory) */}
+            <div>
+              <label className="kvj-label">
+                Estimated Hours <span style={{ color: 'var(--status-danger)' }}>*</span>
+              </label>
+              <input
+                type="number"
+                required
+                min="0.5"
+                step="0.5"
+                placeholder="e.g. 4.0"
+                className="kvj-input"
+                value={form.estimatedHours}
+                onChange={(e) => setForm({ ...form, estimatedHours: e.target.value })}
                 style={{ width: '100%' }}
               />
             </div>
           </div>
 
-          {/* Estimated Hours (Mandatory) */}
-          <div>
-            <label className="kvj-label">
-              Estimated Hours <span style={{ color: 'var(--status-danger)' }}>*</span>
-            </label>
-            <input
-              type="number"
-              required
-              min="0.5"
-              step="0.5"
-              placeholder="e.g. 4.0"
-              className="kvj-input"
-              value={form.estimatedHours}
-              onChange={(e) => setForm({ ...form, estimatedHours: e.target.value })}
-              style={{ width: '100%' }}
-            />
-          </div>
+          {/* Section 4: Context & Instructions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
+              4. Context & Instructions
+            </div>
 
-          {/* Description */}
-          <div>
-            <label className="kvj-label">Description</label>
-            <textarea
-              rows={3}
-              className="kvj-input"
-              placeholder="Detailed instructions or context for this task..."
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              style={{ width: '100%', resize: 'vertical' }}
-            />
+            {/* Description */}
+            <div>
+              <label className="kvj-label">Description & Deliverables</label>
+              <textarea
+                rows={3}
+                className="kvj-input"
+                placeholder="Detailed instructions, milestones, or attachments context for this task..."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                style={{ width: '100%', resize: 'vertical' }}
+              />
+            </div>
           </div>
 
           {/* Footer Buttons */}

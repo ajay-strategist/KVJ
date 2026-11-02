@@ -7,6 +7,7 @@ import { googleIntegration } from '../../../shared/integration/google';
 import { supabase } from '../../../shared/integration/supabase';
 import type { TravelRate } from './TravelRatesModal';
 import { parseExpenseDateToYMD, formatDisplayDateGB } from '../pages/ExpenseClaims';
+import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
 
 export function cleanBatchNameForDisplay(val?: string | null): string {
   if (!val || val === '—') return '—';
@@ -548,23 +549,17 @@ export function ExpenseClaimModal({
           {/* Dynamic Batch Selector if Training Expense */}
           {isTraining && (
             <div>
-              <label className="kvj-label">
-                Training Batch <span style={{ color: 'var(--status-danger)' }}>*</span>
-              </label>
-              <select
-                className="kvj-select"
+              <SearchableBatchSelect
+                label="Training Batch"
                 required
+                batches={batches}
                 value={batchName}
-                onChange={(e) => setBatchName(e.target.value)}
-                style={{ width: '100%' }}
-              >
-                <option value="">Select Training Batch...</option>
-                {batchOptions.map((b) => (
-                  <option key={b.value} value={b.value}>
-                    {b.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(id, b) => {
+                  const label = b ? (b.code || b.trainingName || id) : id;
+                  setBatchName(label);
+                }}
+                placeholder="Select Training Batch..."
+              />
             </div>
           )}
 

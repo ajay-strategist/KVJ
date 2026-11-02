@@ -32,11 +32,14 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   maxHeight?: number | string;
   containerStyle?: React.CSSProperties;
+  rowClassName?: (row: T) => string | undefined;
+  rowStyle?: (row: T) => React.CSSProperties | undefined;
 }
 
 export function DataTable<T>({
   columns, rows, rowKey, loading, pageSize = 10, selectable, onSelectionChange,
   emptyTitle = 'Nothing here yet', emptyMessage, onRowClick, maxHeight, containerStyle,
+  rowClassName, rowStyle,
 }: DataTableProps<T>) {
   const device = useDevice();
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
@@ -182,8 +185,15 @@ export function DataTable<T>({
           <tbody>
             {pageRows.map((row) => {
               const id = rowKey(row);
+              const customClass = rowClassName?.(row) || '';
+              const customStyle = rowStyle?.(row) || {};
               return (
-                <tr key={id} onClick={() => onRowClick?.(row)} style={{ cursor: onRowClick ? 'pointer' : 'default' }}>
+                <tr
+                  key={id}
+                  className={customClass}
+                  style={{ cursor: onRowClick ? 'pointer' : 'default', ...customStyle }}
+                  onClick={() => onRowClick?.(row)}
+                >
                   {selectable && (
                     <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
                       <input
