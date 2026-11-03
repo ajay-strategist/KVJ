@@ -287,6 +287,18 @@ export const AttendancePanel = memo(function AttendancePanel({
   }, [batches, courses, user, currentEmployee, assignedTodayBatchIds, batchStudentCounts]);
 
   const [selectedBatch, setSelectedBatch] = useState('');
+  const [batchSearchQuery, setBatchSearchQuery] = useState('');
+
+  const filteredAvailableBatches = useMemo(() => {
+    if (!batchSearchQuery.trim()) return availableBatches;
+    const q = batchSearchQuery.toLowerCase().trim();
+    return availableBatches.filter((b) =>
+      b.name.toLowerCase().includes(q) ||
+      b.college.toLowerCase().includes(q) ||
+      b.course.toLowerCase().includes(q) ||
+      b.trainer.toLowerCase().includes(q)
+    );
+  }, [availableBatches, batchSearchQuery]);
 
   useEffect(() => {
     if (availableBatches.length > 0 && (!selectedBatch || !availableBatches.some((b) => b.name === selectedBatch))) {
@@ -921,15 +933,30 @@ export const AttendancePanel = memo(function AttendancePanel({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Select Training Batch</span>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{availableBatches.length} Batches Available</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {batchSearchQuery.trim()
+                    ? `${filteredAvailableBatches.length} of ${availableBatches.length} Batches Available`
+                    : `${availableBatches.length} Batches Available`}
+                </span>
               </div>
+
+              {/* Search Option */}
+              <SearchInput
+                value={batchSearchQuery}
+                onChange={setBatchSearchQuery}
+                placeholder="Search batch by name, college, course, trainer..."
+                onClear={() => setBatchSearchQuery('')}
+              />
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
-                {availableBatches.length === 0 ? (
+                {filteredAvailableBatches.length === 0 ? (
                   <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', background: 'var(--bg-sunken)', borderRadius: 8, border: '1px dashed var(--border)' }}>
-                    No training batches found. Create batches in Training Details page.
+                    {availableBatches.length === 0
+                      ? 'No training batches found. Create batches in Training Details page.'
+                      : `No batches found matching "${batchSearchQuery}".`}
                   </div>
                 ) : (
-                  availableBatches.map((b) => {
+                  filteredAvailableBatches.map((b) => {
                     const active = selectedBatch === b.name;
                     return (
                       <div

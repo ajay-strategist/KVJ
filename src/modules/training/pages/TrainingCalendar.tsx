@@ -240,6 +240,21 @@ export function TrainingCalendar() {
     studentCount: 0,
   });
 
+  const [batchFilterText, setBatchFilterText] = useState('');
+
+  const filteredScheduleBatches = useMemo(() => {
+    if (!batchFilterText.trim()) return batches;
+    const q = batchFilterText.toLowerCase().trim();
+    return batches.filter((b) => {
+      const crs = courses.find((c) => c.id === b.courseId);
+      const code = (cleanBatchCode(b.code, b.batchNo) || b.code || '').toLowerCase();
+      const name = (b.trainingName || '').toLowerCase();
+      const college = (b.college || '').toLowerCase();
+      const course = (crs?.title || '').toLowerCase();
+      return code.includes(q) || name.includes(q) || college.includes(q) || course.includes(q);
+    });
+  }, [batches, courses, batchFilterText]);
+
   const applyBatchToForm = useCallback((batchId: string, currentTrainerId?: string) => {
     const b = batches.find((item) => item.id === batchId);
     if (!b) return;
@@ -1311,14 +1326,29 @@ export function TrainingCalendar() {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Select Training Batch</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 700 }}>Select Training Batch</label>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {batchFilterText.trim()
+                  ? `${filteredScheduleBatches.length} of ${batches.length} batches`
+                  : `${batches.length} batches available`}
+              </span>
+            </div>
+            <input
+              type="text"
+              placeholder="🔍 Search batch by name, college, course..."
+              value={batchFilterText}
+              onChange={(e) => setBatchFilterText(e.target.value)}
+              className="kvj-input"
+              style={{ width: '100%', marginBottom: 8, fontSize: 12, padding: '7px 10px' }}
+            />
             <select
               value={assignForm.batchId}
               onChange={(e) => applyBatchToForm(e.target.value)}
               style={{ width: '100%', padding: '9px 12px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
             >
               <option value="">-- Choose a Training Batch --</option>
-              {batches.map((b) => {
+              {filteredScheduleBatches.map((b) => {
                 const crs = courses.find((c) => c.id === b.courseId);
                 const label = `${cleanBatchCode(b.code, b.batchNo) || b.code} · ${b.trainingName || crs?.title || 'Training'} (${b.college || 'Campus'})`;
                 return (
