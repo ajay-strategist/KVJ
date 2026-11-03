@@ -118,7 +118,16 @@ export function EmployeeProfile() {
               <div>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Status</span>
                 <div style={{ marginTop: 2 }}>
-                  <span className={`kvj-badge kvj-badge--${profile.status === 'active' ? 'success' : 'neutral'}`}>{profile.status}</span>
+                  <span
+                    className={`kvj-badge kvj-badge--${profile.status === 'active' ? 'success' : 'neutral'}`}
+                    style={
+                      profile.status === 'relieved' || profile.status === 'terminated'
+                        ? { background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', border: '1px solid rgba(239, 68, 68, 0.25)', fontWeight: 600 }
+                        : undefined
+                    }
+                  >
+                    {profile.status === 'terminated' ? 'relieved' : profile.status}
+                  </span>
                 </div>
               </div>
             </div>

@@ -19,7 +19,7 @@ export interface EmployeeFormModalProps {
     phone?: string;
     role: 'EMPLOYEE' | 'MANAGER' | 'CEO' | 'ADMIN';
     supervisorId?: string;
-    status?: 'active' | 'on_notice' | 'relieved';
+    status?: 'active' | 'on_notice' | 'suspended' | 'relieved' | 'terminated';
   }) => Promise<boolean>;
 }
 
@@ -42,7 +42,7 @@ export function EmployeeFormModal({
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER' | 'CEO' | 'ADMIN'>('EMPLOYEE');
   const [supervisorId, setSupervisorId] = useState<string>('');
-  const [status, setStatus] = useState<'active' | 'on_notice' | 'relieved'>('active');
+  const [status, setStatus] = useState<'active' | 'on_notice' | 'suspended' | 'relieved' | 'terminated'>('active');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -57,8 +57,17 @@ export function EmployeeFormModal({
         setDateOfJoining(employee.dateOfJoining || new Date().toISOString().slice(0, 10));
         setPhone(employee.phone || '');
         setRole((employee.role as any) || 'EMPLOYEE');
-        setSupervisorId((employee as any).supervisorId || '');
-        setStatus((employee.status as any) || 'active');
+        setSupervisorId((employee as any).supervisorId || (employee as any).reportingManagerId || '');
+        const rawStatus = String(employee.status || 'active').toLowerCase();
+        if (rawStatus === 'terminated') {
+          setStatus('relieved');
+        } else if (rawStatus === 'suspended') {
+          setStatus('suspended');
+        } else if (rawStatus === 'on_notice') {
+          setStatus('on_notice');
+        } else {
+          setStatus('active');
+        }
       } else {
         // Add Mode: Auto-generate Employee ID
         const autoId = `EMP-${Math.floor(100 + Math.random() * 900)}`;
@@ -278,17 +287,23 @@ export function EmployeeFormModal({
             <label className="kvj-label">Employment Status</label>
             <select
               className="kvj-select"
-              value={status}
+              value={status === 'terminated' ? 'relieved' : status}
               onChange={(e) => setStatus(e.target.value as any)}
               style={{ width: '100%' }}
             >
               <option value="active">🟢 Active</option>
               <option value="on_notice">🟡 On Notice Period</option>
+              <option value="suspended">⏸️ Suspended / Access Paused</option>
               <option value="relieved">🔴 Relieved / Resigned (Deactivates Access)</option>
             </select>
-            {status === 'relieved' && (
+            {(status === 'relieved' || status === 'terminated') && (
               <div style={{ fontSize: 11, color: 'var(--status-danger, #dc2626)', marginTop: 4 }}>
                 ⚠️ Marking as Relieved deactivates system login access for this user.
+              </div>
+            )}
+            {status === 'suspended' && (
+              <div style={{ fontSize: 11, color: 'var(--status-warning, #d97706)', marginTop: 4 }}>
+                ⚠️ Marking as Suspended temporarily pauses system login access for this user.
               </div>
             )}
           </div>

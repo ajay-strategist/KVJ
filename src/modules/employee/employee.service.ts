@@ -23,8 +23,8 @@ export class EmployeeService implements IEmployeeService {
       const emp = await this.repo.findById(employeeId);
       if (!emp) return Err(AppError.notFound('Employee profile not found.'));
       return Ok(emp);
-    } catch (err) {
-      return Err(AppError.internal());
+    } catch (err: any) {
+      return Err(err instanceof AppError ? err : AppError.internal(err?.message || 'Failed to get profile.'));
     }
   }
 
@@ -33,7 +33,7 @@ export class EmployeeService implements IEmployeeService {
       const emp = await this.repo.create(data, actor);
       return Ok(emp);
     } catch (err: any) {
-      return Err(AppError.internal(err?.message || 'Failed to create employee.'));
+      return Err(err instanceof AppError ? err : AppError.internal(err?.message || 'Failed to create employee.'));
     }
   }
 
@@ -44,8 +44,8 @@ export class EmployeeService implements IEmployeeService {
 
       const updated = await this.repo.update(employeeId, patch, actor);
       return Ok(updated);
-    } catch (err) {
-      return Err(AppError.internal());
+    } catch (err: any) {
+      return Err(err instanceof AppError ? err : AppError.internal(err?.message || 'Failed to update employee profile.'));
     }
   }
 
@@ -62,8 +62,8 @@ export class EmployeeService implements IEmployeeService {
 
       const directReports = await this.repo.findTeamMembers(employeeId);
       return Ok({ manager, directReports });
-    } catch (err) {
-      return Err(AppError.internal());
+    } catch (err: any) {
+      return Err(err instanceof AppError ? err : AppError.internal(err?.message || 'Failed to list employees.'));
     }
   }
 
@@ -71,8 +71,8 @@ export class EmployeeService implements IEmployeeService {
     try {
       const page = await this.repo.findMany({ pageSize: 1000 });
       return Ok(page.data);
-    } catch (err) {
-      return Err(AppError.internal());
+    } catch (err: any) {
+      return Err(err instanceof AppError ? err : AppError.internal(err?.message || 'Failed to list employees.'));
     }
   }
 

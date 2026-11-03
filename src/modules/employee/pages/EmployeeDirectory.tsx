@@ -312,6 +312,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       designation: editForm.designation,
       dateOfJoining: editForm.dateOfJoining,
       phone: editForm.phone,
+      role: editForm.role,
       status: editForm.status as any,
     });
 
@@ -455,13 +456,27 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     {
       key: 'status',
       header: 'Status',
-      render: (r) => (
-        <span
-          className={`kvj-badge kvj-badge--${r.status === 'active' ? 'success' : 'neutral'}`}
-        >
-          {r.status}
-        </span>
-      ),
+      render: (r) => {
+        const isRelieved = r.status === 'relieved' || r.status === 'terminated';
+        const isSuspended = r.status === 'suspended';
+        const isOnNotice = r.status === 'on_notice';
+        return (
+          <span
+            className={`kvj-badge kvj-badge--${r.status === 'active' ? 'success' : isRelieved ? 'danger' : 'neutral'}`}
+            style={
+              isRelieved
+                ? { background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', border: '1px solid rgba(239, 68, 68, 0.25)', fontWeight: 600 }
+                : isSuspended
+                  ? { background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', border: '1px solid rgba(245, 158, 11, 0.25)', fontWeight: 600 }
+                  : isOnNotice
+                    ? { background: 'rgba(234, 179, 8, 0.12)', color: '#ca8a04', border: '1px solid rgba(234, 179, 8, 0.25)', fontWeight: 600 }
+                    : undefined
+            }
+          >
+            {isRelieved ? 'relieved' : r.status}
+          </span>
+        );
+      },
     },
     {
       key: 'actions',
@@ -716,6 +731,8 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
             designation: data.designation,
             dateOfJoining: data.dateOfJoining,
             phone: data.phone,
+            role: data.role,
+            reportingManagerId: data.supervisorId || undefined,
             status: data.status as any,
           });
 
