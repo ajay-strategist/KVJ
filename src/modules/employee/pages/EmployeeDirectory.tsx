@@ -55,6 +55,9 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   };
 
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [openWorkSessions, setOpenWorkSessions] = useState<any[]>([]);
+  const [todayCalendarSessions, setTodayCalendarSessions] = useState<any[]>([]);
+  const [batchesList, setBatchesList] = useState<any[]>([]);
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
   const [activeWorkSessions, setActiveWorkSessions] = useState<any[]>([]);
   const [todayTaskSessions, setTodayTaskSessions] = useState<any[]>([]);
@@ -82,6 +85,41 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
         if (finalAttData) {
           setAttendanceRecords(finalAttData);
+        }
+
+        // Fetch open work sessions (clock_out is null) to detect active training batch sessions
+        const attIds = (finalAttData || []).map((r: any) => r.id).filter(Boolean);
+        if (attIds.length > 0) {
+          const { data: wsData } = await supabase
+            .from('flwdsk_work_sessions')
+            .select('*')
+            .in('attendance_record_id', attIds)
+            .is('clock_out', null)
+            .is('deleted_at', null);
+          if (wsData) {
+            setOpenWorkSessions(wsData);
+          }
+        } else {
+          setOpenWorkSessions([]);
+        }
+
+        // Fetch today's scheduled training sessions from calendar
+        const { data: calSessions } = await supabase
+          .from('flwdsk_calendar_sessions')
+          .select('*')
+          .eq('date', todayStr)
+          .is('deleted_at', null);
+        if (calSessions) {
+          setTodayCalendarSessions(calSessions);
+        }
+
+        // Fetch batches to resolve training titles/codes
+        const { data: batchesData } = await supabase
+          .from('flwdsk_batches')
+          .select('id, code, training_name, college')
+          .is('deleted_at', null);
+        if (batchesData) {
+          setBatchesList(batchesData);
         }
 
         const { data: taskData } = await supabase
@@ -133,7 +171,75 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     return () => clearInterval(interval);
   }, [employees]);
 
+  const isEmployeeInTraining = (emp: Employee): string | null => {
+    const empId = emp.id;
+    const empEmail = emp.email?.toLowerCase();
+    const isCurrentUser = Boolean(user && (user.id === empId || user.email?.toLowerCase() === empEmail));
+
+    const matchingAttendance = attendanceRecords.filter(
+      (r) =>
+        r.employee_id === empId ||
+        (r.employee_email && empEmail && r.employee_email.toLowerCase() === empEmail) ||
+        (isCurrentUser && user && (r.employee_id === user.id || r.employee_email?.toLowerCase() === user.email?.toLowerCase()))
+    );
+
+    // 1. Check open work sessions in flwdsk_work_sessions
+    const attIds = new Set(matchingAttendance.map((r) => r.id));
+    const activeWs = openWorkSessions.find((ws: any) => attIds.has(ws.attendance_record_id));
+    if (activeWs && activeWs.work_type) {
+      const wt = String(activeWs.work_type).trim();
+      if (wt.toLowerCase().includes('training')) {
+        return wt.startsWith('Training:') ? `🎓 ${wt}` : `🎓 Training: ${wt}`;
+      }
+    }
+
+    // 2. Check embedded sessions in matching attendance records
+    for (const att of matchingAttendance) {
+      if (Array.isArray(att.sessions)) {
+        const activeSess = att.sessions.find((s: any) => !s.clockOut && !s.clock_out);
+        const sessionToCheck = activeSess || att.sessions[att.sessions.length - 1];
+        if (sessionToCheck?.workType && String(sessionToCheck.workType).toLowerCase().includes('training')) {
+          const wt = String(sessionToCheck.workType).trim();
+          return wt.startsWith('Training:') ? `🎓 ${wt}` : `🎓 Training: ${wt}`;
+        }
+      }
+      if (att.work_type && String(att.work_type).toLowerCase().includes('training')) {
+        const wt = String(att.work_type).trim();
+        return wt.startsWith('Training:') ? `🎓 ${wt}` : `🎓 Training: ${wt}`;
+      }
+      if (att.workType && String(att.workType).toLowerCase().includes('training')) {
+        const wt = String(att.workType).trim();
+        return wt.startsWith('Training:') ? `🎓 ${wt}` : `🎓 Training: ${wt}`;
+      }
+    }
+
+    // 3. If employee is clocked in today, check if they have a scheduled training session today on Training Calendar
+    const isClockedIn = matchingAttendance.some((r) => r.status === 'present');
+    if (isClockedIn) {
+      const todayCal = todayCalendarSessions.find((cs: any) => {
+        return (
+          cs.trainer_id === empId ||
+          (isCurrentUser && user && cs.trainer_id === user.id) ||
+          (emp.firstName && cs.trainer_name && cs.trainer_name.toLowerCase().includes(emp.firstName.toLowerCase()))
+        );
+      });
+      if (todayCal) {
+        const matchedBatch = batchesList.find((b: any) => b.id === todayCal.batch_id);
+        const batchTitle = matchedBatch?.code || matchedBatch?.training_name || todayCal.session_title || 'Training Batch';
+        return `🎓 Training: ${batchTitle}`;
+      }
+    }
+
+    return null;
+  };
+
   const getEmployeeActiveTask = (emp: Employee) => {
+    // Check if the employee clocked in for a training batch or has an active training session
+    const trainingTitle = isEmployeeInTraining(emp);
+    if (trainingTitle) {
+      return trainingTitle;
+    }
+
     const empId = emp.id;
     const empEmail = emp.email?.toLowerCase();
     const empFullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim().toLowerCase();
@@ -240,6 +346,11 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   };
 
   const getEmployeeIdleInfo = (emp: Employee) => {
+    // If the employee is clocked in for a training batch, they are conducting training and are never idle
+    if (isEmployeeInTraining(emp)) {
+      return { isIdle: false, idleMinutes: 0 };
+    }
+
     const status = getEmployeeStatus(emp);
     const isClockedIn = status.label.includes('Clocked In');
     if (!isClockedIn) {
@@ -501,7 +612,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     return filtered
       .map((e) => ({ emp: e, ...getEmployeeIdleInfo(e) }))
       .filter((x): x is IdleItem => x.isIdle);
-  }, [filtered, isStatusView, attendanceRecords, activeWorkSessions, todayTaskSessions]);
+  }, [filtered, isStatusView, attendanceRecords, activeWorkSessions, todayTaskSessions, openWorkSessions, todayCalendarSessions, batchesList]);
 
   useEffect(() => {
     if (!user || !isStatusView) return;
@@ -864,9 +975,22 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
                 render: (r: Employee) => {
                   const taskName = getEmployeeActiveTask(r);
                   const idleInfo = getEmployeeIdleInfo(r);
+                  const isTraining = taskName.includes('🎓') || taskName.toLowerCase().includes('training');
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color: isTraining ? 'var(--brand-primary, #6366f1)' : 'var(--text-secondary)',
+                          background: isTraining ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                          padding: isTraining ? '3px 10px' : '0',
+                          borderRadius: isTraining ? 8 : 0,
+                          border: isTraining ? '1px solid rgba(99, 102, 241, 0.2)' : 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
                         {taskName}
                       </span>
                       {idleInfo.isIdle && (
