@@ -297,8 +297,14 @@ export function TrainingCalendar() {
         });
 
         setCustomSessions(dbSess);
+        try {
+          localStorage.setItem('kvj_planner_custom_sessions', JSON.stringify(dbSess));
+        } catch {}
       } else {
         setCustomSessions([]);
+        try {
+          localStorage.removeItem('kvj_planner_custom_sessions');
+        } catch {}
       }
     } catch (e) {
       console.warn('Could not load calendar sessions:', e);
@@ -327,6 +333,7 @@ export function TrainingCalendar() {
 
   // Assign / Edit Schedule Drawer state
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [isCopyMode, setIsCopyMode] = useState(false);
   const [isAssignDrawerOpen, setIsAssignDrawerOpen] = useState(false);
   const [assignForm, setAssignForm] = useState<{
     date: string;
@@ -570,7 +577,26 @@ export function TrainingCalendar() {
   }, [range.from, range.to, trainerIds]);
 
   const combinedSessions = useMemo(() => {
-    return [...data.sessions, ...customSessions];
+    // Strict deduplication by unique ID and by slot (date + trainerId + startTime + batchCode)
+    // Prevents accidental duplicates from localStorage, state overlap, or dual table queries
+    const seenIds = new Set<string>();
+    const seenSlots = new Set<string>();
+    const result: ScheduleSession[] = [];
+
+    const all = [...data.sessions, ...customSessions];
+    for (const s of all) {
+      if (!s || !s.id) continue;
+      if (seenIds.has(s.id)) continue;
+
+      const cleanCode = cleanBatchCode(s.batchCode || s.name || '');
+      const slotKey = `${s.date}|${s.trainerId}|${s.startTime}|${cleanCode}`;
+      if (seenSlots.has(slotKey)) continue;
+
+      seenIds.add(s.id);
+      seenSlots.add(slotKey);
+      result.push(s);
+    }
+    return result;
   }, [data.sessions, customSessions]);
 
   const applyPreset = (id: PresetId) => {
@@ -739,6 +765,7 @@ export function TrainingCalendar() {
 
   const handleOpenCellAssign = (date: string, trainerId: string) => {
     setEditingSessionId(null);
+    setIsCopyMode(false);
     setRepeatMode('none');
     setRepeatDaysCount(3);
     setRepeatSkipSundays(true);
@@ -776,6 +803,7 @@ export function TrainingCalendar() {
 
   const handleEditSchedule = (s: ScheduleSession) => {
     setEditingSessionId(s.id);
+    setIsCopyMode(false);
     setRepeatMode('none');
     const matched = batches.find((b) => b.id === (s as any).batchId || b.code === s.batchCode || cleanBatchCode(b.code, b.batchNo) === s.batchCode);
     const c = matched ? courses.find((item) => item.id === matched.courseId) : undefined;
@@ -939,14 +967,23 @@ export function TrainingCalendar() {
       }
     } else {
       if (createdCount > 0) {
-        setCustomSessions((prev) => [...prev, ...newSessions]);
+        // Upsert by ID to ensure no duplicate session object can ever exist in customSessions
+        setCustomSessions((prev) => {
+          const map = new Map<string, ScheduleSession>();
+          prev.forEach((s) => map.set(s.id, s));
+          newSessions.forEach((s) => map.set(s.id, s));
+          return Array.from(map.values());
+        });
         toast({
           variant: 'success',
-          title: createdCount > 1 ? 'Repeating Schedule Assigned' : 'Schedule Assigned',
-          message:
-            createdCount > 1
-              ? `Assigned ${createdCount} training sessions for ${finalBatchCode} to ${trainerName(effectiveTrainerId)} (${datesToSchedule[0]} to ${datesToSchedule[datesToSchedule.length - 1]})${skippedDuplicates > 0 ? ` (${skippedDuplicates} skipped as duplicates)` : ''}.`
-              : `Assigned ${finalName} (${finalBatchCode}) to ${trainerName(effectiveTrainerId)} on ${datesToSchedule[0]}.`,
+          title: isCopyMode
+            ? (createdCount > 1 ? 'Schedule Copied & Repeated' : 'Schedule Copied to New Day')
+            : (createdCount > 1 ? 'Repeating Schedule Assigned' : 'Schedule Assigned'),
+          message: isCopyMode
+            ? `Copied ${finalBatchCode} schedule to ${trainerName(effectiveTrainerId)} on ${datesToSchedule.join(', ')}.`
+            : (createdCount > 1
+                ? `Assigned ${createdCount} training sessions for ${finalBatchCode} to ${trainerName(effectiveTrainerId)} (${datesToSchedule[0]} to ${datesToSchedule[datesToSchedule.length - 1]})${skippedDuplicates > 0 ? ` (${skippedDuplicates} skipped as duplicates)` : ''}.`
+                : `Assigned ${finalName} (${finalBatchCode}) to ${trainerName(effectiveTrainerId)} on ${datesToSchedule[0]}.`),
         });
       } else if (skippedDuplicates > 0) {
         toast({
@@ -966,6 +1003,7 @@ export function TrainingCalendar() {
     }
 
     setIsAssignDrawerOpen(false);
+    setIsCopyMode(false);
     setEditingSessionId(null);
   };
 
@@ -998,8 +1036,9 @@ export function TrainingCalendar() {
       phase: matched?.phase || 'Scheduled',
     });
     setEditingSessionId(null); // Fresh copy, new ID on save
+    setIsCopyMode(true);
     setIsAssignDrawerOpen(true);
-    toast({ variant: 'info', title: 'Session Copied', message: 'Adjust target date or time and click Save to duplicate.' });
+    toast({ variant: 'info', title: 'Copy Schedule Mode', message: `Copying "${session.batchCode}". Choose the target date and save.` });
   };
 
   const handleDeleteSession = async () => {
@@ -1479,6 +1518,7 @@ export function TrainingCalendar() {
                         leave={index.leaves.get(key)}
                         expanded={isOpen}
                         onOpen={handleEditSchedule}
+                        onCopy={handleCopySession}
                         onAssignCell={handleOpenCellAssign}
                         onMoveSession={handleMoveSession}
                       />
@@ -1494,43 +1534,107 @@ export function TrainingCalendar() {
       {/* ASSIGN / EDIT SCHEDULE DRAWER */}
       <Drawer
         open={isAssignDrawerOpen}
-        onClose={() => setIsAssignDrawerOpen(false)}
-        title={editingSessionId ? '✏️ Edit Assigned Training Schedule' : '➕ Assign Training Schedule Session'}
+        onClose={() => {
+          setIsAssignDrawerOpen(false);
+          setIsCopyMode(false);
+          setEditingSessionId(null);
+        }}
+        title={
+          isCopyMode
+            ? `📋 Copy Schedule to Another Day (${assignForm.batchCode || 'Batch'})`
+            : editingSessionId
+              ? '✏️ Edit Assigned Training Schedule'
+              : '➕ Assign Training Schedule Session'
+        }
         size="md"
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            {editingSessionId ? (
-              <button
-                type="button"
-                onClick={handleDeleteSession}
-                disabled={submittingSession}
-                style={{ color: '#dc2626', background: 'none', border: 'none', cursor: submittingSession ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, opacity: submittingSession ? 0.5 : 1 }}
-              >
-                🗑️ Remove Schedule
-              </button>
-            ) : <div />}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {editingSessionId && (
+                <button
+                  type="button"
+                  onClick={handleDeleteSession}
+                  disabled={submittingSession}
+                  style={{ color: '#dc2626', background: 'none', border: 'none', cursor: submittingSession ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, opacity: submittingSession ? 0.5 : 1 }}
+                >
+                  🗑️ Remove Schedule
+                </button>
+              )}
+              {editingSessionId && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const sess = combinedSessions.find((s) => s.id === editingSessionId);
+                    if (sess) {
+                      handleCopySession(sess);
+                    }
+                  }}
+                  style={{ fontSize: 12 }}
+                >
+                  📋 Copy to Another Day
+                </Button>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button variant="secondary" onClick={() => setIsAssignDrawerOpen(false)} disabled={submittingSession}>Cancel</Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsAssignDrawerOpen(false);
+                  setIsCopyMode(false);
+                  setEditingSessionId(null);
+                }}
+                disabled={submittingSession}
+              >
+                Cancel
+              </Button>
               <Button onClick={handleSaveSession} loading={submittingSession}>
                 {editingSessionId
                   ? '💾 Update Schedule'
-                  : scheduledDates.length > 1
-                    ? `💾 Assign ${scheduledDates.length} Sessions`
-                    : '💾 Save Schedule Allocation'}
+                  : isCopyMode
+                    ? scheduledDates.length > 1
+                      ? `💾 Copy to ${scheduledDates.length} Days`
+                      : '💾 Save Copied Schedule'
+                    : scheduledDates.length > 1
+                      ? `💾 Assign ${scheduledDates.length} Sessions`
+                      : '💾 Save Schedule Allocation'}
               </Button>
             </div>
           </div>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
+          {isCopyMode && (
+            <div
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: 8,
+                padding: '10px 14px',
+                fontSize: 12,
+                color: '#1e40af',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>📋</span>
+              <div>
+                <strong>Copying Schedule:</strong> Choose your new target date below and click <strong>"Save Copied Schedule"</strong> to duplicate to another day.
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Schedule Date</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6, color: isCopyMode ? '#1e40af' : 'inherit' }}>
+                {isCopyMode ? '🎯 Target Date (Date to Copy To) *' : 'Schedule Date'}
+              </label>
               <input
                 type="date"
                 value={assignForm.date}
                 onChange={(e) => setAssignForm((f) => ({ ...f, date: e.target.value }))}
-                style={{ width: '100%', padding: '8px 10px', fontSize: 12.5, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                style={{ width: '100%', padding: '8px 10px', fontSize: 12.5, borderRadius: 8, border: isCopyMode ? '2px solid #3b82f6' : '1px solid var(--border)', background: 'var(--bg-surface)' }}
               />
             </div>
 
@@ -2098,12 +2202,13 @@ function MiniBtn({ onClick, children }: { onClick: () => void; children: React.R
 }
 
 /** One trainer/day cell with strict overflow clipping and drag & drop date move support */
-const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sessions, leave, expanded, onOpen, onAssignCell, onMoveSession }: {
+const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sessions, leave, expanded, onOpen, onCopy, onAssignCell, onMoveSession }: {
   left: number; width: number; date: string; trainerId: string;
   sessions: ScheduleSession[];
   leave?: { duration: string; type: string; status: string };
   expanded: boolean;
   onOpen: (s: ScheduleSession) => void;
+  onCopy: (s: ScheduleSession) => void;
   onAssignCell: (date: string, trainerId: string) => void;
   onMoveSession: (sessionId: string, newDate: string, newTrainerId: string) => void;
 }) {
@@ -2202,16 +2307,52 @@ const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sess
           >
             <div
               style={{
-                fontWeight: 700,
-                fontSize: 12,
-                color: 'var(--brand-primary, #1e40af)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                lineHeight: 1.3,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 4,
+                marginBottom: 2,
               }}
             >
-              🎓 {batchDisplay}
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 12,
+                  color: 'var(--brand-primary, #1e40af)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.3,
+                  flex: 1,
+                }}
+              >
+                🎓 {batchDisplay}
+              </div>
+              <span
+                role="button"
+                tabIndex={0}
+                title="Copy schedule to another day"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy(s);
+                }}
+                style={{
+                  fontSize: 11,
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  background: 'var(--bg-sunken, #f1f5f9)',
+                  color: 'var(--text-secondary, #475569)',
+                  border: '1px solid var(--border)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  flexShrink: 0,
+                }}
+              >
+                📋 Copy
+              </span>
             </div>
             <div
               style={{

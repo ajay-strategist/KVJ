@@ -94,4 +94,45 @@ describe('Training Recurrence and Multi-Day Calculations', () => {
     // 2026-11-03 (Tue), 2026-11-04 (Holiday skipped), 2026-11-05 (Thu), 2026-11-06 (Fri)
     expect(dates).toEqual(['2026-11-03', '2026-11-05', '2026-11-06']);
   });
+
+  it('deduplicates sessions by id and time/batch slot to prevent duplicate cards on the same day', () => {
+    const duplicateList = [
+      {
+        id: 'sess-1',
+        date: '2026-11-05',
+        trainerId: 'trainer-linto',
+        startTime: '09:00',
+        endTime: '16:00',
+        name: 'Python for beginners',
+        batchCode: 'Christ - Christ Teachers - Batch 1',
+        college: 'Christ',
+      },
+      {
+        id: 'sess-2',
+        date: '2026-11-05',
+        trainerId: 'trainer-linto',
+        startTime: '09:00',
+        endTime: '16:00',
+        name: 'Python for beginners',
+        batchCode: 'Christ - Christ Teachers - Batch 1',
+        college: 'Christ',
+      },
+    ];
+
+    const seenIds = new Set<string>();
+    const seenSlots = new Set<string>();
+    const deduplicated = duplicateList.filter((s) => {
+      if (!s || !s.id) return false;
+      if (seenIds.has(s.id)) return false;
+      const slotKey = `${s.date}|${s.trainerId}|${s.startTime}|${s.batchCode}`;
+      if (seenSlots.has(slotKey)) return false;
+      seenIds.add(s.id);
+      seenSlots.add(slotKey);
+      return true;
+    });
+
+    expect(deduplicated).toHaveLength(1);
+    expect(deduplicated[0].id).toBe('sess-1');
+  });
 });
+
