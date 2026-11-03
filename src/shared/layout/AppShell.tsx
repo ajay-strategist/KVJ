@@ -20,6 +20,7 @@ import { useCommandPalette } from '../search/CommandPaletteProvider';
 import { useDevice } from '../hooks/responsive';
 import { Avatar, Badge } from '../ui/components';
 import { appConfig } from '../../config/app-config';
+import { IdleEmployeeAlertPopup } from '../notifications/IdleEmployeeAlertPopup';
 
 // ── Inline icons (no icon library import in shell for bundle performance) ──
 const ICON_PATHS: Record<string, string> = {
@@ -964,6 +965,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
           )}
         </div>
       </div>
+      <IdleEmployeeAlertPopup />
     </InsideShellContext.Provider>
   );
 }
