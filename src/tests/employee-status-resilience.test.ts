@@ -33,3 +33,4 @@ describe('SupabaseEmployeeRepository status mapping resilience', () => {
     expect(suspended.status).toBe('suspended');
   });
 });
+
