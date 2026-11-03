@@ -118,6 +118,7 @@ export interface TaskItem {
   assignee?: string;
   assigneeId?: string;
   supervisor?: string;
+  createdAt?: string;
 }
 
 interface AttendancePanelProps {
@@ -2283,22 +2284,28 @@ export function MyDayPage() {
           assignee: assigneeName,
           assigneeId: t.assigneeId,
           supervisor: supervisorName,
+          createdAt: (t as any).createdAt || (t as any).created_at,
         };
       });
 
     saveStoredTaskStates(updatedStates);
 
     const savedOrder = getStoredTaskOrder(user?.id);
-    if (savedOrder.length > 0) {
-      mapped.sort((a, b) => {
-        const idxA = savedOrder.indexOf(a.id);
-        const idxB = savedOrder.indexOf(b.id);
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        if (idxA !== -1) return -1;
-        if (idxB !== -1) return 1;
-        return 0;
-      });
-    }
+    mapped.sort((a, b) => {
+      const idxA = savedOrder.indexOf(a.id);
+      const idxB = savedOrder.indexOf(b.id);
+      // Both tasks are in user's saved manual order
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      // Task A is new (not in savedOrder) -> bring to top
+      if (idxA === -1 && idxB !== -1) return -1;
+      // Task B is new (not in savedOrder) -> bring to top
+      if (idxA !== -1 && idxB === -1) return 1;
+      // Both are new -> sort newest created first
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return a.id.localeCompare(b.id);
+    });
 
     setTasks(mapped);
   }, [projectTasks, projects, employees, user]);
@@ -2732,6 +2739,7 @@ export function MyDayPage() {
     });
 
     const taskId = res.ok ? res.value.id : String(Date.now());
+    const nowIso = new Date().toISOString();
     const newTaskItem: TaskItem = {
       id: taskId,
       title,
@@ -2740,13 +2748,16 @@ export function MyDayPage() {
       priority: 'Normal',
       active: false,
       secondsToday: 0,
+      createdAt: nowIso,
     };
 
     setTasks((prev) => {
-      const next = [newTaskItem, ...prev];
+      const next = [newTaskItem, ...prev.filter((t) => t.id !== taskId)];
       const states = getStoredTaskStates();
       states[taskId] = { secondsToday: 0, active: false };
       saveStoredTaskStates(states);
+      const currentOrder = getStoredTaskOrder(user?.id);
+      saveStoredTaskOrder([taskId, ...currentOrder.filter((id) => id !== taskId)], user?.id);
       return next;
     });
 
