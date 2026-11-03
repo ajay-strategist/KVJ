@@ -2292,7 +2292,13 @@ export function MyDayPage() {
         }
 
         const dbRunningSession = (runningDbSessions || []).find((s: any) => s.task_id === t.id);
-        const isDbRunning = Boolean(dbRunningSession) || t.status === 'in_progress';
+        const isExplicitlyPaused = stored?.active === false || t.status === 'todo';
+        const isExplicitlyDoneOrReview = underReview || isApproved;
+
+        let isDbRunning = false;
+        if (!isExplicitlyPaused && !isExplicitlyDoneOrReview) {
+          isDbRunning = Boolean(dbRunningSession) || t.status === 'in_progress';
+        }
 
         if (isDbRunning) {
           active = true;
@@ -2303,14 +2309,14 @@ export function MyDayPage() {
         } else if (stored) {
           // Continuous Task Accumulation: trust accumulated stored seconds or DB actualHours.
           // When resuming or reloading, start from previously accumulated mark rather than resetting to zero.
-          if (stored.active && stored.lastStartTime) {
+          if (stored.active && stored.lastStartTime && !isExplicitlyPaused && !isExplicitlyDoneOrReview) {
             const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
             if (elapsed > 0 && elapsed < 86400 * 30) {
               secondsToday = Math.max(secondsToday, (stored.secondsToday || 0) + elapsed);
             }
             active = true;
           } else {
-            active = stored.active;
+            active = false;
             if (stored.secondsToday && stored.secondsToday > secondsToday) {
               secondsToday = stored.secondsToday;
             }
@@ -2321,14 +2327,19 @@ export function MyDayPage() {
           } else if (stored.underReview !== undefined && !isRework && !isApproved) {
             underReview = stored.underReview;
           }
+        } else {
+          active = false;
         }
 
-        // If the task is active, ensure the timer in taskTimerStore is actively ticking
+        // If the task is active, ensure the timer in taskTimerStore is actively ticking.
+        // If not active, ensure taskTimerStore is paused!
         if (active) {
           const curTimer = taskTimerStore.getTimer(t.id);
           if (!curTimer || !curTimer.isRunning) {
             taskTimerStore.startTask(t.id, secondsToday * 1000);
           }
+        } else {
+          taskTimerStore.pauseTask(t.id);
         }
 
         // Continuous task duration accumulation: no artificial daily resets
@@ -2500,19 +2511,18 @@ export function MyDayPage() {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskIdToPause ? { ...t, active: false, secondsToday } : t))
       );
+      setRunningDbSessions((prev) => (prev || []).filter((s: any) => s.task_id !== taskIdToPause));
 
       const states = getStoredTaskStates();
       const todayDateStr = toLocalISODate(new Date());
-      if (states[taskIdToPause]) {
-        states[taskIdToPause] = {
-          ...states[taskIdToPause],
-          active: false,
-          secondsToday,
-          lastStartTime: undefined,
-          date: todayDateStr,
-        };
-        saveStoredTaskStates(states);
-      }
+      states[taskIdToPause] = {
+        ...(states[taskIdToPause] || {}),
+        active: false,
+        secondsToday,
+        lastStartTime: undefined,
+        date: todayDateStr,
+      };
+      saveStoredTaskStates(states);
 
       try {
         await updateTask(taskIdToPause as any, { status: 'todo', actualHours: secondsToday / 3600 });
@@ -2520,6 +2530,18 @@ export function MyDayPage() {
           await pauseSession(taskIdToPause as any, updateMsg);
         } else {
           await pauseSession(taskIdToPause as any);
+        }
+        if (user?.id) {
+          await supabase
+            .from('flwdsk_task_work_sessions')
+            .update({
+              status: 'paused',
+              end_time: new Date().toISOString(),
+              notes: updateMsg || 'Paused for break',
+            })
+            .eq('employee_id', user.id)
+            .eq('task_id', taskIdToPause)
+            .is('end_time', null);
         }
       } catch (e) {
         console.warn('Failed to pause task during break start:', e);
@@ -2637,23 +2659,34 @@ export function MyDayPage() {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, active: false, secondsToday } : t))
     );
+    setRunningDbSessions((prev) => (prev || []).filter((s: any) => s.task_id !== taskId));
 
     const states = getStoredTaskStates();
     const todayDateStr = toLocalISODate(new Date());
-    if (states[taskId]) {
-      states[taskId] = {
-        ...states[taskId],
-        active: false,
-        secondsToday,
-        lastStartTime: undefined,
-        date: todayDateStr,
-      };
-      saveStoredTaskStates(states);
-    }
+    states[taskId] = {
+      ...(states[taskId] || {}),
+      active: false,
+      secondsToday,
+      lastStartTime: undefined,
+      date: todayDateStr,
+    };
+    saveStoredTaskStates(states);
 
     try {
       await updateTask(taskId as any, { status: 'todo', actualHours: secondsToday / 3600 });
       await pauseSession(taskId as any, note);
+      if (user?.id) {
+        await supabase
+          .from('flwdsk_task_work_sessions')
+          .update({
+            status: 'paused',
+            end_time: new Date().toISOString(),
+            notes: note,
+          })
+          .eq('employee_id', user.id)
+          .eq('task_id', taskId)
+          .is('end_time', null);
+      }
       const targetTask = (projectTasks || []).find((t) => t.id === taskId) || tasks.find((t) => t.id === taskId);
       const taskTitleText = targetTask?.title || taskId;
       handleActivityLog(`Paused Task: ${taskTitleText}. Work status: ${note}`, 'neutral');
@@ -2736,6 +2769,7 @@ export function MyDayPage() {
       saveStoredTaskStates(states);
     };
     applyUnderReview(true);
+    setRunningDbSessions((prev) => (prev || []).filter((s: any) => s.task_id !== id));
 
     // Save final actualHours to the DB before submitting
     try {

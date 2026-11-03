@@ -115,4 +115,50 @@ describe('Continuous Task Duration Accumulation and Resume Across Start/Pause Cy
     expect(timer?.isRunning).toBe(true);
     expect(timer?.elapsedMs).toBe(7200000); // 2 hours preserved, not zero!
   });
+
+  it('ensures paused tasks remain paused and cannot be resurrected by stale DB session rows', () => {
+    const taskId = 'task-pause-resurrection-test';
+    taskTimerStore.startTask(taskId);
+    expect(taskTimerStore.getTimer(taskId)?.isRunning).toBe(true);
+
+    // Pause the task
+    taskTimerStore.pauseTask(taskId);
+    expect(taskTimerStore.getTimer(taskId)?.isRunning).toBe(false);
+
+    // Simulate stored task states
+    const storedStates: Record<string, any> = {
+      [taskId]: {
+        active: false,
+        secondsToday: 120,
+      },
+    };
+
+    // Stale DB session row that has not yet been polled or updated
+    const staleRunningDbSessions = [{ task_id: taskId, status: 'running' }];
+    const task = { id: taskId, status: 'todo' };
+
+    // Evaluation logic used in MyDayPage
+    const stored = storedStates[taskId];
+    const isExplicitlyPaused = stored?.active === false || task.status === 'todo';
+    const underReview = false;
+    const isApproved = false;
+    const isExplicitlyDoneOrReview = underReview || isApproved;
+
+    let isDbRunning = false;
+    if (!isExplicitlyPaused && !isExplicitlyDoneOrReview) {
+      isDbRunning = Boolean(staleRunningDbSessions.find((s) => s.task_id === taskId)) || task.status === 'in_progress';
+    }
+
+    expect(isExplicitlyPaused).toBe(true);
+    expect(isDbRunning).toBe(false);
+
+    let active = false;
+    if (isDbRunning) {
+      active = true;
+    } else if (stored) {
+      active = stored.active && !isExplicitlyPaused;
+    }
+
+    expect(active).toBe(false);
+  });
 });

@@ -19,7 +19,7 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
-import { todayISO, addDaysISO, formatDisplayDate } from '../../../shared/utils/date';
+import { todayISO, addDaysISO, formatDisplayDate, toLocalISODate } from '../../../shared/utils/date';
 import { exportToExcel } from '../../../shared/utils/exportToExcel';
 import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
 import { useDevice } from '../../../shared/hooks/responsive';
@@ -689,8 +689,33 @@ export function TaskBoard({
     );
 
     try {
+      const raw = localStorage.getItem('kvj_task_timer_state_v1');
+      const states = raw ? JSON.parse(raw) : {};
+      states[taskId] = {
+        ...(states[taskId] || {}),
+        active: false,
+        secondsToday,
+        lastStartTime: undefined,
+        date: toLocalISODate(new Date()),
+      };
+      localStorage.setItem('kvj_task_timer_state_v1', JSON.stringify(states));
+    } catch {}
+
+    try {
       await updateTask(taskId as UUID, { status: 'todo', actualHours: secondsToday / 3600 });
       await pauseSession(taskId as UUID, note);
+      if (user?.id) {
+        await supabase
+          .from('flwdsk_task_work_sessions')
+          .update({
+            status: 'paused',
+            end_time: new Date().toISOString(),
+            notes: note,
+          })
+          .eq('employee_id', user.id)
+          .eq('task_id', taskId)
+          .is('end_time', null);
+      }
     } catch (e) {
       console.warn('Pause task error:', e);
     }
