@@ -71,7 +71,7 @@ export function ServerError({ error, onRetry }: { error?: Error | null; onRetry?
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-        <Button onClick={handleRetry}>Retry</Button>
+        <Button onClick={handleRetry}>🔄 Reload & Retry</Button>
         <Link to="/app"><Button variant="secondary">Go to Workspace</Button></Link>
         <Button variant="ghost" onClick={handleResetSession}>Sign In Again</Button>
       </div>

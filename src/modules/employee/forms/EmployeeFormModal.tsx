@@ -59,7 +59,7 @@ export function EmployeeFormModal({
         setRole((employee.role as any) || 'EMPLOYEE');
         setSupervisorId((employee as any).supervisorId || (employee as any).reportingManagerId || '');
         const rawStatus = String(employee.status || 'active').toLowerCase();
-        if (rawStatus === 'terminated') {
+        if (rawStatus === 'terminated' || rawStatus === 'relieved' || rawStatus === 'resigned') {
           setStatus('relieved');
         } else if (rawStatus === 'suspended') {
           setStatus('suspended');

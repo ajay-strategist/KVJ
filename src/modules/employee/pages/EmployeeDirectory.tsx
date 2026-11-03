@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Avatar, SearchInput, Button, Badge, SectionHeader } from '../../../shared/ui/components';
@@ -19,10 +19,10 @@ import { formatDisplayDate, todayISO } from '../../../shared/utils/date';
 export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId?: string }) {
   const navigate = useNavigate();
   const { confirm } = useDialog();
-  const { employees, createEmployee, updateProfile, deleteEmployee, loading } = useEmployee();
+  const { employees, createEmployee, updateProfile, deleteEmployee, loading, refresh } = useEmployee();
   const { createUser, resetToDefaultPassword, updateUser, deleteUser, getUsers, user } = useAuth();
   const { tasks } = useProject();
-  const { toast } = useNotifications();
+  const { toast, addNotification } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchDeleting, setBatchDeleting] = useState(false);
@@ -55,6 +55,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
   const [activeWorkSessions, setActiveWorkSessions] = useState<any[]>([]);
+  const [todayTaskSessions, setTodayTaskSessions] = useState<any[]>([]);
   const [leaveToday, setLeaveToday] = useState<any[]>([]);
 
   useEffect(() => {
@@ -99,6 +100,16 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           .is('deleted_at', null);
         if (sessData) {
           setActiveWorkSessions(sessData);
+        }
+
+        // Fetch task sessions logged today (used for idle duration measurement after task pauses/completion)
+        const { data: todaySess } = await supabase
+          .from('flwdsk_task_work_sessions')
+          .select('id, employee_id, task_id, start_time, end_time, status')
+          .gte('created_at', `${todayStr}T00:00:00.000Z`)
+          .is('deleted_at', null);
+        if (todaySess) {
+          setTodayTaskSessions(todaySess);
         }
 
         // Approved leaves that cover today (start <= today <= end).
@@ -217,13 +228,68 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       if (status === 'clocked_out') return { label: '🔴 Clocked Out', tone: 'danger' as const };
     }
 
-    // If an active task is running for this employee, mark as active!
+    // If an active task is running for this employee, mark as Clocked In
     const activeTaskStr = getEmployeeActiveTask(emp);
     if (activeTaskStr !== 'No active task in progress') {
-      return { label: '🟢 Clocked In (Active Work)', tone: 'success' as const };
+      return { label: '🟢 Clocked In', tone: 'success' as const };
     }
 
     return { label: 'Offline', tone: 'neutral' as const };
+  };
+
+  const getEmployeeIdleInfo = (emp: Employee) => {
+    const status = getEmployeeStatus(emp);
+    const isClockedIn = status.label.includes('Clocked In');
+    if (!isClockedIn) {
+      return { isIdle: false, idleMinutes: 0 };
+    }
+
+    const activeTask = getEmployeeActiveTask(emp);
+    if (activeTask !== 'No active task in progress') {
+      return { isIdle: false, idleMinutes: 0 };
+    }
+
+    if (status.label.includes('On Break') || status.label.includes('On Leave')) {
+      return { isIdle: false, idleMinutes: 0 };
+    }
+
+    const empId = emp.id;
+    const empEmail = emp.email?.toLowerCase();
+    const record = attendanceRecords.find(
+      (r) =>
+        r.employee_id === empId ||
+        (r.employee_email && empEmail && r.employee_email.toLowerCase() === empEmail) ||
+        (user && user.email?.toLowerCase() === empEmail && r.employee_id === user.id)
+    );
+
+    const clockInIso = record?.first_clock_in || (record as any)?.firstClockIn;
+    if (!clockInIso) {
+      return { isIdle: false, idleMinutes: 0 };
+    }
+
+    let idleStartMs = new Date(clockInIso).getTime();
+
+    // Check if employee completed/paused a task session today after clocking in
+    const empFinishedSessions = (todayTaskSessions || []).filter(
+      (s: any) => s.employee_id === empId && s.end_time
+    );
+
+    if (empFinishedSessions.length > 0) {
+      empFinishedSessions.forEach((s: any) => {
+        const endMs = new Date(s.end_time).getTime();
+        if (!isNaN(endMs) && endMs > idleStartMs) {
+          idleStartMs = endMs;
+        }
+      });
+    }
+
+    const now = Date.now();
+    const idleMinutes = Math.max(0, Math.floor((now - idleStartMs) / (1000 * 60)));
+
+    return {
+      isIdle: idleMinutes >= 15,
+      idleMinutes,
+    };
   };
 
   const [form, setForm] = useState({
@@ -400,11 +466,55 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     }
   };
 
-  const filtered = employees.filter((e) =>
-    `${e.firstName} ${e.lastName} ${e.employeeId} ${e.designation}`
+  const isStatusView = defaultTabId === 'status';
+
+  const filtered = employees.filter((e) => {
+    // In Employee Status view, do not show relieved / terminated employees
+    if (isStatusView) {
+      const s = String(e.status || '').toLowerCase();
+      if (s === 'relieved' || s === 'terminated' || s === 'resigned') {
+        return false;
+      }
+    }
+    return `${e.firstName} ${e.lastName} ${e.employeeId} ${e.designation}`
       .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+      .includes(searchTerm.toLowerCase());
+  });
+
+  interface IdleItem {
+    emp: Employee;
+    isIdle: boolean;
+    idleMinutes: number;
+  }
+
+  const idleEmployees = useMemo<IdleItem[]>(() => {
+    if (!isStatusView) return [];
+    return filtered
+      .map((e) => ({ emp: e, ...getEmployeeIdleInfo(e) }))
+      .filter((x): x is IdleItem => x.isIdle);
+  }, [filtered, isStatusView, attendanceRecords, activeWorkSessions, todayTaskSessions]);
+
+  useEffect(() => {
+    if (!user || !isStatusView) return;
+    const isAdminOrManager = user.role === 'ADMIN' || user.role === 'CEO' || user.role === 'MANAGER';
+    if (!isAdminOrManager) return;
+
+    idleEmployees.forEach(({ emp, idleMinutes }: IdleItem) => {
+      const notifyKey = `flwdsk_admin_idle_notified_${emp.id}_${todayISO()}`;
+      const lastNotified = localStorage.getItem(notifyKey);
+      const now = Date.now();
+      // Throttle: notify admin once per 15 mins per idle employee
+      if (!lastNotified || (now - Number(lastNotified) > 15 * 60 * 1000)) {
+        addNotification({
+          title: `⚠️ Idle-Time Alert: ${emp.firstName} ${emp.lastName}`,
+          message: `${emp.firstName} ${emp.lastName} has been clocked in for ${idleMinutes >= 60 ? `${Math.floor(idleMinutes / 60)}h ${idleMinutes % 60}m` : `${idleMinutes}m`} with no active task in progress.`,
+          category: 'system',
+          priority: 'high',
+        });
+        localStorage.setItem(notifyKey, String(now));
+      }
+    });
+  }, [idleEmployees, isStatusView, user, addNotification]);
 
   const columns: Column<Employee>[] = [
     {
@@ -563,28 +673,36 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   return (
     <AppShell>
       <PageHeader
-        title="Employee Directory"
-        subtitle="Manage and view all employee files and profiles"
+        title={defaultTabId === 'status' ? 'Employee Status' : 'Employee Directory'}
+        subtitle={
+          defaultTabId === 'status'
+            ? 'Real-time employee clock-in status, active work tracking, and idle monitoring'
+            : 'Manage and view all employee files and profiles'
+        }
         actions={
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {/* Batch Delete — visible only to Admin / CEO / Manager, and only when rows are selected */}
-            <Authorize roles={['ADMIN', 'CEO', 'MANAGER']}>
-              {selectedIds.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={handleBatchDelete}
-                  disabled={batchDeleting}
-                >
-                  {batchDeleting
-                    ? `⏳ Deleting ${selectedIds.length}…`
-                    : `🗑️ Delete Selected (${selectedIds.length})`}
-                </Button>
-              )}
-            </Authorize>
-            <Button size="sm" onClick={() => setAddModalOpen(true)}>
-              ➕ Add New Employee
-            </Button>
+            {/* Batch Delete — visible only to Admin / CEO / Manager, and only in directory view when rows are selected */}
+            {defaultTabId !== 'status' && (
+              <Authorize roles={['ADMIN', 'CEO', 'MANAGER']}>
+                {selectedIds.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={handleBatchDelete}
+                    disabled={batchDeleting}
+                  >
+                    {batchDeleting
+                      ? `⏳ Deleting ${selectedIds.length}…`
+                      : `🗑️ Delete Selected (${selectedIds.length})`}
+                  </Button>
+                )}
+              </Authorize>
+            )}
+            {defaultTabId !== 'status' && (
+              <Button size="sm" onClick={() => setAddModalOpen(true)}>
+                ➕ Add New Employee
+              </Button>
+            )}
             <Button size="sm" variant="secondary" onClick={() => navigate('/app')}>
               Back to Day
             </Button>
@@ -617,6 +735,36 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         </div>
       ) : (
         <div>
+          {idleEmployees.length > 0 && (
+            <div
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: 14,
+                padding: '12px 18px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                color: '#92400e',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20 }}>⚠️</span>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 13, color: '#b45309' }}>
+                    Idle Alert ({idleEmployees.length} Employee{idleEmployees.length > 1 ? 's' : ''} Clocked In with No Active Task &gt; 15 Mins)
+                  </div>
+                  <div style={{ fontSize: 12, color: '#78350f', marginTop: 2 }}>
+                    {idleEmployees.map((x) => `${x.emp.firstName} ${x.emp.lastName} (${x.idleMinutes >= 60 ? `${Math.floor(x.idleMinutes / 60)}h ${x.idleMinutes % 60}m` : `${x.idleMinutes}m`} idle)`).join(' • ')}
+                  </div>
+                </div>
+              </div>
+              <Badge tone="warning">⚠️ 15m+ Idle</Badge>
+            </div>
+          )}
+
           <SectionHeader title="Today's Employee Status & Current Work" />
           <DataTable
             columns={[
@@ -638,21 +786,49 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
                 header: 'Current Status',
                 render: (r: Employee) => {
                   const stat = getEmployeeStatus(r);
+                  const idleInfo = getEmployeeIdleInfo(r);
                   return (
-                    <Badge tone={stat.tone}>
-                      {stat.label}
-                    </Badge>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Badge tone={idleInfo.isIdle ? 'warning' : stat.tone}>
+                        {stat.label}
+                      </Badge>
+                    </div>
                   );
                 },
               },
               {
                 key: 'activeTask',
                 header: 'Current Task In Progress',
-                render: (r: Employee) => (
-                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    {getEmployeeActiveTask(r)}
-                  </span>
-                ),
+                render: (r: Employee) => {
+                  const taskName = getEmployeeActiveTask(r);
+                  const idleInfo = getEmployeeIdleInfo(r);
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {taskName}
+                      </span>
+                      {idleInfo.isIdle && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: '#fef3c7',
+                            color: '#b45309',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            border: '1px solid #fde68a',
+                          }}
+                          title={`Clocked in without starting a task for ${idleInfo.idleMinutes} minutes`}
+                        >
+                          ⚠️ Idle ({idleInfo.idleMinutes >= 60 ? `${Math.floor(idleInfo.idleMinutes / 60)}h ${idleInfo.idleMinutes % 60}m` : `${idleInfo.idleMinutes}m`})
+                        </span>
+                      )}
+                    </div>
+                  );
+                },
               },
             ]}
             rows={filtered}
@@ -749,6 +925,9 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
             getUsers().then((uRes) => {
               if (Array.isArray(uRes)) setUsersList(uRes);
             });
+
+            // Re-fetch directory to reflect status immediately in table
+            refresh();
 
             toast({
               variant: 'success',

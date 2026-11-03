@@ -318,8 +318,8 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       header: 'Max Marks & Pass Criteria',
       render: (c) => {
         if (!c) return null;
-        const max = c.maxMarks ?? 100;
-        const pct = c.passPercentage ?? 70;
+        const max = Number(c?.maxMarks ?? 100) || 100;
+        const pct = Number(c?.passPercentage ?? 70) || 70;
         const passMarks = Math.round((max * pct) / 100);
         return (
           <div>
@@ -338,7 +338,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       header: 'Course Execution Checklist',
       render: (c) => {
         if (!c) return null;
-        const items = Array.isArray(c.checklist) ? c.checklist : [];
+        const items = Array.isArray(c?.checklist) ? c.checklist : [];
         return (
           <Badge tone={items.length > 0 ? 'info' : 'neutral'}>
             📋 {items.length} Course Task{items.length !== 1 ? 's' : ''} Configured
@@ -356,7 +356,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
             <Button variant="secondary" size="sm" onClick={() => handleOpenEditCourse(c)}>
               Edit Course & Tasks
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => handleDeleteCourse(c.id, c.title)} style={{ color: 'var(--status-danger)' }}>
+            <Button variant="secondary" size="sm" onClick={() => handleDeleteCourse(c?.id || '', c?.title || 'this course')} style={{ color: 'var(--status-danger)' }}>
               Delete
             </Button>
           </div>
@@ -419,7 +419,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
             <Button variant="secondary" size="sm" onClick={() => handleOpenEditCollege(c)}>
               Edit
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => handleDeleteCollege(c.id, c.name)} style={{ color: 'var(--status-danger)' }}>
+            <Button variant="secondary" size="sm" onClick={() => handleDeleteCollege(c?.id || '', c?.name || 'this college')} style={{ color: 'var(--status-danger)' }}>
               Delete
             </Button>
           </div>

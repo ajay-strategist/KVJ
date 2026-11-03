@@ -19,17 +19,25 @@ function lazyWithRetry<T extends ComponentType<any>>(
     try {
       return await factory();
     } catch (err: any) {
+      const msg = String(err?.message || '').toLowerCase();
+      const name = String(err?.name || '');
       const isChunkLoadFailed =
-        err?.name === 'ChunkLoadError' ||
-        err?.message?.includes('dynamically imported module') ||
-        err?.message?.includes('Importing a module script failed') ||
-        err?.message?.includes('Failed to fetch');
+        name === 'ChunkLoadError' ||
+        msg.includes('dynamically imported module') ||
+        msg.includes('importing a module script failed') ||
+        msg.includes('failed to fetch') ||
+        msg.includes('unexpected token') ||
+        msg.includes('is not valid javascript') ||
+        msg.includes('error loading dynamically imported module') ||
+        msg.includes('failed to load module script') ||
+        msg.includes('load failed') ||
+        msg.includes('unable to preload css');
 
       const storageKey = 'kvj_last_chunk_reload';
       const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
       const now = Date.now();
 
-      if (isChunkLoadFailed && now - lastReload > 8000) {
+      if (isChunkLoadFailed && now - lastReload > 4000) {
         sessionStorage.setItem(storageKey, String(now));
         window.location.reload();
       }
