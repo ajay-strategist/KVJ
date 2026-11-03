@@ -26,6 +26,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     if (this.state.hasError) {
       return (
         <ServerError
+          error={this.state.error}
           onRetry={() => this.setState({ hasError: false, error: null })}
         />
       );

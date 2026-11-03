@@ -5,62 +5,88 @@
  * here yet — only the app framework, workspaces, dashboard and showcase.
  */
 
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary';
 import { ProtectedRoute } from '../shared/permissions/react';
 import { RouteLoading, NotFound, Forbidden } from './pages/errors/ErrorPages';
 import { CommandRegistrar } from './CommandRegistrar';
 
-// Lazy-loaded pages (code-splitting).
-const LoginPage = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
-const SessionExpired = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.SessionExpired })));
-const LockedAccount = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LockedAccount })));
-const MyDayPage = lazy(() => import('./pages/workspaces/MyDayPage').then((m) => ({ default: m.MyDayPage })));
-const DashboardPage = lazy(() => import('./pages/workspaces/ExecutiveDashboardPage').then((m) => ({ default: m.DashboardPage })));
-const RoleWorkspacePage = lazy(() => import('./pages/workspaces/RoleWorkspacePage').then((m) => ({ default: m.RoleWorkspacePage })));
-const ShowcasePage = lazy(() => import('./pages/ShowcasePage').then((m) => ({ default: m.ShowcasePage })));
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
-const EmployeeDirectory = lazy(() => import('../modules/employee/pages/EmployeeDirectory').then((m) => ({ default: m.EmployeeDirectory })));
-const EmployeeProfile = lazy(() => import('../modules/employee/pages/EmployeeProfile').then((m) => ({ default: m.EmployeeProfile })));
-const AttendanceLogPage = lazy(() => import('../modules/attendance/pages/AttendanceLogPage').then((m) => ({ default: m.AttendanceLogPage })));
-const LeaveBoard = lazy(() => import('../modules/leave/pages/LeaveBoard').then((m) => ({ default: m.LeaveBoard })));
-const ApprovalsQueue = lazy(() => import('../modules/attendance/pages/ApprovalsQueue').then((m) => ({ default: m.ApprovalsQueue })));
+function lazyWithRetry<T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (err: any) {
+      const isChunkLoadFailed =
+        err?.name === 'ChunkLoadError' ||
+        err?.message?.includes('dynamically imported module') ||
+        err?.message?.includes('Importing a module script failed') ||
+        err?.message?.includes('Failed to fetch');
+
+      const storageKey = 'kvj_last_chunk_reload';
+      const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+      const now = Date.now();
+
+      if (isChunkLoadFailed && now - lastReload > 8000) {
+        sessionStorage.setItem(storageKey, String(now));
+        window.location.reload();
+      }
+      throw err;
+    }
+  });
+}
+
+// Lazy-loaded pages (code-splitting with chunk reload resilience).
+const LoginPage = lazyWithRetry(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
+const SessionExpired = lazyWithRetry(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.SessionExpired })));
+const LockedAccount = lazyWithRetry(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LockedAccount })));
+const MyDayPage = lazyWithRetry(() => import('./pages/workspaces/MyDayPage').then((m) => ({ default: m.MyDayPage })));
+const DashboardPage = lazyWithRetry(() => import('./pages/workspaces/ExecutiveDashboardPage').then((m) => ({ default: m.DashboardPage })));
+const RoleWorkspacePage = lazyWithRetry(() => import('./pages/workspaces/RoleWorkspacePage').then((m) => ({ default: m.RoleWorkspacePage })));
+const ShowcasePage = lazyWithRetry(() => import('./pages/ShowcasePage').then((m) => ({ default: m.ShowcasePage })));
+const SettingsPage = lazyWithRetry(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const EmployeeDirectory = lazyWithRetry(() => import('../modules/employee/pages/EmployeeDirectory').then((m) => ({ default: m.EmployeeDirectory })));
+const EmployeeProfile = lazyWithRetry(() => import('../modules/employee/pages/EmployeeProfile').then((m) => ({ default: m.EmployeeProfile })));
+const AttendanceLogPage = lazyWithRetry(() => import('../modules/attendance/pages/AttendanceLogPage').then((m) => ({ default: m.AttendanceLogPage })));
+const LeaveBoard = lazyWithRetry(() => import('../modules/leave/pages/LeaveBoard').then((m) => ({ default: m.LeaveBoard })));
+const ApprovalsQueue = lazyWithRetry(() => import('../modules/attendance/pages/ApprovalsQueue').then((m) => ({ default: m.ApprovalsQueue })));
 
 // Training & Student Lifecycle
-const CourseList = lazy(() => import('../modules/training/pages/CourseList').then((m) => ({ default: m.CourseList })));
-const BatchManagement = lazy(() => import('../modules/training/pages/BatchManagement').then((m) => ({ default: m.BatchManagement })));
-const TrainingCalendar = lazy(() => import('../modules/training/pages/TrainingCalendar').then((m) => ({ default: m.TrainingCalendar })));
-const ProjectsAndTasks = lazy(() => import('../modules/project/pages/ProjectsAndTasks').then((m) => ({ default: m.ProjectsAndTasks })));
-const StudentLifecycle = lazy(() => import('../modules/training/pages/StudentLifecycle').then((m) => ({ default: m.StudentLifecycle })));
-const StudentAttendance = lazy(() => import('../modules/training/pages/StudentAttendance').then((m) => ({ default: m.StudentAttendance })));
-const AssessmentBoard = lazy(() => import('../modules/training/pages/AssessmentBoard').then((m) => ({ default: m.AssessmentBoard })));
-const FinalExamModule = lazy(() => import('../modules/training/pages/FinalExamModule').then((m) => ({ default: m.FinalExamModule })));
-const ExamSubmissionPage = lazy(() => import('../modules/training/pages/ExamSubmissionPage').then((m) => ({ default: m.ExamSubmissionPage })));
+const CourseList = lazyWithRetry(() => import('../modules/training/pages/CourseList').then((m) => ({ default: m.CourseList })));
+const BatchManagement = lazyWithRetry(() => import('../modules/training/pages/BatchManagement').then((m) => ({ default: m.BatchManagement })));
+const TrainingCalendar = lazyWithRetry(() => import('../modules/training/pages/TrainingCalendar').then((m) => ({ default: m.TrainingCalendar })));
+const ProjectsAndTasks = lazyWithRetry(() => import('../modules/project/pages/ProjectsAndTasks').then((m) => ({ default: m.ProjectsAndTasks })));
+const StudentLifecycle = lazyWithRetry(() => import('../modules/training/pages/StudentLifecycle').then((m) => ({ default: m.StudentLifecycle })));
+const StudentAttendance = lazyWithRetry(() => import('../modules/training/pages/StudentAttendance').then((m) => ({ default: m.StudentAttendance })));
+const AssessmentBoard = lazyWithRetry(() => import('../modules/training/pages/AssessmentBoard').then((m) => ({ default: m.AssessmentBoard })));
+const FinalExamModule = lazyWithRetry(() => import('../modules/training/pages/FinalExamModule').then((m) => ({ default: m.FinalExamModule })));
+const ExamSubmissionPage = lazyWithRetry(() => import('../modules/training/pages/ExamSubmissionPage').then((m) => ({ default: m.ExamSubmissionPage })));
 
 // Project & Resource Management
-const ClientDirectory = lazy(() => import('../modules/project/pages/ClientDirectory').then((m) => ({ default: m.ClientDirectory })));
-const ProjectList = lazy(() => import('../modules/project/pages/ProjectList').then((m) => ({ default: m.ProjectList })));
-const ResourceScheduler = lazy(() => import('../modules/project/pages/ResourceScheduler').then((m) => ({ default: m.ResourceScheduler })));
-const TaskBoard = lazy(() => import('../modules/project/pages/TaskBoard').then((m) => ({ default: m.TaskBoard })));
-const TimesheetTracker = lazy(() => import('../modules/project/pages/TimesheetTracker').then((m) => ({ default: m.TimesheetTracker })));
+const ClientDirectory = lazyWithRetry(() => import('../modules/project/pages/ClientDirectory').then((m) => ({ default: m.ClientDirectory })));
+const ProjectList = lazyWithRetry(() => import('../modules/project/pages/ProjectList').then((m) => ({ default: m.ProjectList })));
+const ResourceScheduler = lazyWithRetry(() => import('../modules/project/pages/ResourceScheduler').then((m) => ({ default: m.ResourceScheduler })));
+const TaskBoard = lazyWithRetry(() => import('../modules/project/pages/TaskBoard').then((m) => ({ default: m.TaskBoard })));
+const TimesheetTracker = lazyWithRetry(() => import('../modules/project/pages/TimesheetTracker').then((m) => ({ default: m.TimesheetTracker })));
 
 // Finance Management (Expenses & Travel Claims, Expense Analytics)
-const ExpenseClaims = lazy(() => import('../modules/finance/pages/ExpenseClaims').then((m) => ({ default: m.ExpenseClaims })));
-const ExpenseAnalyticsPage = lazy(() => import('../modules/finance/pages/ExpenseAnalyticsPage').then((m) => ({ default: m.ExpenseAnalyticsPage })));
+const ExpenseClaims = lazyWithRetry(() => import('../modules/finance/pages/ExpenseClaims').then((m) => ({ default: m.ExpenseClaims })));
+const ExpenseAnalyticsPage = lazyWithRetry(() => import('../modules/finance/pages/ExpenseAnalyticsPage').then((m) => ({ default: m.ExpenseAnalyticsPage })));
 
 // Communication & Collaboration Platform
-const ChatChannels = lazy(() => import('../modules/communication/pages/ChatChannels').then((m) => ({ default: m.ChatChannels })));
-const AnnouncementsBoard = lazy(() => import('../modules/communication/pages/AnnouncementsBoard').then((m) => ({ default: m.AnnouncementsBoard })));
-const EmailCenter = lazy(() => import('../modules/communication/pages/EmailCenter').then((m) => ({ default: m.EmailCenter })));
-const ReminderCenter = lazy(() => import('../modules/communication/pages/ReminderCenter').then((m) => ({ default: m.ReminderCenter })));
-const IssuesPage = lazy(() => import('../modules/issues/pages/IssuesPage').then((m) => ({ default: m.IssuesPage })));
+const ChatChannels = lazyWithRetry(() => import('../modules/communication/pages/ChatChannels').then((m) => ({ default: m.ChatChannels })));
+const AnnouncementsBoard = lazyWithRetry(() => import('../modules/communication/pages/AnnouncementsBoard').then((m) => ({ default: m.AnnouncementsBoard })));
+const EmailCenter = lazyWithRetry(() => import('../modules/communication/pages/EmailCenter').then((m) => ({ default: m.EmailCenter })));
+const ReminderCenter = lazyWithRetry(() => import('../modules/communication/pages/ReminderCenter').then((m) => ({ default: m.ReminderCenter })));
+const IssuesPage = lazyWithRetry(() => import('../modules/issues/pages/IssuesPage').then((m) => ({ default: m.IssuesPage })));
 
 // Executive Analytics & BI Platform
-const ExecutiveConsole = lazy(() => import('../modules/analytics/pages/ExecutiveConsole').then((m) => ({ default: m.ExecutiveConsole })));
-const ReportBuilder = lazy(() => import('../modules/analytics/pages/ReportBuilder').then((m) => ({ default: m.ReportBuilder })));
-const KpiRegistryPage = lazy(() => import('../modules/analytics/pages/KpiRegistryPage').then((m) => ({ default: m.KpiRegistryPage })));
-const PowerBiGateway = lazy(() => import('../modules/analytics/pages/PowerBiGateway').then((m) => ({ default: m.PowerBiGateway })));
+const ExecutiveConsole = lazyWithRetry(() => import('../modules/analytics/pages/ExecutiveConsole').then((m) => ({ default: m.ExecutiveConsole })));
+const ReportBuilder = lazyWithRetry(() => import('../modules/analytics/pages/ReportBuilder').then((m) => ({ default: m.ReportBuilder })));
+const KpiRegistryPage = lazyWithRetry(() => import('../modules/analytics/pages/KpiRegistryPage').then((m) => ({ default: m.KpiRegistryPage })));
+const PowerBiGateway = lazyWithRetry(() => import('../modules/analytics/pages/PowerBiGateway').then((m) => ({ default: m.PowerBiGateway })));
 
 export function AppRouter() {
   return (

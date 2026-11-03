@@ -36,19 +36,40 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
 
   const { user } = useAuth();
-  const courseRepo = useMemo(() => container.resolve(COURSE_REPOSITORY_TOKEN), []);
-  const collegeRepo = useMemo(() => container.resolve(COLLEGE_REPOSITORY_TOKEN), []);
+  const courseRepo = useMemo(() => {
+    try {
+      return container.resolve(COURSE_REPOSITORY_TOKEN);
+    } catch (e) {
+      console.warn('Could not resolve COURSE_REPOSITORY_TOKEN:', e);
+      return null;
+    }
+  }, []);
+  const collegeRepo = useMemo(() => {
+    try {
+      return container.resolve(COLLEGE_REPOSITORY_TOKEN);
+    } catch (e) {
+      console.warn('Could not resolve COLLEGE_REPOSITORY_TOKEN:', e);
+      return null;
+    }
+  }, []);
 
   // Colleges Management State (Persisted in Supabase DB)
   const [colleges, setColleges] = useState<College[]>([]);
+  const [collegesLoading, setCollegesLoading] = useState(true);
 
   useEffect(() => {
     async function fetchColleges() {
+      setCollegesLoading(true);
       try {
-        const p = await collegeRepo.findMany({ pageSize: 1000, page: 1 });
-        setColleges((p.data as any) || []);
+        const repo = collegeRepo || container.resolve(COLLEGE_REPOSITORY_TOKEN);
+        if (repo) {
+          const p = await repo.findMany({ pageSize: 1000, page: 1 });
+          setColleges((p.data as any) || []);
+        }
       } catch (e) {
         console.warn('Could not fetch colleges from Supabase:', e);
+      } finally {
+        setCollegesLoading(false);
       }
     }
     fetchColleges();
@@ -220,8 +241,11 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     }
 
     try {
+      const repo = collegeRepo || container.resolve(COLLEGE_REPOSITORY_TOKEN);
+      if (!repo) throw new Error('College repository not available');
+
       if (editingCollege) {
-        const val = await collegeRepo.update(editingCollege.id, {
+        const val = await repo.update(editingCollege.id, {
           name: collegeForm.name.trim(),
           code: collegeForm.code.trim().toUpperCase(),
           location: collegeForm.location.trim(),
@@ -235,7 +259,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
         setColleges((prev) => prev.map((c) => (c.id === editingCollege.id ? (val as any) : c)));
         toast({ variant: 'success', title: 'College Updated', message: `${collegeForm.name} updated successfully.` });
       } else {
-        const val = await collegeRepo.create({
+        const val = await repo.create({
           name: collegeForm.name.trim(),
           code: collegeForm.code.trim().toUpperCase(),
           location: collegeForm.location.trim(),
@@ -259,9 +283,12 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   const handleDeleteCourse = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete ${title}?`)) {
       try {
-        await courseRepo.softDelete(id, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
-        toast({ variant: 'info', title: 'Course Deleted', message: `${title} removed from catalog.` });
-        refresh();
+        const repo = courseRepo || container.resolve(COURSE_REPOSITORY_TOKEN);
+        if (repo) {
+          await repo.softDelete(id, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+          toast({ variant: 'info', title: 'Course Deleted', message: `${title} removed from catalog.` });
+          refresh();
+        }
       } catch (err: any) {
         toast({ variant: 'error', title: 'Delete Failed', message: err.message || 'Error occurred.' });
       }
@@ -271,9 +298,12 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   const handleDeleteCollege = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
       try {
-        await collegeRepo.softDelete(id, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
-        setColleges((prev) => prev.filter((c) => c.id !== id));
-        toast({ variant: 'info', title: 'College Deleted', message: `${name} removed from catalog.` });
+        const repo = collegeRepo || container.resolve(COLLEGE_REPOSITORY_TOKEN);
+        if (repo) {
+          await repo.softDelete(id, { id: user?.id || 'system', role: user?.role || 'EMPLOYEE' });
+          setColleges((prev) => prev.filter((c) => c.id !== id));
+          toast({ variant: 'info', title: 'College Deleted', message: `${name} removed from catalog.` });
+        }
       } catch (err: any) {
         toast({ variant: 'error', title: 'Delete Failed', message: err.message || 'Error occurred.' });
       }
@@ -281,12 +311,13 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
   };
 
   const courseColumns: Column<Course>[] = [
-    { key: 'code', header: 'Code', sortable: true, accessor: (c) => c.code },
-    { key: 'title', header: 'Course Title', sortable: true, accessor: (c) => c.title },
+    { key: 'code', header: 'Code', sortable: true, accessor: (c) => c?.code ?? '' },
+    { key: 'title', header: 'Course Title', sortable: true, accessor: (c) => c?.title ?? '' },
     {
       key: 'maxMarks',
       header: 'Max Marks & Pass Criteria',
       render: (c) => {
+        if (!c) return null;
         const max = c.maxMarks ?? 100;
         const pct = c.passPercentage ?? 70;
         const passMarks = Math.round((max * pct) / 100);
@@ -306,6 +337,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       key: 'checklist',
       header: 'Course Execution Checklist',
       render: (c) => {
+        if (!c) return null;
         const items = Array.isArray(c.checklist) ? c.checklist : [];
         return (
           <Badge tone={items.length > 0 ? 'info' : 'neutral'}>
@@ -317,89 +349,101 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
     {
       key: 'actions',
       header: 'Actions',
-      render: (c) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Button variant="secondary" size="sm" onClick={() => handleOpenEditCourse(c)}>
-            Edit Course & Tasks
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => handleDeleteCourse(c.id, c.title)} style={{ color: 'var(--status-danger)' }}>
-            Delete
-          </Button>
-        </div>
-      ),
+      render: (c) => {
+        if (!c) return null;
+        return (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Button variant="secondary" size="sm" onClick={() => handleOpenEditCourse(c)}>
+              Edit Course & Tasks
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleDeleteCourse(c.id, c.title)} style={{ color: 'var(--status-danger)' }}>
+              Delete
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
   const collegeColumns: Column<College>[] = [
-    { key: 'code', header: 'College Code', sortable: true, accessor: (c) => c.code },
+    { key: 'code', header: 'College Code', sortable: true, accessor: (c) => c?.code ?? '' },
     {
       key: 'name',
       header: 'College Name & Logo',
       sortable: true,
-      accessor: (c) => c.name,
-      render: (c) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {c.logoUrl ? (
-            <img src={c.logoUrl} alt={c.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
-          ) : (
-            <span style={{ fontSize: 18 }}>🏛️</span>
-          )}
-          <div>
-            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{c.name}</div>
-            {c.imageUrl && (
-              <a href={c.imageUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'none' }}>
-                🖼️ View Campus Image
-              </a>
+      accessor: (c) => c?.name ?? '',
+      render: (c) => {
+        if (!c) return null;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {c.logoUrl ? (
+              <img src={c.logoUrl} alt={c.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+            ) : (
+              <span style={{ fontSize: 18 }}>🏛️</span>
             )}
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{c.name}</div>
+              {c.imageUrl && (
+                <a href={c.imageUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'none' }}>
+                  🖼️ View Campus Image
+                </a>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
-    { key: 'location', header: 'Location', sortable: true, accessor: (c) => c.location || '—' },
-    { key: 'principalName', header: 'Principal / Head', accessor: (c) => c.principalName || '—' },
+    { key: 'location', header: 'Location', sortable: true, accessor: (c) => c?.location || '—' },
+    { key: 'principalName', header: 'Principal / Head', accessor: (c) => c?.principalName || '—' },
     {
       key: 'contact',
       header: 'Contact Info',
-      render: (c) => (
-        <div style={{ fontSize: 12 }}>
-          {c.contactEmail && <div>📧 {c.contactEmail}</div>}
-          {c.contactPhone && <div style={{ color: 'var(--text-muted)' }}>📞 {c.contactPhone}</div>}
-          {!c.contactEmail && !c.contactPhone && '—'}
-        </div>
-      ),
+      render: (c) => {
+        if (!c) return '—';
+        return (
+          <div style={{ fontSize: 12 }}>
+            {c.contactEmail && <div>📧 {c.contactEmail}</div>}
+            {c.contactPhone && <div style={{ color: 'var(--text-muted)' }}>📞 {c.contactPhone}</div>}
+            {!c.contactEmail && !c.contactPhone && '—'}
+          </div>
+        );
+      },
     },
     {
       key: 'actions',
       header: 'Actions',
-      render: (c) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Button variant="secondary" size="sm" onClick={() => handleOpenEditCollege(c)}>
-            Edit
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => handleDeleteCollege(c.id, c.name)} style={{ color: 'var(--status-danger)' }}>
-            Delete
-          </Button>
-        </div>
-      ),
+      render: (c) => {
+        if (!c) return null;
+        return (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Button variant="secondary" size="sm" onClick={() => handleOpenEditCollege(c)}>
+              Edit
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleDeleteCollege(c.id, c.name)} style={{ color: 'var(--status-danger)' }}>
+              Delete
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
-  const safeCourses = Array.isArray(courses) ? courses : [];
-  const safeColleges = Array.isArray(colleges) ? colleges : [];
+  const safeCourses = useMemo(() => (Array.isArray(courses) ? courses.filter(Boolean) : []), [courses]);
+  const safeColleges = useMemo(() => (Array.isArray(colleges) ? colleges.filter(Boolean) : []), [colleges]);
 
   const tabItems = [
     {
       id: 'courses',
       label: `📚 Courses Catalog (${safeCourses.length})`,
       content: (
-        <DataTable columns={courseColumns} rows={safeCourses} rowKey={(c) => c.id} loading={loading} />
+        <DataTable columns={courseColumns} rows={safeCourses} rowKey={(c) => c?.id || ''} loading={loading} />
       ),
     },
     {
       id: 'colleges',
       label: `🏛️ Colleges Catalog (${safeColleges.length})`,
       content: (
-        <DataTable columns={collegeColumns} rows={safeColleges} rowKey={(c) => c.id} />
+        <DataTable columns={collegeColumns} rows={safeColleges} rowKey={(c) => c?.id || ''} loading={collegesLoading} />
       ),
     },
   ];

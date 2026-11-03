@@ -90,7 +90,7 @@ export function DataTable<T>({
       </div>
     );
   }
-  if (rows.length === 0) {
+  if (safeRows.length === 0) {
     return (
       <div className="kvj-card">
         <EmptyState

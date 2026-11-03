@@ -219,6 +219,10 @@ export function TrainingCalendar() {
     venue: string;
     mode: 'Offline' | 'Online';
     studentCount: number;
+    capacity?: number;
+    batchStartDate?: string;
+    batchEndDate?: string;
+    phase?: string;
   }>({
     date: todayISO(),
     trainerId: '',
@@ -235,6 +239,34 @@ export function TrainingCalendar() {
     mode: 'Offline',
     studentCount: 0,
   });
+
+  const applyBatchToForm = useCallback((batchId: string, currentTrainerId?: string) => {
+    const b = batches.find((item) => item.id === batchId);
+    if (!b) return;
+    const c = courses.find((item) => item.id === b.courseId);
+    const enrolledCount = batchStudentCounts[b.id] ?? b.capacity ?? 0;
+    const cleanCode = cleanBatchCode(b.code, b.batchNo) || b.code || 'Training Batch';
+    const topicName = b.trainingName || c?.title || cleanCode;
+
+    setAssignForm((f) => ({
+      ...f,
+      batchId: b.id,
+      batchCode: cleanCode,
+      name: topicName,
+      college: b.college || '—',
+      course: c?.title || b.trainingName || '—',
+      academicYear: b.academicYear || '2026-2027',
+      coordinator: b.coordinator || '—',
+      venue: f.venue && f.venue !== 'Campus HQ' && f.venue !== 'Lab 1' ? f.venue : (b.venue || 'Campus HQ'),
+      mode: (b.onlineLink ? 'Online' : 'Offline') as 'Online' | 'Offline',
+      studentCount: enrolledCount,
+      capacity: b.capacity,
+      batchStartDate: b.startDate,
+      batchEndDate: b.endDate,
+      phase: b.phase || 'Scheduled',
+      trainerId: currentTrainerId || f.trainerId || b.trainerId || (trainers[0]?.id ?? ''),
+    }));
+  }, [batches, courses, batchStudentCounts, trainers]);
 
   useEffect(() => {
     container.resolve(EMPLOYEE_SERVICE_TOKEN).listEmployees().then((r) => {
@@ -515,75 +547,93 @@ export function TrainingCalendar() {
 
   const handleOpenCellAssign = (date: string, trainerId: string) => {
     setEditingSessionId(null);
-    const firstPreset = dynamicBatchPresets[0];
+    const firstBatch = batches[0];
+    const c = firstBatch ? courses.find((item) => item.id === firstBatch.courseId) : undefined;
+    const enrolled = firstBatch ? (batchStudentCounts[firstBatch.id] ?? firstBatch.capacity ?? 0) : 0;
+    const cleanCode = firstBatch ? (cleanBatchCode(firstBatch.code, firstBatch.batchNo) || firstBatch.code) : '';
+    const effTrainer = trainerId || firstBatch?.trainerId || (trainers[0]?.id ?? '') || (user?.id ?? '');
+
     setAssignForm({
       date,
-      trainerId: trainerId || (trainers[0]?.id ?? ''),
-      name: firstPreset?.name || 'Power BI',
-      batchCode: firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI',
-      batchId: firstPreset?.id || '',
-      college: firstPreset?.college || 'Christ Irinjalakkuda',
-      course: firstPreset?.course || 'Power BI',
-      academicYear: '2026-2027',
-      coordinator: firstPreset?.coordinator || '—',
+      trainerId: effTrainer,
+      name: firstBatch?.trainingName || c?.title || cleanCode || 'Training Session',
+      batchCode: cleanCode || 'Batch',
+      batchId: firstBatch?.id || '',
+      college: firstBatch?.college || '—',
+      course: c?.title || firstBatch?.trainingName || '—',
+      academicYear: firstBatch?.academicYear || '2026-2027',
+      coordinator: firstBatch?.coordinator || '—',
       startTime: '09:00',
       endTime: '12:00',
-      venue: firstPreset?.venue || 'Lab 1',
-      mode: firstPreset?.mode || 'Offline',
-      studentCount: firstPreset?.studentCount || 0,
+      venue: firstBatch?.venue || 'Campus HQ',
+      mode: (firstBatch?.onlineLink ? 'Online' : 'Offline') as 'Online' | 'Offline',
+      studentCount: enrolled,
+      capacity: firstBatch?.capacity,
+      batchStartDate: firstBatch?.startDate,
+      batchEndDate: firstBatch?.endDate,
+      phase: firstBatch?.phase || 'Scheduled',
     });
     setIsAssignDrawerOpen(true);
   };
 
   const handleEditSchedule = (s: ScheduleSession) => {
     setEditingSessionId(s.id);
-    const matched = batches.find((b) => b.code === s.batchCode || cleanBatchCode(b.code, b.batchNo) === s.batchCode);
-    const bId = matched?.id || '';
+    const matched = batches.find((b) => b.id === (s as any).batchId || b.code === s.batchCode || cleanBatchCode(b.code, b.batchNo) === s.batchCode);
+    const c = matched ? courses.find((item) => item.id === matched.courseId) : undefined;
+    const enrolled = matched ? (batchStudentCounts[matched.id] ?? s.studentCount ?? 0) : s.studentCount;
+
     setAssignForm({
       date: s.date,
       trainerId: s.trainerId,
       name: s.name,
       batchCode: s.batchCode,
-      batchId: bId,
-      college: s.college,
-      course: s.course,
-      academicYear: s.academicYear,
-      coordinator: s.coordinator,
+      batchId: matched?.id || '',
+      college: s.college || matched?.college || '—',
+      course: s.course || c?.title || matched?.trainingName || '—',
+      academicYear: s.academicYear || matched?.academicYear || '2026-2027',
+      coordinator: s.coordinator || matched?.coordinator || '—',
       startTime: s.startTime,
       endTime: s.endTime,
-      venue: s.venue,
-      mode: s.mode,
-      studentCount: s.studentCount,
+      venue: s.venue || matched?.venue || 'Campus HQ',
+      mode: s.mode || (matched?.onlineLink ? 'Online' : 'Offline'),
+      studentCount: enrolled,
+      capacity: matched?.capacity,
+      batchStartDate: matched?.startDate,
+      batchEndDate: matched?.endDate,
+      phase: matched?.phase || 'Scheduled',
     });
     setIsAssignDrawerOpen(true);
   };
 
   const handleSaveSession = async () => {
     if (submittingSession) return;
-    const effectiveTrainerId = assignForm.trainerId || user?.id || trainers[0]?.id || '';
-    if (!effectiveTrainerId) {
-      toast({ variant: 'error', title: 'Trainer Required', message: 'Please select a trainer for the schedule.' });
+
+    if (!assignForm.batchId) {
+      toast({ variant: 'error', title: 'Batch Required', message: 'Please select a batch from the list.' });
       return;
     }
 
-    // End time must be after start time (times are zero-padded "HH:MM", so a
-    // plain string comparison is correct). Prevents an impossible session slot.
+    const assocBatch = batches.find((b) => b.id === assignForm.batchId);
+    if (!assocBatch) {
+      toast({ variant: 'error', title: 'Batch Not Found', message: 'Selected batch was not found in the database.' });
+      return;
+    }
+
+    const effectiveTrainerId = assignForm.trainerId || assocBatch.trainerId || trainers[0]?.id || user?.id || '';
+    if (!effectiveTrainerId) {
+      toast({ variant: 'error', title: 'Trainer Required', message: 'Please select an assigned trainer for the schedule.' });
+      return;
+    }
+
+    // End time must be after start time
     if (assignForm.startTime && assignForm.endTime && assignForm.endTime <= assignForm.startTime) {
       toast({ variant: 'error', title: 'Invalid Time', message: 'End time must be later than the start time.' });
       return;
     }
 
-    const firstPreset = dynamicBatchPresets[0];
-    const finalBatchCode = assignForm.batchCode.trim() || firstPreset?.batchCode || 'Christ Irinjalakkuda-2 BBA-2026-27-Batch 1-Power BI';
-    const finalName = assignForm.name.trim() || firstPreset?.name || 'Power BI';
-
-    const assocBatch = batches.find((b) => 
-      b.id === assignForm.batchId ||
-      b.code === finalBatchCode || 
-      b.batchNo === finalBatchCode || 
-      b.id === finalBatchCode ||
-      cleanBatchCode(b.code, b.batchNo) === finalBatchCode
-    );
+    const cleanCode = cleanBatchCode(assocBatch.code, assocBatch.batchNo) || assocBatch.code || 'Training Batch';
+    const finalBatchCode = assignForm.batchCode.trim() || cleanCode;
+    const finalName = assignForm.name.trim() || assocBatch.trainingName || cleanCode;
 
     const isEdit = Boolean(editingSessionId && UUID_RE.test(editingSessionId));
     const sessId = isEdit && editingSessionId ? editingSessionId : crypto.randomUUID();
@@ -592,7 +642,7 @@ export function TrainingCalendar() {
     const isDuplicate = combinedSessions.some((s) => {
       if (isEdit && s.id === editingSessionId) return false;
       const matchDate = s.date === assignForm.date;
-      const matchBatch = (assocBatch && s.batchCode === finalBatchCode) || (s.name === finalName && s.trainerId === effectiveTrainerId);
+      const matchBatch = s.batchCode === finalBatchCode || (assocBatch && s.name === finalName && s.trainerId === effectiveTrainerId);
       const matchTime = s.startTime === assignForm.startTime;
       return matchDate && matchBatch && matchTime;
     });
@@ -607,7 +657,12 @@ export function TrainingCalendar() {
     }
 
     const validTrainerId = toValidUuid(effectiveTrainerId) || (toValidUuid(user?.id) ?? null);
-    const validBatchId = assocBatch ? toValidUuid(assocBatch.id) : null;
+    const validBatchId = toValidUuid(assocBatch.id);
+
+    if (!validBatchId || !validTrainerId) {
+      toast({ variant: 'error', title: 'Invalid Assignment', message: 'Could not resolve valid IDs for batch or trainer.' });
+      return;
+    }
 
     const sessionObj: ScheduleSession = {
       id: sessId,
@@ -615,15 +670,15 @@ export function TrainingCalendar() {
       date: assignForm.date,
       name: finalName,
       batchCode: finalBatchCode,
-      college: assignForm.college || assocBatch?.college || '—',
+      college: assignForm.college || assocBatch.college || '—',
       course: assignForm.course || '—',
-      academicYear: assignForm.academicYear || assocBatch?.academicYear || '—',
-      coordinator: assignForm.coordinator || assocBatch?.coordinator || '—',
+      academicYear: assignForm.academicYear || assocBatch.academicYear || '—',
+      coordinator: assignForm.coordinator || assocBatch.coordinator || '—',
       startTime: assignForm.startTime,
       endTime: assignForm.endTime,
-      venue: assignForm.venue,
-      mode: assignForm.mode,
-      studentCount: Number(assignForm.studentCount) || 0,
+      venue: assignForm.venue || assocBatch.venue || 'Campus HQ',
+      mode: assignForm.mode || (assocBatch.onlineLink ? 'Online' : 'Offline'),
+      studentCount: Number(assignForm.studentCount) || assocBatch.capacity || 0,
       status: 'Scheduled',
       color: 'var(--brand)',
     };
@@ -686,21 +741,29 @@ export function TrainingCalendar() {
   };
 
   const handleCopySession = (session: ScheduleSession) => {
+    const matched = batches.find((b) => b.id === (session as any).batchId || b.code === session.batchCode || cleanBatchCode(b.code, b.batchNo) === session.batchCode);
+    const c = matched ? courses.find((item) => item.id === matched.courseId) : undefined;
+    const enrolled = matched ? (batchStudentCounts[matched.id] ?? session.studentCount ?? 0) : session.studentCount;
+
     setAssignForm({
       date: session.date,
       trainerId: session.trainerId,
-      batchId: '',
+      batchId: matched?.id || '',
       batchCode: session.batchCode,
       name: session.name,
       college: session.college,
-      course: session.course,
+      course: session.course || c?.title || '—',
       academicYear: session.academicYear,
       coordinator: session.coordinator,
       startTime: session.startTime,
       endTime: session.endTime,
       venue: session.venue,
       mode: session.mode,
-      studentCount: session.studentCount,
+      studentCount: enrolled,
+      capacity: matched?.capacity,
+      batchStartDate: matched?.startDate,
+      batchEndDate: matched?.endDate,
+      phase: matched?.phase || 'Scheduled',
     });
     setEditingSessionId(null); // Fresh copy, new ID on save
     setIsAssignDrawerOpen(true);
@@ -1222,19 +1285,6 @@ export function TrainingCalendar() {
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Assign Trainer</label>
-            <select
-              value={assignForm.trainerId}
-              onChange={(e) => setAssignForm((f) => ({ ...f, trainerId: e.target.value }))}
-              style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
-            >
-              {trainers.map((t) => (
-                <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>
-              ))}
-            </select>
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Schedule Date</label>
@@ -1247,59 +1297,110 @@ export function TrainingCalendar() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Select Batch Name</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Assign Trainer</label>
               <select
-                value={assignForm.batchCode}
-                onChange={(e) => {
-                  const bCode = e.target.value;
-                  const preset = dynamicBatchPresets.find((b) => b.batchCode === bCode);
-                  if (preset) {
-                    setAssignForm((f) => ({
-                      ...f,
-                      batchCode: preset.batchCode,
-                      batchId: preset.id,
-                      name: preset.name,
-                      college: preset.college,
-                      course: preset.course,
-                      coordinator: preset.coordinator,
-                      venue: preset.venue,
-                      mode: preset.mode,
-                      studentCount: preset.studentCount,
-                    }));
-                  } else {
-                    setAssignForm((f) => ({ ...f, batchCode: bCode, batchId: '' }));
-                  }
-                }}
-                style={{ width: '100%', padding: '9px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                value={assignForm.trainerId}
+                onChange={(e) => setAssignForm((f) => ({ ...f, trainerId: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
               >
-                {dynamicBatchPresets.length > 0 ? (
-                  dynamicBatchPresets.map((b) => (
-                    <option key={b.id} value={b.batchCode}>
-                      {b.fullLabel}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">No batches found</option>
-                )}
+                {trainers.map((t) => (
+                  <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>
+                ))}
               </select>
             </div>
           </div>
 
-          {/* Auto-filled batch summary badge */}
-          <div style={{
-            background: 'var(--bg-sunken)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            padding: '10px 12px',
-            fontSize: 12,
-            color: 'var(--text-secondary)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-          }}>
-            <div style={{ fontWeight: 700, color: 'var(--brand-primary, #1e40af)', fontSize: 12 }}>🎓 {assignForm.batchCode || `${assignForm.college} · ${assignForm.course}`}</div>
-            <div>Coordinator: <strong>{assignForm.coordinator}</strong> · Students: <strong>{assignForm.studentCount}</strong></div>
-            <div>Default Venue: <strong>{assignForm.venue} ({assignForm.mode})</strong></div>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Select Training Batch</label>
+            <select
+              value={assignForm.batchId}
+              onChange={(e) => applyBatchToForm(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+            >
+              <option value="">-- Choose a Training Batch --</option>
+              {batches.map((b) => {
+                const crs = courses.find((c) => c.id === b.courseId);
+                const label = `${cleanBatchCode(b.code, b.batchNo) || b.code} · ${b.trainingName || crs?.title || 'Training'} (${b.college || 'Campus'})`;
+                return (
+                  <option key={b.id} value={b.id}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Auto-filled detailed batch summary card */}
+          {assignForm.batchId && (
+            <div style={{
+              background: 'var(--bg-sunken, #f8fafc)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '12px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand-primary, #1e40af)' }}>
+                  🎓 {assignForm.batchCode}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  background: 'var(--brand-subtle, #e0e7ff)',
+                  color: 'var(--brand-primary, #3730a3)',
+                  fontWeight: 600
+                }}>
+                  {assignForm.phase || 'Scheduled'}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: 12 }}>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>Course / Topic:</span>{' '}
+                  <strong>{assignForm.course}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>College:</span>{' '}
+                  <strong>{assignForm.college}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>Academic Year:</span>{' '}
+                  <strong>{assignForm.academicYear}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>Enrolled Students:</span>{' '}
+                  <strong>{assignForm.studentCount} {assignForm.capacity ? `(${assignForm.capacity} Capacity)` : ''}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>Coordinator:</span>{' '}
+                  <strong>{assignForm.coordinator}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>Default Venue:</span>{' '}
+                  <strong>{assignForm.venue} ({assignForm.mode})</strong>
+                </div>
+                {assignForm.batchStartDate && (
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Batch Duration:</span>{' '}
+                    <strong>{assignForm.batchStartDate} to {assignForm.batchEndDate || '—'}</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Session Topic / Title</label>
+            <input
+              type="text"
+              value={assignForm.name}
+              onChange={(e) => setAssignForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Power BI DAX & Data Models"
+              style={{ width: '100%', padding: '8px 10px', fontSize: 12.5, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+            />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1321,6 +1422,31 @@ export function TrainingCalendar() {
                 onChange={(e) => setAssignForm((f) => ({ ...f, endTime: e.target.value }))}
                 style={{ width: '100%', padding: '8px 10px', fontSize: 12.5, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
               />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Venue / Room</label>
+              <input
+                type="text"
+                value={assignForm.venue}
+                onChange={(e) => setAssignForm((f) => ({ ...f, venue: e.target.value }))}
+                placeholder="e.g. Lab 2 / Campus HQ"
+                style={{ width: '100%', padding: '8px 10px', fontSize: 12.5, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Delivery Mode</label>
+              <select
+                value={assignForm.mode}
+                onChange={(e) => setAssignForm((f) => ({ ...f, mode: e.target.value as any }))}
+                style={{ width: '100%', padding: '9px 12px', fontSize: 12.5, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+              >
+                <option value="Offline">Offline (In-Person)</option>
+                <option value="Online">Online (Virtual)</option>
+              </select>
             </div>
           </div>
         </div>

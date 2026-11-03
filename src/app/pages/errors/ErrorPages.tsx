@@ -25,7 +25,7 @@ export function NotFound() {
 export function Forbidden() {
   return <Shell code="403" title="Access denied" message="You don't have permission to view this page. Contact an administrator if you believe this is a mistake." />;
 }
-export function ServerError({ onRetry }: { onRetry?: () => void }) {
+export function ServerError({ error, onRetry }: { error?: Error | null; onRetry?: () => void }) {
   const handleRetry = () => {
     if (onRetry) {
       try { onRetry(); } catch (_) {}
@@ -44,6 +44,11 @@ export function ServerError({ onRetry }: { onRetry?: () => void }) {
 
   return (
     <Shell code="500" title="Something went wrong" message="An unexpected error occurred during page load. You can retry, head to your workspace, or sign in again.">
+      {error?.message && (
+        <div style={{ marginBottom: 16, padding: '6px 12px', background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', maxWidth: 380, marginInline: 'auto', wordBreak: 'break-word' }}>
+          {error.message}
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
         <Button onClick={handleRetry}>Retry</Button>
         <Link to="/app"><Button variant="secondary">Go to Workspace</Button></Link>
