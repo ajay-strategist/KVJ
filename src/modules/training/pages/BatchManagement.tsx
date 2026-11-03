@@ -5,6 +5,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
+import { isEligibleTrainer, sortEmployeesByCode } from '../../employee/employee.repository';
 import { useTraining } from '../hooks/useTraining';
 import { STUDENT_REPOSITORY_TOKEN, COLLEGE_REPOSITORY_TOKEN, type Batch, type TrainingPhase, TRAINING_PHASES, APPROVED_BATCH_STATUSES } from '../training.repository';
 import { normalizeStudentKey } from '../supabase-training.repository';
@@ -113,7 +114,8 @@ export function BatchManagement() {
       if (fetchPromise) {
         fetchPromise.then((res: any) => {
           if (res?.ok && Array.isArray(res?.value)) {
-            setTrainers(res.value);
+            const activeTrainers = sortEmployeesByCode((res.value as Employee[]).filter(isEligibleTrainer));
+            setTrainers(activeTrainers);
           }
         }).catch(() => {});
       }

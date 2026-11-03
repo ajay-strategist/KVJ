@@ -9,6 +9,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import Drawer from '../../../shared/ui/Drawer';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Employee } from '../employee.repository';
+import { isRelievedEmployee, sortEmployeesByCode } from '../employee.repository';
 import { EmployeeFormModal } from '../forms/EmployeeFormModal';
 import { useProject } from '../../project/hooks/useProject';
 import { supabase } from '../../../shared/integration/supabase';
@@ -24,6 +25,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   const { tasks } = useProject();
   const { toast, addNotification } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
+  const [directoryStatusFilter, setDirectoryStatusFilter] = useState<'active' | 'all' | 'relieved'>('active');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -468,18 +470,25 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
   const isStatusView = defaultTabId === 'status';
 
-  const filtered = employees.filter((e) => {
-    // In Employee Status view, do not show relieved / terminated employees
-    if (isStatusView) {
-      const s = String(e.status || '').toLowerCase();
-      if (s === 'relieved' || s === 'terminated' || s === 'resigned') {
-        return false;
+  const activeCount = useMemo(() => employees.filter((e) => !isRelievedEmployee(e.status)).length, [employees]);
+  const relievedCount = useMemo(() => employees.filter((e) => isRelievedEmployee(e.status)).length, [employees]);
+
+  const filtered = useMemo(() => {
+    const list = employees.filter((e) => {
+      // In Employee Status view, never show relieved / terminated employees
+      if (isStatusView) {
+        if (isRelievedEmployee(e.status)) return false;
+      } else {
+        // In Employee Directory view, respect directoryStatusFilter (default: 'active')
+        if (directoryStatusFilter === 'active' && isRelievedEmployee(e.status)) return false;
+        if (directoryStatusFilter === 'relieved' && !isRelievedEmployee(e.status)) return false;
       }
-    }
-    return `${e.firstName} ${e.lastName} ${e.employeeId} ${e.designation}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-  });
+      return `${e.firstName} ${e.lastName} ${e.employeeId} ${e.designation}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+    });
+    return sortEmployeesByCode(list);
+  }, [employees, isStatusView, directoryStatusFilter, searchTerm]);
 
   interface IdleItem {
     emp: Employee;
@@ -715,6 +724,59 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           <div style={{ marginBottom: 20, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 280px', maxWidth: 360 }}>
               <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search directory..." />
+            </div>
+            <div style={{ display: 'inline-flex', background: 'var(--bg-sunken)', padding: 3, borderRadius: 8, border: '1px solid var(--border)', gap: 2 }}>
+              <button
+                type="button"
+                onClick={() => setDirectoryStatusFilter('active')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: directoryStatusFilter === 'active' ? 'var(--brand-primary, #3b82f6)' : 'transparent',
+                  color: directoryStatusFilter === 'active' ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Active ({activeCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryStatusFilter('relieved')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: directoryStatusFilter === 'relieved' ? 'var(--brand-primary, #3b82f6)' : 'transparent',
+                  color: directoryStatusFilter === 'relieved' ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Relieved ({relievedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryStatusFilter('all')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: directoryStatusFilter === 'all' ? 'var(--brand-primary, #3b82f6)' : 'transparent',
+                  color: directoryStatusFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                All ({employees.length})
+              </button>
             </div>
             {searchTerm && (
               <Button size="sm" variant="secondary" onClick={() => setSearchTerm('')}>

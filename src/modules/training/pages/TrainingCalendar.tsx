@@ -14,6 +14,7 @@ import Drawer from '../../../shared/ui/Drawer';
 import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
+import { isEligibleTrainer, sortEmployeesByCode } from '../../employee/employee.repository';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { todayISO, formatDisplayDate } from '../../../shared/utils/date';
@@ -65,6 +66,129 @@ const EMPTY_FILTERS: FilterState = {
 };
 
 const SAVED_KEY = 'kvj.planner.savedFilters';
+
+export interface RecurrenceConfig {
+  mode: 'none' | 'consecutive' | 'range' | 'custom_days';
+  startDate: string; // YYYY-MM-DD
+  consecutiveDays?: number; // e.g. 3
+  endDate?: string; // YYYY-MM-DD
+  selectedWeekdays?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+  repeatWeeks?: number; // e.g. 2
+  skipSundays?: boolean; // default true
+  skipSaturdays?: boolean; // default false
+  skipHolidays?: boolean; // default true
+  holidayDates?: Set<string>; // set of YYYY-MM-DD holiday strings
+}
+
+export function computeRecurrenceDates(config: RecurrenceConfig): string[] {
+  const {
+    mode,
+    startDate,
+    consecutiveDays = 1,
+    endDate,
+    selectedWeekdays = [1, 2, 3, 4, 5],
+    repeatWeeks = 1,
+    skipSundays = true,
+    skipSaturdays = false,
+    skipHolidays = true,
+    holidayDates = new Set<string>(),
+  } = config;
+
+  if (!startDate) return [];
+  if (mode === 'none') return [startDate];
+
+  const results: string[] = [];
+  const start = new Date(`${startDate}T00:00:00`);
+  if (isNaN(start.getTime())) return [startDate];
+
+  if (mode === 'consecutive') {
+    const curr = new Date(start);
+    let collected = 0;
+    const maxSafety = 60;
+    let iterations = 0;
+
+    while (collected < consecutiveDays && iterations < maxSafety) {
+      iterations++;
+      const yyyy = curr.getFullYear();
+      const mm = String(curr.getMonth() + 1).padStart(2, '0');
+      const dd = String(curr.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dayOfWeek = curr.getDay(); // 0 = Sun, 6 = Sat
+
+      const isSunday = dayOfWeek === 0;
+      const isSaturday = dayOfWeek === 6;
+      const isHoliday = holidayDates.has(dateStr);
+
+      const skip =
+        (skipSundays && isSunday) ||
+        (skipSaturdays && isSaturday) ||
+        (skipHolidays && isHoliday);
+
+      if (!skip) {
+        results.push(dateStr);
+        collected++;
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
+  } else if (mode === 'range') {
+    if (!endDate || endDate < startDate) return [startDate];
+    const end = new Date(`${endDate}T00:00:00`);
+    const curr = new Date(start);
+    const maxSafety = 90;
+    let iterations = 0;
+
+    while (curr <= end && iterations < maxSafety) {
+      iterations++;
+      const yyyy = curr.getFullYear();
+      const mm = String(curr.getMonth() + 1).padStart(2, '0');
+      const dd = String(curr.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dayOfWeek = curr.getDay();
+
+      const isSunday = dayOfWeek === 0;
+      const isSaturday = dayOfWeek === 6;
+      const isHoliday = holidayDates.has(dateStr);
+
+      const skip =
+        (skipSundays && isSunday) ||
+        (skipSaturdays && isSaturday) ||
+        (skipHolidays && isHoliday);
+
+      if (!skip) {
+        results.push(dateStr);
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
+  } else if (mode === 'custom_days') {
+    const totalDays = (repeatWeeks || 1) * 7;
+    const curr = new Date(start);
+    const maxSafety = Math.min(totalDays + 14, 90);
+    let iterations = 0;
+
+    while (iterations < maxSafety && results.length < 30) {
+      iterations++;
+      const yyyy = curr.getFullYear();
+      const mm = String(curr.getMonth() + 1).padStart(2, '0');
+      const dd = String(curr.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dayOfWeek = curr.getDay();
+
+      if (endDate && dateStr > endDate) break;
+
+      const isMatchingWeekday = selectedWeekdays.includes(dayOfWeek);
+      const isHoliday = holidayDates.has(dateStr);
+      const skip = !isMatchingWeekday || (skipHolidays && isHoliday);
+
+      if (!skip) {
+        results.push(dateStr);
+      }
+      curr.setDate(curr.getDate() + 1);
+      if (iterations >= totalDays && !endDate) break;
+    }
+  }
+
+  return results.length > 0 ? results : [startDate];
+}
 
 export function TrainingCalendar() {
   const { user } = useAuth();
@@ -240,6 +364,54 @@ export function TrainingCalendar() {
     studentCount: 0,
   });
 
+  // Repeating / Recurrence state for Assign Schedule
+  const [repeatMode, setRepeatMode] = useState<'none' | 'consecutive' | 'range' | 'custom_days'>('none');
+  const [repeatDaysCount, setRepeatDaysCount] = useState<number>(3);
+  const [repeatEndDate, setRepeatEndDate] = useState<string>('');
+  const [repeatSkipSundays, setRepeatSkipSundays] = useState<boolean>(true);
+  const [repeatSkipSaturdays, setRepeatSkipSaturdays] = useState<boolean>(false);
+  const [repeatSkipHolidays, setRepeatSkipHolidays] = useState<boolean>(true);
+  const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [repeatWeeksCount, setRepeatWeeksCount] = useState<number>(2);
+
+  const holidayDateSet = useMemo(() => {
+    const set = new Set<string>();
+    (data.holidays || []).forEach((h) => {
+      if (h.date) set.add(h.date);
+    });
+    return set;
+  }, [data.holidays]);
+
+  const scheduledDates = useMemo(() => {
+    if (editingSessionId || repeatMode === 'none') {
+      return [assignForm.date];
+    }
+    return computeRecurrenceDates({
+      mode: repeatMode,
+      startDate: assignForm.date,
+      consecutiveDays: repeatDaysCount,
+      endDate: repeatEndDate,
+      selectedWeekdays: repeatWeekdays,
+      repeatWeeks: repeatWeeksCount,
+      skipSundays: repeatSkipSundays,
+      skipSaturdays: repeatSkipSaturdays,
+      skipHolidays: repeatSkipHolidays,
+      holidayDates: holidayDateSet,
+    });
+  }, [
+    editingSessionId,
+    repeatMode,
+    assignForm.date,
+    repeatDaysCount,
+    repeatEndDate,
+    repeatWeekdays,
+    repeatWeeksCount,
+    repeatSkipSundays,
+    repeatSkipSaturdays,
+    repeatSkipHolidays,
+    holidayDateSet,
+  ]);
+
   const [batchFilterText, setBatchFilterText] = useState('');
 
   const filteredScheduleBatches = useMemo(() => {
@@ -262,6 +434,10 @@ export function TrainingCalendar() {
     const enrolledCount = batchStudentCounts[b.id] ?? b.capacity ?? 0;
     const cleanCode = cleanBatchCode(b.code, b.batchNo) || b.code || 'Training Batch';
     const topicName = b.trainingName || c?.title || cleanCode;
+
+    if (b.endDate && b.endDate >= (b.startDate || '')) {
+      setRepeatEndDate(b.endDate);
+    }
 
     setAssignForm((f) => ({
       ...f,
@@ -289,7 +465,8 @@ export function TrainingCalendar() {
         // Training Calendar is a shared resource: EVERY user (Admin/CEO/Manager
         // and all employees) sees and can edit ALL trainers' schedules — no
         // user-level filter. Previously non-executives saw only their own row.
-        setTrainers(r.value);
+        const activeTrainers = sortEmployeesByCode((r.value || []).filter(isEligibleTrainer));
+        setTrainers(activeTrainers);
       }
     });
 
@@ -562,11 +739,17 @@ export function TrainingCalendar() {
 
   const handleOpenCellAssign = (date: string, trainerId: string) => {
     setEditingSessionId(null);
+    setRepeatMode('none');
+    setRepeatDaysCount(3);
+    setRepeatSkipSundays(true);
+    setRepeatSkipHolidays(true);
+    setRepeatSkipSaturdays(false);
     const firstBatch = batches[0];
     const c = firstBatch ? courses.find((item) => item.id === firstBatch.courseId) : undefined;
     const enrolled = firstBatch ? (batchStudentCounts[firstBatch.id] ?? firstBatch.capacity ?? 0) : 0;
     const cleanCode = firstBatch ? (cleanBatchCode(firstBatch.code, firstBatch.batchNo) || firstBatch.code) : '';
     const effTrainer = trainerId || firstBatch?.trainerId || (trainers[0]?.id ?? '') || (user?.id ?? '');
+    setRepeatEndDate(firstBatch?.endDate || '');
 
     setAssignForm({
       date,
@@ -593,6 +776,7 @@ export function TrainingCalendar() {
 
   const handleEditSchedule = (s: ScheduleSession) => {
     setEditingSessionId(s.id);
+    setRepeatMode('none');
     const matched = batches.find((b) => b.id === (s as any).batchId || b.code === s.batchCode || cleanBatchCode(b.code, b.batchNo) === s.batchCode);
     const c = matched ? courses.find((item) => item.id === matched.courseId) : undefined;
     const enrolled = matched ? (batchStudentCounts[matched.id] ?? s.studentCount ?? 0) : s.studentCount;
@@ -651,23 +835,10 @@ export function TrainingCalendar() {
     const finalName = assignForm.name.trim() || assocBatch.trainingName || cleanCode;
 
     const isEdit = Boolean(editingSessionId && UUID_RE.test(editingSessionId));
-    const sessId = isEdit && editingSessionId ? editingSessionId : crypto.randomUUID();
+    const datesToSchedule = isEdit ? [assignForm.date] : scheduledDates;
 
-    // UIUX-REQ-014: Duplicate Prevention Guard (batch_id, date, start_time)
-    const isDuplicate = combinedSessions.some((s) => {
-      if (isEdit && s.id === editingSessionId) return false;
-      const matchDate = s.date === assignForm.date;
-      const matchBatch = s.batchCode === finalBatchCode || (assocBatch && s.name === finalName && s.trainerId === effectiveTrainerId);
-      const matchTime = s.startTime === assignForm.startTime;
-      return matchDate && matchBatch && matchTime;
-    });
-
-    if (isDuplicate) {
-      toast({
-        variant: 'error',
-        title: 'Duplicate Session Detected',
-        message: 'A session is already scheduled for this batch and trainer at this date and time.',
-      });
+    if (datesToSchedule.length === 0) {
+      toast({ variant: 'error', title: 'No Valid Dates', message: 'Please select at least one valid date to schedule.' });
       return;
     }
 
@@ -679,53 +850,75 @@ export function TrainingCalendar() {
       return;
     }
 
-    const sessionObj: ScheduleSession = {
-      id: sessId,
-      trainerId: effectiveTrainerId,
-      date: assignForm.date,
-      name: finalName,
-      batchCode: finalBatchCode,
-      college: assignForm.college || assocBatch.college || '—',
-      course: assignForm.course || '—',
-      academicYear: assignForm.academicYear || assocBatch.academicYear || '—',
-      coordinator: assignForm.coordinator || assocBatch.coordinator || '—',
-      startTime: assignForm.startTime,
-      endTime: assignForm.endTime,
-      venue: assignForm.venue || assocBatch.venue || 'Campus HQ',
-      mode: assignForm.mode || (assocBatch.onlineLink ? 'Online' : 'Offline'),
-      studentCount: Number(assignForm.studentCount) || assocBatch.capacity || 0,
-      status: 'Scheduled',
-      color: 'var(--brand)',
-    };
-
-    // Persist to Supabase flwdsk_calendar_sessions table
-    const payload: Record<string, any> = {
-      id: sessId,
-      date: sessionObj.date,
-      session_title: sessionObj.name,
-      trainer_id: validTrainerId,
-      batch_id: validBatchId,
-      start_time: sessionObj.startTime,
-      end_time: sessionObj.endTime,
-      venue: sessionObj.venue,
-      mode: sessionObj.mode,
-      student_count: sessionObj.studentCount,
-      status: sessionObj.status,
-      color: sessionObj.color || 'var(--brand)',
-    };
-
     setSubmittingSession(true);
-    try {
-      const res = await saveCalendarSession(payload);
+    let createdCount = 0;
+    let skippedDuplicates = 0;
+    const newSessions: ScheduleSession[] = [];
 
-      if (!res.ok) {
-        console.error('Calendar session save error:', res.error);
-        toast({
-          variant: 'error',
-          title: 'Save Failed',
-          message: res.error || 'Could not save session to database.',
+    try {
+      for (let idx = 0; idx < datesToSchedule.length; idx++) {
+        const targetDate = datesToSchedule[idx];
+
+        // UIUX-REQ-014: Duplicate Prevention Guard (batch_id, date, start_time)
+        const isDuplicate = combinedSessions.some((s) => {
+          if (isEdit && s.id === editingSessionId) return false;
+          const matchDate = s.date === targetDate;
+          const matchBatch = s.batchCode === finalBatchCode || (assocBatch && s.name === finalName && s.trainerId === effectiveTrainerId);
+          const matchTime = s.startTime === assignForm.startTime;
+          return matchDate && matchBatch && matchTime;
         });
-        return;
+
+        if (isDuplicate) {
+          skippedDuplicates++;
+          continue;
+        }
+
+        const sessId = isEdit && editingSessionId ? editingSessionId : crypto.randomUUID();
+        const sessionObj: ScheduleSession = {
+          id: sessId,
+          trainerId: effectiveTrainerId,
+          date: targetDate,
+          name: finalName,
+          batchCode: finalBatchCode,
+          college: assignForm.college || assocBatch.college || '—',
+          course: assignForm.course || '—',
+          academicYear: assignForm.academicYear || assocBatch.academicYear || '—',
+          coordinator: assignForm.coordinator || assocBatch.coordinator || '—',
+          startTime: assignForm.startTime,
+          endTime: assignForm.endTime,
+          venue: assignForm.venue || assocBatch.venue || 'Campus HQ',
+          mode: assignForm.mode || (assocBatch.onlineLink ? 'Online' : 'Offline'),
+          studentCount: Number(assignForm.studentCount) || assocBatch.capacity || 0,
+          status: 'Scheduled',
+          color: 'var(--brand)',
+        };
+
+        const notes = datesToSchedule.length > 1 ? `Multi-day session (${idx + 1} of ${datesToSchedule.length})` : undefined;
+
+        // Persist to Supabase flwdsk_calendar_sessions table
+        const payload: Record<string, any> = {
+          id: sessId,
+          date: sessionObj.date,
+          session_title: sessionObj.name,
+          trainer_id: validTrainerId,
+          batch_id: validBatchId,
+          start_time: sessionObj.startTime,
+          end_time: sessionObj.endTime,
+          venue: sessionObj.venue,
+          mode: sessionObj.mode,
+          student_count: sessionObj.studentCount,
+          status: sessionObj.status,
+          color: sessionObj.color || 'var(--brand)',
+          notes,
+        };
+
+        const res = await saveCalendarSession(payload);
+        if (res.ok) {
+          createdCount++;
+          newSessions.push(sessionObj);
+        } else {
+          console.error(`Calendar session save error for ${targetDate}:`, res.error);
+        }
       }
     } finally {
       setSubmittingSession(false);
@@ -733,22 +926,43 @@ export function TrainingCalendar() {
 
     await loadDbSessions();
 
-    if (editingSessionId) {
-      setCustomSessions((prev) =>
-        prev.map((sess) => (sess.id === editingSessionId || sess.id === sessId ? sessionObj : sess))
-      );
-      toast({
-        variant: 'success',
-        title: 'Schedule Updated',
-        message: `Updated schedule for ${sessionObj.batchCode} on ${sessionObj.date}`,
-      });
+    if (isEdit) {
+      if (newSessions.length > 0) {
+        setCustomSessions((prev) =>
+          prev.map((sess) => (sess.id === editingSessionId ? newSessions[0] : sess))
+        );
+        toast({
+          variant: 'success',
+          title: 'Schedule Updated',
+          message: `Updated schedule for ${finalBatchCode} on ${assignForm.date}`,
+        });
+      }
     } else {
-      setCustomSessions((prev) => [...prev, sessionObj]);
-      toast({
-        variant: 'success',
-        title: 'Schedule Assigned',
-        message: `Assigned ${sessionObj.name} (${sessionObj.batchCode}) to ${trainerName(sessionObj.trainerId)} on ${sessionObj.date}`,
-      });
+      if (createdCount > 0) {
+        setCustomSessions((prev) => [...prev, ...newSessions]);
+        toast({
+          variant: 'success',
+          title: createdCount > 1 ? 'Repeating Schedule Assigned' : 'Schedule Assigned',
+          message:
+            createdCount > 1
+              ? `Assigned ${createdCount} training sessions for ${finalBatchCode} to ${trainerName(effectiveTrainerId)} (${datesToSchedule[0]} to ${datesToSchedule[datesToSchedule.length - 1]})${skippedDuplicates > 0 ? ` (${skippedDuplicates} skipped as duplicates)` : ''}.`
+              : `Assigned ${finalName} (${finalBatchCode}) to ${trainerName(effectiveTrainerId)} on ${datesToSchedule[0]}.`,
+        });
+      } else if (skippedDuplicates > 0) {
+        toast({
+          variant: 'error',
+          title: 'Duplicate Session Detected',
+          message: 'A session is already scheduled for this batch and trainer at this date and time.',
+        });
+        return;
+      } else {
+        toast({
+          variant: 'error',
+          title: 'Save Failed',
+          message: 'Could not save session to database.',
+        });
+        return;
+      }
     }
 
     setIsAssignDrawerOpen(false);
@@ -756,9 +970,12 @@ export function TrainingCalendar() {
   };
 
   const handleCopySession = (session: ScheduleSession) => {
+    setRepeatMode('none');
+    setRepeatDaysCount(3);
     const matched = batches.find((b) => b.id === (session as any).batchId || b.code === session.batchCode || cleanBatchCode(b.code, b.batchNo) === session.batchCode);
     const c = matched ? courses.find((item) => item.id === matched.courseId) : undefined;
     const enrolled = matched ? (batchStudentCounts[matched.id] ?? session.studentCount ?? 0) : session.studentCount;
+    setRepeatEndDate(matched?.endDate || '');
 
     setAssignForm({
       date: session.date,
@@ -1294,7 +1511,13 @@ export function TrainingCalendar() {
             ) : <div />}
             <div style={{ display: 'flex', gap: 10 }}>
               <Button variant="secondary" onClick={() => setIsAssignDrawerOpen(false)} disabled={submittingSession}>Cancel</Button>
-              <Button onClick={handleSaveSession} loading={submittingSession}>{editingSessionId ? '💾 Update Schedule' : '💾 Save Schedule Allocation'}</Button>
+              <Button onClick={handleSaveSession} loading={submittingSession}>
+                {editingSessionId
+                  ? '💾 Update Schedule'
+                  : scheduledDates.length > 1
+                    ? `💾 Assign ${scheduledDates.length} Sessions`
+                    : '💾 Save Schedule Allocation'}
+              </Button>
             </div>
           </div>
         }
@@ -1324,6 +1547,238 @@ export function TrainingCalendar() {
               </select>
             </div>
           </div>
+
+          {/* Repeating / Multi-Day Training Scheduler */}
+          {!editingSessionId && (
+            <div
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: 10,
+                padding: '12px 14px',
+                background: repeatMode !== 'none' ? '#f0f9ff' : 'var(--bg-sunken, #f8fafc)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>🔁 Repeat Training Schedule</span>
+                  {repeatMode !== 'none' && (
+                    <span style={{ fontSize: 11, background: '#0284c7', color: '#fff', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>
+                      {scheduledDates.length} Sessions
+                    </span>
+                  )}
+                </label>
+                <div style={{ display: 'inline-flex', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, padding: 2 }}>
+                  <button
+                    type="button"
+                    onClick={() => setRepeatMode('none')}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      borderRadius: 4,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: repeatMode === 'none' ? 'var(--brand-primary, #3b82f6)' : 'transparent',
+                      color: repeatMode === 'none' ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    Single Day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRepeatMode('consecutive')}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      borderRadius: 4,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: repeatMode === 'consecutive' ? 'var(--brand-primary, #3b82f6)' : 'transparent',
+                      color: repeatMode === 'consecutive' ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    Consecutive Days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRepeatMode('range')}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      borderRadius: 4,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: repeatMode === 'range' ? 'var(--brand-primary, #3b82f6)' : 'transparent',
+                      color: repeatMode === 'range' ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    Date Range
+                  </button>
+                </div>
+              </div>
+
+              {repeatMode === 'consecutive' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Repeat For:</span>
+                    {[2, 3, 4, 5, 6, 10].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setRepeatDaysCount(num)}
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          borderRadius: 6,
+                          border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          background: repeatDaysCount === num ? 'var(--brand-primary, #3b82f6)' : 'var(--bg-surface)',
+                          color: repeatDaysCount === num ? '#fff' : 'var(--text-primary)',
+                        }}
+                      >
+                        {num} Days
+                      </button>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input
+                        type="number"
+                        min={2}
+                        max={30}
+                        value={repeatDaysCount}
+                        onChange={(e) => setRepeatDaysCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        style={{ width: 55, padding: '3px 6px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                      />
+                      <span style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>days</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11.5 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={repeatSkipSundays}
+                        onChange={(e) => setRepeatSkipSundays(e.target.checked)}
+                      />
+                      Skip Sundays
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={repeatSkipHolidays}
+                        onChange={(e) => setRepeatSkipHolidays(e.target.checked)}
+                      />
+                      Skip Holidays
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={repeatSkipSaturdays}
+                        onChange={(e) => setRepeatSkipSaturdays(e.target.checked)}
+                      />
+                      Skip Saturdays
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {repeatMode === 'range' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={assignForm.date}
+                        disabled
+                        style={{ width: '100%', padding: '6px 8px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-muted, #f1f5f9)', color: 'var(--text-muted)' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                        End Date (Repeat Until)
+                      </label>
+                      <input
+                        type="date"
+                        min={assignForm.date}
+                        value={repeatEndDate || assignForm.date}
+                        onChange={(e) => setRepeatEndDate(e.target.value)}
+                        style={{ width: '100%', padding: '6px 8px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11.5 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={repeatSkipSundays}
+                        onChange={(e) => setRepeatSkipSundays(e.target.checked)}
+                      />
+                      Skip Sundays
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={repeatSkipHolidays}
+                        onChange={(e) => setRepeatSkipHolidays(e.target.checked)}
+                      />
+                      Skip Holidays
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={repeatSkipSaturdays}
+                        onChange={(e) => setRepeatSkipSaturdays(e.target.checked)}
+                      />
+                      Skip Saturdays
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {repeatMode !== 'none' && scheduledDates.length > 0 && (
+                <div
+                  style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid #bae6fd',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    fontSize: 11.5,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: '#0369a1', marginBottom: 6 }}>
+                    📅 {scheduledDates.length} Training Sessions will be scheduled:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 85, overflowY: 'auto' }}>
+                    {scheduledDates.map((d) => (
+                      <span
+                        key={d}
+                        style={{
+                          fontSize: 11,
+                          background: '#e0f2fe',
+                          color: '#0369a1',
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          fontWeight: 600,
+                          border: '1px solid #7dd3fc',
+                        }}
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>

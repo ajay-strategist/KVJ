@@ -1,5 +1,6 @@
 import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import type { Employee, IEmployeeRepository } from './employee.repository';
+import { sortEmployeesByCode } from './employee.repository';
 import type { Actor, QuerySpec, Page, UUID } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 
@@ -50,9 +51,10 @@ export class SupabaseEmployeeRepository extends SupabaseRepository<Employee> imp
 
   override async findMany(query: QuerySpec = {}): Promise<Page<Employee>> {
     const page = await super.findMany(query);
+    const mapped = (page.data || []).map((e) => this.toAppEmployee(e)!);
     return {
       ...page,
-      data: (page.data || []).map((e) => this.toAppEmployee(e)!),
+      data: sortEmployeesByCode(mapped),
     };
   }
 
