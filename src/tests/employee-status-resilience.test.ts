@@ -32,5 +32,45 @@ describe('SupabaseEmployeeRepository status mapping resilience', () => {
     const suspended = (repo as any).sanitizeEmployeeData({ status: 'suspended' });
     expect(suspended.status).toBe('suspended');
   });
+
+  describe('Active task in progress validation', () => {
+    const isTaskTrulyInProgress = (task: any): boolean => {
+      if (!task) return false;
+      const s = String(task.status || '').toLowerCase().trim();
+      if (
+        s === 'review' ||
+        s === 'under review' ||
+        s === 'under_review' ||
+        s === 'done' ||
+        s === 'completed' ||
+        s === 'closed' ||
+        s === 'cancelled'
+      ) {
+        return false;
+      }
+      const app = String(task.approvalStatus || (task as any).approval_status || '').toLowerCase().trim();
+      if (app === 'pending_task_approval' || app === 'submitted') {
+        return false;
+      }
+      if (task.underReview || (task as any).under_review) {
+        return false;
+      }
+      return true;
+    };
+
+    it('rejects submitted tasks from being displayed as active task in progress', () => {
+      expect(isTaskTrulyInProgress({ status: 'review' })).toBe(false);
+      expect(isTaskTrulyInProgress({ status: 'Under Review' })).toBe(false);
+      expect(isTaskTrulyInProgress({ status: 'done' })).toBe(false);
+      expect(isTaskTrulyInProgress({ status: 'completed' })).toBe(false);
+      expect(isTaskTrulyInProgress({ status: 'in_progress', approvalStatus: 'pending_task_approval' })).toBe(false);
+      expect(isTaskTrulyInProgress({ status: 'in_progress', underReview: true })).toBe(false);
+    });
+
+    it('accepts only truly in_progress tasks without review or completion flags', () => {
+      expect(isTaskTrulyInProgress({ status: 'in_progress' })).toBe(true);
+      expect(isTaskTrulyInProgress({ status: 'In Progress' })).toBe(true);
+    });
+  });
 });
 

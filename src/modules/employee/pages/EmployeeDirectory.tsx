@@ -233,6 +233,30 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     return null;
   };
 
+  const isTaskTrulyInProgress = (task: any): boolean => {
+    if (!task) return false;
+    const s = String(task.status || '').toLowerCase().trim();
+    if (
+      s === 'review' ||
+      s === 'under review' ||
+      s === 'under_review' ||
+      s === 'done' ||
+      s === 'completed' ||
+      s === 'closed' ||
+      s === 'cancelled'
+    ) {
+      return false;
+    }
+    const app = String(task.approvalStatus || (task as any).approval_status || '').toLowerCase().trim();
+    if (app === 'pending_task_approval' || app === 'submitted') {
+      return false;
+    }
+    if (task.underReview || (task as any).under_review) {
+      return false;
+    }
+    return true;
+  };
+
   const getEmployeeActiveTask = (emp: Employee) => {
     // Check if the employee clocked in for a training batch or has an active training session
     const trainingTitle = isEmployeeInTraining(emp);
@@ -247,12 +271,22 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
     // 1. Check real-time database work sessions (status = 'running' & end_time is null)
     const dbSession = activeWorkSessions.find((s: any) => {
+      if (s.status !== 'running' || s.end_time) return false;
       const isForThisEmp =
         s.employee_id === empId ||
         (s.employee_id && empEmail && s.employee_id.toLowerCase() === empEmail) ||
         (s.employee_name && empFullName && s.employee_name.toLowerCase() === empFullName) ||
         (isCurrentUser && user && (s.employee_id === user.id || s.employee_id?.toLowerCase() === user.email?.toLowerCase()));
-      return isForThisEmp;
+      if (!isForThisEmp) return false;
+
+      // If dbSession links to a task, verify that task is NOT submitted, under review, or completed
+      if (s.task_id) {
+        const linkedTask = (tasks || []).find((t: any) => t.id === s.task_id);
+        if (linkedTask && !isTaskTrulyInProgress(linkedTask)) {
+          return false;
+        }
+      }
+      return true;
     });
 
     if (dbSession) {
@@ -271,15 +305,23 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       }
       const rawMyDay = localStorage.getItem('kvj_task_timer_state_v1');
       if (rawMyDay) {
-        const parsed: Record<string, { active: boolean }> = JSON.parse(rawMyDay);
+        const parsed: Record<string, { active: boolean; underReview?: boolean }> = JSON.parse(rawMyDay);
         for (const [tId, s] of Object.entries(parsed)) {
-          if (s?.active === true) runningTaskIds.add(tId);
+          if (s?.underReview) {
+            runningTaskIds.delete(tId);
+          } else if (s?.active === true) {
+            runningTaskIds.add(tId);
+          } else {
+            runningTaskIds.delete(tId);
+          }
         }
       }
     } catch {}
 
     const runningTask = (tasks || []).find((t: any) => {
       if (!runningTaskIds.has(t.id)) return false;
+      // Must genuinely be in progress — submitted, under review, or completed tasks can never be running
+      if (!isTaskTrulyInProgress(t)) return false;
 
       const isForThisEmp =
         t.assigneeId === empId ||

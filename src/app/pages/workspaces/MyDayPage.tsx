@@ -2706,12 +2706,13 @@ export function MyDayPage() {
   };
 
   const handleSubmitReview = async (id: string, taskTitle: string) => {
-    // 1. Pause timer in taskTimerStore to capture final time
+    // 1. Pause and reset timer in taskTimerStore to capture final time and ensure it's not running
     taskTimerStore.pauseTask(id);
     const timer = taskTimerStore.getTimer(id);
     const finalSeconds = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+    taskTimerStore.resetTask(id);
 
-    // Optimistically mark under review.
+    // Optimistically mark under review and active: false.
     const applyUnderReview = (val: boolean) => {
       setTasks((prev) => prev.map((t) =>
         t.id === id ? { 
@@ -2724,23 +2725,40 @@ export function MyDayPage() {
         } : t
       ));
       const states = getStoredTaskStates();
-      if (states[id]) {
-        states[id].secondsToday = finalSeconds;
-        states[id].active = false;
-        states[id].underReview = val;
-        delete states[id].lastStartTime;
-        saveStoredTaskStates(states);
-      }
+      states[id] = {
+        ...(states[id] || {}),
+        secondsToday: finalSeconds,
+        active: false,
+        underReview: val,
+        date: toLocalISODate(new Date()),
+      };
+      delete states[id].lastStartTime;
+      saveStoredTaskStates(states);
     };
     applyUnderReview(true);
 
     // Save final actualHours to the DB before submitting
     try {
-      await updateTask(id as any, { actualHours: finalSeconds / 3600 });
-      completeSession(id as any);
+      await updateTask(id as any, { actualHours: finalSeconds / 3600, status: 'review' });
+      await completeSession(id as any);
     } catch (e) {
       console.warn('Failed to update task hours on submit:', e);
     }
+
+    // Direct DB cleanup: ensure all open work sessions for this task & employee are closed
+    try {
+      if (user) {
+        await supabase
+          .from('flwdsk_task_work_sessions')
+          .update({
+            status: 'completed',
+            end_time: new Date().toISOString(),
+          })
+          .eq('employee_id', user.id)
+          .eq('task_id', id)
+          .is('end_time', null);
+      }
+    } catch (_) {}
 
     const res = await submitTask(id as any, 'Submitted from Workspace');
     if (!res.ok) {
@@ -2752,6 +2770,10 @@ export function MyDayPage() {
       });
       return;
     }
+
+    try {
+      await refresh?.();
+    } catch (_) {}
 
     toast({
       variant: 'success',

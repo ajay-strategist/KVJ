@@ -32,6 +32,7 @@ import { taskTimerStore } from '../../../shared/utils/taskTimerStore';
 import { formatHoursMinutes } from '../../../shared/utils/taskDuration';
 import { TaskFormModal } from '../forms/TaskFormModal';
 import { TaskWorklogUpdatesDrawer } from '../components/TaskWorklogUpdatesDrawer';
+import { supabase } from '../../../shared/integration/supabase';
 
 export type TaskStatus = 'Pending Approval' | 'To Do' | 'In Progress' | 'Under Review' | 'Completed';
 
@@ -709,18 +710,46 @@ export function TaskBoard({
   };
 
   const handleSubmitTaskForApproval = async (task: TaskItem) => {
-    // Pause timer if running via shared store
+    // Pause and reset timer if running via shared store
     taskTimerStore.pauseTask(task.id);
     const timer = taskTimerStore.getTimer(task.id);
     const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : 0;
+    taskTimerStore.resetTask(task.id);
+
+    try {
+      const raw = localStorage.getItem('kvj_task_timer_state_v1');
+      const states = raw ? JSON.parse(raw) : {};
+      states[task.id] = {
+        ...(states[task.id] || {}),
+        active: false,
+        underReview: true,
+        secondsToday,
+      };
+      delete states[task.id].lastStartTime;
+      localStorage.setItem('kvj_task_timer_state_v1', JSON.stringify(states));
+    } catch {}
 
     // Save final actualHours to the DB and complete the work session
     try {
-      await updateTask(task.id as UUID, { actualHours: secondsToday / 3600 });
+      await updateTask(task.id as UUID, { actualHours: secondsToday / 3600, status: 'review' });
       await completeSession(task.id as UUID);
     } catch (e) {
       console.warn('Failed to update task hours on submission:', e);
     }
+
+    try {
+      if (user) {
+        await supabase
+          .from('flwdsk_task_work_sessions')
+          .update({
+            status: 'completed',
+            end_time: new Date().toISOString(),
+          })
+          .eq('employee_id', user.id)
+          .eq('task_id', task.id)
+          .is('end_time', null);
+      }
+    } catch (_) {}
 
     setTasksList((prev) =>
       prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))
@@ -781,6 +810,21 @@ export function TaskBoard({
       setTasksList((prev) =>
         prev.map((x) => (x.id === task.id ? { ...x, status: 'Completed' } : x))
       );
+      // Clean up timer and local storage state
+      taskTimerStore.resetTask(task.id);
+      try {
+        const raw = localStorage.getItem('kvj_task_timer_state_v1');
+        const states = raw ? JSON.parse(raw) : {};
+        states[task.id] = {
+          ...(states[task.id] || {}),
+          active: false,
+          underReview: false,
+          secondsToday,
+        };
+        delete states[task.id].lastStartTime;
+        localStorage.setItem('kvj_task_timer_state_v1', JSON.stringify(states));
+      } catch {}
+
       try {
         await updateTask(task.id as UUID, { status: 'done', approvalStatus: 'approved', actualHours: secondsToday / 3600 });
         await completeSession(task.id as UUID);
@@ -789,12 +833,40 @@ export function TaskBoard({
       }
       toast({ variant: 'success', title: 'Task Completed', message: `Task "${task.name}" marked complete.` });
     } else {
+      taskTimerStore.resetTask(task.id);
       try {
-        await updateTask(task.id as UUID, { actualHours: secondsToday / 3600 });
+        const raw = localStorage.getItem('kvj_task_timer_state_v1');
+        const states = raw ? JSON.parse(raw) : {};
+        states[task.id] = {
+          ...(states[task.id] || {}),
+          active: false,
+          underReview: true,
+          secondsToday,
+        };
+        delete states[task.id].lastStartTime;
+        localStorage.setItem('kvj_task_timer_state_v1', JSON.stringify(states));
+      } catch {}
+
+      try {
+        await updateTask(task.id as UUID, { actualHours: secondsToday / 3600, status: 'review' });
         await completeSession(task.id as UUID);
       } catch (e) {
         console.warn('Failed to update task hours on completion request:', e);
       }
+
+      try {
+        if (user) {
+          await supabase
+            .from('flwdsk_task_work_sessions')
+            .update({
+              status: 'completed',
+              end_time: new Date().toISOString(),
+            })
+            .eq('employee_id', user.id)
+            .eq('task_id', task.id)
+            .is('end_time', null);
+        }
+      } catch (_) {}
 
       setTasksList((prev) =>
         prev.map((x) => (x.id === task.id ? { ...x, status: 'Under Review' } : x))

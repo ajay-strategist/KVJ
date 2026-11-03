@@ -29,10 +29,12 @@ function loadTimers(): Record<string, TaskTimerState> {
     // Merge from MyDay storage key if present
     const rawMyDay = localStorage.getItem(MY_DAY_KEY);
     if (rawMyDay) {
-      const myDayData: Record<string, { secondsToday: number; active: boolean; lastStartTime?: number; date?: string }> = JSON.parse(rawMyDay);
+      const myDayData: Record<string, { secondsToday: number; active: boolean; lastStartTime?: number; date?: string; underReview?: boolean }> = JSON.parse(rawMyDay);
       Object.entries(myDayData).forEach(([id, val]) => {
+        // If task is underReview, it can never be running
+        const isRunning = !val.underReview && !!val.active;
+
         if (!result[id]) {
-          const isRunning = !!val.active;
           let elapsed = (val.secondsToday || 0) * 1000;
           if (isRunning && val.lastStartTime) {
             // Subtract active session duration to prevent double-counting
@@ -47,7 +49,6 @@ function loadTimers(): Record<string, TaskTimerState> {
           };
         } else {
           const wasRunning = result[id].isRunning;
-          const isRunning = !!val.active;
           result[id].isRunning = isRunning;
           if (isRunning) {
             // If the task is running, do NOT overwrite elapsedMs with ticking val.secondsToday
@@ -74,18 +75,28 @@ function saveTimers(timers: Record<string, TaskTimerState>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(timers));
 
-    // Also sync to MyDay key format for backward compatibility
-    const myDayStates: Record<string, any> = {};
+    // Also sync to MyDay key format for backward compatibility, preserving underReview status
+    let existingMyDay: Record<string, any> = {};
+    try {
+      const raw = localStorage.getItem(MY_DAY_KEY);
+      if (raw) existingMyDay = JSON.parse(raw);
+    } catch {}
+
+    const myDayStates: Record<string, any> = { ...existingMyDay };
     Object.entries(timers).forEach(([id, t]) => {
       let sec = Math.floor(t.elapsedMs / 1000);
       if (t.isRunning) {
         sec += Math.floor((Date.now() - t.startTime) / 1000);
       }
       myDayStates[id] = {
+        ...myDayStates[id],
         secondsToday: sec,
         active: t.isRunning,
         lastStartTime: t.startTime,
       };
+      if (t.isRunning) {
+        delete myDayStates[id].underReview;
+      }
     });
     localStorage.setItem(MY_DAY_KEY, JSON.stringify(myDayStates));
   } catch {}
