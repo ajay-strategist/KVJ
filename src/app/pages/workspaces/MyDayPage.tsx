@@ -2212,8 +2212,9 @@ export function MyDayPage() {
       .filter((t) => {
         if (!t) return false;
         const appStatus = ((t as any).approvalStatus || '').toLowerCase();
-        // Don't show unapproved assignment requests until approved by manager
-        if (appStatus === 'pending_assignment_approval') return false;
+        const isSelfAssignedBySupervisor = Boolean(t.assigneeId && t.supervisorId && t.assigneeId === t.supervisorId);
+        // Don't show unapproved assignment requests until approved by manager (unless self-assigned by supervisor)
+        if (appStatus === 'pending_assignment_approval' && !isSelfAssignedBySupervisor) return false;
 
         const myId = (user?.id || '').toLowerCase();
         const myEmail = typeof user?.email === 'string' ? user.email.toLowerCase() : '';

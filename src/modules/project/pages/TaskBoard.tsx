@@ -304,7 +304,8 @@ export function TaskBoard({
       });
 
       let status: TaskStatus = 'To Do';
-      if ((t as any).approvalStatus === 'pending_assignment_approval') {
+      const isSelfAssignedBySupervisor = Boolean(t.assigneeId && t.supervisorId && t.assigneeId === t.supervisorId);
+      if ((t as any).approvalStatus === 'pending_assignment_approval' && !isSelfAssignedBySupervisor) {
         status = 'Pending Approval';
       } else if (t.status === 'done' || t.status === 'completed') {
         status = 'Completed';
@@ -508,16 +509,27 @@ export function TaskBoard({
     const roleUpper = (user?.role || '').toUpperCase();
     const isCeo = roleUpper === 'CEO';
 
+    const isCreatorSupervisor =
+      (finalSupervisorId && user?.id && finalSupervisorId === user.id) ||
+      (proj && (proj.supervisorId === user?.id || (proj as any).supervisor_id === user?.id)) ||
+      roleUpper === 'ADMIN' ||
+      roleUpper === 'CEO' ||
+      roleUpper === 'MANAGER';
+
     // Task Approval Rules:
     // 1. CEO can create/assign any task without approval.
     // 2. If assigning to another employee (!isSelfAssigned) -> Admin/CEO/Manager approval is required.
     // 3. If self-assigned (isSelfAssigned):
     //    - In Office Task: No approval is required.
-    //    - In Project Task: Project Supervisor / Admin / CEO / Manager approval is required.
+    //    - In Project Task:
+    //        * If creator is the supervisor / admin / CEO / manager: No approval is required!
+    //        * Otherwise (regular employee): Project Supervisor / Admin / CEO / Manager approval is required.
+    const needsApproval = !isSelfAssigned
+      ? !isCeo
+      : (!isOfficeTask && !isCreatorSupervisor);
+
     const approvalStatus: 'pending_assignment_approval' | null =
-      !isCeo && (!isSelfAssigned || !isOfficeTask)
-        ? 'pending_assignment_approval'
-        : null;
+      needsApproval ? 'pending_assignment_approval' : null;
 
     const res = await createTask({
       projectId: proj?.id || null,

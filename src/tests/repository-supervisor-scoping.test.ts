@@ -102,7 +102,7 @@ describe('Phase 4: Project Supervisor Authority & Scoping (PROJECT-Q1, DISC-004,
     container.register(TASK_REPOSITORY_TOKEN, () => ({
       findById: vi.fn(),
       findMany: vi.fn(),
-      create: vi.fn(),
+      create: vi.fn(async (data: any) => ({ id: 'new-task-id', ...data })),
       update: vi.fn(),
       softDelete: vi.fn(),
       hardDelete: vi.fn(),
@@ -138,6 +138,41 @@ describe('Phase 4: Project Supervisor Authority & Scoping (PROJECT-Q1, DISC-004,
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.value).toHaveLength(0);
+    }
+  });
+
+  it('supervisor creating and assigning task to themselves does NOT require approval (approvalStatus is null)', async () => {
+    const service = new ProjectService();
+    const res = await service.createTask(
+      {
+        projectId: projectId2, // projectId2 has supervisorId = supervisorId
+        title: 'Muthoot Proposal',
+        assigneeId: supervisorId,
+      },
+      { id: supervisorId, role: 'Employee' }
+    );
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value.approvalStatus).toBeNull();
+      expect(res.value.assigneeId).toBe(supervisorId);
+    }
+  });
+
+  it('regular employee creating project task for themselves requires supervisor approval', async () => {
+    const service = new ProjectService();
+    const res = await service.createTask(
+      {
+        projectId: projectId2, // projectId2 has supervisorId = supervisorId
+        title: 'Team Member Task',
+        assigneeId: otherEmpId,
+      },
+      { id: otherEmpId, role: 'Employee' }
+    );
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value.approvalStatus).toBe('pending_assignment_approval');
     }
   });
 });

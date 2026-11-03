@@ -242,16 +242,38 @@ export class ProjectService implements IProjectService {
       // Automatically set supervisor to project supervisor if in a project, or specified supervisor, or actor
       const supervisorId = data.supervisorId || (proj && proj.supervisorId ? proj.supervisorId : actor.id);
 
+      const isCreatorSupervisor =
+        (supervisorId && actor.id === supervisorId) ||
+        (proj && proj.supervisorId && actor.id === proj.supervisorId) ||
+        roleUpper === 'ADMIN' ||
+        roleUpper === 'CEO' ||
+        roleUpper === 'MANAGER';
+
       // Task Approval Rules:
       // 1. CEO can assign task to anyone without approval.
       // 2. If assigning to another employee (!isSelfAssigned), Admin/CEO/Manager approval is required (for both Project & Office Tasks).
       // 3. If self-assigned (isSelfAssigned):
       //    - Office Task: No approval is required.
-      //    - Project Task: Project Supervisor / Admin / CEO / Manager approval is required.
+      //    - Project Task:
+      //        * If creator is the supervisor / admin / CEO / manager: No approval is required!
+      //        * Otherwise (regular employee): Project Supervisor / Admin / CEO / Manager approval is required.
       const isCeo = roleUpper === 'CEO';
-      const needsAssignmentApproval = data.approvalStatus !== undefined
-        ? data.approvalStatus === 'pending_assignment_approval'
-        : (!isCeo && (!isSelfAssigned || !isOfficeTask));
+      let needsAssignmentApproval = false;
+      if (data.approvalStatus !== undefined) {
+        needsAssignmentApproval = data.approvalStatus === 'pending_assignment_approval';
+        // Safety override: if supervisor/admin/CEO is creating task for themselves, never require approval
+        if (isSelfAssigned && isCreatorSupervisor) {
+          needsAssignmentApproval = false;
+        }
+      } else {
+        if (!isCeo) {
+          if (!isSelfAssigned) {
+            needsAssignmentApproval = true;
+          } else if (!isOfficeTask && !isCreatorSupervisor) {
+            needsAssignmentApproval = true;
+          }
+        }
+      }
 
       let taskCode = data.code;
       if (!taskCode) {

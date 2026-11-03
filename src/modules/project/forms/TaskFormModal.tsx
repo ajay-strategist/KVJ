@@ -152,17 +152,27 @@ export function TaskFormModal({
 
       const roleUpper = user?.role?.toUpperCase() || '';
       const isCeo = roleUpper === 'CEO';
+      const isCreatorSupervisor =
+        (resolvedSupervisorId && user?.id && resolvedSupervisorId === user.id) ||
+        (proj && (proj.supervisorId === user?.id || (proj as any).supervisor_id === user?.id)) ||
+        roleUpper === 'ADMIN' ||
+        roleUpper === 'CEO' ||
+        roleUpper === 'MANAGER';
 
       // Task Approval Rules:
       // 1. CEO can assign tasks to anyone without approval.
       // 2. If assigning to another employee (isAssigningToOther), Admin/CEO/Manager approval is required (for both Project & Office Tasks).
       // 3. If self-assigned (!isAssigningToOther):
       //    - Office Task: No approval is required.
-      //    - Project Task: Project Supervisor / Admin / CEO / Manager approval is required.
+      //    - Project Task:
+      //        * If creator is the supervisor / admin / CEO / manager: No approval is required!
+      //        * Otherwise (regular employee): Project Supervisor / Admin / CEO / Manager approval is required.
+      const needsApproval = isAssigningToOther
+        ? !isCeo
+        : (!isOfficeTask && !isCreatorSupervisor);
+
       const approvalStatus: 'pending_assignment_approval' | null =
-        !isCeo && (isAssigningToOther || !isOfficeTask)
-          ? 'pending_assignment_approval'
-          : null;
+        needsApproval ? 'pending_assignment_approval' : null;
 
       const projectService = container.resolve(PROJECT_SERVICE_TOKEN);
       const res = await projectService.createTask(

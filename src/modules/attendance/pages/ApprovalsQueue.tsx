@@ -224,8 +224,25 @@ export function ApprovalsQueue() {
 
   const pendingAssignmentTasks = useMemo(() => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
+    // Self-healing: if any task is self-assigned by its supervisor, clear pending_assignment_approval
+    const selfSupervised = safeTasks.filter(
+      (t) => t.approvalStatus === 'pending_assignment_approval' && t.assigneeId && t.supervisorId && t.assigneeId === t.supervisorId
+    );
+    if (selfSupervised.length > 0) {
+      selfSupervised.forEach((st) => {
+        Promise.resolve(
+          supabase
+            .from('flwdsk_tasks')
+            .update({ approval_status: null })
+            .eq('id', st.id)
+        ).catch(() => {});
+      });
+    }
+
     return safeTasks.filter((t) => {
       if (t.deletedAt || t.approvalStatus !== 'pending_assignment_approval') return false;
+      // If the assignee is the supervisor themselves, no approval is required!
+      if (t.assigneeId && t.supervisorId && t.assigneeId === t.supervisorId) return false;
       // Row Level Security: Only tasks under the supervisor's purview
       return canApproveTaskItem(t);
     });
@@ -240,8 +257,9 @@ export function ApprovalsQueue() {
       // Row Level Security: Non-supervisors cannot see tasks they do not supervise
       if (!canApproveTaskItem(t)) return false;
 
+      const isSelfSupervised = Boolean(t.assigneeId && t.supervisorId && t.assigneeId === t.supervisorId);
       const isPendingTask = t.approvalStatus === 'pending_task_approval' || t.status === 'review';
-      const isPendingAssign = t.approvalStatus === 'pending_assignment_approval';
+      const isPendingAssign = t.approvalStatus === 'pending_assignment_approval' && !isSelfSupervised;
       if (!isPendingTask && !isPendingAssign) return false;
 
       if (taskStatusFilter === 'pending_task_approval') {
