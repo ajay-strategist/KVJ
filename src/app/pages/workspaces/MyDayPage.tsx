@@ -197,19 +197,30 @@ export const AttendancePanel = memo(function AttendancePanel({
     async function loadAssignedSessions() {
       try {
         const todayStr = toLocalISODate(new Date());
-        const { data } = await supabase
-          .from('flwdsk_schedule_sessions')
-          .select('*')
-          .eq('date', todayStr)
-          .is('deleted_at', null);
+        const [schedRes, calRes] = await Promise.allSettled([
+          supabase
+            .from('flwdsk_schedule_sessions')
+            .select('*')
+            .eq('date', todayStr)
+            .is('deleted_at', null),
+          supabase
+            .from('flwdsk_calendar_sessions')
+            .select('*')
+            .eq('date', todayStr)
+            .is('deleted_at', null),
+        ]);
 
-        if (data && data.length > 0) {
+        const schedRows = schedRes.status === 'fulfilled' && schedRes.value.data ? schedRes.value.data : [];
+        const calRows = calRes.status === 'fulfilled' && calRes.value.data ? calRes.value.data : [];
+        const combined = [...schedRows, ...calRows];
+
+        if (combined.length > 0) {
           const set = new Set<string>();
           const userEmail = user?.email?.toLowerCase()?.trim();
           const userName = user?.fullName?.toLowerCase()?.trim();
           const empId = currentEmployee?.id;
 
-          data.forEach((s: any) => {
+          combined.forEach((s: any) => {
             const isTrainerMatch =
               (s.trainer_id && (s.trainer_id === user?.id || s.trainer_id === empId)) ||
               (s.employee_id && (s.employee_id === user?.id || s.employee_id === empId)) ||

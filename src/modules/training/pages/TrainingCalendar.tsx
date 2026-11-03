@@ -105,20 +105,50 @@ export function TrainingCalendar() {
   const [batchStudentCounts, setBatchStudentCounts] = useState<Record<string, number>>({});
 
   // Load schedule sessions from canonical Supabase flwdsk_schedule_sessions table (CAL-Q01 & ISSUE-005)
+  // with resilient fallback to flwdsk_calendar_sessions for unmigrated environments
   const loadDbSessions = useCallback(async () => {
     try {
-      const { data: rows, error } = await supabase
-        .from('flwdsk_schedule_sessions')
-        .select('*')
-        .is('deleted_at', null);
+      const [schedRes, calRes] = await Promise.allSettled([
+        supabase
+          .from('flwdsk_schedule_sessions')
+          .select('*')
+          .is('deleted_at', null),
+        supabase
+          .from('flwdsk_calendar_sessions')
+          .select('*')
+          .is('deleted_at', null),
+      ]);
 
-      if (error) {
-        console.warn('Could not load calendar sessions:', error.message);
-        return;
-      }
+      const schedRows = schedRes.status === 'fulfilled' && schedRes.value.data ? schedRes.value.data : [];
+      const calRows = calRes.status === 'fulfilled' && calRes.value.data ? calRes.value.data : [];
 
-      if (rows && rows.length > 0) {
-        const dbSess: ScheduleSession[] = rows.map((r: any) => {
+      // Combine rows: prefer schedule_sessions if it has session_title/color; otherwise pull from calendar_sessions
+      const mergedMap = new Map<string, any>();
+
+      calRows.forEach((r: any) => {
+        mergedMap.set(r.id, r);
+      });
+
+      schedRows.forEach((r: any) => {
+        if (!r.student_id) { // Only parent calendar session rows, not individual student attendance rows
+          const existing = mergedMap.get(r.id);
+          mergedMap.set(r.id, {
+            ...existing,
+            ...r,
+            session_title: r.session_title || existing?.session_title || r.notes,
+            color: r.color || existing?.color || 'var(--brand)',
+            start_time: r.start_time || existing?.start_time || '09:00',
+            end_time: r.end_time || existing?.end_time || '16:00',
+            venue: r.venue || existing?.venue,
+            mode: r.mode || existing?.mode,
+          });
+        }
+      });
+
+      const combinedRows = Array.from(mergedMap.values());
+
+      if (combinedRows.length > 0) {
+        const dbSess: ScheduleSession[] = combinedRows.map((r: any) => {
           const matchedBatch = batches.find((b) => b.id === r.batch_id);
           const matchedCourse = matchedBatch ? courses.find((c) => c.id === matchedBatch.courseId) : undefined;
 
@@ -724,10 +754,16 @@ export function TrainingCalendar() {
     try {
       if (UUID_RE.test(sessionId)) {
         const validTrainerId = toValidUuid(newTrainerId) || (toValidUuid(user?.id) ?? null);
-        await supabase
-          .from('flwdsk_schedule_sessions')
-          .update({ date: newDate, trainer_id: validTrainerId })
-          .eq('id', sessionId);
+        await Promise.allSettled([
+          supabase
+            .from('flwdsk_schedule_sessions')
+            .update({ date: newDate, trainer_id: validTrainerId })
+            .eq('id', sessionId),
+          supabase
+            .from('flwdsk_calendar_sessions')
+            .update({ date: newDate, trainer_id: validTrainerId })
+            .eq('id', sessionId),
+        ]);
       }
 
       toast({

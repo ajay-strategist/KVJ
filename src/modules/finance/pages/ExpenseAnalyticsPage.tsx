@@ -207,14 +207,24 @@ export function ExpenseAnalyticsPage() {
       });
       setEnrollmentsMap(enrollCounts);
 
-      // Fetch Canonical Schedule Sessions (Metric 7 Authoritative Source)
-      const { data: schedSessionsData } = await supabase
-        .from('flwdsk_schedule_sessions')
-        .select('batch_id, date')
-        .is('deleted_at', null);
+      // Fetch Canonical Schedule Sessions & Calendar Sessions (Metric 7 Authoritative Source)
+      const [schedRes, calRes] = await Promise.allSettled([
+        supabase
+          .from('flwdsk_schedule_sessions')
+          .select('batch_id, date')
+          .is('deleted_at', null),
+        supabase
+          .from('flwdsk_calendar_sessions')
+          .select('batch_id, date')
+          .is('deleted_at', null),
+      ]);
+
+      const schedSessionsData = schedRes.status === 'fulfilled' && schedRes.value.data ? schedRes.value.data : [];
+      const calSessionsData = calRes.status === 'fulfilled' && calRes.value.data ? calRes.value.data : [];
+      const allSessionsData = [...schedSessionsData, ...calSessionsData];
 
       const batchDates: Record<string, Set<string>> = {};
-      schedSessionsData?.forEach((s: any) => {
+      allSessionsData.forEach((s: any) => {
         if (s.batch_id && s.date) {
           if (!batchDates[s.batch_id]) batchDates[s.batch_id] = new Set();
           batchDates[s.batch_id].add(s.date);

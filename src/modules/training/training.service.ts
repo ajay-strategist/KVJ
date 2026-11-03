@@ -2451,8 +2451,8 @@ export class TrainingService implements ITrainingService {
         return Err(AppError.validation('Batch ID and Trainer ID are required.'));
       }
 
-      // Canonical storage target: flwdsk_schedule_sessions (CAL-Q01 & ISSUE-005)
-      const schedulePayload: Record<string, any> = {
+      // Authoritative unified training calendar storage: flwdsk_calendar_sessions
+      const calendarPayload: Record<string, any> = {
         id: session.id,
         batch_id: session.batch_id,
         trainer_id: session.trainer_id,
@@ -2462,24 +2462,39 @@ export class TrainingService implements ITrainingService {
         end_time: session.end_time || '17:00',
         venue: session.venue,
         mode: session.mode || 'Offline',
-        color: session.color || 'var(--brand)',
+        student_count: session.student_count || 0,
         status: session.status || 'Scheduled',
+        color: session.color || 'var(--brand)',
       };
 
       const { data: existing } = await supabase
-        .from('flwdsk_schedule_sessions')
+        .from('flwdsk_calendar_sessions')
         .select('*')
         .eq('id', session.id)
         .maybeSingle();
 
       const { data: resultRecord, error: saveError } = await supabase
-        .from('flwdsk_schedule_sessions')
-        .upsert(schedulePayload)
+        .from('flwdsk_calendar_sessions')
+        .upsert(calendarPayload)
         .select('*')
         .single();
 
       if (saveError) {
         return Err(AppError.internal(saveError.message));
+      }
+
+      // Synchronize base attendance schedule row
+      try {
+        await supabase.from('flwdsk_schedule_sessions').upsert({
+          id: session.id,
+          batch_id: session.batch_id,
+          trainer_id: session.trainer_id,
+          date: session.date,
+          status: session.status || 'Scheduled',
+          notes: session.session_title || session.name || null,
+        });
+      } catch (syncErr) {
+        console.warn('Sync to base flwdsk_schedule_sessions skipped:', syncErr);
       }
 
       await supabase.from('flwdsk_audit_logs').insert({
@@ -2506,24 +2521,20 @@ export class TrainingService implements ITrainingService {
         return Err(new AppError({ code: ErrorCode.FORBIDDEN, message: 'Only trainers or admins can delete calendar events.', severity: 'warning' }));
       }
 
-      const { data: existing } = await supabase
-        .from('flwdsk_schedule_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .maybeSingle();
+      const [schedRes, calRes] = await Promise.all([
+        supabase.from('flwdsk_schedule_sessions').select('*').eq('id', sessionId).maybeSingle(),
+        supabase.from('flwdsk_calendar_sessions').select('*').eq('id', sessionId).maybeSingle(),
+      ]);
 
+      const existing = schedRes.data || calRes.data;
       if (!existing) {
         return Err(AppError.notFound('Calendar session not found.'));
       }
 
-      const { error: deleteError } = await supabase
-        .from('flwdsk_schedule_sessions')
-        .delete()
-        .eq('id', sessionId);
-
-      if (deleteError) {
-        return Err(AppError.internal(deleteError.message));
-      }
+      await Promise.allSettled([
+        supabase.from('flwdsk_schedule_sessions').delete().eq('id', sessionId),
+        supabase.from('flwdsk_calendar_sessions').delete().eq('id', sessionId),
+      ]);
 
       await supabase.from('flwdsk_audit_logs').insert({
         actor_id: actor.id,
