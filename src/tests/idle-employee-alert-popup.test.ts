@@ -41,3 +41,4 @@ describe('IdleEmployeeAlertPopup and Notification Chime', () => {
     expect(isSnoozed(dismissed35MinsAgo, now)).toBe(false);
   });
 });
+

@@ -82,6 +82,15 @@ export function TaskWorklogView({
   });
   const [sessTo, setSessTo] = useState('');
 
+  const localProjectData = useProject();
+  const actualProjectData = projectData || localProjectData;
+  const projects = actualProjectData?.projects || [];
+  const tasks = actualProjectData?.tasks || [];
+  const allocations = actualProjectData?.allocations || [];
+  const timesheets = actualProjectData?.timesheets || [];
+  const { approveTimesheet } = actualProjectData || {};
+  const { employees = [] } = useEmployee() || {};
+
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [targetSessionId, setTargetSessionId] = useState<string | null>(null);
   const [targetTaskId, setTargetTaskId] = useState<string | undefined>(undefined);
@@ -126,15 +135,6 @@ export function TaskWorklogView({
   }, [listSessions]);
 
   const [logs, setLogs] = useState<WorklogRecord[]>([]);
-
-  const localProjectData = useProject();
-  const actualProjectData = projectData || localProjectData;
-  const projects = actualProjectData?.projects || [];
-  const tasks = actualProjectData?.tasks || [];
-  const allocations = actualProjectData?.allocations || [];
-  const timesheets = actualProjectData?.timesheets || [];
-  const { approveTimesheet } = actualProjectData || {};
-  const { employees = [] } = useEmployee() || {};
 
   // ── Build synthetic sessions from localStorage when DB sessions are empty ────
   const sessions: TaskWorkSession[] = useMemo(() => {

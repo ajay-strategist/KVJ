@@ -108,6 +108,20 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+const sidebarIconBtnStyle: React.CSSProperties = {
+  flex: 1,
+  height: 34,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-sunken)',
+  color: 'var(--text-secondary)',
+  cursor: 'pointer',
+  transition: 'all 160ms',
+};
+
 // ── FRAME ────────────────────────────────────────────────────────────────────
 function AppShellFrame({ children }: { children: ReactNode }) {
   const device = useDevice();
@@ -1012,17 +1026,3 @@ function SideNavLink({
     </Link>
   );
 }
-
-const sidebarIconBtnStyle: React.CSSProperties = {
-  flex: 1,
-  height: 34,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--border)',
-  background: 'var(--bg-sunken)',
-  color: 'var(--text-secondary)',
-  cursor: 'pointer',
-  transition: 'all 160ms',
-};

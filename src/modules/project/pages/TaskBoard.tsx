@@ -599,6 +599,9 @@ export function TaskBoard({
 
   const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
   const [pendingSwitchTask, setPendingSwitchTask] = useState<TaskItem | null>(null);
+  const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [pauseTargetTaskId, setPauseTargetTaskId] = useState<string | null>(null);
+  const [pauseWorkNote, setPauseWorkNote] = useState('');
 
   const performStartTask = async (task: TaskItem) => {
     setStartingTaskId(task.id);
@@ -659,10 +662,6 @@ export function TaskBoard({
 
     await performStartTask(task);
   };
-
-  const [pauseModalOpen, setPauseModalOpen] = useState(false);
-  const [pauseTargetTaskId, setPauseTargetTaskId] = useState<string | null>(null);
-  const [pauseWorkNote, setPauseWorkNote] = useState('');
 
   const handlePauseTask = (taskId: string) => {
     setPendingSwitchTask(null);

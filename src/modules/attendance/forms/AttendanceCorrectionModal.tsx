@@ -131,8 +131,6 @@ export function AttendanceCorrectionModal({
     }
   }, [open, todayStr]);
 
-  if (!open) return null;
-
   // Payroll month validation check
   const isDateInCurrentPayrollMonth = attendanceDate.startsWith(currentMonthPrefix);
 
@@ -163,6 +161,8 @@ export function AttendanceCorrectionModal({
     }
     return null;
   }, [mode, singleStartTime, singleEndTime, sessions]);
+
+  if (!open) return null;
 
   // Auto-chaining start time when adding next session
   const handleAddSession = () => {

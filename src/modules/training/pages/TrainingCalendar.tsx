@@ -190,6 +190,228 @@ export function computeRecurrenceDates(config: RecurrenceConfig): string[] {
   return results.length > 0 ? results : [startDate];
 }
 
+const ConflictCard = memo(function ConflictCard({ c, onDetails, onResolve, onReassign, onIgnore }: {
+  c: ScheduleConflict; onDetails: () => void; onResolve: () => void; onReassign: () => void; onIgnore: () => void;
+}) {
+  const meta = CONFLICT_META[c.type];
+  return (
+    <div style={{
+      minWidth: 300, flex: '0 0 auto', border: '1px solid var(--border)',
+      borderLeft: `4px solid ${c.severity === 'High' ? '#dc2626' : c.severity === 'Medium' ? '#d97706' : '#2563eb'}`,
+      borderRadius: 'var(--radius-sm, 6px)', padding: 10, background: '#ffffff',
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{meta.icon} {c.type}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>
+        {c.trainerName} · {c.date}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.time}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Batches: {c.batches.join(', ')}</div>
+      <div style={{ fontSize: 12, marginTop: 4 }}>
+        Severity <strong>{c.severity}</strong> · Status <strong>{c.status}</strong>
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+        <MiniBtn onClick={onDetails}>View Details</MiniBtn>
+        <MiniBtn onClick={onResolve}>Resolve</MiniBtn>
+        <MiniBtn onClick={onReassign}>Reassign</MiniBtn>
+        <MiniBtn onClick={onIgnore}>Ignore</MiniBtn>
+      </div>
+    </div>
+  );
+});
+
+function MiniBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      fontSize: 12, padding: '3px 7px', borderRadius: 'var(--radius-xs, 4px)',
+      border: '1px solid var(--border)', background: 'var(--bg-sunken)',
+      color: 'var(--text-secondary)', cursor: 'pointer',
+    }}>{children}</button>
+  );
+}
+
+/** One trainer/day cell with strict overflow clipping and drag & drop date move support */
+const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sessions, leave, expanded, onOpen, onCopy, onAssignCell, onMoveSession }: {
+  left: number; width: number; date: string; trainerId: string;
+  sessions: ScheduleSession[];
+  leave?: { duration: string; type: string; status: string };
+  expanded: boolean;
+  onOpen: (s: ScheduleSession) => void;
+  onCopy: (s: ScheduleSession) => void;
+  onAssignCell: (date: string, trainerId: string) => void;
+  onMoveSession: (sessionId: string, newDate: string, newTrainerId: string) => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  return (
+    <div
+      onClick={(e) => {
+        // Prevent opening assign if clicking directly on a session button
+        if ((e.target as HTMLElement).closest('button')) return;
+        if (!leave) onAssignCell(date, trainerId);
+      }}
+      onDragOver={(e) => {
+        if (leave) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        setIsDragOver(false);
+        if (leave) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          const raw = e.dataTransfer.getData('text/plain');
+          if (!raw) return;
+          const data = JSON.parse(raw);
+          if (data && data.sessionId) {
+            onMoveSession(data.sessionId, date, trainerId);
+          }
+        } catch (err) {
+          console.warn('Drop error:', err);
+        }
+      }}
+      style={{
+        position: 'absolute', left, width, top: 0, height: '100%',
+        borderRight: '1px solid var(--border)', padding: 6,
+        display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box',
+        cursor: !leave ? 'pointer' : 'default',
+        overflow: 'hidden',
+        background: isDragOver ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+        transition: 'background 0.15s ease',
+      }}
+    >
+      {leave && (
+        <div style={{ fontSize: 12, fontWeight: 700, padding: '3px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          🟧 {leave.duration} {leave.type} ({leave.status})
+        </div>
+      )}
+      {sessions.map((s) => {
+        let rawCode = s.batchCode || s.name || s.course || '';
+        let batchDisplay = (s.batchCode && s.batchCode !== 'Training Batch' && s.batchCode !== 'Training Session')
+          ? s.batchCode
+          : cleanBatchCode(rawCode);
+
+        if (!batchDisplay || batchDisplay === 'Training Batch' || batchDisplay === 'Custom') {
+          batchDisplay = s.name && s.name !== 'Training Batch' && s.name !== 'Custom'
+            ? s.name
+            : (s.course && s.course !== '—' ? s.course : 'Training Session');
+        }
+
+        const timeDisplay = `${s.startTime}–${s.endTime}`;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            draggable
+            onDragStart={(e) => {
+              e.stopPropagation();
+              e.dataTransfer.setData('text/plain', JSON.stringify({ sessionId: s.id, fromDate: s.date, fromTrainerId: s.trainerId }));
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            title={`Drag to move date or reassign trainer · ${batchDisplay} (${timeDisplay})`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen(s);
+            }}
+            style={{
+              textAlign: 'left',
+              borderLeft: `4px solid ${s.color || 'var(--brand)'}`,
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              padding: '6px 8px',
+              cursor: 'grab',
+              fontSize: 12,
+              color: 'var(--text-primary)',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              width: '100%',
+              flexShrink: 0,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 4,
+                marginBottom: 2,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 12,
+                  color: 'var(--brand-primary, #1e40af)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.3,
+                  flex: 1,
+                }}
+              >
+                🎓 {batchDisplay}
+              </div>
+              <span
+                role="button"
+                tabIndex={0}
+                title="Copy schedule to another day"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy(s);
+                }}
+                style={{
+                  fontSize: 11,
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  background: 'var(--bg-sunken, #f1f5f9)',
+                  color: 'var(--text-secondary, #475569)',
+                  border: '1px solid var(--border)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  flexShrink: 0,
+                }}
+              >
+                📋 Copy
+              </span>
+            </div>
+            <div
+              style={{
+                color: 'var(--text-secondary)',
+                fontSize: 12,
+                fontWeight: 500,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                marginTop: 2,
+              }}
+            >
+              ⏰ {timeDisplay} {s.name && cleanBatchCode(s.name) !== batchDisplay ? `· ${cleanBatchCode(s.name)}` : ''}
+            </div>
+            {expanded && (
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
+                📍 {s.venue} · {s.mode} {s.studentCount ? `· 👥 ${s.studentCount}` : ''}<br />🏛️ {s.college} · 👤 {s.coordinator}
+              </div>
+            )}
+          </button>
+        );
+      })}
+      {!leave && sessions.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', alignSelf: 'center', marginTop: 'auto', marginBottom: 'auto', opacity: 0.6 }}>
+          Office
+        </div>
+      )}
+    </div>
+  );
+});
+
 export function TrainingCalendar() {
   const { user } = useAuth();
   const userRole = (user?.role || 'EMPLOYEE').toUpperCase();
@@ -2162,226 +2384,6 @@ function FrozenCell({ w, left, bg, children }: { w: number; left: number; bg: st
   );
 }
 
-const ConflictCard = memo(function ConflictCard({ c, onDetails, onResolve, onReassign, onIgnore }: {
-  c: ScheduleConflict; onDetails: () => void; onResolve: () => void; onReassign: () => void; onIgnore: () => void;
-}) {
-  const meta = CONFLICT_META[c.type];
-  return (
-    <div style={{
-      minWidth: 300, flex: '0 0 auto', border: '1px solid var(--border)',
-      borderLeft: `4px solid ${c.severity === 'High' ? '#dc2626' : c.severity === 'Medium' ? '#d97706' : '#2563eb'}`,
-      borderRadius: 'var(--radius-sm, 6px)', padding: 10, background: '#ffffff',
-    }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{meta.icon} {c.type}</div>
-      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>
-        {c.trainerName} · {c.date}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.time}</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Batches: {c.batches.join(', ')}</div>
-      <div style={{ fontSize: 12, marginTop: 4 }}>
-        Severity <strong>{c.severity}</strong> · Status <strong>{c.status}</strong>
-      </div>
-      <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-        <MiniBtn onClick={onDetails}>View Details</MiniBtn>
-        <MiniBtn onClick={onResolve}>Resolve</MiniBtn>
-        <MiniBtn onClick={onReassign}>Reassign</MiniBtn>
-        <MiniBtn onClick={onIgnore}>Ignore</MiniBtn>
-      </div>
-    </div>
-  );
-});
 
-function MiniBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      fontSize: 12, padding: '3px 7px', borderRadius: 'var(--radius-xs, 4px)',
-      border: '1px solid var(--border)', background: 'var(--bg-sunken)',
-      color: 'var(--text-secondary)', cursor: 'pointer',
-    }}>{children}</button>
-  );
-}
-
-/** One trainer/day cell with strict overflow clipping and drag & drop date move support */
-const MatrixCell = memo(function MatrixCell({ left, width, date, trainerId, sessions, leave, expanded, onOpen, onCopy, onAssignCell, onMoveSession }: {
-  left: number; width: number; date: string; trainerId: string;
-  sessions: ScheduleSession[];
-  leave?: { duration: string; type: string; status: string };
-  expanded: boolean;
-  onOpen: (s: ScheduleSession) => void;
-  onCopy: (s: ScheduleSession) => void;
-  onAssignCell: (date: string, trainerId: string) => void;
-  onMoveSession: (sessionId: string, newDate: string, newTrainerId: string) => void;
-}) {
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  return (
-    <div
-      onClick={(e) => {
-        // Prevent opening assign if clicking directly on a session button
-        if ((e.target as HTMLElement).closest('button')) return;
-        if (!leave) onAssignCell(date, trainerId);
-      }}
-      onDragOver={(e) => {
-        if (leave) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        setIsDragOver(true);
-      }}
-      onDragLeave={() => setIsDragOver(false)}
-      onDrop={(e) => {
-        setIsDragOver(false);
-        if (leave) return;
-        e.preventDefault();
-        e.stopPropagation();
-        try {
-          const raw = e.dataTransfer.getData('text/plain');
-          if (!raw) return;
-          const data = JSON.parse(raw);
-          if (data && data.sessionId) {
-            onMoveSession(data.sessionId, date, trainerId);
-          }
-        } catch (err) {
-          console.warn('Drop error:', err);
-        }
-      }}
-      style={{
-        position: 'absolute', left, width, top: 0, height: '100%',
-        borderRight: '1px solid var(--border)', padding: 6,
-        display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box',
-        cursor: !leave ? 'pointer' : 'default',
-        overflow: 'hidden',
-        background: isDragOver ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-        transition: 'background 0.15s ease',
-      }}
-    >
-      {leave && (
-        <div style={{ fontSize: 12, fontWeight: 700, padding: '3px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          🟧 {leave.duration} {leave.type} ({leave.status})
-        </div>
-      )}
-      {sessions.map((s) => {
-        let rawCode = s.batchCode || s.name || s.course || '';
-        let batchDisplay = (s.batchCode && s.batchCode !== 'Training Batch' && s.batchCode !== 'Training Session')
-          ? s.batchCode
-          : cleanBatchCode(rawCode);
-
-        if (!batchDisplay || batchDisplay === 'Training Batch' || batchDisplay === 'Custom') {
-          batchDisplay = s.name && s.name !== 'Training Batch' && s.name !== 'Custom'
-            ? s.name
-            : (s.course && s.course !== '—' ? s.course : 'Training Session');
-        }
-
-        const timeDisplay = `${s.startTime}–${s.endTime}`;
-        return (
-          <button
-            key={s.id}
-            type="button"
-            draggable
-            onDragStart={(e) => {
-              e.stopPropagation();
-              e.dataTransfer.setData('text/plain', JSON.stringify({ sessionId: s.id, fromDate: s.date, fromTrainerId: s.trainerId }));
-              e.dataTransfer.effectAllowed = 'move';
-            }}
-            title={`Drag to move date or reassign trainer · ${batchDisplay} (${timeDisplay})`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen(s);
-            }}
-            style={{
-              textAlign: 'left',
-              borderLeft: `4px solid ${s.color || 'var(--brand)'}`,
-              background: 'var(--bg-panel)',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              padding: '6px 8px',
-              cursor: 'grab',
-              fontSize: 12,
-              color: 'var(--text-primary)',
-              overflow: 'hidden',
-              boxSizing: 'border-box',
-              width: '100%',
-              flexShrink: 0,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 4,
-                marginBottom: 2,
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 12,
-                  color: 'var(--brand-primary, #1e40af)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  lineHeight: 1.3,
-                  flex: 1,
-                }}
-              >
-                🎓 {batchDisplay}
-              </div>
-              <span
-                role="button"
-                tabIndex={0}
-                title="Copy schedule to another day"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCopy(s);
-                }}
-                style={{
-                  fontSize: 11,
-                  padding: '1px 6px',
-                  borderRadius: 4,
-                  background: 'var(--bg-sunken, #f1f5f9)',
-                  color: 'var(--text-secondary, #475569)',
-                  border: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  flexShrink: 0,
-                }}
-              >
-                📋 Copy
-              </span>
-            </div>
-            <div
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: 12,
-                fontWeight: 500,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                marginTop: 2,
-              }}
-            >
-              ⏰ {timeDisplay} {s.name && cleanBatchCode(s.name) !== batchDisplay ? `· ${cleanBatchCode(s.name)}` : ''}
-            </div>
-            {expanded && (
-              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
-                📍 {s.venue} · {s.mode} {s.studentCount ? `· 👥 ${s.studentCount}` : ''}<br />🏛️ {s.college} · 👤 {s.coordinator}
-              </div>
-            )}
-          </button>
-        );
-      })}
-      {!leave && sessions.length === 0 && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', alignSelf: 'center', marginTop: 'auto', marginBottom: 'auto', opacity: 0.6 }}>
-          Office
-        </div>
-      )}
-    </div>
-  );
-});
 
 export default TrainingCalendar;

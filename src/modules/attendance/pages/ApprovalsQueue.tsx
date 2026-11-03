@@ -161,6 +161,61 @@ export function ApprovalsQueue() {
     return isProjSupervisor || isTaskSupervisor || isNameMatchSupervisor;
   }, [user?.id, user?.role, user?.fullName, projects]);
 
+  const empName = useCallback((empId?: string) => {
+    if (!empId) return 'Unknown Employee';
+    const emp = employees[empId];
+    return emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
+  }, [employees]);
+
+  const getSupervisorName = useCallback((t: any) => {
+    if (!t) return '—';
+    const safeProjects = Array.isArray(projects) ? projects : [];
+    const proj = safeProjects.find((p) => p.id === t.projectId);
+    const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
+
+    // 1. Project Supervisor takes primary precedence for project tasks
+    if (projSupId && employees[projSupId]) {
+      const emp = employees[projSupId];
+      return `${emp.firstName} ${emp.lastName}`;
+    }
+
+    // 2. Task-level supervisor ID (if assigned and NOT the assignee themselves)
+    const taskSupId = t.supervisorId || t.supervisor_id;
+    if (taskSupId && taskSupId !== t.assigneeId && employees[taskSupId]) {
+      const emp = employees[taskSupId];
+      return `${emp.firstName} ${emp.lastName}`;
+    }
+
+    // 3. String supervisor on task (if valid and NOT the assignee's name)
+    const assigneeEmp = employees[t.assigneeId];
+    const assigneeName = assigneeEmp ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}`.trim().toLowerCase() : '';
+    if (typeof t.supervisor === 'string' && t.supervisor && t.supervisor !== '—' && t.supervisor !== 'None') {
+      if (!assigneeName || t.supervisor.trim().toLowerCase() !== assigneeName) {
+        return t.supervisor;
+      }
+    }
+
+    // 4. Assigned by employee (only if assignor is NOT the assignee)
+    const assignorId = t.assignedByEmployeeId || t.assigned_by_employee_id;
+    if (assignorId && assignorId !== t.assigneeId && employees[assignorId]) {
+      const emp = employees[assignorId];
+      return `${emp.firstName} ${emp.lastName}`;
+    }
+    if (typeof t.assignedBy === 'string' && t.assignedBy) {
+      if (!assigneeName || t.assignedBy.trim().toLowerCase() !== assigneeName) {
+        return t.assignedBy;
+      }
+    }
+
+    // 5. Fallback project supervisor if empName resolves
+    if (projSupId) {
+      const fallback = empName(projSupId);
+      if (fallback !== 'Unknown Employee') return fallback;
+    }
+
+    return '—';
+  }, [projects, employees, empName]);
+
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'pending_task_approval' | 'pending_assignment_approval' | 'over_7_days'>('all');
   const [taskEmployeeFilter, setTaskEmployeeFilter] = useState<string>('all');
   const [taskSupervisorFilter, setTaskSupervisorFilter] = useState<string>('all');
@@ -216,7 +271,7 @@ export function ApprovalsQueue() {
 
       return true;
     });
-  }, [tasks, taskStatusFilter, taskEmployeeFilter, taskSupervisorFilter, canApproveTaskItem, employees]);
+  }, [tasks, taskStatusFilter, taskEmployeeFilter, taskSupervisorFilter, canApproveTaskItem, employees, getSupervisorName]);
 
   /** Task Completion items that have been waiting in the queue for >= 7 days (used for banner). */
   const over7DaysTasks = useMemo(() => {
@@ -281,61 +336,6 @@ export function ApprovalsQueue() {
   useEffect(() => {
     fetchCorrectionsAndEmployees();
   }, [fetchCorrectionsAndEmployees, pendingApprovals]);
-
-  const empName = (empId?: string) => {
-    if (!empId) return 'Unknown Employee';
-    const emp = employees[empId];
-    return emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
-  };
-
-  const getSupervisorName = (t: any) => {
-    if (!t) return '—';
-    const safeProjects = Array.isArray(projects) ? projects : [];
-    const proj = safeProjects.find((p) => p.id === t.projectId);
-    const projSupId = (proj as any)?.supervisorId || (proj as any)?.supervisor_id;
-
-    // 1. Project Supervisor takes primary precedence for project tasks
-    if (projSupId && employees[projSupId]) {
-      const emp = employees[projSupId];
-      return `${emp.firstName} ${emp.lastName}`;
-    }
-
-    // 2. Task-level supervisor ID (if assigned and NOT the assignee themselves)
-    const taskSupId = t.supervisorId || t.supervisor_id;
-    if (taskSupId && taskSupId !== t.assigneeId && employees[taskSupId]) {
-      const emp = employees[taskSupId];
-      return `${emp.firstName} ${emp.lastName}`;
-    }
-
-    // 3. String supervisor on task (if valid and NOT the assignee's name)
-    const assigneeEmp = employees[t.assigneeId];
-    const assigneeName = assigneeEmp ? `${assigneeEmp.firstName} ${assigneeEmp.lastName}`.trim().toLowerCase() : '';
-    if (typeof t.supervisor === 'string' && t.supervisor && t.supervisor !== '—' && t.supervisor !== 'None') {
-      if (!assigneeName || t.supervisor.trim().toLowerCase() !== assigneeName) {
-        return t.supervisor;
-      }
-    }
-
-    // 4. Assigned by employee (only if assignor is NOT the assignee)
-    const assignorId = t.assignedByEmployeeId || t.assigned_by_employee_id;
-    if (assignorId && assignorId !== t.assigneeId && employees[assignorId]) {
-      const emp = employees[assignorId];
-      return `${emp.firstName} ${emp.lastName}`;
-    }
-    if (typeof t.assignedBy === 'string' && t.assignedBy) {
-      if (!assigneeName || t.assignedBy.trim().toLowerCase() !== assigneeName) {
-        return t.assignedBy;
-      }
-    }
-
-    // 5. Fallback project supervisor if empName resolves
-    if (projSupId) {
-      const fallback = empName(projSupId);
-      if (fallback !== 'Unknown Employee') return fallback;
-    }
-
-    return '—';
-  };
 
   const [selectedLeaveIds, setSelectedLeaveIds] = useState<string[]>([]);
   const [batchProcessing, setBatchProcessing] = useState(false);

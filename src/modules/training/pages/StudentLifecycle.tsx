@@ -52,6 +52,10 @@ export function StudentLifecycle() {
     }
   };
 
+  const safeStudents = Array.isArray(students) ? students : [];
+  const safeBatches = Array.isArray(batches) ? batches : [];
+  const safeEnrollments = Array.isArray(enrollments) ? enrollments : [];
+
   const studentName = (studentId: string) => {
     const s = safeStudents.find((st) => st?.id === studentId);
     return s ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : 'Unknown';
@@ -77,10 +81,6 @@ export function StudentLifecycle() {
       <span className={`kvj-badge kvj-badge--${e.status === 'admitted' ? 'success' : 'neutral'}`}>{e.status}</span>
     )},
   ];
-
-  const safeStudents = Array.isArray(students) ? students : [];
-  const safeBatches = Array.isArray(batches) ? batches : [];
-  const safeEnrollments = Array.isArray(enrollments) ? enrollments : [];
 
   const studentOptions = safeStudents.map((s) => ({ value: s?.id || '', label: `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || 'Unknown' }));
   const batchOptions = safeBatches.map((b) => ({ value: b?.id || '', label: cleanBatchCode(b?.code || '') || b?.code || 'Unnamed Batch' }));

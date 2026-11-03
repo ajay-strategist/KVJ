@@ -495,6 +495,457 @@ export function AttendanceLogPage() {
     }
   };
 
+
+  const resolveBatchHelper = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string) => {
+    const wt = workType || 'Office';
+    const safeBatches = Array.isArray(batches) ? batches : [];
+    const isTraining = wt.startsWith('Training:') || wt === 'Training' || (sessionNotes || '').toLowerCase().includes('training') || (recordNotes || '').toLowerCase().includes('training');
+
+    let foundBatch: any = null;
+    let extractedLoc: string | null = null;
+
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+    const locMatch = rawNotes.match(/Location:\s*([^\n,]+)/i);
+    if (locMatch && locMatch[1].trim()) {
+      const parsedLoc = locMatch[1].trim().replace(/\.$/, '').trim();
+      if (parsedLoc.toLowerCase() !== 'office work' && parsedLoc.toLowerCase() !== 'office') {
+        extractedLoc = parsedLoc;
+      }
+    }
+
+    // 1. Direct recordBatchId lookup
+    if (recordBatchId) {
+      foundBatch = safeBatches.find((b) => b && (b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId));
+    }
+
+    // 2. Extract batch code from "Training: Code" prefix
+    if (!foundBatch && wt.startsWith('Training:')) {
+      const codePart = wt.substring(9).trim();
+      foundBatch = safeBatches.find((b) =>
+        b && (
+          b.code === codePart ||
+          b.id === codePart ||
+          b.trainingName === codePart ||
+          batchDisplayName(b) === codePart
+        )
+      );
+    }
+
+    // 3. Match extracted Location string ONLY IF IT IS AN EXACT MATCH for batch code or full display name
+    if (!foundBatch && extractedLoc) {
+      const lowerLoc = extractedLoc.toLowerCase();
+      foundBatch = safeBatches.find((b) => {
+        if (!b) return false;
+        const disp = batchDisplayName(b).toLowerCase();
+        if (disp === lowerLoc) return true;
+        if (b.code && b.code.toLowerCase() === lowerLoc) return true;
+        return false;
+      });
+    }
+
+    return { foundBatch, extractedLoc, isTraining };
+  }, [batches]);
+
+  const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+    const wt = (workType || '').toLowerCase().trim();
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+    const lowerNotes = rawNotes.toLowerCase();
+
+    if (wt.includes('marketing') || lowerNotes.includes('classification: marketing')) {
+      return 'Marketing';
+    }
+    if (wt === 'work from home' || wt === 'remote' || wt === 'wfh' || wt.includes('remote') || wt.includes('wfh') || wt.includes('work from home') || lowerNotes.includes('remote') || lowerNotes.includes('wfh') || lowerNotes.includes('work from home')) {
+      return 'Remote';
+    }
+
+    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    if (foundBatch) {
+      return batchDisplayName(foundBatch);
+    }
+    if (extractedLoc) {
+      return extractedLoc;
+    }
+    return isTraining ? 'Training Batch' : (wt === 'office' || !wt ? 'KVJ Analytics' : (workType || '—'));
+  }, [resolveBatchHelper]);
+
+  const resolveLocationValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
+    const wt = (workType || '').toLowerCase().trim();
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+    const lowerNotes = rawNotes.toLowerCase();
+
+    if (wt === 'work from home' || wt === 'remote' || wt === 'wfh' || wt.includes('remote') || wt.includes('wfh') || wt.includes('work from home') || lowerNotes.includes('remote') || lowerNotes.includes('wfh') || lowerNotes.includes('work from home')) {
+      return 'Remote';
+    }
+
+    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    if (foundBatch) {
+      return foundBatch.venue || foundBatch.college || 'Offline';
+    }
+    if (extractedLoc) {
+      return 'Offline';
+    }
+    return isTraining ? 'Offline' : (wt === 'office' || !wt ? 'Office' : workType || '—');
+  }, [resolveBatchHelper]);
+
+  const resolveClassOrWorkValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string) => {
+    const wt = (workType || '').toLowerCase().trim();
+    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+    const lowerNotes = rawNotes.toLowerCase();
+
+    const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    if (isTraining) {
+      return { value: 'Class', isTraining: true };
+    }
+    if (wt === 'work from home' || wt === 'remote' || wt === 'wfh' || wt.includes('remote') || wt.includes('wfh') || wt.includes('work from home') || lowerNotes.includes('remote') || lowerNotes.includes('wfh') || lowerNotes.includes('work from home')) {
+      return { value: 'Work From Home', isTraining: false };
+    }
+    const origWt = workType || 'Office';
+    const cleanWt = origWt.startsWith('Training:') ? origWt.substring(9).trim() : origWt;
+    return { value: cleanWt, isTraining: false };
+  }, [resolveBatchHelper]);
+
+  const calendarDays: CalendarDayDetail[] = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days: CalendarDayDetail[] = [];
+
+    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
+    const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
+    const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
+    const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
+
+    const empId = currentEmployee?.id || user?.id || '';
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = toLocalISODate(d);
+      const dayNum = d.getDate();
+      const dayOfWeekIdx = d.getDay();
+      const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
+
+      const record = recList.find(r => r && r.workDate === dateStr);
+      const dayClaims = claimList.filter(c => c && (c.status || '').toLowerCase() === 'approved' && (c.createdAt || '').slice(0, 10) === dateStr);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
+      const decHoliday = holList.find((h: any) => h && h.date === dateStr);
+      const activeLeave = leaveList.find(l =>
+        (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
+        dateStr >= l.startDate && dateStr <= l.endDate &&
+        l.status === 'approved'
+      );
+
+      if (record) {
+        const firstSession = record.sessions?.[0];
+        const workType = firstSession?.workType || 'Office';
+        const batchId = (firstSession as any)?.batchId || (firstSession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+        const orgVal = resolveOrgValue(workType, firstSession?.notes, (record as any).notes, batchId) || 'Office';
+
+        const sessions = record.sessions?.map(s => ({
+          location: resolveOrgValue(s.workType, s.notes, (record as any).notes, (s as any).batchId || (s as any).batch_id) || 'Office',
+          type: s.workType || 'Office',
+          startTime: safeFormatTime(s.clockIn),
+          endTime: safeFormatTime(s.clockOut),
+          tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
+        })) || [];
+
+        let totalMins = 0;
+        const validSessions = (record.sessions || []).filter(s => {
+          const st = safeFormatTime(s.clockIn);
+          return !!st && st !== '—';
+        });
+
+        if (validSessions.length > 0) {
+          const seenKeys = new Set<string>();
+          for (const s of validSessions) {
+            const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              if (s.clockIn) {
+                const t1 = new Date(s.clockIn).getTime();
+                const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
+                  totalMins += Math.max(0, Math.round((t2 - t1) / 60000));
+                }
+              }
+            }
+          }
+          if (record.totalBreakMinutes) {
+            totalMins = Math.max(0, totalMins - record.totalBreakMinutes);
+          }
+        } else if (record.totalWorkingMinutes && record.totalWorkingMinutes > 0) {
+          totalMins = record.totalWorkingMinutes;
+        } else if (record.firstClockIn && record.lastClockOut) {
+          const endTs = new Date(record.lastClockOut).getTime();
+          const startTs = new Date(record.firstClockIn).getTime();
+          if (!isNaN(endTs) && !isNaN(startTs) && endTs > startTs) {
+            totalMins = Math.max(0, Math.round((endTs - startTs) / 60000) - (record.totalBreakMinutes || 0));
+          }
+        }
+        const totalHrs = Math.floor(totalMins / 60);
+        const remMins = totalMins % 60;
+
+        const isHolType = workType === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday');
+        const isLeaveType = (workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave);
+
+        days.push({
+          dateNum: dayNum,
+          dayName,
+          fullDate: dateStr.split('-').reverse().join('/'),
+          status: decHoliday || isHolType ? 'holiday' : isLeaveType ? 'leave' : 'present',
+          location: orgVal,
+          startTime: safeFormatTime(record.firstClockIn),
+          endTime: safeFormatTime(record.lastClockOut),
+          sessions,
+          tasks: record.sessions?.map(s => ({ title: s.notes || 'Task', duration: '' })) || [],
+          hoursWorked: `${totalHrs}h ${remMins}m`,
+          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '',
+          breakMinutes: record.totalBreakMinutes || 0,
+        });
+      } else {
+        const isSunday = dayOfWeekIdx === 0;
+        const isHoliday = !!decHoliday || isSunday;
+
+        days.push({
+          dateNum: dayNum,
+          dayName,
+          fullDate: dateStr.split('-').reverse().join('/'),
+          status: isHoliday ? 'holiday' : activeLeave ? 'leave' : 'absent',
+          location: decHoliday ? decHoliday.name : isSunday ? 'Weekend Off' : activeLeave ? `On Leave (${activeLeave.leaveType})` : '',
+          startTime: undefined,
+          endTime: undefined,
+          sessions: [],
+          tasks: [],
+          hoursWorked: '',
+          expenses: '',
+        });
+      }
+    }
+    return days;
+  }, [startDate, endDate, attendanceRecords, expenseClaims, declaredHolidays, leaveRecords, currentEmployee, selectedEmployee, user, resolveOrgValue]);
+
+  const tableRows = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const rows: AttendanceLogRow[] = [];
+
+    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
+    const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
+    const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
+    const empList = Array.isArray(employees) ? employees : [];
+    const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
+
+    const empId = currentEmployee?.id || user?.id || '';
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = toLocalISODate(d);
+      const record = recList.find(r => r && r.workDate === dateStr);
+      const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
+      const decHoliday = holList.find((h: any) => h && h.date === dateStr);
+      const activeLeave = leaveList.find(l =>
+        l && l.employeeId === (record ? record.employeeId : empId) &&
+        dateStr >= l.startDate && dateStr <= l.endDate &&
+        l.status === 'approved'
+      );
+
+      const empName = currentEmployee
+        ? `${currentEmployee.firstName || ''} ${currentEmployee.lastName || ''}`.trim()
+        : user ? user.fullName || 'Employee' : 'Employee';
+
+      if (record) {
+        const emp = empList.find(e => e && e.id === record.employeeId);
+        const resolvedEmpName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : empName;
+        
+        let breakMins = 0;
+        if (record.breaks && record.breaks.length > 0) {
+          breakMins = calculateMergedBreakMinutes(record.breaks, {
+            isCurrentlyOnBreak: record.status === 'on_break',
+          });
+        }
+        if (breakMins === 0) {
+          breakMins = record.totalBreakMinutes || (record as any).total_break_minutes || 0;
+        }
+
+        if (record.firstClockIn) {
+          const endTs = record.lastClockOut ? new Date(record.lastClockOut).getTime() : Date.now();
+          const grossMins = Math.max(0, Math.round((endTs - new Date(record.firstClockIn).getTime()) / 60000));
+          breakMins = Math.min(breakMins, grossMins);
+        }
+
+        const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
+
+        const rawSessionsList = record.sessions && record.sessions.length > 0
+          ? record.sessions
+          : [{
+              id: record.id,
+              workType: 'Office' as WorkSessionType,
+              clockIn: record.firstClockIn || '',
+              clockOut: record.lastClockOut || '',
+              notes: (record as any).notes || '',
+            }];
+
+        // Filter out any session with no valid clockIn time ('—' or empty)
+        const validSessions = rawSessionsList.filter(s => {
+          const st = safeFormatTime(s.clockIn);
+          return !!st && st !== '—';
+        });
+
+        // Deduplicate sessions with identical clockIn, clockOut, workType, and notes
+        const uniqueSessions: any[] = [];
+        const seenKeys = new Set<string>();
+        for (const s of validSessions) {
+          const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueSessions.push(s);
+          }
+        }
+
+        const isHoliday = (record as any).notes?.toLowerCase().includes('holiday') || !!decHoliday;
+        const isLeave = !!activeLeave;
+        const leaveModeLabel = activeLeave?.halfDay
+          ? `On Leave (${activeLeave.halfDayShift || 'Half Day'})`
+          : 'On Leave';
+
+        if ((isLeave && uniqueSessions.length === 0) || isHoliday || uniqueSessions.length === 0) {
+          const primarySession = rawSessionsList[0];
+          const workType = primarySession?.workType || 'Office';
+          const batchId = (primarySession as any)?.batchId || (primarySession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+          const orgVal = resolveOrgValue(workType, primarySession?.notes, (record as any).notes, batchId) || 'Office';
+          const locVal = resolveLocationValue(workType, primarySession?.notes, (record as any).notes, batchId) || 'Office';
+          const classOrWorkInfo = resolveClassOrWorkValue(workType, primarySession?.notes, (record as any).notes, batchId);
+
+          let fallbackMins = 0;
+          const sTimeStr = safeFormatTime(record.firstClockIn || primarySession?.clockIn);
+          const eTimeStr = safeFormatTime(record.lastClockOut || primarySession?.clockOut);
+          const sMinVal = parseDisplayTimeToMinutes(sTimeStr);
+          const eMinVal = parseDisplayTimeToMinutes(eTimeStr);
+          if (sMinVal !== null && eMinVal !== null && eMinVal >= sMinVal) {
+            fallbackMins = eMinVal - sMinVal;
+          } else {
+            const cInTime = record.firstClockIn || primarySession?.clockIn;
+            const cOutTime = record.lastClockOut || primarySession?.clockOut;
+            if (cInTime) {
+              const endMs = cOutTime ? new Date(cOutTime).getTime() : Date.now();
+              const grossMs = Math.max(0, endMs - new Date(cInTime).getTime());
+              fallbackMins = Math.max(0, Math.round(grossMs / 60000));
+            }
+          }
+          const fallbackDur = `${Math.floor(fallbackMins / 60)}h ${fallbackMins % 60}m`;
+
+            const isPrimaryRemote = locVal === 'Remote' || orgVal === 'Remote';
+            rows.push({
+              date: dateStr.split('-').reverse().join('-'),
+              name: resolvedEmpName,
+              holiday: decHoliday ? (decHoliday as any).name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
+              org: isLeave ? '—' : orgVal,
+              location: isLeave ? '—' : locVal,
+              type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
+              isTraining: isLeave ? false : classOrWorkInfo.isTraining,
+              mode: isHoliday ? 'Holiday' : isLeave ? leaveModeLabel : (workType === 'Training' ? 'Training' : isPrimaryRemote ? 'Remote' : 'Offline'),
+              start: isLeave ? '—' : sTimeStr,
+              end: isLeave ? '—' : eTimeStr,
+              duration: isLeave ? '0h 0m' : fallbackDur,
+              expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+              note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : formatCleanNote(primarySession?.notes || (record as any).notes, workType),
+              break: isLeave ? '0h 0m' : breakTime,
+              tasks: primarySession?.notes ? [primarySession.notes] : [],
+            });
+          } else {
+            // EMIT SEPARATE ROW FOR EACH VALID SESSION
+            uniqueSessions.forEach((s, idx) => {
+              const sStartStr = safeFormatTime(s.clockIn);
+              const sEndStr = safeFormatTime(s.clockOut);
+              const sStartMins = parseDisplayTimeToMinutes(sStartStr);
+              const sEndMins = parseDisplayTimeToMinutes(sEndStr);
+
+              let sGrossMins = 0;
+              if (sStartMins !== null && sEndMins !== null && sEndMins >= sStartMins) {
+                sGrossMins = sEndMins - sStartMins;
+              } else if (s.clockIn) {
+                const t1 = new Date(s.clockIn).getTime();
+                const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
+                  sGrossMins = Math.round((t2 - t1) / 60000);
+                }
+              }
+
+              // Calculate breaks specifically belonging to this session
+              let sBreakMins = 0;
+              if (record.breaks && record.breaks.length > 0) {
+                const sessionBreaks = record.breaks.filter((b) => {
+                  const bStart = b.startTime || (b as any).start_time;
+                  if (!bStart) return false;
+                  const matchesSessionId = b.workSessionId && b.workSessionId === s.id;
+                  const sInTs = new Date(s.clockIn).getTime();
+                  const sOutTs = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                  const bStartTs = new Date(bStart).getTime();
+                  const fallsInSession = !isNaN(sInTs) && bStartTs >= sInTs && (isNaN(sOutTs) || bStartTs <= sOutTs);
+                  return matchesSessionId || fallsInSession || uniqueSessions.length === 1;
+                });
+
+                sBreakMins = calculateMergedBreakMinutes(sessionBreaks, {
+                  isCurrentlyOnBreak: record.status === 'on_break',
+                  maxGrossMinutes: sGrossMins,
+                });
+              } else {
+                sBreakMins = Math.min(uniqueSessions.length === 1 || idx === 0 ? breakMins : 0, sGrossMins);
+              }
+
+              // Duration in the attendance table is Clock out - Clock in (gross elapsed session time)
+              const sDuration = `${Math.floor(sGrossMins / 60)}h ${sGrossMins % 60}m`;
+              const sBreakTime = `${Math.floor(sBreakMins / 60)}h ${sBreakMins % 60}m`;
+
+              const sWorkType = s.workType || 'Office';
+              const sBatchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
+              const sOrg = resolveOrgValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
+              const sLoc = resolveLocationValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
+              const sClass = resolveClassOrWorkValue(sWorkType, s.notes, (record as any).notes, sBatchId);
+              const isSessionRemote = sLoc === 'Remote' || sOrg === 'Remote';
+
+              rows.push({
+                date: dateStr.split('-').reverse().join('-'),
+                name: resolvedEmpName,
+                holiday: decHoliday ? (decHoliday as any).name : d.getDay() === 0 ? 'Sunday' : '',
+                org: sOrg,
+                location: sLoc,
+                type: sClass.value,
+                isTraining: sClass.isTraining,
+                mode: sWorkType === 'Training' ? 'Training' : (isSessionRemote ? 'Remote' : 'Offline'),
+                start: sStartStr,
+                end: sEndStr,
+                duration: sDuration,
+                expenses: idx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+                note: formatCleanNote(s.notes || (record as any).notes, sWorkType),
+                break: sBreakTime,
+                tasks: s.notes ? [s.notes] : [],
+              });
+            });
+          }
+      } else {
+        const isSunday = d.getDay() === 0;
+        const isHoliday = !!decHoliday || isSunday;
+        const isLeave = !!activeLeave;
+
+        rows.push({
+          date: dateStr.split('-').reverse().join('-'),
+          name: empName,
+          holiday: decHoliday ? decHoliday.name : isSunday ? 'Sunday' : '',
+          org: '—',
+          location: '—',
+          type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : '—',
+          mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : '—',
+          start: '—',
+          end: '—',
+          duration: '0h 0m',
+          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
+          note: '—',
+          break: '0h 0m',
+          tasks: [],
+        });
+      }
+    }
+    return rows;
+  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, leaveRecords, resolveOrgValue, resolveLocationValue, resolveClassOrWorkValue]);
+
   const escapeXml = (val: any): string => {
     if (val === undefined || val === null) return '';
     return String(val)
@@ -1022,455 +1473,6 @@ export function AttendanceLogPage() {
     }
   };
 
-  const resolveBatchHelper = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string) => {
-    const wt = workType || 'Office';
-    const safeBatches = Array.isArray(batches) ? batches : [];
-    const isTraining = wt.startsWith('Training:') || wt === 'Training' || (sessionNotes || '').toLowerCase().includes('training') || (recordNotes || '').toLowerCase().includes('training');
-
-    let foundBatch: any = null;
-    let extractedLoc: string | null = null;
-
-    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
-    const locMatch = rawNotes.match(/Location:\s*([^\n,]+)/i);
-    if (locMatch && locMatch[1].trim()) {
-      const parsedLoc = locMatch[1].trim().replace(/\.$/, '').trim();
-      if (parsedLoc.toLowerCase() !== 'office work' && parsedLoc.toLowerCase() !== 'office') {
-        extractedLoc = parsedLoc;
-      }
-    }
-
-    // 1. Direct recordBatchId lookup
-    if (recordBatchId) {
-      foundBatch = safeBatches.find((b) => b && (b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId));
-    }
-
-    // 2. Extract batch code from "Training: Code" prefix
-    if (!foundBatch && wt.startsWith('Training:')) {
-      const codePart = wt.substring(9).trim();
-      foundBatch = safeBatches.find((b) =>
-        b && (
-          b.code === codePart ||
-          b.id === codePart ||
-          b.trainingName === codePart ||
-          batchDisplayName(b) === codePart
-        )
-      );
-    }
-
-    // 3. Match extracted Location string ONLY IF IT IS AN EXACT MATCH for batch code or full display name
-    if (!foundBatch && extractedLoc) {
-      const lowerLoc = extractedLoc.toLowerCase();
-      foundBatch = safeBatches.find((b) => {
-        if (!b) return false;
-        const disp = batchDisplayName(b).toLowerCase();
-        if (disp === lowerLoc) return true;
-        if (b.code && b.code.toLowerCase() === lowerLoc) return true;
-        return false;
-      });
-    }
-
-    return { foundBatch, extractedLoc, isTraining };
-  }, [batches]);
-
-  const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
-    const wt = (workType || '').toLowerCase().trim();
-    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
-    const lowerNotes = rawNotes.toLowerCase();
-
-    if (wt.includes('marketing') || lowerNotes.includes('classification: marketing')) {
-      return 'Marketing';
-    }
-    if (wt === 'work from home' || wt === 'remote' || wt === 'wfh' || wt.includes('remote') || wt.includes('wfh') || wt.includes('work from home') || lowerNotes.includes('remote') || lowerNotes.includes('wfh') || lowerNotes.includes('work from home')) {
-      return 'Remote';
-    }
-
-    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
-    if (foundBatch) {
-      return batchDisplayName(foundBatch);
-    }
-    if (extractedLoc) {
-      return extractedLoc;
-    }
-    return isTraining ? 'Training Batch' : (wt === 'office' || !wt ? 'KVJ Analytics' : (workType || '—'));
-  }, [resolveBatchHelper]);
-
-  const resolveLocationValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
-    const wt = (workType || '').toLowerCase().trim();
-    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
-    const lowerNotes = rawNotes.toLowerCase();
-
-    if (wt === 'work from home' || wt === 'remote' || wt === 'wfh' || wt.includes('remote') || wt.includes('wfh') || wt.includes('work from home') || lowerNotes.includes('remote') || lowerNotes.includes('wfh') || lowerNotes.includes('work from home')) {
-      return 'Remote';
-    }
-
-    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
-    if (foundBatch) {
-      return foundBatch.venue || foundBatch.college || 'Offline';
-    }
-    if (extractedLoc) {
-      return 'Offline';
-    }
-    return isTraining ? 'Offline' : (wt === 'office' || !wt ? 'Office' : workType || '—');
-  }, [resolveBatchHelper]);
-
-  const resolveClassOrWorkValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string) => {
-    const wt = (workType || '').toLowerCase().trim();
-    const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
-    const lowerNotes = rawNotes.toLowerCase();
-
-    const { foundBatch, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
-    if (isTraining) {
-      return { value: 'Class', isTraining: true };
-    }
-    if (wt === 'work from home' || wt === 'remote' || wt === 'wfh' || wt.includes('remote') || wt.includes('wfh') || wt.includes('work from home') || lowerNotes.includes('remote') || lowerNotes.includes('wfh') || lowerNotes.includes('work from home')) {
-      return { value: 'Work From Home', isTraining: false };
-    }
-    const origWt = workType || 'Office';
-    const cleanWt = origWt.startsWith('Training:') ? origWt.substring(9).trim() : origWt;
-    return { value: cleanWt, isTraining: false };
-  }, [resolveBatchHelper]);
-
-  const calendarDays: CalendarDayDetail[] = useMemo(() => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days: CalendarDayDetail[] = [];
-
-    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
-    const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
-    const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
-    const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
-
-    const empId = currentEmployee?.id || user?.id || '';
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = toLocalISODate(d);
-      const dayNum = d.getDate();
-      const dayOfWeekIdx = d.getDay();
-      const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
-
-      const record = recList.find(r => r && r.workDate === dateStr);
-      const dayClaims = claimList.filter(c => c && (c.status || '').toLowerCase() === 'approved' && (c.createdAt || '').slice(0, 10) === dateStr);
-      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
-      const decHoliday = holList.find((h: any) => h && h.date === dateStr);
-      const activeLeave = leaveList.find(l =>
-        (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
-        dateStr >= l.startDate && dateStr <= l.endDate &&
-        l.status === 'approved'
-      );
-
-      if (record) {
-        const firstSession = record.sessions?.[0];
-        const workType = firstSession?.workType || 'Office';
-        const batchId = (firstSession as any)?.batchId || (firstSession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
-        const orgVal = resolveOrgValue(workType, firstSession?.notes, (record as any).notes, batchId) || 'Office';
-
-        const sessions = record.sessions?.map(s => ({
-          location: resolveOrgValue(s.workType, s.notes, (record as any).notes, (s as any).batchId || (s as any).batch_id) || 'Office',
-          type: s.workType || 'Office',
-          startTime: safeFormatTime(s.clockIn),
-          endTime: safeFormatTime(s.clockOut),
-          tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
-        })) || [];
-
-        let totalMins = 0;
-        const validSessions = (record.sessions || []).filter(s => {
-          const st = safeFormatTime(s.clockIn);
-          return !!st && st !== '—';
-        });
-
-        if (validSessions.length > 0) {
-          const seenKeys = new Set<string>();
-          for (const s of validSessions) {
-            const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
-            if (!seenKeys.has(key)) {
-              seenKeys.add(key);
-              if (s.clockIn) {
-                const t1 = new Date(s.clockIn).getTime();
-                const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
-                if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
-                  totalMins += Math.max(0, Math.round((t2 - t1) / 60000));
-                }
-              }
-            }
-          }
-          if (record.totalBreakMinutes) {
-            totalMins = Math.max(0, totalMins - record.totalBreakMinutes);
-          }
-        } else if (record.totalWorkingMinutes && record.totalWorkingMinutes > 0) {
-          totalMins = record.totalWorkingMinutes;
-        } else if (record.firstClockIn && record.lastClockOut) {
-          const endTs = new Date(record.lastClockOut).getTime();
-          const startTs = new Date(record.firstClockIn).getTime();
-          if (!isNaN(endTs) && !isNaN(startTs) && endTs > startTs) {
-            totalMins = Math.max(0, Math.round((endTs - startTs) / 60000) - (record.totalBreakMinutes || 0));
-          }
-        }
-        const totalHrs = Math.floor(totalMins / 60);
-        const remMins = totalMins % 60;
-
-        const isHolType = workType === 'Holiday' || (record as any).notes?.toLowerCase().includes('holiday');
-        const isLeaveType = (workType === 'Leave' || (record as any).notes?.toLowerCase().includes('leave') || !!activeLeave);
-
-        days.push({
-          dateNum: dayNum,
-          dayName,
-          fullDate: dateStr.split('-').reverse().join('/'),
-          status: decHoliday || isHolType ? 'holiday' : isLeaveType ? 'leave' : 'present',
-          location: orgVal,
-          startTime: safeFormatTime(record.firstClockIn),
-          endTime: safeFormatTime(record.lastClockOut),
-          sessions,
-          tasks: record.sessions?.map(s => ({ title: s.notes || 'Task', duration: '' })) || [],
-          hoursWorked: `${totalHrs}h ${remMins}m`,
-          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '',
-          breakMinutes: record.totalBreakMinutes || 0,
-        });
-      } else {
-        const isSunday = dayOfWeekIdx === 0;
-        const isHoliday = !!decHoliday || isSunday;
-
-        days.push({
-          dateNum: dayNum,
-          dayName,
-          fullDate: dateStr.split('-').reverse().join('/'),
-          status: isHoliday ? 'holiday' : activeLeave ? 'leave' : 'absent',
-          location: decHoliday ? decHoliday.name : isSunday ? 'Weekend Off' : activeLeave ? `On Leave (${activeLeave.leaveType})` : '',
-          startTime: undefined,
-          endTime: undefined,
-          sessions: [],
-          tasks: [],
-          hoursWorked: '',
-          expenses: '',
-        });
-      }
-    }
-    return days;
-  }, [startDate, endDate, attendanceRecords, expenseClaims, declaredHolidays, leaveRecords, currentEmployee, selectedEmployee, user, resolveOrgValue]);
-
-  const tableRows = useMemo(() => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const rows: AttendanceLogRow[] = [];
-
-    const recList = Array.isArray(attendanceRecords) ? attendanceRecords : [];
-    const claimList = Array.isArray(expenseClaims) ? expenseClaims : [];
-    const holList = Array.isArray(declaredHolidays) ? declaredHolidays : [];
-    const empList = Array.isArray(employees) ? employees : [];
-    const leaveList = Array.isArray(leaveRecords) ? leaveRecords : [];
-
-    const empId = currentEmployee?.id || user?.id || '';
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = toLocalISODate(d);
-      const record = recList.find(r => r && r.workDate === dateStr);
-      const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
-      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
-      const decHoliday = holList.find((h: any) => h && h.date === dateStr);
-      const activeLeave = leaveList.find(l =>
-        l && l.employeeId === (record ? record.employeeId : empId) &&
-        dateStr >= l.startDate && dateStr <= l.endDate &&
-        l.status === 'approved'
-      );
-
-      const empName = currentEmployee
-        ? `${currentEmployee.firstName || ''} ${currentEmployee.lastName || ''}`.trim()
-        : user ? user.fullName || 'Employee' : 'Employee';
-
-      if (record) {
-        const emp = empList.find(e => e && e.id === record.employeeId);
-        const resolvedEmpName = emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : empName;
-        
-        let breakMins = 0;
-        if (record.breaks && record.breaks.length > 0) {
-          breakMins = calculateMergedBreakMinutes(record.breaks, {
-            isCurrentlyOnBreak: record.status === 'on_break',
-          });
-        }
-        if (breakMins === 0) {
-          breakMins = record.totalBreakMinutes || (record as any).total_break_minutes || 0;
-        }
-
-        if (record.firstClockIn) {
-          const endTs = record.lastClockOut ? new Date(record.lastClockOut).getTime() : Date.now();
-          const grossMins = Math.max(0, Math.round((endTs - new Date(record.firstClockIn).getTime()) / 60000));
-          breakMins = Math.min(breakMins, grossMins);
-        }
-
-        const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
-
-        const rawSessionsList = record.sessions && record.sessions.length > 0
-          ? record.sessions
-          : [{
-              id: record.id,
-              workType: 'Office' as WorkSessionType,
-              clockIn: record.firstClockIn || '',
-              clockOut: record.lastClockOut || '',
-              notes: (record as any).notes || '',
-            }];
-
-        // Filter out any session with no valid clockIn time ('—' or empty)
-        const validSessions = rawSessionsList.filter(s => {
-          const st = safeFormatTime(s.clockIn);
-          return !!st && st !== '—';
-        });
-
-        // Deduplicate sessions with identical clockIn, clockOut, workType, and notes
-        const uniqueSessions: any[] = [];
-        const seenKeys = new Set<string>();
-        for (const s of validSessions) {
-          const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            uniqueSessions.push(s);
-          }
-        }
-
-        const isHoliday = (record as any).notes?.toLowerCase().includes('holiday') || !!decHoliday;
-        const isLeave = !!activeLeave;
-        const leaveModeLabel = activeLeave?.halfDay
-          ? `On Leave (${activeLeave.halfDayShift || 'Half Day'})`
-          : 'On Leave';
-
-        if ((isLeave && uniqueSessions.length === 0) || isHoliday || uniqueSessions.length === 0) {
-          const primarySession = rawSessionsList[0];
-          const workType = primarySession?.workType || 'Office';
-          const batchId = (primarySession as any)?.batchId || (primarySession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
-          const orgVal = resolveOrgValue(workType, primarySession?.notes, (record as any).notes, batchId) || 'Office';
-          const locVal = resolveLocationValue(workType, primarySession?.notes, (record as any).notes, batchId) || 'Office';
-          const classOrWorkInfo = resolveClassOrWorkValue(workType, primarySession?.notes, (record as any).notes, batchId);
-
-          let fallbackMins = 0;
-          const sTimeStr = safeFormatTime(record.firstClockIn || primarySession?.clockIn);
-          const eTimeStr = safeFormatTime(record.lastClockOut || primarySession?.clockOut);
-          const sMinVal = parseDisplayTimeToMinutes(sTimeStr);
-          const eMinVal = parseDisplayTimeToMinutes(eTimeStr);
-          if (sMinVal !== null && eMinVal !== null && eMinVal >= sMinVal) {
-            fallbackMins = eMinVal - sMinVal;
-          } else {
-            const cInTime = record.firstClockIn || primarySession?.clockIn;
-            const cOutTime = record.lastClockOut || primarySession?.clockOut;
-            if (cInTime) {
-              const endMs = cOutTime ? new Date(cOutTime).getTime() : Date.now();
-              const grossMs = Math.max(0, endMs - new Date(cInTime).getTime());
-              fallbackMins = Math.max(0, Math.round(grossMs / 60000));
-            }
-          }
-          const fallbackDur = `${Math.floor(fallbackMins / 60)}h ${fallbackMins % 60}m`;
-
-            const isPrimaryRemote = locVal === 'Remote' || orgVal === 'Remote';
-            rows.push({
-              date: dateStr.split('-').reverse().join('-'),
-              name: resolvedEmpName,
-              holiday: decHoliday ? (decHoliday as any).name : d.getDay() === 0 ? 'Sunday' : isHoliday ? 'Holiday' : '',
-              org: isLeave ? '—' : orgVal,
-              location: isLeave ? '—' : locVal,
-              type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : classOrWorkInfo.value,
-              isTraining: isLeave ? false : classOrWorkInfo.isTraining,
-              mode: isHoliday ? 'Holiday' : isLeave ? leaveModeLabel : (workType === 'Training' ? 'Training' : isPrimaryRemote ? 'Remote' : 'Offline'),
-              start: isLeave ? '—' : sTimeStr,
-              end: isLeave ? '—' : eTimeStr,
-              duration: isLeave ? '0h 0m' : fallbackDur,
-              expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-              note: isLeave ? formatCleanNote((activeLeave as any)?.reason || 'On Leave', 'Leave') : formatCleanNote(primarySession?.notes || (record as any).notes, workType),
-              break: isLeave ? '0h 0m' : breakTime,
-              tasks: primarySession?.notes ? [primarySession.notes] : [],
-            });
-          } else {
-            // EMIT SEPARATE ROW FOR EACH VALID SESSION
-            uniqueSessions.forEach((s, idx) => {
-              const sStartStr = safeFormatTime(s.clockIn);
-              const sEndStr = safeFormatTime(s.clockOut);
-              const sStartMins = parseDisplayTimeToMinutes(sStartStr);
-              const sEndMins = parseDisplayTimeToMinutes(sEndStr);
-
-              let sGrossMins = 0;
-              if (sStartMins !== null && sEndMins !== null && sEndMins >= sStartMins) {
-                sGrossMins = sEndMins - sStartMins;
-              } else if (s.clockIn) {
-                const t1 = new Date(s.clockIn).getTime();
-                const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
-                if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
-                  sGrossMins = Math.round((t2 - t1) / 60000);
-                }
-              }
-
-              // Calculate breaks specifically belonging to this session
-              let sBreakMins = 0;
-              if (record.breaks && record.breaks.length > 0) {
-                const sessionBreaks = record.breaks.filter((b) => {
-                  const bStart = b.startTime || (b as any).start_time;
-                  if (!bStart) return false;
-                  const matchesSessionId = b.workSessionId && b.workSessionId === s.id;
-                  const sInTs = new Date(s.clockIn).getTime();
-                  const sOutTs = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
-                  const bStartTs = new Date(bStart).getTime();
-                  const fallsInSession = !isNaN(sInTs) && bStartTs >= sInTs && (isNaN(sOutTs) || bStartTs <= sOutTs);
-                  return matchesSessionId || fallsInSession || uniqueSessions.length === 1;
-                });
-
-                sBreakMins = calculateMergedBreakMinutes(sessionBreaks, {
-                  isCurrentlyOnBreak: record.status === 'on_break',
-                  maxGrossMinutes: sGrossMins,
-                });
-              } else {
-                sBreakMins = Math.min(uniqueSessions.length === 1 || idx === 0 ? breakMins : 0, sGrossMins);
-              }
-
-              // Duration in the attendance table is Clock out - Clock in (gross elapsed session time)
-              const sDuration = `${Math.floor(sGrossMins / 60)}h ${sGrossMins % 60}m`;
-              const sBreakTime = `${Math.floor(sBreakMins / 60)}h ${sBreakMins % 60}m`;
-
-              const sWorkType = s.workType || 'Office';
-              const sBatchId = (s as any)?.batchId || (s as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
-              const sOrg = resolveOrgValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
-              const sLoc = resolveLocationValue(sWorkType, s.notes, (record as any).notes, sBatchId) || 'Office';
-              const sClass = resolveClassOrWorkValue(sWorkType, s.notes, (record as any).notes, sBatchId);
-              const isSessionRemote = sLoc === 'Remote' || sOrg === 'Remote';
-
-              rows.push({
-                date: dateStr.split('-').reverse().join('-'),
-                name: resolvedEmpName,
-                holiday: decHoliday ? (decHoliday as any).name : d.getDay() === 0 ? 'Sunday' : '',
-                org: sOrg,
-                location: sLoc,
-                type: sClass.value,
-                isTraining: sClass.isTraining,
-                mode: sWorkType === 'Training' ? 'Training' : (isSessionRemote ? 'Remote' : 'Offline'),
-                start: sStartStr,
-                end: sEndStr,
-                duration: sDuration,
-                expenses: idx === 0 && dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-                note: formatCleanNote(s.notes || (record as any).notes, sWorkType),
-                break: sBreakTime,
-                tasks: s.notes ? [s.notes] : [],
-              });
-            });
-          }
-      } else {
-        const isSunday = d.getDay() === 0;
-        const isHoliday = !!decHoliday || isSunday;
-        const isLeave = !!activeLeave;
-
-        rows.push({
-          date: dateStr.split('-').reverse().join('-'),
-          name: empName,
-          holiday: decHoliday ? decHoliday.name : isSunday ? 'Sunday' : '',
-          org: '—',
-          location: '—',
-          type: isHoliday ? 'Holiday' : isLeave ? 'Leave' : '—',
-          mode: isHoliday ? 'Holiday' : isLeave ? 'On Leave' : '—',
-          start: '—',
-          end: '—',
-          duration: '0h 0m',
-          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '—',
-          note: '—',
-          break: '0h 0m',
-          tasks: [],
-        });
-      }
-    }
-    return rows;
-  }, [startDate, endDate, attendanceRecords, expenseClaims, employees, currentEmployee, user, declaredHolidays, leaveRecords, resolveOrgValue, resolveLocationValue, resolveClassOrWorkValue]);
 
   const mappedExpenseRows = useMemo(() => {
     const list = expenseClaims.map((claim) => {
