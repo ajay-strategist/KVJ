@@ -103,17 +103,52 @@ export function IdleEmployeeAlertPopup() {
 
       if (!finalAttData.length) return;
 
-      // 3. Fetch open work sessions in flwdsk_work_sessions
+      // 3. Fetch open work sessions & break records in flwdsk_work_sessions & flwdsk_break_records
       const attIds = finalAttData.map((r: any) => r.id).filter(Boolean);
       let openWorkSessions: any[] = [];
+      let todayBreaks: any[] = [];
       if (attIds.length > 0) {
         const { data: wsData } = await supabase
           .from('flwdsk_work_sessions')
-          .select('*')
+          .select('id, attendance_record_id, clock_in, clock_out, work_type')
           .in('attendance_record_id', attIds)
-          .is('clock_out', null)
           .is('deleted_at', null);
-        if (wsData) openWorkSessions = wsData;
+
+        if (wsData && wsData.length > 0) {
+          openWorkSessions = wsData.filter((ws: any) => !ws.clock_out);
+          const wsIds = wsData.map((ws: any) => ws.id);
+          const wsToAttMap = new Map(wsData.map((w: any) => [w.id, w.attendance_record_id]));
+          const attToEmpMap = new Map(finalAttData.map((a: any) => [a.id, a.employee_id]));
+
+          if (wsIds.length > 0) {
+            const { data: bData } = await supabase
+              .from('flwdsk_break_records')
+              .select('*')
+              .in('work_session_id', wsIds)
+              .is('deleted_at', null);
+            if (bData && bData.length > 0) {
+              bData.forEach((b: any) => {
+                const attId = wsToAttMap.get(b.work_session_id);
+                const empId = attId ? attToEmpMap.get(attId) : undefined;
+                todayBreaks.push({ ...b, employee_id: empId });
+              });
+            }
+          }
+        }
+
+        // Also extract embedded breaks from finalAttData
+        finalAttData.forEach((r: any) => {
+          if (Array.isArray(r.breaks) && r.breaks.length > 0) {
+            r.breaks.forEach((b: any) => {
+              todayBreaks.push({
+                ...b,
+                employee_id: r.employee_id,
+                start_time: b.startTime || b.start_time,
+                end_time: b.endTime || b.end_time,
+              });
+            });
+          }
+        });
       }
 
       // 4. Fetch today's training calendar sessions
@@ -180,6 +215,13 @@ export function IdleEmployeeAlertPopup() {
 
         if (!att || att.status !== 'present') continue;
 
+        // Check if employee is currently on break (either by status or open break record)
+        const empBreaks = todayBreaks.filter((b: any) => b.employee_id === empId);
+        const hasOpenBreak = empBreaks.some((b: any) => !b.end_time && !b.endTime);
+        if (hasOpenBreak || att.status === 'on_break') {
+          continue; // Currently on break, NOT idle!
+        }
+
         // Check if employee is in training session:
         // A. Work session with Training work_type
         const matchingAttIds = new Set(
@@ -243,6 +285,25 @@ export function IdleEmployeeAlertPopup() {
             idleStartMs = endMs;
           }
         });
+
+        // Cross-check finished breaks: If employee was on break, idle time begins AFTER the break ended!
+        empBreaks.forEach((b: any) => {
+          const endVal = b.end_time || b.endTime;
+          if (endVal) {
+            const breakEndMs = new Date(endVal).getTime();
+            if (!isNaN(breakEndMs) && breakEndMs > idleStartMs) {
+              idleStartMs = breakEndMs;
+            }
+          }
+        });
+
+        // Also check if attendance record was updated after taking a break
+        if (att && (att.total_break_minutes > 0 || att.totalBreakMinutes > 0)) {
+          const attUpdatedMs = new Date(att.updated_at || (att as any).updatedAt || '').getTime();
+          if (!isNaN(attUpdatedMs) && attUpdatedMs > idleStartMs) {
+            idleStartMs = attUpdatedMs;
+          }
+        }
 
         const idleMinutes = Math.max(0, Math.floor((now - idleStartMs) / (1000 * 60)));
 

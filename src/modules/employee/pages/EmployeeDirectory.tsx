@@ -61,6 +61,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
   const [activeWorkSessions, setActiveWorkSessions] = useState<any[]>([]);
   const [todayTaskSessions, setTodayTaskSessions] = useState<any[]>([]);
+  const [todayBreakRecords, setTodayBreakRecords] = useState<any[]>([]);
   const [leaveToday, setLeaveToday] = useState<any[]>([]);
 
   useEffect(() => {
@@ -87,20 +88,55 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           setAttendanceRecords(finalAttData);
         }
 
-        // Fetch open work sessions (clock_out is null) to detect active training batch sessions
+        // Fetch work sessions & break records to detect active training batch sessions & breaks
         const attIds = (finalAttData || []).map((r: any) => r.id).filter(Boolean);
         if (attIds.length > 0) {
           const { data: wsData } = await supabase
             .from('flwdsk_work_sessions')
-            .select('*')
+            .select('id, attendance_record_id, clock_in, clock_out, work_type')
             .in('attendance_record_id', attIds)
-            .is('clock_out', null)
             .is('deleted_at', null);
           if (wsData) {
-            setOpenWorkSessions(wsData);
+            setOpenWorkSessions(wsData.filter((ws: any) => !ws.clock_out));
+            const wsIds = wsData.map((ws: any) => ws.id);
+            const wsToAttMap = new Map(wsData.map((w: any) => [w.id, w.attendance_record_id]));
+            const attToEmpMap = new Map((finalAttData || []).map((a: any) => [a.id, a.employee_id]));
+
+            const collectedBreaks: any[] = [];
+            if (wsIds.length > 0) {
+              const { data: bData } = await supabase
+                .from('flwdsk_break_records')
+                .select('*')
+                .in('work_session_id', wsIds)
+                .is('deleted_at', null);
+              if (bData) {
+                bData.forEach((b: any) => {
+                  const attId = wsToAttMap.get(b.work_session_id);
+                  const empId = attId ? attToEmpMap.get(attId) : undefined;
+                  collectedBreaks.push({ ...b, employee_id: empId });
+                });
+              }
+            }
+
+            // Also collect embedded breaks from attendance records
+            (finalAttData || []).forEach((r: any) => {
+              if (Array.isArray(r.breaks) && r.breaks.length > 0) {
+                r.breaks.forEach((b: any) => {
+                  collectedBreaks.push({
+                    ...b,
+                    employee_id: r.employee_id,
+                    start_time: b.startTime || b.start_time,
+                    end_time: b.endTime || b.end_time,
+                  });
+                });
+              }
+            });
+
+            setTodayBreakRecords(collectedBreaks);
           }
         } else {
           setOpenWorkSessions([]);
+          setTodayBreakRecords([]);
         }
 
         // Fetch today's scheduled training sessions from calendar
@@ -350,19 +386,6 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       return { label: '🌴 On Leave', tone: 'warning' as const };
     }
 
-    // Check local clock-in state if this employee is the logged-in user
-    if (user && user.email?.toLowerCase() === empEmail) {
-      try {
-        const rawClock = localStorage.getItem('kvj_clock_in_state');
-        if (rawClock) {
-          const parsed = JSON.parse(rawClock);
-          if (parsed.isClockedIn) {
-            return { label: '🟢 Clocked In', tone: 'success' as const };
-          }
-        }
-      } catch {}
-    }
-
     // Check DB attendance records
     const record = attendanceRecords.find(
       (r) =>
@@ -371,10 +394,19 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         (user && user.email?.toLowerCase() === empEmail && r.employee_id === user.id)
     );
 
+    // Cross-check break records: If employee has an open break, mark as On Break
+    const empBreaks = (todayBreakRecords || []).filter(
+      (b: any) => b.employee_id === empId || (user && user.email?.toLowerCase() === empEmail && b.employee_id === user.id)
+    );
+    const hasOpenBreak = empBreaks.some((b: any) => !b.end_time && !b.endTime);
+
+    if (record?.status === 'on_break' || hasOpenBreak) {
+      return { label: '☕ On Break', tone: 'warning' as const };
+    }
+
     if (record) {
       const status = record.status;
       if (status === 'present') return { label: '🟢 Clocked In', tone: 'success' as const };
-      if (status === 'on_break') return { label: '☕ On Break', tone: 'warning' as const };
       if (status === 'clocked_out') return { label: '🔴 Clocked Out', tone: 'danger' as const };
     }
 
@@ -394,6 +426,10 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     }
 
     const status = getEmployeeStatus(emp);
+    if (status.label.includes('On Break') || status.label.includes('On Leave')) {
+      return { isIdle: false, idleMinutes: 0 };
+    }
+
     const isClockedIn = status.label.includes('Clocked In');
     if (!isClockedIn) {
       return { isIdle: false, idleMinutes: 0 };
@@ -401,10 +437,6 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
     const activeTask = getEmployeeActiveTask(emp);
     if (activeTask !== 'No active task in progress') {
-      return { isIdle: false, idleMinutes: 0 };
-    }
-
-    if (status.label.includes('On Break') || status.label.includes('On Leave')) {
       return { isIdle: false, idleMinutes: 0 };
     }
 
@@ -416,6 +448,15 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         (r.employee_email && empEmail && r.employee_email.toLowerCase() === empEmail) ||
         (user && user.email?.toLowerCase() === empEmail && r.employee_id === user.id)
     );
+
+    // Cross-check break records: If employee is on an open break or record is on_break, they are NOT idle
+    const empBreaks = (todayBreakRecords || []).filter(
+      (b: any) => b.employee_id === empId || (user && user.email?.toLowerCase() === empEmail && b.employee_id === user.id)
+    );
+    const hasOpenBreak = empBreaks.some((b: any) => !b.end_time && !b.endTime);
+    if (hasOpenBreak || record?.status === 'on_break') {
+      return { isIdle: false, idleMinutes: 0 };
+    }
 
     const clockInIso = record?.first_clock_in || (record as any)?.firstClockIn;
     if (!clockInIso) {
@@ -436,6 +477,25 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
           idleStartMs = endMs;
         }
       });
+    }
+
+    // Cross-check finished breaks today: If employee was on break, idle time begins AFTER the break ended!
+    empBreaks.forEach((b: any) => {
+      const endVal = b.end_time || b.endTime;
+      if (endVal) {
+        const breakEndMs = new Date(endVal).getTime();
+        if (!isNaN(breakEndMs) && breakEndMs > idleStartMs) {
+          idleStartMs = breakEndMs;
+        }
+      }
+    });
+
+    // Also check if attendance record itself was updated after taking a break
+    if (record && (record.total_break_minutes > 0 || record.totalBreakMinutes > 0)) {
+      const attUpdatedMs = new Date(record.updated_at || (record as any).updatedAt || '').getTime();
+      if (!isNaN(attUpdatedMs) && attUpdatedMs > idleStartMs) {
+        idleStartMs = attUpdatedMs;
+      }
     }
 
     const now = Date.now();
@@ -654,7 +714,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
     return filtered
       .map((e) => ({ emp: e, ...getEmployeeIdleInfo(e) }))
       .filter((x): x is IdleItem => x.isIdle);
-  }, [filtered, isStatusView, attendanceRecords, activeWorkSessions, todayTaskSessions, openWorkSessions, todayCalendarSessions, batchesList]);
+  }, [filtered, isStatusView, attendanceRecords, activeWorkSessions, todayTaskSessions, todayBreakRecords, openWorkSessions, todayCalendarSessions, batchesList]);
 
   useEffect(() => {
     if (!user || !isStatusView) return;
