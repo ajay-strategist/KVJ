@@ -829,40 +829,49 @@ export function ProjectList({
   };
 
   const tableColumns: Column<ProjectCardData>[] = [
-    { key: 'title', header: 'Project Name & Client', sortable: true, render: (p) => <div><div style={{ fontWeight: 600 }}>{p.title}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Client: {p.client}</div></div> },
-    { key: 'supervisor', header: 'Supervisor', render: (p) => p.supervisor ? <span>👤 {p.supervisor}</span> : <span>—</span> },
-    { key: 'members', header: 'Assigned Members & Hours', render: (p) => (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {p.members.map((m, idx) => (
-          <span key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>
-            {m.name}: <strong>{m.hours}h</strong>
-          </span>
-        ))}
-      </div>
-    )},
-    { key: 'totalHours', header: 'Total Hours', sortable: true, render: (p) => <strong>⏱ {p.totalHours}</strong> },
+    { key: 'title', header: 'Project Name & Client', sortable: true, render: (p) => <div><div style={{ fontWeight: 600 }}>{p?.title || 'Untitled Project'}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Client: {p?.client || '—'}</div></div> },
+    { key: 'supervisor', header: 'Supervisor', render: (p) => p?.supervisor ? <span>👤 {p.supervisor}</span> : <span>—</span> },
+    { key: 'members', header: 'Assigned Members & Hours', render: (p) => {
+      const members = Array.isArray(p?.members) ? p.members : [];
+      if (members.length === 0) return <span>—</span>;
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {members.map((m, idx) => (
+            <span key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>
+              {m?.name || 'Unknown'}: <strong>{m?.hours ?? 0}h</strong>
+            </span>
+          ))}
+        </div>
+      );
+    }},
+    { key: 'totalHours', header: 'Total Hours', sortable: true, render: (p) => <strong>⏱ {p?.totalHours ?? 0}</strong> },
     { key: 'completion', header: 'Completion Ratio', render: (p) => {
-      const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
+      const total = p?.tasksTotal ?? 0;
+      const completed = p?.tasksCompleted ?? 0;
+      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
       return (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700 }}>{p.tasksCompleted} / {p.tasksTotal} ({pct}%)</div>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>{completed} / {total} ({pct}%)</div>
           <div style={{ width: 100, height: 6, background: 'var(--bg-sunken)', borderRadius: 3, marginTop: 4, overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? 'var(--status-success)' : 'var(--brand)' }} />
           </div>
         </div>
       );
     }},
-    { key: 'status', header: 'Status', render: (p) => (
-      <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Progress' ? 'progress' : 'neutral'}>
-        {p.status}
-      </Badge>
-    )},
+    { key: 'status', header: 'Status', render: (p) => {
+      const status = p?.status || 'Unknown';
+      return (
+        <Badge tone={status === 'Completed' ? 'success' : status === 'In Progress' ? 'progress' : 'neutral'}>
+          {status}
+        </Badge>
+      );
+    }},
     { key: 'actions', header: 'Actions', render: (p) => (
       <div style={{ display: 'flex', gap: 6 }}>
-        <Button size="sm" variant="secondary" onClick={() => { setSelectedProject(p); setReportOpen(true); }}>
+        <Button size="sm" variant="secondary" onClick={() => { if (p) { setSelectedProject(p); setReportOpen(true); } }}>
           📊 Report
         </Button>
-        <Button size="sm" onClick={() => { setSelectedProject(p); setAddTaskOpen(true); }}>
+        <Button size="sm" onClick={() => { if (p) { setSelectedProject(p); setAddTaskOpen(true); } }}>
           ➕ Task
         </Button>
       </div>

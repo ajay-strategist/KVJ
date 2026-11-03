@@ -49,3 +49,4 @@ describe('CourseList & DataTable Resilience', () => {
     div.remove();
   });
 });
+

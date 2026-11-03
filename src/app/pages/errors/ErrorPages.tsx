@@ -3,6 +3,7 @@
  * Branded 404 / 403 / 500 / Offline / loading — never blank screens.
  */
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Skeleton } from '../../../shared/ui/components';
 
@@ -26,6 +27,8 @@ export function Forbidden() {
   return <Shell code="403" title="Access denied" message="You don't have permission to view this page. Contact an administrator if you believe this is a mistake." />;
 }
 export function ServerError({ error, onRetry }: { error?: Error | null; onRetry?: () => void }) {
+  const [showDetails, setShowDetails] = useState(false);
+
   const handleRetry = () => {
     if (onRetry) {
       try { onRetry(); } catch (_) {}
@@ -42,11 +45,29 @@ export function ServerError({ error, onRetry }: { error?: Error | null; onRetry?
     window.location.href = '/login';
   };
 
+  const errorMsg = error?.message || (typeof error === 'string' ? error : '') || (error ? String(error) : '');
+
   return (
     <Shell code="500" title="Something went wrong" message="An unexpected error occurred during page load. You can retry, head to your workspace, or sign in again.">
-      {error?.message && (
-        <div style={{ marginBottom: 16, padding: '6px 12px', background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', maxWidth: 380, marginInline: 'auto', wordBreak: 'break-word' }}>
-          {error.message}
+      {errorMsg && (
+        <div style={{ marginBottom: 16, padding: '8px 14px', background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', maxWidth: 420, marginInline: 'auto', wordBreak: 'break-word', textAlign: 'left' }}>
+          <strong>Error:</strong> {errorMsg}
+          {error?.stack && (
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+                style={{ background: 'none', border: 'none', color: 'var(--brand)', cursor: 'pointer', padding: 0, fontSize: 11, textDecoration: 'underline' }}
+              >
+                {showDetails ? 'Hide diagnostics' : 'Show diagnostics'}
+              </button>
+              {showDetails && (
+                <pre style={{ marginTop: 6, fontSize: 10, maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap', color: 'var(--text-muted)' }}>
+                  {error.stack}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>

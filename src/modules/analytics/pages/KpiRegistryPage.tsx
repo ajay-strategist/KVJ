@@ -31,13 +31,15 @@ export function KpiRegistryPage() {
     }
   };
 
+  const safeKpis = Array.isArray(kpis) ? kpis : [];
+
   const columns: Column<KpiDefinition>[] = [
-    { key: 'code', header: 'KPI Code', sortable: true, accessor: (k) => k.code },
-    { key: 'name', header: 'Metric Title', sortable: true, accessor: (k) => k.name },
-    { key: 'category', header: 'Department Domain', accessor: (k) => k.category },
-    { key: 'formula', header: 'Calculation Formula', accessor: (k) => k.formula },
-    { key: 'current', header: 'Current Actual', accessor: (k) => String(k.currentValue) },
-    { key: 'target', header: 'Target Goal', accessor: (k) => String(k.targetValue) },
+    { key: 'code', header: 'KPI Code', sortable: true, accessor: (k) => k?.code || '—' },
+    { key: 'name', header: 'Metric Title', sortable: true, accessor: (k) => k?.name || '—' },
+    { key: 'category', header: 'Department Domain', accessor: (k) => k?.category || '—' },
+    { key: 'formula', header: 'Calculation Formula', accessor: (k) => k?.formula || '—' },
+    { key: 'current', header: 'Current Actual', accessor: (k) => String(k?.currentValue ?? 0) },
+    { key: 'target', header: 'Target Goal', accessor: (k) => String(k?.targetValue ?? 0) },
   ];
 
   return (
@@ -48,7 +50,7 @@ export function KpiRegistryPage() {
         actions={<Button onClick={() => setOpen(true)}>Register KPI Metric</Button>}
       />
 
-      <DataTable columns={columns} rows={kpis} rowKey={(k) => k.id} loading={loading} />
+      <DataTable columns={columns} rows={safeKpis} rowKey={(k) => k?.id || Math.random().toString()} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Register KPI Definition metric">
         <Form initial={{ category: 'Finance' }} onSubmit={handleRegisterSubmit}>

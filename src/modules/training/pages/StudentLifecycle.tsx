@@ -53,20 +53,20 @@ export function StudentLifecycle() {
   };
 
   const studentName = (studentId: string) => {
-    const s = students.find((st) => st.id === studentId);
-    return s ? `${s.firstName} ${s.lastName}` : 'Unknown';
+    const s = safeStudents.find((st) => st?.id === studentId);
+    return s ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : 'Unknown';
   };
 
   const batchCode = (batchId?: string) => {
-    const b = batches.find((ba) => ba.id === batchId);
-    return b ? b.code : 'Unassigned';
+    const b = safeBatches.find((ba) => ba?.id === batchId);
+    return b ? (b.code || 'Unassigned') : 'Unassigned';
   };
 
   const studentColumns: Column<Student>[] = [
-    { key: 'name', header: 'Student Name', render: (s) => `${s.firstName} ${s.lastName}` },
-    { key: 'email', header: 'Email Address', accessor: (s) => s.email },
-    { key: 'phone', header: 'Phone Number', accessor: (s) => s.phone },
-    { key: 'qualification', header: 'Academics', accessor: (s) => s.academicQualification ?? 'N/A' },
+    { key: 'name', header: 'Student Name', render: (s) => `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || 'Unnamed' },
+    { key: 'email', header: 'Email Address', accessor: (s) => s?.email || '—' },
+    { key: 'phone', header: 'Phone Number', accessor: (s) => s?.phone || '—' },
+    { key: 'qualification', header: 'Academics', accessor: (s) => s?.academicQualification ?? 'N/A' },
   ];
 
   const enrollmentColumns: Column<Enrollment>[] = [
@@ -78,13 +78,17 @@ export function StudentLifecycle() {
     )},
   ];
 
-  const studentOptions = students.map((s) => ({ value: s.id, label: `${s.firstName} ${s.lastName}` }));
-  const batchOptions = batches.map((b) => ({ value: b.id, label: cleanBatchCode(b.code) || b.code }));
+  const safeStudents = Array.isArray(students) ? students : [];
+  const safeBatches = Array.isArray(batches) ? batches : [];
+  const safeEnrollments = Array.isArray(enrollments) ? enrollments : [];
+
+  const studentOptions = safeStudents.map((s) => ({ value: s?.id || '', label: `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || 'Unknown' }));
+  const batchOptions = safeBatches.map((b) => ({ value: b?.id || '', label: cleanBatchCode(b?.code || '') || b?.code || 'Unnamed Batch' }));
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredStudents = students.filter((s) =>
-    `${s.firstName} ${s.lastName} ${s.email} ${s.phone} ${s.academicQualification}`
+  const filteredStudents = safeStudents.filter((s) =>
+    `${s?.firstName || ''} ${s?.lastName || ''} ${s?.email || ''} ${s?.phone || ''} ${s?.academicQualification || ''}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
@@ -118,7 +122,7 @@ export function StudentLifecycle() {
     {
       id: 'enrollments',
       label: 'Enrollment Logs',
-      content: <DataTable columns={enrollmentColumns} rows={enrollments} rowKey={(e) => e.id} loading={loading} />,
+      content: <DataTable columns={enrollmentColumns} rows={safeEnrollments} rowKey={(e) => e?.id || Math.random().toString()} loading={loading} />,
     },
   ];
 
@@ -136,8 +140,8 @@ export function StudentLifecycle() {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <StatCard label="Total Registered Students" value={students.length} tone="info" icon="🧑" />
-        <StatCard label="Active Enrollments" value={enrollments.length} tone="success" icon="✓" />
+        <StatCard label="Total Registered Students" value={safeStudents.length} tone="info" icon="🧑" />
+        <StatCard label="Active Enrollments" value={safeEnrollments.length} tone="success" icon="✓" />
       </div>
 
       <Tabs items={tabs} />

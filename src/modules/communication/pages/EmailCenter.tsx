@@ -37,13 +37,15 @@ export function EmailCenter() {
     }
   };
 
+  const safeEmailLogs = Array.isArray(emailLogs) ? emailLogs : [];
+
   const columns: Column<EmailLog>[] = [
-    { key: 'recipient', header: 'Recipient Email', sortable: true, accessor: (e) => e.recipient },
-    { key: 'subject', header: 'Subject Line', accessor: (e) => e.subject },
+    { key: 'recipient', header: 'Recipient Email', sortable: true, accessor: (e) => e?.recipient || '—' },
+    { key: 'subject', header: 'Subject Line', accessor: (e) => e?.subject || '—' },
     { key: 'status', header: 'Delivery Status', render: (e) => (
-      <span className={`kvj-badge kvj-badge--${e.status === 'sent' ? 'success' : 'neutral'}`}>{e.status}</span>
+      <span className={`kvj-badge kvj-badge--${e?.status === 'sent' ? 'success' : 'neutral'}`}>{e?.status || 'Unknown'}</span>
     )},
-    { key: 'retry', header: 'Retries', accessor: (e) => String(e.retryCount ?? 0) },
+    { key: 'retry', header: 'Retries', accessor: (e) => String(e?.retryCount ?? 0) },
   ];
 
   return (
@@ -59,7 +61,7 @@ export function EmailCenter() {
         }
       />
 
-      <DataTable columns={columns} rows={emailLogs} rowKey={(e) => e.id} loading={loading} />
+      <DataTable columns={columns} rows={safeEmailLogs} rowKey={(e) => e?.id || Math.random().toString()} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Queue Outbound Email Delivery">
         <Form initial={{}} onSubmit={handleQueueSubmit}>

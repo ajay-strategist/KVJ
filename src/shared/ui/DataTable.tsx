@@ -5,7 +5,7 @@
  * Generic over row type; no business coupling.
  */
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import { EmptyState, Skeleton } from './components';
 import { useDevice } from '../hooks/responsive';
 import './ui.css';
@@ -46,18 +46,48 @@ export function DataTable<T>({
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const safeRows = useMemo(() => (Array.isArray(rows) ? rows : []), [rows]);
+  const safeRows = useMemo(() => (Array.isArray(rows) ? rows.filter(Boolean) : []), [rows]);
+  const safeColumns = useMemo(() => (Array.isArray(columns) ? columns.filter(Boolean) : []), [columns]);
+
+  const safeRowKey = useCallback((row: T, fallbackIdx: number): string => {
+    try {
+      if (rowKey) {
+        const k = rowKey(row);
+        if (k != null && k !== '') return String(k);
+      }
+      const directId = (row as any)?.id;
+      if (directId != null && directId !== '') return String(directId);
+      return `row-${fallbackIdx}`;
+    } catch {
+      return `row-${fallbackIdx}`;
+    }
+  }, [rowKey]);
+
+  const renderCell = useCallback((c: Column<T>, row: T) => {
+    try {
+      if (c.render) return c.render(row);
+      if (c.accessor) return String(c.accessor(row) ?? '');
+      return String((row as any)?.[c.key] ?? '');
+    } catch (err) {
+      console.warn(`[DataTable] Render error in column "${c.key}":`, err);
+      return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+    }
+  }, []);
 
   const sorted = useMemo(() => {
     if (!sort) return safeRows;
-    const col = columns?.find((c) => c.key === sort.key);
+    const col = safeColumns?.find((c) => c.key === sort.key);
     if (!col?.accessor) return safeRows;
     return [...safeRows].sort((a, b) => {
-      const av = col.accessor!(a) ?? ''; const bv = col.accessor!(b) ?? '';
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
-      return sort.dir === 'desc' ? -cmp : cmp;
+      try {
+        const av = col.accessor!(a) ?? ''; const bv = col.accessor!(b) ?? '';
+        const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+        return sort.dir === 'desc' ? -cmp : cmp;
+      } catch {
+        return 0;
+      }
     });
-  }, [safeRows, sort, columns]);
+  }, [safeRows, sort, safeColumns]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageRows = sorted.slice((page - 1) * pageSize, page * pageSize);
@@ -105,19 +135,19 @@ export function DataTable<T>({
   if (device === 'mobile') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {pageRows.map((row) => (
+        {pageRows.map((row, idx) => (
           <div
-            key={rowKey(row)}
+            key={safeRowKey(row, idx)}
             className="kvj-card kvj-card--hover"
             onClick={() => onRowClick?.(row)}
             style={{ cursor: onRowClick ? 'pointer' : 'default' }}
           >
             <div className="kvj-card__body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {columns.map((c) => (
+              {safeColumns.map((c) => (
                 <div key={c.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
                   <span style={{ color: 'var(--text-muted)' }}>{c.header}</span>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {c.render ? c.render(row) : String(c.accessor?.(row) ?? '')}
+                    {renderCell(c, row)}
                   </span>
                 </div>
               ))}
@@ -129,10 +159,10 @@ export function DataTable<T>({
     );
   }
 
-  const allPageSelected = pageRows.length > 0 && pageRows.every((r) => selected.has(rowKey(r)));
+  const allPageSelected = pageRows.length > 0 && pageRows.every((r, idx) => selected.has(safeRowKey(r, idx)));
 
   const toggleSelectAll = () => {
-    const pageIds = pageRows.map(rowKey);
+    const pageIds = pageRows.map(safeRowKey);
     setSelected((prev) => {
       const next = new Set(prev);
       if (allPageSelected) {
@@ -170,7 +200,7 @@ export function DataTable<T>({
                   />
                 </th>
               )}
-              {columns.map((c) => (
+              {safeColumns.map((c) => (
                 <th
                   key={c.key}
                   onClick={() => toggleSort(c)}
@@ -183,8 +213,8 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((row) => {
-              const id = rowKey(row);
+            {pageRows.map((row, idx) => {
+              const id = safeRowKey(row, idx);
               const customClass = rowClassName?.(row) || '';
               const customStyle = rowStyle?.(row) || {};
               return (
@@ -204,11 +234,11 @@ export function DataTable<T>({
                       />
                     </td>
                   )}
-                  {columns.map((c) => {
+                  {safeColumns.map((c) => {
                     const rawVal = c.accessor ? String(c.accessor(row) ?? '') : undefined;
                     return (
                       <td key={c.key} className={c.numeric ? 'kvj-num' : ''} title={rawVal}>
-                        {c.render ? c.render(row) : (rawVal ?? '')}
+                        {renderCell(c, row)}
                       </td>
                     );
                   })}

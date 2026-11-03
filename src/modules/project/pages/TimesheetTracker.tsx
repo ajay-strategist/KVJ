@@ -67,7 +67,10 @@ export function TimesheetTracker() {
 
   ];
 
-  const projectOptions = projects.map((p) => ({ value: p.id, label: p.title }));
+  const safeProjects = Array.isArray(projects) ? projects : [];
+  const safeTimesheets = Array.isArray(timesheets) ? timesheets : [];
+
+  const projectOptions = safeProjects.map((p) => ({ value: p?.id || '', label: p?.title || 'Untitled' }));
 
   return (
     <AppShell>
@@ -78,7 +81,7 @@ export function TimesheetTracker() {
       />
 
 
-      <DataTable columns={columns} rows={timesheets} rowKey={(t) => t.id} loading={loading} />
+      <DataTable columns={columns} rows={safeTimesheets} rowKey={(t) => t?.id || Math.random().toString()} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Log Work Session Hours">
         <Form initial={{ billable: 'true', workDate: todayISO() }} onSubmit={handleLogSubmit}>

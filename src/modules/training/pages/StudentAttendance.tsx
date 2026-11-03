@@ -18,9 +18,13 @@ export function StudentAttendance() {
   const [sessionDate, setSessionDate] = useState(todayISO());
   const [attendanceStatuses, setAttendanceStatuses] = useState<Record<string, 'present' | 'absent' | 'late' | 'leave'>>({});
 
-  const batchStudents = enrollments
-    .filter((e) => e.batchId === selectedBatchId)
-    .map((e) => students.find((s) => s.id === e.studentId))
+  const safeEnrollments = Array.isArray(enrollments) ? enrollments : [];
+  const safeStudents = Array.isArray(students) ? students : [];
+  const safeBatches = Array.isArray(batches) ? batches : [];
+
+  const batchStudents = safeEnrollments
+    .filter((e) => e && e.batchId === selectedBatchId)
+    .map((e) => safeStudents.find((s) => s && s.id === e.studentId))
     .filter(Boolean);
 
   const handleSaveAttendance = async () => {
@@ -39,15 +43,15 @@ export function StudentAttendance() {
       toast({ variant: 'success', title: 'Attendance Logged', message: `Saved record sheet for ${sessionDate}` });
       setSelectedBatchId(null);
     } else {
-      toast({ variant: 'error', title: 'Error', message: res.error.message });
+      toast({ variant: 'error', title: 'Error', message: (res as any)?.error?.message || 'Failed to save attendance' });
     }
   };
 
   const columns: Column<Batch>[] = [
-    { key: 'code', header: 'Batch Code', sortable: true, accessor: (b) => cleanBatchCode(b.code) || b.code },
-    { key: 'dates', header: 'Duration', render: (b) => `${b.startDate} to ${b.endDate}` },
+    { key: 'code', header: 'Batch Code', sortable: true, accessor: (b) => cleanBatchCode(b?.code || '') || b?.code || '—' },
+    { key: 'dates', header: 'Duration', render: (b) => `${b?.startDate || '—'} to ${b?.endDate || '—'}` },
     { key: 'action', header: 'Actions', render: (b) => (
-      <Button size="sm" onClick={() => setSelectedBatchId(b.id)}>Take Session Attendance</Button>
+      <Button size="sm" onClick={() => b?.id && setSelectedBatchId(b.id)}>Take Session Attendance</Button>
     )},
   ];
 
@@ -59,11 +63,11 @@ export function StudentAttendance() {
       />
 
       {!selectedBatchId ? (
-        <DataTable columns={columns} rows={batches} rowKey={(b) => b.id} loading={loading} />
+        <DataTable columns={columns} rows={safeBatches} rowKey={(b) => b?.id || Math.random().toString()} loading={loading} />
       ) : (
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <SectionHeader title={`Log Attendance for Batch: ${cleanBatchCode(batches.find((b) => b.id === selectedBatchId)?.code)}`} />
+            <SectionHeader title={`Log Attendance for Batch: ${cleanBatchCode(safeBatches.find((b) => b?.id === selectedBatchId)?.code) || '—'}`} />
             <Button variant="secondary" onClick={() => setSelectedBatchId(null)}>Back to Batches</Button>
           </div>
 

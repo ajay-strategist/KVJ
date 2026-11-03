@@ -13,13 +13,22 @@ export interface TabsProps {
   className?: string;
 }
 
-export function Tabs({ items, defaultTabId, onChange, className = '' }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultTabId ?? items[0]?.id);
+export function Tabs({ items = [], defaultTabId, onChange, className = '' }: TabsProps) {
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  const [activeTab, setActiveTab] = useState(defaultTabId ?? safeItems[0]?.id ?? '');
+
+  const effectiveActiveTab = safeItems.some((t) => t.id === activeTab)
+    ? activeTab
+    : (safeItems[0]?.id ?? '');
 
   const handleTabClick = (id: string) => {
     setActiveTab(id);
     onChange?.(id);
   };
+
+  if (safeItems.length === 0) {
+    return null;
+  }
 
   return (
     <div className={`kvj-tabs-container ${className}`}>
@@ -40,8 +49,8 @@ export function Tabs({ items, defaultTabId, onChange, className = '' }: TabsProp
           boxShadow: 'var(--e1)',
         }}
       >
-        {items.map((tab) => {
-          const isActive = activeTab === tab.id;
+        {safeItems.map((tab) => {
+          const isActive = effectiveActiveTab === tab.id;
           return (
             <button
               key={tab.id}
@@ -70,7 +79,7 @@ export function Tabs({ items, defaultTabId, onChange, className = '' }: TabsProp
         })}
       </div>
       <div className="kvj-tab-panel" role="tabpanel">
-        {items.find((tab) => tab.id === activeTab)?.content}
+        {safeItems.find((tab) => tab.id === effectiveActiveTab)?.content}
       </div>
     </div>
   );

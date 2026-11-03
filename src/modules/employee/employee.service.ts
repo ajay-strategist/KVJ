@@ -9,6 +9,7 @@ export interface IEmployeeService {
   updateProfile(employeeId: UUID, patch: Partial<Employee>, actor: Actor): Promise<Result<Employee>>;
   getHierarchy(employeeId: UUID): Promise<Result<{ manager?: Employee; directReports: Employee[] }>>;
   listEmployees(): Promise<Result<Employee[]>>;
+  getEmployees?(): Promise<Result<Employee[]>>;
   deleteEmployee(employeeId: UUID, actor: Actor): Promise<Result<void>>;
 }
 
@@ -73,6 +74,10 @@ export class EmployeeService implements IEmployeeService {
     } catch (err) {
       return Err(AppError.internal());
     }
+  }
+
+  async getEmployees(): Promise<Result<Employee[]>> {
+    return this.listEmployees();
   }
 
   async deleteEmployee(employeeId: UUID, actor: Actor): Promise<Result<void>> {

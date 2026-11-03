@@ -29,10 +29,12 @@ export function ReportBuilder() {
     }
   };
 
+  const safeSavedReports = Array.isArray(savedReports) ? savedReports : [];
+
   const columns: Column<SavedReport>[] = [
-    { key: 'title', header: 'Saved Report Title', sortable: true, accessor: (r) => r.title },
-    { key: 'grouping', header: 'Grouping Dimension', accessor: (r) => r.groupingBy ?? 'None' },
-    { key: 'sorting', header: 'Sorting Dimension', accessor: (r) => r.sortingBy ?? 'None' },
+    { key: 'title', header: 'Saved Report Title', sortable: true, accessor: (r) => r?.title || '—' },
+    { key: 'grouping', header: 'Grouping Dimension', accessor: (r) => r?.groupingBy ?? 'None' },
+    { key: 'sorting', header: 'Sorting Dimension', accessor: (r) => r?.sortingBy ?? 'None' },
   ];
 
   return (
@@ -43,7 +45,7 @@ export function ReportBuilder() {
         actions={<Button onClick={() => setOpen(true)}>Save Report Config</Button>}
       />
 
-      <DataTable columns={columns} rows={savedReports} rowKey={(r) => r.id} loading={loading} />
+      <DataTable columns={columns} rows={safeSavedReports} rowKey={(r) => r?.id || Math.random().toString()} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Save Custom Report Parameterization">
         <Form initial={{}} onSubmit={handleSaveSubmit}>

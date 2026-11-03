@@ -29,8 +29,20 @@ export function ApprovalsQueue() {
   const { tasks, projects, approveTaskSubmission, requestRework, approveTaskAssignment, updateTask, deleteTask, refresh: refreshProjects } = useProject();
   const [reworkTask, setReworkTask] = useState<any | null>(null);
   const [reworkNotes, setReworkNotes] = useState('');
-  const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
-  const empService = container.resolve(EMPLOYEE_SERVICE_TOKEN);
+  const attService = useMemo(() => {
+    try {
+      return container.resolve(ATTENDANCE_SERVICE_TOKEN);
+    } catch {
+      return null as any;
+    }
+  }, []);
+  const empService = useMemo(() => {
+    try {
+      return container.resolve(EMPLOYEE_SERVICE_TOKEN);
+    } catch {
+      return null as any;
+    }
+  }, []);
   const { confirm } = useDialog();
   const { toast } = useNotifications();
 
@@ -252,10 +264,10 @@ export function ApprovalsQueue() {
         if (cRes.ok && Array.isArray(cRes.value)) setCorrections(cRes.value);
       }
 
-      const eRes = await empService.listEmployees();
-      if (eRes.ok && Array.isArray(eRes.value)) {
+      const eRes = await empService?.listEmployees?.();
+      if (eRes?.ok && Array.isArray(eRes?.value)) {
         const map: Record<string, Employee> = {};
-        eRes.value.forEach((e) => { if (e && e.id) map[e.id] = e; });
+        eRes.value.forEach((e: any) => { if (e && e.id) map[e.id] = e; });
         setEmployees(map);
       }
       if (isExecutive) {

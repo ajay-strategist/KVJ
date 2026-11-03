@@ -61,8 +61,12 @@ export function ResourceScheduler() {
     )},
   ];
 
-  const projectOptions = projects.map((p) => ({ value: p.id, label: `${p.code} - ${p.title}` }));
-  const employeeOptions = employees.map((e) => ({ value: e.id, label: `${e.firstName} ${e.lastName} (${e.designation})` }));
+  const safeProjects = Array.isArray(projects) ? projects : [];
+  const safeEmployees = Array.isArray(employees) ? employees : [];
+  const safeAllocations = Array.isArray(allocations) ? allocations : [];
+
+  const projectOptions = safeProjects.map((p) => ({ value: p?.id || '', label: `${p?.code || ''} - ${p?.title || ''}`.trim() }));
+  const employeeOptions = safeEmployees.map((e) => ({ value: e?.id || '', label: `${e?.firstName || ''} ${e?.lastName || ''} (${e?.designation || ''})`.trim() }));
 
   return (
     <AppShell>
@@ -72,7 +76,7 @@ export function ResourceScheduler() {
         actions={<Button onClick={() => setOpen(true)}>Allocate Resource</Button>}
       />
 
-      <DataTable columns={columns} rows={allocations} rowKey={(a) => a.id} loading={loading} />
+      <DataTable columns={columns} rows={safeAllocations} rowKey={(a) => a?.id || Math.random().toString()} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Allocate Project Resource">
         <Form initial={{ capacityPercentage: 100 }} onSubmit={handleAllocateSubmit}>

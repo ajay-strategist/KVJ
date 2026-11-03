@@ -18,6 +18,19 @@ import './app/global.css';
 bootstrap(); // initialize DI registry
 initTheme(); // apply persisted/system theme before first paint
 
+// Resilient handling for Vite chunk loading failures across deployments
+window.addEventListener('vite:preloadError', (event) => {
+  console.warn('[Vite] Chunk preload failed. Refreshing for latest deployment assets...', event);
+  const key = 'kvj_vite_preload_retry';
+  if (!sessionStorage.getItem(key)) {
+    sessionStorage.setItem(key, '1');
+    window.location.reload();
+  }
+});
+try {
+  sessionStorage.removeItem('kvj_vite_preload_retry');
+} catch (_) {}
+
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

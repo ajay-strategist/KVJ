@@ -71,26 +71,29 @@ export function AssessmentBoard() {
     }
   };
 
+  const safeEnrollments = Array.isArray(enrollments) ? enrollments : [];
+  const safeStudents = Array.isArray(students) ? students : [];
+
   const studentName = (studentId: string) => {
-    const s = students.find((st) => st.id === studentId);
-    return s ? `${s.firstName} ${s.lastName}` : 'Unknown';
+    const s = safeStudents.find((st) => st?.id === studentId);
+    return s ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : 'Unknown';
   };
 
   const columns: Column<Enrollment>[] = [
-    { key: 'student', header: 'Student Name', render: (e) => studentName(e.studentId) },
-    { key: 'seat', header: 'Allocated Seat', accessor: (e) => e.seatNumber ?? 'Pending' },
+    { key: 'student', header: 'Student Name', render: (e) => studentName(e?.studentId) },
+    { key: 'seat', header: 'Allocated Seat', accessor: (e) => e?.seatNumber ?? 'Pending' },
     { key: 'status', header: 'Status', render: (e) => (
-      <span className="kvj-badge kvj-badge--success">{e.status}</span>
+      <span className="kvj-badge kvj-badge--success">{e?.status || 'Active'}</span>
     )},
     { key: 'actions', header: 'Evaluation Actions', render: (e) => (
       <div style={{ display: 'flex', gap: 8 }}>
-        <Button size="sm" variant="secondary" onClick={() => { setActiveEnrolId(e.id); setOpenEval(true); }}>
+        <Button size="sm" variant="secondary" onClick={() => { if (e?.id) { setActiveEnrolId(e.id); setOpenEval(true); } }}>
           Log Grade
         </Button>
-        <Button size="sm" onClick={() => handleClaimVoucher(e.id)}>
+        <Button size="sm" onClick={() => e?.id && handleClaimVoucher(e.id)}>
           Voucher
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => handleIssueCertificate(e.id)}>
+        <Button size="sm" variant="secondary" onClick={() => e?.id && handleIssueCertificate(e.id)}>
           Certificate
         </Button>
       </div>
@@ -104,7 +107,7 @@ export function AssessmentBoard() {
         subtitle="Manage student test grading, exam vouchers, and QR verified completion certificates"
       />
 
-      <DataTable columns={columns} rows={enrollments} rowKey={(e) => e.id} loading={loading} />
+      <DataTable columns={columns} rows={safeEnrollments} rowKey={(e) => e?.id || Math.random().toString()} loading={loading} />
 
       <Drawer open={openEval} onClose={() => setOpenEval(false)} title="Log Evaluation Grade">
         <Form initial={{ maxMarks: 100 }} onSubmit={handleEvaluateSubmit}>

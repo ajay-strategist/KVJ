@@ -104,11 +104,19 @@ export function BatchManagement() {
   useEffect(() => {
     try {
       const empService = container.resolve<any>(EMPLOYEE_SERVICE_TOKEN);
-      empService.getEmployees().then((res: any) => {
-        if (res.ok && res.value) {
-          setTrainers(res.value);
-        }
-      });
+      const fetchPromise = typeof empService?.listEmployees === 'function'
+        ? empService.listEmployees()
+        : typeof empService?.getEmployees === 'function'
+          ? empService.getEmployees()
+          : null;
+
+      if (fetchPromise) {
+        fetchPromise.then((res: any) => {
+          if (res?.ok && Array.isArray(res?.value)) {
+            setTrainers(res.value);
+          }
+        }).catch(() => {});
+      }
     } catch (e) {
       void e;
     }

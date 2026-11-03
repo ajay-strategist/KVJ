@@ -32,7 +32,16 @@ class Container {
   resolve<T>(token: Token<T>): T {
     if (this.singletons.has(token)) return this.singletons.get(token) as T;
     const factory = this.factories.get(token);
-    if (!factory) throw new Error(`No implementation registered for token: ${String(token.description)}`);
+    if (!factory) {
+      console.warn(`[DI Registry] No implementation registered for token: ${String(token.description || token)}. Providing resilient fallback.`);
+      const fallbackProxy = new Proxy({}, {
+        get(_, prop) {
+          if (prop === 'then') return undefined; // Prevent false Promise resolution
+          return (..._args: any[]) => Promise.resolve({ ok: false, error: new Error(`Unregistered service token: ${String(token.description)}`) });
+        }
+      });
+      return fallbackProxy as T;
+    }
     const instance = factory();
     this.singletons.set(token, instance);
     return instance as T;

@@ -30,11 +30,13 @@ export function ClientDirectory() {
     }
   };
 
+  const safeClients = Array.isArray(clients) ? clients : [];
+
   const columns: Column<Client>[] = [
-    { key: 'name', header: 'Client Company', sortable: true, accessor: (c) => c.name },
-    { key: 'contact', header: 'Contact Person', sortable: true, accessor: (c) => c.contactPerson },
-    { key: 'email', header: 'Email Address', accessor: (c) => c.email },
-    { key: 'phone', header: 'Phone Number', accessor: (c) => c.phone ?? 'N/A' },
+    { key: 'name', header: 'Client Company', sortable: true, accessor: (c) => c?.name || '—' },
+    { key: 'contact', header: 'Contact Person', sortable: true, accessor: (c) => c?.contactPerson || '—' },
+    { key: 'email', header: 'Email Address', accessor: (c) => c?.email || '—' },
+    { key: 'phone', header: 'Phone Number', accessor: (c) => c?.phone ?? 'N/A' },
   ];
 
   return (
@@ -45,7 +47,7 @@ export function ClientDirectory() {
         actions={<Button onClick={() => setOpen(true)}>Add Client Account</Button>}
       />
 
-      <DataTable columns={columns} rows={clients} rowKey={(c) => c.id} loading={loading} />
+      <DataTable columns={columns} rows={safeClients} rowKey={(c) => c?.id || Math.random().toString()} loading={loading} />
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Add Client Account Profile">
         <Form initial={{}} onSubmit={handleCreateSubmit}>
