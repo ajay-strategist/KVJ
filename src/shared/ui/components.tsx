@@ -9,6 +9,7 @@ import {
   type ButtonHTMLAttributes, type ReactNode, useState, useRef, useEffect,
 } from 'react';
 import { useBreakpoint } from '../hooks/responsive';
+import { useTutorial, resolveTutorialKey } from '../../modules/tutorial/TutorialContext';
 import './ui.css';
 
 export type StatusTone =
@@ -194,14 +195,32 @@ export function PageHeader({
   actions,
   tabs,
   breadcrumb,
+  tutorialKey,
+  hideTutorial = false,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   tabs?: ReactNode;
   breadcrumb?: ReactNode;
+  tutorialKey?: string;
+  hideTutorial?: boolean;
 }) {
   const isDesktop = useBreakpoint('md');
+
+  let tutorialCtx: ReturnType<typeof useTutorial> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    tutorialCtx = useTutorial();
+  } catch {
+    tutorialCtx = null;
+  }
+
+  const handleOpenHelp = () => {
+    if (!tutorialCtx) return;
+    const key = tutorialKey || resolveTutorialKey(title);
+    tutorialCtx.openTutorial(key);
+  };
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -216,18 +235,71 @@ export function PageHeader({
         }}
       >
         <div style={{ flex: isDesktop ? '1 1 auto' : undefined, minWidth: 0 }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              letterSpacing: 'var(--letter-spacing-tight)',
-              color: 'var(--text-primary)',
-              lineHeight: 'var(--line-height-tight)',
-            }}
-          >
-            {title}
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 'var(--font-size-2xl)',
+                fontWeight: 'var(--font-weight-bold)',
+                letterSpacing: 'var(--letter-spacing-tight)',
+                color: 'var(--text-primary)',
+                lineHeight: 'var(--line-height-tight)',
+              }}
+            >
+              {title}
+            </h1>
+
+            {!hideTutorial && (
+              <button
+                type="button"
+                onClick={handleOpenHelp}
+                aria-label={`User guide and tutorial for ${title}`}
+                title={`How to use ${title} (User Guide & Tutorial — Press ?)`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '3px 8px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border, #cbd5e1)',
+                  background: 'var(--bg-sunken, #f8fafc)',
+                  color: 'var(--text-muted, #64748b)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 140ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e0e7ff';
+                  e.currentTarget.style.borderColor = '#6366f1';
+                  e.currentTarget.style.color = '#4338ca';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-sunken, #f8fafc)';
+                  e.currentTarget.style.borderColor = 'var(--border, #cbd5e1)';
+                  e.currentTarget.style.color = 'var(--text-muted, #64748b)';
+                }}
+              >
+                <span
+                  style={{
+                    width: 17,
+                    height: 17,
+                    borderRadius: '50%',
+                    background: '#6366f1',
+                    color: '#ffffff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    fontWeight: 800,
+                  }}
+                >
+                  ?
+                </span>
+                <span>Guide</span>
+              </button>
+            )}
+          </div>
           {subtitle && (
             <p
               style={{

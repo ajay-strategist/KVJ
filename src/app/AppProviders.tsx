@@ -13,6 +13,7 @@ import { AuthProvider } from '../modules/auth/AuthProvider';
 import { NotificationProvider } from '../shared/notifications/NotificationProvider';
 import { DialogProvider } from '../shared/feedback/DialogProvider';
 import { CommandPaletteProvider } from '../shared/search/CommandPaletteProvider';
+import { TutorialProvider } from '../modules/tutorial/TutorialContext';
 import '../shared/design-system/tokens.css';
 import '../shared/ui/ui.css';
 
@@ -29,7 +30,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
           <AuthProvider>
             <NotificationProvider>
               <DialogProvider>
-                <CommandPaletteProvider>{children}</CommandPaletteProvider>
+                <CommandPaletteProvider>
+                  <TutorialProvider>{children}</TutorialProvider>
+                </CommandPaletteProvider>
               </DialogProvider>
             </NotificationProvider>
           </AuthProvider>

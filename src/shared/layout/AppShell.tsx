@@ -21,6 +21,8 @@ import { useDevice } from '../hooks/responsive';
 import { Avatar, Badge } from '../ui/components';
 import { appConfig } from '../../config/app-config';
 import { IdleEmployeeAlertPopup } from '../notifications/IdleEmployeeAlertPopup';
+import { TutorialModal } from '../../modules/tutorial/TutorialModal';
+import { useTutorial } from '../../modules/tutorial/TutorialContext';
 
 // ── Inline icons (no icon library import in shell for bundle performance) ──
 const ICON_PATHS: Record<string, string> = {
@@ -63,6 +65,7 @@ const ICON_PATHS: Record<string, string> = {
   UserCheck: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 11l2 2 4-4',
   Star: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
   LifeBuoy: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 15a5 5 0 1 1 5-5 5 5 0 0 1-5 5zm7.07-9.93l-3.54 3.54M8.47 15.53l-3.54 3.54M4.93 8.07l3.54 3.54M15.53 15.53l3.54 3.54',
+  HelpCircle: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01',
 };
 
 function Icon({ name, size = 18 }: { name: string; size?: number }) {
@@ -144,6 +147,14 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const { setOpen: setCmdOpen } = useCommandPalette();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  let openTutorial = (_tabKey?: string) => {};
+  try {
+    const tut = useTutorial();
+    openTutorial = tut.openTutorial;
+  } catch {
+    // fallback if outside provider
+  }
 
   const items = visibleNav(can, user?.role);
   const isMobile = device === 'mobile';
@@ -394,6 +405,23 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                 >
                   <Icon name="Search" size={15} />
                 </button>
+
+                {/* Tutorial / Help Center Button */}
+                <button
+                  type="button"
+                  onClick={() => openTutorial()}
+                  aria-label="Help Center & User Guide (?)"
+                  title="Help Center & User Guide (Press ?)"
+                  style={{
+                    ...sidebarIconBtnStyle,
+                    color: 'var(--brand, #4f46e5)',
+                    background: 'rgba(79, 70, 229, 0.08)',
+                    borderColor: 'rgba(79, 70, 229, 0.25)',
+                    fontWeight: 700,
+                  }}
+                >
+                  <Icon name="HelpCircle" size={15} />
+                </button>
               </div>
 
               {/* User Profile Pill Button */}
@@ -453,6 +481,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                     <div style={{ padding: 6 }}>
                       {[
                         { icon: 'User', label: 'My Profile', action: () => { navigate('/app/employees'); setUserOpen(false); } },
+                        { icon: 'HelpCircle', label: 'Help & User Guide (?)', action: () => { openTutorial(); setUserOpen(false); } },
                         { icon: 'Settings', label: 'Settings', action: () => { navigate('/app/settings'); setUserOpen(false); } },
                       ].map((item) => (
                         <button
@@ -980,6 +1009,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
         </div>
       </div>
       <IdleEmployeeAlertPopup />
+      <TutorialModal />
     </InsideShellContext.Provider>
   );
 }
