@@ -439,6 +439,13 @@ export class AttendanceService implements IAttendanceService {
 
       // Determine workDate, firstClockIn, lastClockOut, and parsedSessions
       let workDate = corr.requestedDate || todayStr();
+      if (corr.fieldToCorrect === 'attendance_claim' && corr.proposedValue) {
+        const claimMatch = corr.proposedValue.match(/^([\d-]+)\s*\((.+)\)$/s);
+        if (claimMatch) {
+          workDate = claimMatch[1].trim();
+        }
+      }
+
       let firstClockIn: string | undefined = undefined;
       let lastClockOut: string | undefined = undefined;
       let parsedSessions: WorkSession[] = [];
@@ -447,7 +454,11 @@ export class AttendanceService implements IAttendanceService {
       let record: AttendanceRecord | null = null;
       if (corr.attendanceRecordId && corr.attendanceRecordId.length === 36) {
         try {
-          record = await this.repo.findById(corr.attendanceRecordId);
+          const candidateById = await this.repo.findById(corr.attendanceRecordId);
+          // Only bind if the record strictly belongs to the claimed workDate
+          if (candidateById && candidateById.workDate === workDate) {
+            record = candidateById;
+          }
         } catch {}
       }
 

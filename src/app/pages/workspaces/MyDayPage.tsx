@@ -637,7 +637,7 @@ export const AttendancePanel = memo(function AttendancePanel({
               CURRENT STATUS
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-              {currentStatus === 'present' ? '🟢 Working' : currentStatus === 'on_break' ? '🟡 On Break' : '⚫ Not Working'}
+              {(currentStatus === 'present' || Boolean(activeRunningTask)) ? '🟢 Working' : currentStatus === 'on_break' ? '🟡 On Break' : '⚫ Not Working'}
             </span>
           </div>
 
@@ -715,7 +715,7 @@ export const AttendancePanel = memo(function AttendancePanel({
 
         {/* Action Controls Bar matching Sample Image */}
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
-          {(currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && (
+          {((currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && !activeRunningTask) && (
             <button
               type="button"
               className="kvj-btn"
@@ -740,7 +740,7 @@ export const AttendancePanel = memo(function AttendancePanel({
             </button>
           )}
 
-          {currentStatus === 'present' && (
+          {(currentStatus === 'present' || Boolean(activeRunningTask)) && (
             <>
               <button
                 type="button"
@@ -1051,8 +1051,11 @@ export const AttendancePanel = memo(function AttendancePanel({
             
             try {
               const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
+              const targetRecordId = (record && record.workDate === values.date)
+                ? record.id
+                : (globalThis.crypto?.randomUUID?.() || String(Date.now()));
               await attService.requestCorrection(
-                record?.id || String(Date.now()),
+                targetRecordId,
                 'attendance_claim',
                 `${values.date} (${values.startTime} - ${values.endTime})`,
                 `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
@@ -1960,6 +1963,40 @@ export function MyDayPage() {
     return `${TIMELINE_STORAGE_KEY}_${activeKey}`;
   }, [selectedEmpId, user]);
 
+  // Load live running work sessions directly from DB so active task state is 100% synchronized across tabs and refreshes
+  const [runningDbSessions, setRunningDbSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId) return;
+    let isSubscribed = true;
+
+    async function loadRunningSessions() {
+      try {
+        const { data } = await supabase
+          .from('flwdsk_task_work_sessions')
+          .select('*')
+          .eq('employee_id', userId)
+          .eq('status', 'running')
+          .is('end_time', null)
+          .is('deleted_at', null);
+
+        if (isSubscribed && data) {
+          setRunningDbSessions(data);
+        }
+      } catch (e) {
+        console.warn('Could not load running task work sessions:', e);
+      }
+    }
+
+    loadRunningSessions();
+    const interval = setInterval(loadRunningSessions, 5000);
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [user?.id]);
+
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
 
   useEffect(() => {
@@ -2227,7 +2264,16 @@ export function MyDayPage() {
           underReview = false;
         }
 
-        if (stored) {
+        const dbRunningSession = (runningDbSessions || []).find((s: any) => s.task_id === t.id);
+        const isDbRunning = Boolean(dbRunningSession) || t.status === 'in_progress';
+
+        if (isDbRunning) {
+          active = true;
+          if (dbRunningSession?.start_time) {
+            const elapsedFromSession = Math.max(0, Math.floor((now - new Date(dbRunningSession.start_time).getTime()) / 1000));
+            secondsToday = Math.max(secondsToday, Math.round(((t as any).actualHours || 0) * 3600) + elapsedFromSession);
+          }
+        } else if (stored) {
           // Continuous Task Accumulation: trust accumulated stored seconds or DB actualHours.
           // When resuming or reloading, start from previously accumulated mark rather than resetting to zero.
           if (stored.active && stored.lastStartTime) {
@@ -2247,6 +2293,14 @@ export function MyDayPage() {
             underReview = true;
           } else if (stored.underReview !== undefined && !isRework && !isApproved) {
             underReview = stored.underReview;
+          }
+        }
+
+        // If the task is active, ensure the timer in taskTimerStore is actively ticking
+        if (active) {
+          const curTimer = taskTimerStore.getTimer(t.id);
+          if (!curTimer || !curTimer.isRunning) {
+            taskTimerStore.startTask(t.id, secondsToday * 1000);
           }
         }
 
@@ -2319,7 +2373,7 @@ export function MyDayPage() {
     });
 
     setTasks(mapped);
-  }, [projectTasks, projects, employees, user]);
+  }, [projectTasks, projects, employees, user, runningDbSessions]);
 
   useEffect(() => {
     const unsubscribe = taskTimerStore.subscribe((allTimers) => {

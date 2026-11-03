@@ -289,9 +289,9 @@ export function useAttendance() {
   }, [service, user, resumeTasksAfterBreak]);
 
   useEffect(() => {
-    if (loading) return;
-    const isInactive = !record || record.status === 'clocked_out' || record.status === 'on_break';
-    if (isInactive) {
+    if (loading || !record) return;
+    const isExplicitlyInactive = record.status === 'clocked_out' || record.status === 'on_break';
+    if (isExplicitlyInactive) {
       const currentTimers = taskTimerStore.getTimers();
       Object.keys(currentTimers).forEach((id) => {
         if (currentTimers[id].isRunning) {
