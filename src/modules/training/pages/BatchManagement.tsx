@@ -967,59 +967,35 @@ export function BatchManagement() {
         onToggleCompleteBatch={handleToggleCompleteBatch}
       />
 
-      {/* ── Quick Action Bar & Summary Stats ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        {/* Workspace Sub-Tab Navigation */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {[
-            { id: 'matrix', label: '📊 Performance Matrix' },
-            { id: 'attendance', label: '📅 Attendance Matrix' },
-            { id: 'final-exam', label: '🎓 Final Exam' },
-            { id: 'retest', label: '🔄 Retest (Unlocked)' },
-            { id: 'registration', label: '📋 Registration' },
-            { id: 'certificates', label: '📜 Certificates' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id as StudentSubTab)}
-              style={{
-                padding: '8px 16px',
-                fontSize: 13,
-                fontWeight: 700,
-                borderRadius: 8,
-                border: activeTab === tab.id ? '1px solid var(--brand)' : '1px solid var(--border)',
-                background: activeTab === tab.id ? 'var(--brand)' : 'var(--bg-surface)',
-                color: activeTab === tab.id ? '#fff' : 'var(--text-primary)',
-                cursor: 'pointer',
-                transition: 'all 150ms',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Global Toolbar Actions */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {canViewDailyReport && (
-            <Button size="sm" onClick={() => setDailyReportBuilderOpen(true)}>
-              📊 Daily Report
-            </Button>
-          )}
-          <Button size="sm" variant="secondary" onClick={downloadVoucherTemplate}>
-            📥 Voucher Template
-          </Button>
-          <Button size="sm" onClick={() => setUploadModalOpen(true)}>
-            📤 Upload Students (Excel)
-          </Button>
-          <Button size="sm" onClick={() => setAddStudentModalOpen(true)}>
-            ➕ Add Student
-          </Button>
-          <Button size="sm" variant="secondary" onClick={downloadPDF}>
-            📄 Download PDF
-          </Button>
-        </div>
+      {/* ── Workspace Sub-Tab Navigation ── */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        {[
+          { id: 'matrix', label: '📊 Performance Matrix' },
+          { id: 'attendance', label: '📅 Attendance Matrix' },
+          { id: 'final-exam', label: '🎓 Final Exam' },
+          { id: 'retest', label: '🔄 Retest (Unlocked)' },
+          { id: 'registration', label: '📋 Registration' },
+          { id: 'certificates', label: '📜 Certificates' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id as StudentSubTab)}
+            style={{
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 700,
+              borderRadius: 8,
+              border: activeTab === tab.id ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: activeTab === tab.id ? 'var(--brand)' : 'var(--bg-surface)',
+              color: activeTab === tab.id ? '#fff' : 'var(--text-primary)',
+              cursor: 'pointer',
+              transition: 'all 150ms',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Sub-Tab Body ── */}
