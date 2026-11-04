@@ -215,6 +215,22 @@ function ConditionalAttendanceFields() {
   return null;
 }
 
+export const getExpenseClaimDate = (claim: any): string => {
+  if (!claim) return '';
+  if (claim.notes && typeof claim.notes === 'string' && claim.notes.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(claim.notes);
+      if (parsed.expenseDate) return String(parsed.expenseDate).slice(0, 10);
+      if (parsed.date) return String(parsed.date).slice(0, 10);
+    } catch (e) { void e; }
+  }
+  if (claim.expenseDate) return String(claim.expenseDate).slice(0, 10);
+  if (claim.date) return String(claim.date).slice(0, 10);
+  if (claim.createdAt) return String(claim.createdAt).slice(0, 10);
+  if (claim.created_at) return String(claim.created_at).slice(0, 10);
+  return '';
+};
+
 export function AttendanceLogPage() {
   const { user } = useAuth();
   const { toast } = useNotifications();
@@ -293,7 +309,11 @@ export function AttendanceLogPage() {
           records = rawRecords.filter((r: any) => r && r.workDate && r.workDate >= range.from && r.workDate <= range.to);
           const allClaims = await expenseRepo.findMany({ pageSize: 1000 });
           const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
-          claims = rawClaims.filter((c: any) => c && !c.deletedAt && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
+          claims = rawClaims.filter((c: any) => {
+            if (!c || c.deletedAt) return false;
+            const cDate = getExpenseClaimDate(c);
+            return cDate >= range.from && cDate <= range.to;
+          });
         } else {
           const empId = currentEmployee?.id || user?.id;
           if (empId) {
@@ -301,7 +321,11 @@ export function AttendanceLogPage() {
             records = Array.isArray(rawHist) ? rawHist : [];
             const allClaims = await expenseRepo.findMany({ pageSize: 1000 });
             const rawClaims = Array.isArray(allClaims?.data) ? allClaims.data : Array.isArray(allClaims) ? allClaims : [];
-            claims = rawClaims.filter((c: any) => c && !c.deletedAt && c.employeeId === empId && (c.createdAt || '').slice(0, 10) >= range.from && (c.createdAt || '').slice(0, 10) <= range.to);
+            claims = rawClaims.filter((c: any) => {
+              if (!c || c.deletedAt || c.employeeId !== empId) return false;
+              const cDate = getExpenseClaimDate(c);
+              return cDate >= range.from && cDate <= range.to;
+            });
           }
         }
         setAttendanceRecords(Array.isArray(records) ? records : []);
@@ -623,8 +647,8 @@ export function AttendanceLogPage() {
       const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeekIdx];
 
       const record = recList.find(r => r && r.workDate === dateStr);
-      const dayClaims = claimList.filter(c => c && (c.status || '').toLowerCase() === 'approved' && (c.createdAt || '').slice(0, 10) === dateStr);
-      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
+      const dayClaims = claimList.filter(c => c && (c.status || '').toLowerCase() === 'approved' && getExpenseClaimDate(c) === dateStr);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (Number(c?.amount) || 0), 0);
       const decHoliday = holList.find((h: any) => h && h.date === dateStr);
       const activeLeave = leaveList.find(l =>
         (selectedEmployee === 'All Employees' || !empId || l.employeeId === empId) &&
@@ -714,7 +738,7 @@ export function AttendanceLogPage() {
           sessions: [],
           tasks: [],
           hoursWorked: '',
-          expenses: '',
+          expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '',
         });
       }
     }
@@ -737,8 +761,8 @@ export function AttendanceLogPage() {
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = toLocalISODate(d);
       const record = recList.find(r => r && r.workDate === dateStr);
-      const dayClaims = claimList.filter(c => c && (c.createdAt || '').slice(0, 10) === dateStr);
-      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (c?.amount || 0), 0);
+      const dayClaims = claimList.filter(c => c && (c.status || '').toLowerCase() === 'approved' && getExpenseClaimDate(c) === dateStr);
+      const dayExpensesSum = dayClaims.reduce((sum, c) => sum + (Number(c?.amount) || 0), 0);
       const decHoliday = holList.find((h: any) => h && h.date === dateStr);
       const activeLeave = leaveList.find(l =>
         l && l.employeeId === (record ? record.employeeId : empId) &&
@@ -1626,6 +1650,7 @@ export function AttendanceLogPage() {
       content: (
         <AttendanceCalendarView
           days={calendarDays}
+          totalExpenses={totalExpenseSum}
           selectedEmployeeName={selectedEmployeeDisplay}
         />
       ),
@@ -1637,6 +1662,7 @@ export function AttendanceLogPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <AttendanceCalendarView
             days={calendarDays}
+            totalExpenses={totalExpenseSum}
             showTopSummaries={true}
             showBottomSummaries={false}
             showCalendarGrid={false}
@@ -1825,6 +1851,7 @@ export function AttendanceLogPage() {
 
           <AttendanceCalendarView
             days={calendarDays}
+            totalExpenses={totalExpenseSum}
             showTopSummaries={false}
             showBottomSummaries={true}
             showCalendarGrid={false}

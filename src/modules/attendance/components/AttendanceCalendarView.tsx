@@ -33,6 +33,7 @@ export interface AttendanceCalendarViewProps {
   showTopSummaries?: boolean;
   showBottomSummaries?: boolean;
   showCalendarGrid?: boolean;
+  totalExpenses?: number;
 }
 
 function getCurrentFinancialYear(): string {
@@ -50,6 +51,7 @@ export function AttendanceCalendarView({
   showTopSummaries = true,
   showBottomSummaries = true,
   showCalendarGrid = true,
+  totalExpenses: propTotalExpenses,
 }: AttendanceCalendarViewProps) {
   const [selectedDay, setSelectedDay] = useState<CalendarDayDetail | null>(null);
   const [selectedFY, setSelectedFY] = useState(getCurrentFinancialYear());
@@ -239,10 +241,11 @@ export function AttendanceCalendarView({
     const totalBreakMins = days.reduce((sum, d) => sum + (d.breakMinutes || 0), 0);
     const totalBreakHrs = Math.round((totalBreakMins / 60) * 10) / 10;
 
-    const totalExpenses = days.reduce((sum, d) => {
+    const computedExpenses = days.reduce((sum, d) => {
       const amt = parseFloat(d.expenses.replace(/[^\d.]/g, '')) || 0;
       return sum + amt;
     }, 0);
+    const totalExpenses = typeof propTotalExpenses === 'number' ? propTotalExpenses : computedExpenses;
 
     const totalHoursWorked = days.reduce((sum, d) => {
       if (d.status === 'present') {
