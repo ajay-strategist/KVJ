@@ -172,6 +172,29 @@ const mins = (t: string) => {
 const overlaps = (a: ScheduleSession, b: ScheduleSession) =>
   mins(a.startTime) < mins(b.endTime) && mins(b.startTime) < mins(a.endTime);
 
+/**
+ * Checks whether a venue string is a generic campus/offline placeholder
+ * (e.g., 'Campus HQ', 'Campus', 'Offline') rather than a specific physical room/lab.
+ */
+export const isGenericVenue = (v?: string): boolean => {
+  if (!v) return true;
+  const clean = v.trim().toLowerCase();
+  return (
+    clean === '' ||
+    clean === '—' ||
+    clean === '-' ||
+    clean === 'tbd' ||
+    clean === 'online' ||
+    clean === 'offline' ||
+    clean === 'campus' ||
+    clean === 'campus hq' ||
+    clean === 'main campus' ||
+    clean === 'college' ||
+    clean === 'college campus' ||
+    clean === 'campus venue'
+  );
+};
+
 export function detectConflicts(
   sessions: ScheduleSession[],
   leaves: LeaveRequest[],
@@ -194,6 +217,7 @@ export function detectConflicts(
       for (let j = i + 1; j < daySessions.length; j++) {
         const a = daySessions[i];
         const b = daySessions[j];
+        if (a.status === 'Cancelled' || b.status === 'Cancelled') continue;
         if (overlaps(a, b)) {
           if (a.trainerId === b.trainerId) {
             conflicts.push({
@@ -208,19 +232,34 @@ export function detectConflicts(
               status: 'Open',
               detail: `Trainer assigned to ${a.batchCode} and ${b.batchCode} during overlapping hours.`,
             });
-          } else if (a.venue && b.venue && a.venue === b.venue && a.venue !== 'Online') {
-            conflicts.push({
-              id: `c-vc-${a.id}-${b.id}`,
-              trainerId: a.trainerId,
-              trainerName: trainerMap.get(a.trainerId) ?? a.trainerId,
-              date,
-              time: `${a.startTime}-${a.endTime}`,
-              batches: [a.batchCode, b.batchCode],
-              type: 'Venue Conflict',
-              severity: 'Low',
-              status: 'Open',
-              detail: `Venue ${a.venue} double booked for ${a.batchCode} and ${b.batchCode}.`,
-            });
+          } else {
+            // Venue conflict:
+            // 1. Neither session is Online mode
+            // 2. Both sessions must belong to the SAME college/institution (different colleges have completely separate campuses)
+            // 3. Both sessions must specify the same specific, non-generic room/lab (e.g. "Lab 1", "Room 204")
+            const isOnline = a.mode === 'Online' || b.mode === 'Online';
+            const collegeA = (a.college || '').trim().toLowerCase();
+            const collegeB = (b.college || '').trim().toLowerCase();
+            const isSameCollege = Boolean(collegeA && collegeB && collegeA === collegeB);
+
+            const venueA = (a.venue || '').trim().toLowerCase();
+            const venueB = (b.venue || '').trim().toLowerCase();
+            const isSpecificRoomMatch = !isGenericVenue(a.venue) && !isGenericVenue(b.venue) && venueA === venueB;
+
+            if (!isOnline && isSameCollege && isSpecificRoomMatch) {
+              conflicts.push({
+                id: `c-vc-${a.id}-${b.id}`,
+                trainerId: a.trainerId,
+                trainerName: trainerMap.get(a.trainerId) ?? a.trainerId,
+                date,
+                time: `${a.startTime}-${a.endTime}`,
+                batches: [a.batchCode, b.batchCode],
+                type: 'Venue Conflict',
+                severity: 'Low',
+                status: 'Open',
+                detail: `Venue ${a.venue} double booked at ${a.college} for ${a.batchCode} and ${b.batchCode}.`,
+              });
+            }
           }
         }
       }

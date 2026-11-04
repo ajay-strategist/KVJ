@@ -6,6 +6,7 @@ import {
   type Employee,
 } from '../modules/employee/employee.repository';
 import { computeRecurrenceDates } from '../modules/training/pages/TrainingCalendar';
+import { detectConflicts, isGenericVenue, type ScheduleSession } from '../modules/training/schedule.data';
 
 describe('Employee Ordering and Relieved Employee Exclusion', () => {
   const mockEmployees: Partial<Employee>[] = [
@@ -269,5 +270,159 @@ describe('Employee Training Session Idle State & Active Work Recognition', () =>
     expect(result.activeTask).toBe('No active task in progress');
   });
 });
+
+describe('Schedule Conflict Detection Accuracy & False Positive Prevention', () => {
+  const trainers = [
+    { id: 't-ajay', name: 'Ajay Thomas' },
+    { id: 't-linto', name: 'Linto George' },
+  ];
+
+  it('correctly identifies generic venues that do not cause room collision conflicts', () => {
+    expect(isGenericVenue('Campus HQ')).toBe(true);
+    expect(isGenericVenue('Campus')).toBe(true);
+    expect(isGenericVenue('Offline')).toBe(true);
+    expect(isGenericVenue('Online')).toBe(true);
+    expect(isGenericVenue('—')).toBe(true);
+    expect(isGenericVenue(undefined)).toBe(true);
+    expect(isGenericVenue('Lab 1')).toBe(false);
+    expect(isGenericVenue('Room 204')).toBe(false);
+    expect(isGenericVenue('Auditorium B')).toBe(false);
+  });
+
+  it('does NOT flag a venue conflict for sessions in different colleges even with overlapping times', () => {
+    const sessions: ScheduleSession[] = [
+      {
+        id: 's-sjcet',
+        trainerId: 't-ajay',
+        date: '2026-11-04',
+        name: 'Excel Expert 365',
+        batchCode: 'SJCET - 2 MBA - Batch 1',
+        college: 'SJCET',
+        course: 'Excel',
+        academicYear: '2026-27',
+        coordinator: 'Soumya',
+        startTime: '09:00',
+        endTime: '13:30',
+        venue: 'Campus HQ',
+        mode: 'Offline',
+        studentCount: 60,
+        status: 'Scheduled',
+        color: '#6366f1',
+      },
+      {
+        id: 's-christ',
+        trainerId: 't-linto',
+        date: '2026-11-04',
+        name: 'Python for beginners',
+        batchCode: 'Christ - Christ Teachers - Batch 1',
+        college: 'Christ',
+        course: 'Python',
+        academicYear: '2026-27',
+        coordinator: 'Coordinator',
+        startTime: '09:00',
+        endTime: '16:00',
+        venue: 'Campus HQ',
+        mode: 'Offline',
+        studentCount: 21,
+        status: 'Scheduled',
+        color: '#6366f1',
+      },
+    ];
+
+    const conflicts = detectConflicts(sessions, [], [], trainers);
+    expect(conflicts).toHaveLength(0);
+  });
+
+  it('does NOT flag a venue conflict for two sessions in the same college when using generic campus venues', () => {
+    const sessions: ScheduleSession[] = [
+      {
+        id: 's-christ-1',
+        trainerId: 't-ajay',
+        date: '2026-11-04',
+        name: 'Batch 1',
+        batchCode: 'Christ - Batch 1',
+        college: 'Christ',
+        course: 'Python',
+        academicYear: '2026-27',
+        coordinator: 'Coordinator',
+        startTime: '09:00',
+        endTime: '13:00',
+        venue: 'Campus HQ',
+        mode: 'Offline',
+        studentCount: 30,
+        status: 'Scheduled',
+        color: '#6366f1',
+      },
+      {
+        id: 's-christ-2',
+        trainerId: 't-linto',
+        date: '2026-11-04',
+        name: 'Batch 2',
+        batchCode: 'Christ - Batch 2',
+        college: 'Christ',
+        course: 'Excel',
+        academicYear: '2026-27',
+        coordinator: 'Coordinator',
+        startTime: '09:00',
+        endTime: '13:00',
+        venue: 'Campus HQ',
+        mode: 'Offline',
+        studentCount: 30,
+        status: 'Scheduled',
+        color: '#6366f1',
+      },
+    ];
+
+    const conflicts = detectConflicts(sessions, [], [], trainers);
+    expect(conflicts).toHaveLength(0);
+  });
+
+  it('flags a genuine venue conflict when the SAME specific room in the SAME college is double-booked', () => {
+    const sessions: ScheduleSession[] = [
+      {
+        id: 's-christ-lab1',
+        trainerId: 't-ajay',
+        date: '2026-11-04',
+        name: 'Batch 1',
+        batchCode: 'Christ - Batch 1',
+        college: 'Christ',
+        course: 'Python',
+        academicYear: '2026-27',
+        coordinator: 'Coordinator',
+        startTime: '09:00',
+        endTime: '13:00',
+        venue: 'Computer Lab 3',
+        mode: 'Offline',
+        studentCount: 30,
+        status: 'Scheduled',
+        color: '#6366f1',
+      },
+      {
+        id: 's-christ-lab2',
+        trainerId: 't-linto',
+        date: '2026-11-04',
+        name: 'Batch 2',
+        batchCode: 'Christ - Batch 2',
+        college: 'Christ',
+        course: 'Excel',
+        academicYear: '2026-27',
+        coordinator: 'Coordinator',
+        startTime: '10:00',
+        endTime: '14:00',
+        venue: 'Computer Lab 3',
+        mode: 'Offline',
+        studentCount: 30,
+        status: 'Scheduled',
+        color: '#6366f1',
+      },
+    ];
+
+    const conflicts = detectConflicts(sessions, [], [], trainers);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].type).toBe('Venue Conflict');
+    expect(conflicts[0].detail).toContain('Computer Lab 3');
+  });
+});
+
 
 
