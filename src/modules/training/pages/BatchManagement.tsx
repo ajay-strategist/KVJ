@@ -69,7 +69,7 @@ export function BatchManagement() {
   const [trainers, setTrainers] = useState<Employee[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<StudentSubTab>('matrix');
+  const [activeTab, setActiveTab] = useState<StudentSubTab | null>(null);
   const [dbColleges, setDbColleges] = useState<any[]>([]);
 
   // Load Colleges
@@ -967,36 +967,18 @@ export function BatchManagement() {
         onToggleCompleteBatch={handleToggleCompleteBatch}
       />
 
-      {/* ── Workspace Sub-Tab Navigation ── */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
-        {[
-          { id: 'matrix', label: '📊 Performance Matrix' },
-          { id: 'attendance', label: '📅 Attendance Matrix' },
-          { id: 'final-exam', label: '🎓 Final Exam' },
-          { id: 'retest', label: '🔄 Retest (Unlocked)' },
-          { id: 'registration', label: '📋 Registration' },
-          { id: 'certificates', label: '📜 Certificates' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id as StudentSubTab)}
-            style={{
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 700,
-              borderRadius: 8,
-              border: activeTab === tab.id ? '1px solid var(--brand)' : '1px solid var(--border)',
-              background: activeTab === tab.id ? 'var(--brand)' : 'var(--bg-surface)',
-              color: activeTab === tab.id ? '#fff' : 'var(--text-primary)',
-              cursor: 'pointer',
-              transition: 'all 150ms',
-            }}
+      {/* ── Sub-Tab Body (When activated via batch actions) ── */}
+      {activeTab && (
+        <div style={{ marginBottom: 16 }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setActiveTab(null)}
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+            ← Back to Batches
+          </Button>
+        </div>
+      )}
 
       {/* ── Sub-Tab Body ── */}
       {activeTab === 'matrix' && (
