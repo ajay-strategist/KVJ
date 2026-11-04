@@ -36,6 +36,22 @@ import { calculateTaskTotalSeconds, formatHoursMinutes } from '../../../shared/u
 import { TimelineWidget, parseTimeToMinutes, getEntryDate, getEntryTimestamp } from './components/TimelineWidget';
 import { AnnouncementWidget } from './components/AnnouncementWidget';
 import { DownloadMobileAppModal } from '../../../modules/mobile/components/DownloadMobileAppModal';
+import {
+  isTaskAssignedToUser,
+  getTaskOrderStorageKey,
+  getStoredTaskOrder,
+  saveStoredTaskOrder,
+  clearStoredTaskOrder,
+  sortTasksWithSupervisorTier,
+} from './task-ordering';
+export {
+  isTaskAssignedToUser,
+  getTaskOrderStorageKey,
+  getStoredTaskOrder,
+  saveStoredTaskOrder,
+  clearStoredTaskOrder,
+  sortTasksWithSupervisorTier,
+};
 
 function Greeting() {
   const { user } = useAuth();
@@ -1357,30 +1373,6 @@ function getTimeLeftInfo(dueStr: string): { label: string; tone: 'danger' | 'war
   }
 }
 
-const getTaskOrderStorageKey = (userId?: string): string => {
-  return userId ? `flwdsk_task_order_${userId}` : 'flwdsk_task_order_guest';
-};
-
-const getStoredTaskOrder = (userId?: string): string[] => {
-  try {
-    const key = getTaskOrderStorageKey(userId);
-    const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
-    // Legacy fallback
-    const legacy = localStorage.getItem('kvj_task_order_v1');
-    return legacy ? JSON.parse(legacy) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveStoredTaskOrder = (order: string[], userId?: string) => {
-  try {
-    const key = getTaskOrderStorageKey(userId);
-    localStorage.setItem(key, JSON.stringify(order));
-  } catch (e) { void e; }
-};
-
 export const TaskWidget = memo(function TaskWidget({
   tasks,
   setTasks,
@@ -1395,12 +1387,23 @@ export const TaskWidget = memo(function TaskWidget({
   onSyncTask?: (id: string, secondsToday: number, active: boolean, underReview?: boolean) => void;
 }) {
   const { user } = useAuth();
+  const { toast } = useNotifications();
   const isDesktop = useBreakpoint('md');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const [showSubmitted, setShowSubmitted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>({});
+
+  const handleResetOrder = () => {
+    clearStoredTaskOrder(user?.id);
+    setTasks((prev) => sortTasksWithSupervisorTier(prev, [], user));
+    toast({
+      variant: 'info',
+      title: 'Task Order Reset',
+      message: 'Task order reset: your tasks are placed at the top, supervisor view tasks at the bottom.',
+    });
+  };
 
   const toggleExpand = (taskId: string) => {
     setExpandedTaskIds((prev) => ({
@@ -1564,6 +1567,15 @@ export const TaskWidget = memo(function TaskWidget({
             >
               {showSubmitted ? '🙈 Hide Submitted' : '👁️ Show Submitted'}
             </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleResetOrder}
+              title="Reset task order to default: your tasks at top, supervisor tasks at bottom"
+              style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
+            >
+              🔄 Reset Order
+            </Button>
           </div>
         }
       />
@@ -1707,12 +1719,7 @@ export const TaskWidget = memo(function TaskWidget({
                            </span>
                          ) : (
                            (() => {
-                             const isMyAssignee = Boolean(
-                               user?.id && (
-                                 (t as any).assigneeId === user.id ||
-                                 (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
-                               )
-                             );
+                             const isMyAssignee = isTaskAssignedToUser(t, user);
                              if (!isMyAssignee) {
                                return (
                                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 6, border: '1px solid var(--border)' }}>
@@ -1816,12 +1823,7 @@ export const TaskWidget = memo(function TaskWidget({
                              </span>
                            ) : (
                              (() => {
-                               const isMyAssignee = Boolean(
-                                 user?.id && (
-                                   (t as any).assigneeId === user.id ||
-                                   (typeof (t as any).assignee === 'string' && user?.fullName && (t as any).assignee.toLowerCase() === user.fullName.toLowerCase())
-                                 )
-                               );
+                               const isMyAssignee = isTaskAssignedToUser(t, user);
                                if (!isMyAssignee) {
                                  return (
                                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 6, border: '1px solid var(--border)' }}>
@@ -2395,23 +2397,8 @@ export function MyDayPage() {
     saveStoredTaskStates(updatedStates);
 
     const savedOrder = getStoredTaskOrder(user?.id);
-    mapped.sort((a, b) => {
-      const idxA = savedOrder.indexOf(a.id);
-      const idxB = savedOrder.indexOf(b.id);
-      // Both tasks are in user's saved manual order
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      // Task A is new (not in savedOrder) -> bring to top
-      if (idxA === -1 && idxB !== -1) return -1;
-      // Task B is new (not in savedOrder) -> bring to top
-      if (idxA !== -1 && idxB === -1) return 1;
-      // Both are new -> sort newest created first
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      if (timeA !== timeB) return timeB - timeA;
-      return a.id.localeCompare(b.id);
-    });
-
-    setTasks(mapped);
+    const sorted = sortTasksWithSupervisorTier(mapped, savedOrder, user);
+    setTasks(sorted);
   }, [projectTasks, projects, employees, user, runningDbSessions]);
 
   useEffect(() => {
@@ -2901,12 +2888,18 @@ export function MyDayPage() {
     };
 
     setTasks((prev) => {
-      const next = [newTaskItem, ...prev.filter((t) => t.id !== taskId)];
+      const isOwn = isTaskAssignedToUser(newTaskItem, user);
+      const filtered = prev.filter((t) => t.id !== taskId);
+      const next = isOwn ? [newTaskItem, ...filtered] : [...filtered, newTaskItem];
       const states = getStoredTaskStates();
       states[taskId] = { secondsToday: 0, active: false };
       saveStoredTaskStates(states);
       const currentOrder = getStoredTaskOrder(user?.id);
-      saveStoredTaskOrder([taskId, ...currentOrder.filter((id) => id !== taskId)], user?.id);
+      if (currentOrder.length > 0) {
+        const filteredOrder = currentOrder.filter((id) => id !== taskId);
+        const nextOrder = isOwn ? [taskId, ...filteredOrder] : [...filteredOrder, taskId];
+        saveStoredTaskOrder(nextOrder, user?.id);
+      }
       return next;
     });
 
