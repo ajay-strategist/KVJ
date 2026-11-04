@@ -108,3 +108,4 @@ describe('Attendance Log & Expense Summary Alignment', () => {
     expect(totalFromDays).toBe(3709);
   });
 });
+

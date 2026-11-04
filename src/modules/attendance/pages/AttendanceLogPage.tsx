@@ -23,6 +23,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useBreakpoint } from '../../../shared/hooks/responsive';
 import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
 import { SubmitAttendanceDrawerForm } from '../components/SubmitAttendanceDrawerForm';
+import { EditExpenseModal, type EditableExpense } from '../../finance/forms/EditExpenseModal';
 
 /**
  * Human-readable name of a training batch, e.g.
@@ -258,6 +259,7 @@ export function AttendanceLogPage() {
   const [expenseRows, setExpenseRows] = useState<Array<any>>([]);
   const [expenseSortOrder, setExpenseSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({});
+  const [editingExpense, setEditingExpense] = useState<EditableExpense | null>(null);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -1992,22 +1994,34 @@ export function AttendanceLogPage() {
                         </td>
                         <td style={{ padding: 10 }}>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            {isManagement && (
+                              <Button
+                                size="xs"
+                                variant="secondary"
+                                onClick={() => setEditingExpense(exp)}
+                                title="Admin: Edit Expense Claim"
+                                style={{ fontSize: 11.5 }}
+                              >
+                                ✏️ Edit
+                              </Button>
+                            )}
                             {!isLocked && exp.status === 'submitted' && isManagement && (
                               <>
                                 <Button size="xs" variant="success" onClick={() => handleIndividualAction(exp.id, 'approve')}>Approve</Button>
                                 <Button size="xs" variant="danger" onClick={() => handleIndividualAction(exp.id, 'reject')}>Reject</Button>
                               </>
                             )}
-                            {!isLocked && (
+                            {(!isLocked || isManagement) && (
                               <Button
                                 size="xs"
                                 variant="danger"
                                 onClick={() => handleIndividualAction(exp.id, 'delete')}
+                                style={{ fontSize: 11.5 }}
                               >
                                 Delete
                               </Button>
                             )}
-                            {isLocked && (
+                            {isLocked && !isManagement && (
                               <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 🔒 Locked
                               </span>
@@ -2299,6 +2313,15 @@ export function AttendanceLogPage() {
           toast={toast}
         />
       </Drawer>
+
+      {/* Admin Edit Expense Claim Drawer / Modal */}
+      <EditExpenseModal
+        open={Boolean(editingExpense)}
+        onClose={() => setEditingExpense(null)}
+        onSuccess={() => setRefetchTrigger((prev) => prev + 1)}
+        expense={editingExpense}
+        batches={batches}
+      />
 
       {/* Receipt Preview Modal / Drawer */}
       <Drawer open={!!receiptModalUrl} onClose={() => setReceiptModalUrl(null)} title="Expense Receipt Preview">

@@ -23,6 +23,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { googleIntegration } from '../../../shared/integration/google';
 import { ExpenseClaimModal, cleanBatchNameForDisplay } from '../forms/ExpenseClaimModal';
 import { TravelRatesModal, type TravelRate, DEFAULT_TRAVEL_RATES } from '../forms/TravelRatesModal';
+import { EditExpenseModal, type EditableExpense } from '../forms/EditExpenseModal';
 
 export interface ExpenseRecord {
   id: string;
@@ -107,6 +108,7 @@ export function ExpenseClaims() {
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [batchEntryMode, setBatchEntryMode] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<EditableExpense | null>(null);
   const [rateModalOpen, setRateModalOpen] = useState(false);
   const [travelRates, setTravelRates] = useState<TravelRate[]>(() => {
     try {
@@ -1377,7 +1379,17 @@ export function ExpenseClaims() {
                   )}
 
                   {/* Actions Row */}
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                    {isManagement && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setEditingExpense(exp)}
+                        title="Admin: Edit Expense Claim"
+                      >
+                        ✏️ Edit
+                      </Button>
+                    )}
                     {!isLocked && exp.status === 'submitted' && isManagement && (
                       <>
                         <Button size="sm" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>
@@ -1388,7 +1400,7 @@ export function ExpenseClaims() {
                         </Button>
                       </>
                     )}
-                    {!isLocked && (
+                    {(!isLocked || isManagement) && (
                       <Button
                         size="sm"
                         variant="danger"
@@ -1418,7 +1430,7 @@ export function ExpenseClaims() {
                         Cancel Claim
                       </Button>
                     )}
-                    {isLocked && (
+                    {isLocked && !isManagement && (
                       <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
                         {exp.status === 'Cancelled' ? '🚫 Cancelled' : 'Audit Locked'}
                       </span>
@@ -1603,13 +1615,23 @@ export function ExpenseClaims() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {isManagement && (
+                            <Button
+                              size="xs"
+                              variant="secondary"
+                              onClick={() => setEditingExpense(exp)}
+                              title="Admin: Edit Expense Claim"
+                            >
+                              ✏️ Edit
+                            </Button>
+                          )}
                           {!isLocked && exp.status === 'submitted' && isManagement && (
                             <>
                               <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>Approve</Button>
                               <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>Reject</Button>
                             </>
                           )}
-                          {!isLocked && (
+                          {(!isLocked || isManagement) && (
                             <Button
                               size="xs"
                               variant="danger"
@@ -1627,24 +1649,24 @@ export function ExpenseClaims() {
                               Delete
                             </Button>
                           )}
-                          {isLocked && (
+                          {isLocked && !isManagement && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                                 {exp.status === 'Cancelled' ? '🚫 Cancelled' : '🔒 Locked'}
                               </span>
-                              {isManagement && exp.status !== 'Cancelled' && (
-                                <Button
-                                  size="xs"
-                                  variant="secondary"
-                                  onClick={() => {
-                                    setCancelModalClaimId(exp.id);
-                                    setCancelReason('');
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                              )}
                             </div>
+                          )}
+                          {isLocked && isManagement && exp.status !== 'Cancelled' && (
+                            <Button
+                              size="xs"
+                              variant="secondary"
+                              onClick={() => {
+                                setCancelModalClaimId(exp.id);
+                                setCancelReason('');
+                              }}
+                            >
+                              Cancel
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -1670,6 +1692,18 @@ export function ExpenseClaims() {
         customExpenseTypes={customExpenseTypes}
         onRegisterNewType={handleRegisterNewType}
         defaultBatchMode={batchEntryMode}
+      />
+
+      {/* Admin Edit Expense Claim Modal */}
+      <EditExpenseModal
+        open={Boolean(editingExpense)}
+        onClose={() => setEditingExpense(null)}
+        onSuccess={() => loadClaims()}
+        expense={editingExpense}
+        batches={batches}
+        travelRates={travelRates}
+        bikeRate={bikeRate}
+        carRate={carRate}
       />
 
       {/* Travel Rates Modal */}
