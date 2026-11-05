@@ -141,7 +141,8 @@ export function AttendanceSummaryPanels({
     const holidayWorked = attendanceRecords.filter(r => new Date(r.workDate).getDay() === 0 || holidayDatesSet.has(r.workDate)).length;
     
     const lateReporting = attendanceRecords.filter(r => {
-      const wType = r.sessions?.[0]?.workType || (r as any).workType || 'Office';
+      const sortedSess = [...(r.sessions || [])].sort((a, b) => (a.clockIn ? new Date(a.clockIn).getTime() : 0) - (b.clockIn ? new Date(b.clockIn).getTime() : 0));
+      const wType = sortedSess[0]?.workType || (r as any).workType || 'Office';
       if (!r.firstClockIn) return false;
       const clockInTimeStr = new Date(r.firstClockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       return isLate(clockInTimeStr, wType);

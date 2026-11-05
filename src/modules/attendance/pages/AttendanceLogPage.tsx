@@ -726,7 +726,12 @@ export function AttendanceLogPage() {
 
       if (record) {
         const isPastDate = dateStr < todayISO();
-        const firstSession = record.sessions?.[0];
+        const sortedRecordSessions = [...(record.sessions || [])].sort((a, b) => {
+          const tA = a.clockIn ? new Date(a.clockIn).getTime() : 0;
+          const tB = b.clockIn ? new Date(b.clockIn).getTime() : 0;
+          return tA - tB;
+        });
+        const firstSession = sortedRecordSessions[0];
         const workType = firstSession?.workType || 'Office';
         const batchId = (firstSession as any)?.batchId || (firstSession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
         const orgVal = resolveOrgValue(workType, firstSession?.notes, (record as any).notes, batchId) || 'Office';
@@ -734,7 +739,7 @@ export function AttendanceLogPage() {
         const effectiveFirstClockIn = record.firstClockIn || firstSession?.clockIn;
         const effectiveRecordClockOut = record.lastClockOut || (isPastDate && effectiveFirstClockIn ? `${dateStr}T17:30:00+05:30` : record.lastClockOut);
 
-        const sessions = record.sessions?.map(s => {
+        const sessions = sortedRecordSessions.map(s => {
           const sClockOut = s.clockOut || (isPastDate && s.clockIn ? (record.lastClockOut || `${dateStr}T17:30:00+05:30`) : s.clockOut);
           const sStart = safeFormatTime(s.clockIn);
           let sEnd = safeFormatTime(sClockOut);
@@ -762,7 +767,7 @@ export function AttendanceLogPage() {
         }) || [];
 
         let totalMins = 0;
-        const validSessions = (record.sessions || []).filter(s => {
+        const validSessions = sortedRecordSessions.filter(s => {
           const st = safeFormatTime(s.clockIn);
           return !!st && st !== '—';
         });
@@ -813,7 +818,7 @@ export function AttendanceLogPage() {
           startTime: safeFormatTime(effectiveFirstClockIn),
           endTime: safeFormatTime(effectiveRecordClockOut),
           sessions,
-          tasks: record.sessions?.map(s => ({ title: s.notes || 'Task', duration: '' })) || [],
+          tasks: sortedRecordSessions.map(s => ({ title: s.notes || 'Task', duration: '' })),
           hoursWorked: `${totalHrs}h ${remMins}m`,
           expenses: dayExpensesSum > 0 ? `₹ ${dayExpensesSum.toFixed(2)}` : '',
           breakMinutes: record.totalBreakMinutes || 0,
@@ -892,7 +897,11 @@ export function AttendanceLogPage() {
         const breakTime = `${Math.floor(breakMins / 60)}h ${breakMins % 60}m`;
 
         const rawSessionsList = record.sessions && record.sessions.length > 0
-          ? record.sessions
+          ? [...record.sessions].sort((a, b) => {
+              const tA = a.clockIn ? new Date(a.clockIn).getTime() : 0;
+              const tB = b.clockIn ? new Date(b.clockIn).getTime() : 0;
+              return tA - tB;
+            })
           : [{
               id: record.id,
               workType: 'Office' as WorkSessionType,
@@ -920,6 +929,13 @@ export function AttendanceLogPage() {
             uniqueSessions.push(s);
           }
         }
+
+        // Strictly sort uniqueSessions chronologically ascending by clockIn so morning sessions appear before evening
+        uniqueSessions.sort((a, b) => {
+          const tA = a.clockIn ? new Date(a.clockIn).getTime() : 0;
+          const tB = b.clockIn ? new Date(b.clockIn).getTime() : 0;
+          return tA - tB;
+        });
 
         const isHoliday = (record as any).notes?.toLowerCase().includes('holiday') || !!decHoliday;
         const isLeave = !!activeLeave;
@@ -1366,7 +1382,12 @@ export function AttendanceLogPage() {
         const dateStr = (ex.createdAt || '').slice(0, 10);
         const attRec = attList.find((a: any) => a && a.employeeId === ex.employeeId && a.workDate === dateStr);
         if (attRec) {
-          const firstSess = attRec.sessions?.[0] as any;
+          const sortedAttSessions = [...(attRec.sessions || [])].sort((a: any, b: any) => {
+            const tA = a.clockIn ? new Date(a.clockIn).getTime() : 0;
+            const tB = b.clockIn ? new Date(b.clockIn).getTime() : 0;
+            return tA - tB;
+          });
+          const firstSess = sortedAttSessions[0] as any;
           const workType = firstSess?.workType || 'Office';
           const batchId = firstSess?.batchId || firstSess?.batch_id || (attRec as any).batchId || (attRec as any).batch_id;
           const resolvedBatch = resolveOrgValue(workType, firstSess?.notes, (attRec as any).notes, batchId);
@@ -1752,7 +1773,12 @@ export function AttendanceLogPage() {
       const clockIn = todayRec?.firstClockIn ? safeFormatTime(todayRec.firstClockIn) : null;
       const clockOut = todayRec?.lastClockOut ? safeFormatTime(todayRec.lastClockOut) : null;
       const workMins = todayRec?.totalWorkingMinutes || 0;
-      const workType = (todayRec?.sessions?.[0]?.workType || 'Office') as string;
+      const sortedTodaySessions = [...(todayRec?.sessions || [])].sort((a, b) => {
+        const tA = a.clockIn ? new Date(a.clockIn).getTime() : 0;
+        const tB = b.clockIn ? new Date(b.clockIn).getTime() : 0;
+        return tA - tB;
+      });
+      const workType = (sortedTodaySessions[0]?.workType || 'Office') as string;
       const barPct = Math.min(100, Math.round((workMins / 540) * 100));
       return { empId, name, initials, status, clockIn, clockOut, workMins, workType, barPct, leaveType: onLeave?.leaveType };
     });

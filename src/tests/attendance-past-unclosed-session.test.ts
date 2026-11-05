@@ -96,4 +96,36 @@ describe('Past Unclosed Attendance Session 5:30 PM Default', () => {
     const grossMins = (endMins || 0) - (startMins || 0);
     expect(grossMins).toBe(579);
   });
+
+  it('sorts multiple sessions chronologically by clockIn ascending so morning comes before evening', () => {
+    // Simulated unordered sessions (e.g. 12-10-2026 where evening class arrived before morning office session)
+    const sessions = [
+      {
+        id: 'sess-evening',
+        workType: 'Training',
+        clockIn: '2026-10-12T12:35:16.753+00:00', // 06:05 PM IST
+        clockOut: '2026-10-12T17:01:30.071+00:00', // 10:31 PM IST
+      },
+      {
+        id: 'sess-morning',
+        workType: 'Office',
+        clockIn: '2026-10-12T04:09:19.825+00:00', // 09:39 AM IST
+        clockOut: '2026-10-12T12:34:53.420+00:00', // 06:04 PM IST
+      },
+    ];
+
+    const sorted = [...sessions].sort((a, b) => {
+      const tA = a.clockIn ? new Date(a.clockIn).getTime() : 0;
+      const tB = b.clockIn ? new Date(b.clockIn).getTime() : 0;
+      return tA - tB;
+    });
+
+    expect(sorted[0].id).toBe('sess-morning');
+    expect(safeFormatTime(sorted[0].clockIn)).toBe('09:39 AM');
+    expect(safeFormatTime(sorted[0].clockOut)).toBe('06:04 PM');
+
+    expect(sorted[1].id).toBe('sess-evening');
+    expect(safeFormatTime(sorted[1].clockIn)).toBe('06:05 PM');
+    expect(safeFormatTime(sorted[1].clockOut)).toBe('10:31 PM');
+  });
 });

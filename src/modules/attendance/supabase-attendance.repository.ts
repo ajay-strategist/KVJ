@@ -49,7 +49,8 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
       const { data: wsData } = await supabase
         .from('flwdsk_work_sessions')
         .select('*')
-        .in('attendance_record_id', ids);
+        .in('attendance_record_id', ids)
+        .order('clock_in', { ascending: true });
 
       if (wsData && wsData.length > 0) {
         const map: Record<string, WorkSession[]> = {};
@@ -63,6 +64,15 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
           };
           if (!map[row.attendance_record_id]) map[row.attendance_record_id] = [];
           map[row.attendance_record_id].push(s);
+        });
+
+        // Ensure chronological ascending order for sessions of each record
+        Object.keys(map).forEach((k) => {
+          map[k].sort((a, b) => {
+            const tA = a.clockIn ? new Date(a.clockIn).getTime() : 0;
+            const tB = b.clockIn ? new Date(b.clockIn).getTime() : 0;
+            return tA - tB;
+          });
         });
 
         return records.map((r) => ({
@@ -158,7 +168,8 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
         const { data: bData } = await supabase
           .from('flwdsk_break_records')
           .select('*')
-          .in('work_session_id', sessionIds);
+          .in('work_session_id', sessionIds)
+          .order('start_time', { ascending: true });
 
         if (bData && bData.length > 0) {
           const attToBreaksMap: Record<string, BreakRecord[]> = {};
@@ -175,6 +186,15 @@ export class SupabaseAttendanceRepository extends SupabaseRepository<AttendanceR
               if (!attToBreaksMap[attId]) attToBreaksMap[attId] = [];
               attToBreaksMap[attId].push(b);
             }
+          });
+
+          // Ensure chronological ascending order for breaks of each record
+          Object.keys(attToBreaksMap).forEach((k) => {
+            attToBreaksMap[k].sort((a, b) => {
+              const tA = a.startTime ? new Date(a.startTime).getTime() : 0;
+              const tB = b.startTime ? new Date(b.startTime).getTime() : 0;
+              return tA - tB;
+            });
           });
 
           return records.map((r) => ({
