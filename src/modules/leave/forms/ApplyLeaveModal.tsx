@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
 import { Button } from '../../../shared/ui/components';
 import { useAuth } from '../../auth/AuthProvider';
@@ -6,42 +6,15 @@ import { useNotifications } from '../../../shared/notifications/NotificationProv
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useLeave } from '../hooks/useLeave';
 import { googleIntegration } from '../../../shared/integration/google';
+import { supabase } from '../../../shared/integration/supabase';
+import { calculateWorkingDays, type LeaveShiftType } from '../utils/working-days';
 
-export type LeaveShiftType = 'Full Day' | 'Morning Half Day' | 'Afternoon Half Day';
+export { calculateWorkingDays, type LeaveShiftType };
 
 export interface ApplyLeaveModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-}
-
-/**
- * Calculates net working days between start and end date, strictly
- * excluding Saturdays (6) and Sundays (0) to enforce KVJ's No-Sandwich Policy.
- */
-export function calculateWorkingDays(startDate: string, endDate: string, shift: LeaveShiftType): number {
-  if (shift === 'Morning Half Day' || shift === 'Afternoon Half Day') {
-    return 0.5;
-  }
-  if (!startDate || !endDate) return 0;
-  const [sY, sM, sD] = startDate.split('-').map(Number);
-  const [eY, eM, eD] = endDate.split('-').map(Number);
-  if (!sY || !sM || !sD || !eY || !eM || !eD) return 0;
-
-  const start = new Date(sY, sM - 1, sD);
-  const end = new Date(eY, eM - 1, eD);
-  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
-
-  let count = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    const day = cur.getDay();
-    if (day !== 0 && day !== 6) {
-      count++;
-    }
-    cur.setDate(cur.getDate() + 1);
-  }
-  return count;
 }
 
 export function ApplyLeaveModal({ open, onClose, onSuccess }: ApplyLeaveModalProps) {
@@ -59,12 +32,38 @@ export function ApplyLeaveModal({ open, onClose, onSuccess }: ApplyLeaveModalPro
   const [reason, setReason] = useState<string>('');
   const [medCertFile, setMedCertFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [declaredHolidays, setDeclaredHolidays] = useState<Set<string>>(new Set());
+
+  // Fetch declared holidays to exclude only Sundays and Declared Holidays (Saturday is a working day)
+  useEffect(() => {
+    let active = true;
+    const fetchDeclaredHolidays = async () => {
+      try {
+        const { data } = await supabase
+          .from('flwdsk_declared_holidays')
+          .select('date, holiday_date, status')
+          .is('deleted_at', null);
+
+        if (active && data) {
+          const hols = data
+            .filter((h: any) => h.status !== 'cancelled')
+            .map((h: any) => (h.date || h.holiday_date)?.slice(0, 10))
+            .filter(Boolean);
+          setDeclaredHolidays(new Set(hols));
+        }
+      } catch (err) {
+        console.warn('Failed to load declared holidays for leave modal:', err);
+      }
+    };
+    fetchDeclaredHolidays();
+    return () => { active = false; };
+  }, []);
 
   if (!open) return null;
 
   const isHalfDay = shift !== 'Full Day';
   const effectiveEndDate = isHalfDay ? startDate : endDate;
-  const calculatedDays = calculateWorkingDays(startDate, effectiveEndDate, shift);
+  const calculatedDays = calculateWorkingDays(startDate, effectiveEndDate, shift, declaredHolidays);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -296,7 +295,7 @@ export function ApplyLeaveModal({ open, onClose, onSuccess }: ApplyLeaveModalPro
         </div>
         {!isHalfDay && calculatedDays > 0 && (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -10 }}>
-            ℹ️ Saturdays and Sundays are excluded from deduction (No Sandwich Policy).
+            ℹ️ No Sandwich Policy
           </div>
         )}
 

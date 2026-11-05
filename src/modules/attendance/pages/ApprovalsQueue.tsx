@@ -22,6 +22,7 @@ import { useBreakpoint } from '../../../shared/hooks/responsive';
 import { useTaskSessions, getSessionNotesMap } from '../../project/hooks/useTaskSessions';
 import { TaskWorklogUpdatesDrawer } from '../../project/components/TaskWorklogUpdatesDrawer';
 import { determineTaskRejectionAction } from '../../../shared/utils/taskRejection';
+import { calculateWorkingDays } from '../../leave/utils/working-days';
 
 export function ApprovalsQueue() {
   const { user } = useAuth();
@@ -854,7 +855,7 @@ export function ApprovalsQueue() {
       header: 'Leave Balance',
       render: (r: LeaveRecord) => {
         const empLeaves = (allLeaves || pendingApprovals || []).filter((l: LeaveRecord) => l.employeeId === r.employeeId && l.status === 'approved');
-        const count = empLeaves.reduce((acc: number, l: LeaveRecord) => acc + (l.halfDay ? 0.5 : 1), 0);
+        const count = empLeaves.reduce((acc: number, l: LeaveRecord) => acc + (l.halfDay ? 0.5 : calculateWorkingDays(l.startDate, l.endDate || l.startDate, 'Full Day')), 0);
         const empObj = Object.values(employees || {}).find((e: Employee) => e.id === r.employeeId);
         const alloc = empObj?.leaveAllocationPerMonth ?? 1;
         const now = new Date();

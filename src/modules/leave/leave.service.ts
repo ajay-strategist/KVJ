@@ -7,6 +7,8 @@ import { LEAVE_REPOSITORY_TOKEN, type LeaveRecord } from './leave.repository';
 import { EMPLOYEE_REPOSITORY_TOKEN } from '../employee/employee.repository';
 import { googleIntegration } from '../../shared/integration/google';
 import { calculateEarnedLeaveAllocation } from '../../shared/utils/leaveAccrual';
+import { supabase } from '../../shared/integration/supabase';
+import { calculateWorkingDays } from './utils/working-days';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (val?: string): boolean => !!val && UUID_RE.test(val);
@@ -305,15 +307,30 @@ export class LeaveService implements ILeaveService {
         return leaveDate >= fyStartDate;
       });
 
+      // Fetch declared holidays to accurately deduct working days under No-Sandwich Policy
+      let declaredHolsSet = new Set<string>();
+      try {
+        const { data: hols } = await supabase
+          .from('flwdsk_declared_holidays')
+          .select('date, holiday_date, status')
+          .is('deleted_at', null);
+        if (hols) {
+          const activeHols = hols
+            .filter((h: any) => h.status !== 'cancelled')
+            .map((h: any) => (h.date || h.holiday_date)?.slice(0, 10))
+            .filter(Boolean);
+          declaredHolsSet = new Set(activeHols);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch declared holidays in leave service:', e);
+      }
+
       let leavesTakenDays = 0;
       for (const l of approvedLeavesInFY) {
         if (l.halfDay) {
           leavesTakenDays += 0.5;
         } else {
-          const start = new Date(l.startDate).getTime();
-          const end = new Date(l.endDate || l.startDate).getTime();
-          const diffDays = Math.max(1, Math.round((end - start) / (1000 * 3600 * 24)) + 1);
-          leavesTakenDays += diffDays;
+          leavesTakenDays += calculateWorkingDays(l.startDate, l.endDate || l.startDate, 'Full Day', declaredHolsSet);
         }
       }
 
