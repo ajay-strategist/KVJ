@@ -725,18 +725,25 @@ export function AttendanceLogPage() {
       );
 
       if (record) {
+        const isPastDate = dateStr < todayISO();
         const firstSession = record.sessions?.[0];
         const workType = firstSession?.workType || 'Office';
         const batchId = (firstSession as any)?.batchId || (firstSession as any)?.batch_id || (record as any)?.batchId || (record as any)?.batch_id;
         const orgVal = resolveOrgValue(workType, firstSession?.notes, (record as any).notes, batchId) || 'Office';
 
-        const sessions = record.sessions?.map(s => ({
-          location: resolveOrgValue(s.workType, s.notes, (record as any).notes, (s as any).batchId || (s as any).batch_id) || 'Office',
-          type: s.workType || 'Office',
-          startTime: safeFormatTime(s.clockIn),
-          endTime: safeFormatTime(s.clockOut),
-          tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
-        })) || [];
+        const effectiveFirstClockIn = record.firstClockIn || firstSession?.clockIn;
+        const effectiveRecordClockOut = record.lastClockOut || (isPastDate && effectiveFirstClockIn ? `${dateStr}T17:30:00+05:30` : record.lastClockOut);
+
+        const sessions = record.sessions?.map(s => {
+          const sClockOut = s.clockOut || (isPastDate && s.clockIn ? (record.lastClockOut || `${dateStr}T17:30:00+05:30`) : s.clockOut);
+          return {
+            location: resolveOrgValue(s.workType, s.notes, (record as any).notes, (s as any).batchId || (s as any).batch_id) || 'Office',
+            type: s.workType || 'Office',
+            startTime: safeFormatTime(s.clockIn),
+            endTime: safeFormatTime(sClockOut),
+            tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
+          };
+        }) || [];
 
         let totalMins = 0;
         const validSessions = (record.sessions || []).filter(s => {
@@ -747,12 +754,13 @@ export function AttendanceLogPage() {
         if (validSessions.length > 0) {
           const seenKeys = new Set<string>();
           for (const s of validSessions) {
-            const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
+            const sClockOut = s.clockOut || (isPastDate && s.clockIn ? (record.lastClockOut || `${dateStr}T17:30:00+05:30`) : s.clockOut);
+            const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(sClockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
             if (!seenKeys.has(key)) {
               seenKeys.add(key);
               if (s.clockIn) {
                 const t1 = new Date(s.clockIn).getTime();
-                const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                const t2 = sClockOut ? new Date(sClockOut).getTime() : Date.now();
                 if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
                   totalMins += Math.max(0, Math.round((t2 - t1) / 60000));
                 }
@@ -764,9 +772,9 @@ export function AttendanceLogPage() {
           }
         } else if (record.totalWorkingMinutes && record.totalWorkingMinutes > 0) {
           totalMins = record.totalWorkingMinutes;
-        } else if (record.firstClockIn && record.lastClockOut) {
-          const endTs = new Date(record.lastClockOut).getTime();
-          const startTs = new Date(record.firstClockIn).getTime();
+        } else if (effectiveFirstClockIn && effectiveRecordClockOut) {
+          const endTs = new Date(effectiveRecordClockOut).getTime();
+          const startTs = new Date(effectiveFirstClockIn).getTime();
           if (!isNaN(endTs) && !isNaN(startTs) && endTs > startTs) {
             totalMins = Math.max(0, Math.round((endTs - startTs) / 60000) - (record.totalBreakMinutes || 0));
           }
@@ -783,8 +791,8 @@ export function AttendanceLogPage() {
           fullDate: dateStr.split('-').reverse().join('/'),
           status: decHoliday || isHolType ? 'holiday' : isLeaveType ? 'leave' : 'present',
           location: orgVal,
-          startTime: safeFormatTime(record.firstClockIn),
-          endTime: safeFormatTime(record.lastClockOut),
+          startTime: safeFormatTime(effectiveFirstClockIn),
+          endTime: safeFormatTime(effectiveRecordClockOut),
           sessions,
           tasks: record.sessions?.map(s => ({ title: s.notes || 'Task', duration: '' })) || [],
           hoursWorked: `${totalHrs}h ${remMins}m`,
@@ -874,6 +882,8 @@ export function AttendanceLogPage() {
               notes: (record as any).notes || '',
             }];
 
+        const isPastDate = dateStr < todayISO();
+
         // Filter out any session with no valid clockIn time ('—' or empty)
         const validSessions = rawSessionsList.filter(s => {
           const st = safeFormatTime(s.clockIn);
@@ -884,7 +894,8 @@ export function AttendanceLogPage() {
         const uniqueSessions: any[] = [];
         const seenKeys = new Set<string>();
         for (const s of validSessions) {
-          const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(s.clockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
+          const effectiveSessionClockOut = s.clockOut || (isPastDate && s.clockIn ? (record.lastClockOut || `${dateStr}T17:30:00+05:30`) : s.clockOut);
+          const key = `${safeFormatTime(s.clockIn)}_${safeFormatTime(effectiveSessionClockOut)}_${s.workType || 'Office'}_${s.notes || ''}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             uniqueSessions.push(s);
@@ -905,21 +916,20 @@ export function AttendanceLogPage() {
           const locVal = resolveLocationValue(workType, primarySession?.notes, (record as any).notes, batchId) || 'Office';
           const classOrWorkInfo = resolveClassOrWorkValue(workType, primarySession?.notes, (record as any).notes, batchId);
 
+          const cInTime = record.firstClockIn || primarySession?.clockIn;
+          const cOutTime = record.lastClockOut || primarySession?.clockOut || (isPastDate && cInTime ? `${dateStr}T17:30:00+05:30` : undefined);
+
           let fallbackMins = 0;
-          const sTimeStr = safeFormatTime(record.firstClockIn || primarySession?.clockIn);
-          const eTimeStr = safeFormatTime(record.lastClockOut || primarySession?.clockOut);
+          const sTimeStr = safeFormatTime(cInTime);
+          const eTimeStr = safeFormatTime(cOutTime);
           const sMinVal = parseDisplayTimeToMinutes(sTimeStr);
           const eMinVal = parseDisplayTimeToMinutes(eTimeStr);
           if (sMinVal !== null && eMinVal !== null && eMinVal >= sMinVal) {
             fallbackMins = eMinVal - sMinVal;
-          } else {
-            const cInTime = record.firstClockIn || primarySession?.clockIn;
-            const cOutTime = record.lastClockOut || primarySession?.clockOut;
-            if (cInTime) {
-              const endMs = cOutTime ? new Date(cOutTime).getTime() : Date.now();
-              const grossMs = Math.max(0, endMs - new Date(cInTime).getTime());
-              fallbackMins = Math.max(0, Math.round(grossMs / 60000));
-            }
+          } else if (cInTime) {
+            const endMs = cOutTime ? new Date(cOutTime).getTime() : Date.now();
+            const grossMs = Math.max(0, endMs - new Date(cInTime).getTime());
+            fallbackMins = Math.max(0, Math.round(grossMs / 60000));
           }
           const fallbackDur = `${Math.floor(fallbackMins / 60)}h ${fallbackMins % 60}m`;
 
@@ -944,8 +954,9 @@ export function AttendanceLogPage() {
           } else {
             // EMIT SEPARATE ROW FOR EACH VALID SESSION
             uniqueSessions.forEach((s, idx) => {
+              const effectiveSessionClockOut = s.clockOut || (isPastDate && s.clockIn ? (record.lastClockOut || `${dateStr}T17:30:00+05:30`) : s.clockOut);
               const sStartStr = safeFormatTime(s.clockIn);
-              const sEndStr = safeFormatTime(s.clockOut);
+              const sEndStr = safeFormatTime(effectiveSessionClockOut);
               const sStartMins = parseDisplayTimeToMinutes(sStartStr);
               const sEndMins = parseDisplayTimeToMinutes(sEndStr);
 
@@ -954,7 +965,7 @@ export function AttendanceLogPage() {
                 sGrossMins = sEndMins - sStartMins;
               } else if (s.clockIn) {
                 const t1 = new Date(s.clockIn).getTime();
-                const t2 = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                const t2 = effectiveSessionClockOut ? new Date(effectiveSessionClockOut).getTime() : Date.now();
                 if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
                   sGrossMins = Math.round((t2 - t1) / 60000);
                 }
@@ -968,7 +979,7 @@ export function AttendanceLogPage() {
                   if (!bStart) return false;
                   const matchesSessionId = b.workSessionId && b.workSessionId === s.id;
                   const sInTs = new Date(s.clockIn).getTime();
-                  const sOutTs = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
+                  const sOutTs = effectiveSessionClockOut ? new Date(effectiveSessionClockOut).getTime() : Date.now();
                   const bStartTs = new Date(bStart).getTime();
                   const fallsInSession = !isNaN(sInTs) && bStartTs >= sInTs && (isNaN(sOutTs) || bStartTs <= sOutTs);
                   return matchesSessionId || fallsInSession || uniqueSessions.length === 1;
@@ -1183,14 +1194,24 @@ export function AttendanceLogPage() {
               lateCount++;
             }
 
-            if (r.lastClockOut) {
-              const cOutT = safeFormatTime(r.lastClockOut);
+            const isPastRec = r.workDate < todayISO();
+            const effOut = r.lastClockOut || (isPastRec && r.firstClockIn ? `${r.workDate}T17:30:00+05:30` : undefined);
+            if (effOut) {
+              const cOutT = safeFormatTime(effOut);
               if (cOutT !== '—' && cOutT < '17:30' && (r.workType === 'Office' || !r.workType)) {
                 earlyCount++;
               }
             }
 
-            workMins += r.totalWorkingMinutes || 0;
+            let rWorkMins = r.totalWorkingMinutes || 0;
+            if (rWorkMins === 0 && r.firstClockIn && effOut) {
+              const startMs = new Date(r.firstClockIn).getTime();
+              const endMs = new Date(effOut).getTime();
+              if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+                rWorkMins = Math.max(0, Math.round((endMs - startMs) / 60000) - (r.totalBreakMinutes || 0));
+              }
+            }
+            workMins += rWorkMins;
             let rBreakMins = 0;
             if (Array.isArray(r.breaks) && r.breaks.length > 0) {
               rBreakMins = calculateMergedBreakMinutes(r.breaks, {

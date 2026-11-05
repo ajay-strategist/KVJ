@@ -186,3 +186,4 @@ describe('Attendance Batch Name Resolution', () => {
     expect(org).toBe('KVJ Analytics');
   });
 });
+
