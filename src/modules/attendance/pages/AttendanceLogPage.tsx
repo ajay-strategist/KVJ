@@ -528,9 +528,47 @@ export function AttendanceLogPage() {
     const isTraining = wt.startsWith('Training:') || wt === 'Training' || (sessionNotes || '').toLowerCase().includes('training') || (recordNotes || '').toLowerCase().includes('training');
 
     let foundBatch: any = null;
+    let extractedBatchName: string | null = null;
     let extractedLoc: string | null = null;
 
     const rawNotes = `${sessionNotes || ''} ${recordNotes || ''}`;
+
+    // 1. Direct recordBatchId lookup
+    if (recordBatchId) {
+      foundBatch = safeBatches.find((b) => b && (b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId));
+      if (foundBatch) {
+        extractedBatchName = batchDisplayName(foundBatch);
+      }
+    }
+
+    // 2. Candidate batch name extraction from workType or notes
+    let candidate: string | null = null;
+    if (wt.startsWith('Training:')) {
+      candidate = wt.substring(9).trim();
+    }
+    if (!candidate && rawNotes) {
+      // Bracketed tag: [Training: Batch Name] or [Training: Batch Name - extra]
+      const bracketMatch = rawNotes.match(/\[(?:Training|Batch):\s*([^\]\-]+?)(?:\s*-\s*[^\]]+)?\]/i);
+      if (bracketMatch && bracketMatch[1].trim()) {
+        candidate = bracketMatch[1].trim();
+      }
+    }
+    if (!candidate && rawNotes) {
+      // Training: or Batch: prefix
+      const tbMatch = rawNotes.match(/(?:Training|Batch):\s*([^\n,\]]+)/i);
+      if (tbMatch && tbMatch[1].trim()) {
+        candidate = tbMatch[1].trim();
+      }
+    }
+    if (!candidate && rawNotes) {
+      // Classification: Training, Location: Batch Name
+      const classLocMatch = rawNotes.match(/Classification:\s*Training[^\n,]*Location:\s*([^\n,\]]+)/i);
+      if (classLocMatch && classLocMatch[1].trim()) {
+        candidate = classLocMatch[1].trim();
+      }
+    }
+
+    // Also extract Location if specified
     const locMatch = rawNotes.match(/Location:\s*([^\n,]+)/i);
     if (locMatch && locMatch[1].trim()) {
       const parsedLoc = locMatch[1].trim().replace(/\.$/, '').trim();
@@ -539,26 +577,42 @@ export function AttendanceLogPage() {
       }
     }
 
-    // 1. Direct recordBatchId lookup
-    if (recordBatchId) {
-      foundBatch = safeBatches.find((b) => b && (b.id === recordBatchId || b.code === recordBatchId || b.trainingName === recordBatchId));
+    // Clean up candidate and filter out generic placeholders
+    if (candidate) {
+      candidate = candidate.replace(/[.,\])]+$/, '').trim();
+      const lowerCandidate = candidate.toLowerCase();
+      if (['training session', 'training batch', 'office work', 'office', 'training', 'approved session'].includes(lowerCandidate)) {
+        candidate = null;
+      }
     }
 
-    // 2. Extract batch code from "Training: Code" prefix
-    if (!foundBatch && wt.startsWith('Training:')) {
-      const codePart = wt.substring(9).trim();
-      foundBatch = safeBatches.find((b) =>
-        b && (
-          b.code === codePart ||
-          b.id === codePart ||
-          b.trainingName === codePart ||
-          batchDisplayName(b) === codePart
-        )
-      );
+    // 3. Match candidate against safeBatches
+    if (!foundBatch && candidate) {
+      const lowerCandidate = candidate.toLowerCase();
+      const cleanCandidate = cleanBatchCode(candidate).toLowerCase();
+
+      foundBatch = safeBatches.find((b) => {
+        if (!b) return false;
+        if (b.id && b.id.toLowerCase() === lowerCandidate) return true;
+        if (b.code && b.code.toLowerCase() === lowerCandidate) return true;
+        if (b.trainingName && b.trainingName.toLowerCase() === lowerCandidate) return true;
+        if (batchDisplayName(b).toLowerCase() === lowerCandidate) return true;
+
+        const cleanB = cleanBatchCode(b.code, b.batchNo).toLowerCase();
+        if (cleanB && (cleanB === cleanCandidate || cleanB === lowerCandidate)) return true;
+        if (cleanCandidate && cleanB && (cleanB.includes(cleanCandidate) || cleanCandidate.includes(cleanB))) return true;
+        return false;
+      });
+
+      if (foundBatch) {
+        extractedBatchName = batchDisplayName(foundBatch);
+      } else {
+        extractedBatchName = cleanBatchCode(candidate) || candidate;
+      }
     }
 
-    // 3. Match extracted Location string ONLY IF IT IS AN EXACT MATCH for batch code or full display name
-    if (!foundBatch && extractedLoc) {
+    // 4. Match extracted Location if candidate wasn't found
+    if (!foundBatch && !extractedBatchName && extractedLoc) {
       const lowerLoc = extractedLoc.toLowerCase();
       foundBatch = safeBatches.find((b) => {
         if (!b) return false;
@@ -567,9 +621,14 @@ export function AttendanceLogPage() {
         if (b.code && b.code.toLowerCase() === lowerLoc) return true;
         return false;
       });
+      if (foundBatch) {
+        extractedBatchName = batchDisplayName(foundBatch);
+      } else if (lowerLoc !== 'training session' && lowerLoc !== 'training batch') {
+        extractedBatchName = cleanBatchCode(extractedLoc) || extractedLoc;
+      }
     }
 
-    return { foundBatch, extractedLoc, isTraining };
+    return { foundBatch, extractedBatchName, extractedLoc, isTraining };
   }, [batches]);
 
   const resolveOrgValue = useCallback((workType?: string, sessionNotes?: string, recordNotes?: string, recordBatchId?: string): string => {
@@ -584,9 +643,12 @@ export function AttendanceLogPage() {
       return 'Remote';
     }
 
-    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    const { foundBatch, extractedBatchName, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
       return batchDisplayName(foundBatch);
+    }
+    if (extractedBatchName) {
+      return extractedBatchName;
     }
     if (extractedLoc) {
       return extractedLoc;
@@ -603,12 +665,16 @@ export function AttendanceLogPage() {
       return 'Remote';
     }
 
-    const { foundBatch, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
+    const { foundBatch, extractedBatchName, extractedLoc, isTraining } = resolveBatchHelper(workType, sessionNotes, recordNotes, recordBatchId);
     if (foundBatch) {
       return foundBatch.venue || foundBatch.college || 'Offline';
     }
+    if (extractedBatchName) {
+      const collegePart = extractedBatchName.split(' - ')[0]?.trim();
+      return collegePart || 'Offline';
+    }
     if (extractedLoc) {
-      return 'Offline';
+      return extractedLoc || 'Offline';
     }
     return isTraining ? 'Offline' : (wt === 'office' || !wt ? 'Office' : workType || '—');
   }, [resolveBatchHelper]);

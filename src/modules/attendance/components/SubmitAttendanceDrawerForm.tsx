@@ -82,6 +82,14 @@ export function SubmitAttendanceDrawerForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    for (const s of sessions) {
+      if (s.classification === 'Training' && !s.location?.trim()) {
+        toast({ variant: 'error', title: 'Batch Required', message: 'Please select a Training Batch for every training session.' });
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
