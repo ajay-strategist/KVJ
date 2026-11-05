@@ -736,11 +736,27 @@ export function AttendanceLogPage() {
 
         const sessions = record.sessions?.map(s => {
           const sClockOut = s.clockOut || (isPastDate && s.clockIn ? (record.lastClockOut || `${dateStr}T17:30:00+05:30`) : s.clockOut);
+          const sStart = safeFormatTime(s.clockIn);
+          let sEnd = safeFormatTime(sClockOut);
+          const sInM = parseDisplayTimeToMinutes(sStart);
+          let sOutM = parseDisplayTimeToMinutes(sEnd);
+          if (sInM !== null && sOutM !== null && sOutM < sInM) {
+            if (sOutM + 720 >= sInM && sOutM + 720 <= 1440) {
+              sOutM += 720;
+              const h = Math.floor(sOutM / 60);
+              const m = sOutM % 60;
+              const ampm = h >= 12 ? 'PM' : 'AM';
+              const displayH = h % 12 || 12;
+              sEnd = `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+            } else if (sInM <= 17 * 60 + 30) {
+              sEnd = '05:30 PM';
+            }
+          }
           return {
             location: resolveOrgValue(s.workType, s.notes, (record as any).notes, (s as any).batchId || (s as any).batch_id) || 'Office',
             type: s.workType || 'Office',
-            startTime: safeFormatTime(s.clockIn),
-            endTime: safeFormatTime(sClockOut),
+            startTime: sStart,
+            endTime: sEnd,
             tasks: s.notes ? [{ title: s.notes, duration: '' }] : [],
           };
         }) || [];
@@ -760,7 +776,10 @@ export function AttendanceLogPage() {
               seenKeys.add(key);
               if (s.clockIn) {
                 const t1 = new Date(s.clockIn).getTime();
-                const t2 = sClockOut ? new Date(sClockOut).getTime() : Date.now();
+                let t2 = sClockOut ? new Date(sClockOut).getTime() : Date.now();
+                if (!isNaN(t1) && !isNaN(t2) && t2 < t1 && t2 + 12 * 3600 * 1000 > t1) {
+                  t2 += 12 * 3600 * 1000;
+                }
                 if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
                   totalMins += Math.max(0, Math.round((t2 - t1) / 60000));
                 }
@@ -956,16 +975,36 @@ export function AttendanceLogPage() {
             uniqueSessions.forEach((s, idx) => {
               const effectiveSessionClockOut = s.clockOut || (isPastDate && s.clockIn ? (record.lastClockOut || `${dateStr}T17:30:00+05:30`) : s.clockOut);
               const sStartStr = safeFormatTime(s.clockIn);
-              const sEndStr = safeFormatTime(effectiveSessionClockOut);
+              let sEndStr = safeFormatTime(effectiveSessionClockOut);
               const sStartMins = parseDisplayTimeToMinutes(sStartStr);
-              const sEndMins = parseDisplayTimeToMinutes(sEndStr);
+              let sEndMins = parseDisplayTimeToMinutes(sEndStr);
+
+              // Defensive guard: Clock-out time cannot be earlier than clock-in time on the same date
+              if (sStartMins !== null && sEndMins !== null && sEndMins < sStartMins) {
+                if (sEndMins + 720 >= sStartMins && sEndMins + 720 <= 1440) {
+                  // 12-hour AM/PM inversion correction (e.g. 04:10 AM instead of 04:10 PM)
+                  sEndMins += 720;
+                  const h = Math.floor(sEndMins / 60);
+                  const m = sEndMins % 60;
+                  const ampm = h >= 12 ? 'PM' : 'AM';
+                  const displayH = h % 12 || 12;
+                  sEndStr = `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+                } else if (sStartMins <= 17 * 60 + 30) {
+                  // Fallback to standard 05:30 PM
+                  sEndStr = '05:30 PM';
+                  sEndMins = 17 * 60 + 30;
+                }
+              }
 
               let sGrossMins = 0;
               if (sStartMins !== null && sEndMins !== null && sEndMins >= sStartMins) {
                 sGrossMins = sEndMins - sStartMins;
               } else if (s.clockIn) {
                 const t1 = new Date(s.clockIn).getTime();
-                const t2 = effectiveSessionClockOut ? new Date(effectiveSessionClockOut).getTime() : Date.now();
+                let t2 = effectiveSessionClockOut ? new Date(effectiveSessionClockOut).getTime() : Date.now();
+                if (!isNaN(t1) && !isNaN(t2) && t2 < t1 && t2 + 12 * 3600 * 1000 > t1) {
+                  t2 += 12 * 3600 * 1000;
+                }
                 if (!isNaN(t1) && !isNaN(t2) && t2 > t1) {
                   sGrossMins = Math.round((t2 - t1) / 60000);
                 }

@@ -981,14 +981,32 @@ export function ApprovalsQueue() {
 
   const handleConfirmForceClockOut = async () => {
     if (!selectedUnclosedRecord) return;
+
+    const workDate = selectedUnclosedRecord.work_date || selectedUnclosedRecord.workDate;
+    const outTimeIso = localDateTimeToUtcIso(workDate, forceClockOutTime || '17:30');
+
+    // Prevent force clocking out earlier than active session clock-in
+    const openSession = (selectedUnclosedRecord.sessions || []).find((s: any) => !s.clockOut) || selectedUnclosedRecord.sessions?.[selectedUnclosedRecord.sessions.length - 1];
+    const rawIn = openSession?.clockIn || selectedUnclosedRecord.firstClockIn || selectedUnclosedRecord.first_clock_in;
+    if (rawIn) {
+      const inDate = new Date(rawIn);
+      const outDate = new Date(outTimeIso);
+      if (!isNaN(inDate.getTime()) && !isNaN(outDate.getTime()) && outDate.getTime() <= inDate.getTime()) {
+        toast({
+          variant: 'error',
+          title: 'Invalid Clock Out Time',
+          message: `Clock out time (${forceClockOutTime || '17:30'}) cannot be earlier than session clock in time.`,
+        });
+        return;
+      }
+    }
+
     const ok = await confirm({
       title: 'Force Clock Out Session?',
       message: 'This will close the open attendance session for past date and set status to clocked out.',
     });
     if (!ok) return;
 
-    const workDate = selectedUnclosedRecord.work_date || selectedUnclosedRecord.workDate;
-    const outTimeIso = localDateTimeToUtcIso(workDate, forceClockOutTime || '17:30');
     const res = await attService.forceClockOutSession(
       selectedUnclosedRecord.id,
       outTimeIso,

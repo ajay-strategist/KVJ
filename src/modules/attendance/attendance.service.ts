@@ -695,7 +695,18 @@ export class AttendanceService implements IAttendanceService {
       const totalBreakMins = calculateMergedBreakMinutes(updatedBreaks);
 
       let totalMins = 0;
-      if (record.firstClockIn) {
+      if (updatedSessions.length > 0) {
+        for (const s of updatedSessions) {
+          if (s.clockIn && s.clockOut) {
+            const inMs = new Date(s.clockIn).getTime();
+            const outMs = new Date(s.clockOut).getTime();
+            if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
+              totalMins += Math.round((outMs - inMs) / 60000);
+            }
+          }
+        }
+        totalMins = Math.max(0, totalMins - totalBreakMins);
+      } else if (record.firstClockIn) {
         const startMs = new Date(record.firstClockIn).getTime();
         const endMs = new Date(outTs).getTime();
         if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {

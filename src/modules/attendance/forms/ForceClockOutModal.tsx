@@ -32,6 +32,23 @@ export function ForceClockOutModal({ open, onClose, onSuccess, record }: ForceCl
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent force clocking out earlier than the active session clock-in
+    const openSession = (record.sessions || []).find((s: any) => !s.clockOut) || record.sessions?.[record.sessions.length - 1];
+    const rawIn = openSession?.clockIn || record.firstClockIn || record.first_clock_in;
+    if (rawIn) {
+      const inDate = new Date(rawIn);
+      const outIso = localDateTimeToUtcIso(workDate, clockOutTime || '17:30');
+      const outDate = new Date(outIso);
+      if (!isNaN(inDate.getTime()) && !isNaN(outDate.getTime()) && outDate.getTime() <= inDate.getTime()) {
+        toast({
+          variant: 'error',
+          title: 'Invalid Clock Out Time',
+          message: `Clock out time (${clockOutTime}) cannot be earlier than session clock in time (${inDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).`,
+        });
+        return;
+      }
+    }
+
     const ok = await confirm({
       title: 'Confirm Force Clock Out?',
       message: `Force close attendance session for ${employeeName} on ${workDate} at ${clockOutTime}?`,

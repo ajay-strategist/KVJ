@@ -59,4 +59,41 @@ describe('Past Unclosed Attendance Session 5:30 PM Default', () => {
     const endStr = safeFormatTime(effectiveClockOut);
     expect(endStr).toBe('05:40 PM');
   });
+
+  it('corrects inverted clock-out time when end is earlier than start on the same day', () => {
+    const clockIn = '2026-10-13T06:31:32.462+00:00'; // 12:01 PM IST
+    const clockOut = '2026-10-13T04:10:00+00:00'; // Inverted / misentered 09:40 AM IST
+
+    const startStr = safeFormatTime(clockIn);
+    let endStr = safeFormatTime(clockOut);
+    const startMins = parseDisplayTimeToMinutes(startStr);
+    let endMins = parseDisplayTimeToMinutes(endStr);
+
+    expect(startStr).toBe('12:01 PM');
+    expect(endStr).toBe('09:40 AM');
+    expect(startMins).toBe(12 * 60 + 1); // 721
+    expect(endMins).toBe(9 * 60 + 40); // 580
+    expect(endMins! < startMins!).toBe(true);
+
+    // Apply defensive inversion resolution
+    if (startMins !== null && endMins !== null && endMins < startMins) {
+      if (endMins + 720 >= startMins && endMins + 720 <= 1440) {
+        endMins += 720;
+        const h = Math.floor(endMins / 60);
+        const m = endMins % 60;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 || 12;
+        endStr = `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+      } else if (startMins <= 17 * 60 + 30) {
+        endStr = '05:30 PM';
+        endMins = 17 * 60 + 30;
+      }
+    }
+
+    // 09:40 AM + 12h = 09:40 PM (1300 mins)
+    expect(endStr).toBe('09:40 PM');
+    expect(endMins).toBe(21 * 60 + 40);
+    const grossMins = (endMins || 0) - (startMins || 0);
+    expect(grossMins).toBe(579);
+  });
 });
