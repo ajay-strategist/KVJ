@@ -2,18 +2,20 @@
  * BatchExpenseDetailsDrawer (Current Screen Popup Modal)
  *
  * Displays financial analytics and workhour intelligence for a training batch:
- *  - 7 KPI Cards:
- *      1. Total Students
- *      2. Batch Workhours (Scheduled & Delivered)
- *      3. Total Expense
- *      4. Cost Per Student
- *      5. Cost Per Workhour (Total Expense / Batch Workhours)
- *      6. Average Expense / Day
- *      7. Average Expense / Claim
- *  - Visual Category Distribution Breakdown (Travel, Food, Stay, Materials)
- *  - Trainer / Submitter Spending Breakdown & % Share
- *  - Daily Expense & Workhours Correlation Timeline
- *  - Mileage & Vehicle Reimbursement Insights
+ *  - 5 KPI Cards:
+ *      1. Total Students (sourced directly from batch creation capacity/roster)
+ *      2. Batch Workhours (actual training delivery duration with merged overlapping intervals)
+ *      3. Total Expense (sum of valid batch expenses)
+ *      4. Cost Per Student (Total Expense / Total Students, zero protected)
+ *      5. Average Expense / Day (Total Expense / Unique Attendance Training Dates)
+ *  - Expense Category Distribution: Single container with 2 side-by-side bar charts (Amounts & Percentages)
+ *  - Trainer & Submitter Allocation with expandable detail drilldown
+ *  - Daily Expense & Workhours Delivery Timeline (attendance-based, without cost-per-hour)
+ *  - Work Hours Tab:
+ *      - Overall Batch Man-hours
+ *      - Batch Workhours
+ *      - Employee-wise Work Hours Summary (Employee, Training Days, Work Hours)
+ *      - Detailed Work Hours Log (Employee, Date, Clock-In, Clock-Out, Work Hours)
  *  - Detailed Filterable Expense Log with Search, Submitter Filters, and CSV Export
  */
 
@@ -36,7 +38,7 @@ interface RawExpenseClaim {
   employee_id?: string;
 }
 
-interface ExpenseRow {
+export interface ExpenseRow {
   id: string;
   date: string;
   rawDate: string;
@@ -49,6 +51,21 @@ interface ExpenseRow {
   route?: string;
   vehicle?: string;
   km?: number;
+}
+
+export interface BatchWorkSession {
+  id: string;
+  employeeId?: string;
+  employeeName: string;
+  workDate: string; // YYYY-MM-DD
+  clockIn: string;
+  clockOut?: string | null;
+  durationHours: number;
+}
+
+export interface TimeInterval {
+  start: number; // minutes from midnight
+  end: number;   // minutes from midnight
 }
 
 export interface BatchExpenseDetailsDrawerProps {
@@ -67,7 +84,7 @@ export interface BatchExpenseDetailsDrawerProps {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function parseDateStr(val?: string | null): Date | null {
+export function parseDateStr(val?: string | null): Date | null {
   if (!val || val === '—') return null;
   const ymd = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (ymd) return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
@@ -77,13 +94,44 @@ function parseDateStr(val?: string | null): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function formatDate(val?: string | null): string {
+export function formatDate(val?: string | null): string {
   if (!val) return '—';
   const d = parseDateStr(val);
   if (!d) return val;
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+export function parseTimeToMinutes(timeStr?: string | null): number | null {
+  if (!timeStr) return null;
+  // If it's an ISO datetime string
+  const d = new Date(timeStr);
+  if (!isNaN(d.getTime())) {
+    return d.getHours() * 60 + d.getMinutes();
+  }
+  // If 12-hour or 24-hour time string
+  const m = timeStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2]);
+  const ampm = m[3]?.toLowerCase();
+  if (ampm === 'pm' && h < 12) h += 12;
+  if (ampm === 'am' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+export function formatClockTime(isoOrTimeStr?: string | null): string {
+  if (!isoOrTimeStr) return '—';
+  const d = new Date(isoOrTimeStr);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+  return isoOrTimeStr;
+}
+
+/**
+ * Normalizes batch identifiers for matching.
+ * Handles prefixes (Training:, Class:, Batch:), academic years, and formatting.
+ */
 export function normalizeBatchKey(str?: string | null): string {
   if (!str) return '';
   return String(str)
@@ -91,6 +139,8 @@ export function normalizeBatchKey(str?: string | null): string {
     .replace(/^batch\s*\(/i, '')
     .replace(/\)$/, '')
     .replace(/^batch\s*-\s*/i, '')
+    // Remove prefixes like "Training: ", "Class: ", "Location: ", "Batch: "
+    .replace(/^(?:training|class|batch|location)\s*[:\-]?\s*/gi, '')
     // Remove academic years like 2026-2027
     .replace(/20\d\d\s*-\s*20\d\d/g, '')
     // Standardize batch number
@@ -156,6 +206,54 @@ export function isBatchMatch(
   }
 
   return false;
+}
+
+export function isSessionForBatch(
+  ws: { work_type?: string; notes?: string },
+  targetBatchName: string,
+  targetBatchCode?: string,
+  batchObj?: Batch | null
+): boolean {
+  if (!ws) return false;
+  const textCandidates = [ws.work_type, ws.notes].filter(Boolean) as string[];
+  for (const text of textCandidates) {
+    if (isBatchMatch(text, targetBatchName, targetBatchCode, batchObj)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Merges overlapping or contiguous time intervals.
+ * Scenario A: (09:00-15:00) & (09:00-15:00) -> 09:00-15:00 (6h)
+ * Scenario B: (09:00-13:00) & (13:00-16:00) -> 09:00-16:00 (7h)
+ * Scenario C: (09:00-16:00) & (09:00-12:00) -> 09:00-16:00 (7h)
+ */
+export function mergeTimeIntervals(intervals: TimeInterval[]): TimeInterval[] {
+  if (intervals.length === 0) return [];
+  const valid = intervals.filter((i) => i.end > i.start);
+  if (valid.length === 0) return [];
+
+  valid.sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const merged: TimeInterval[] = [{ ...valid[0] }];
+  for (let i = 1; i < valid.length; i++) {
+    const current = valid[i];
+    const prev = merged[merged.length - 1];
+    if (current.start <= prev.end) {
+      prev.end = Math.max(prev.end, current.end);
+    } else {
+      merged.push({ ...current });
+    }
+  }
+  return merged;
+}
+
+export function calculateMergedHours(intervals: TimeInterval[]): number {
+  const merged = mergeTimeIntervals(intervals);
+  const totalMinutes = merged.reduce((sum, int) => sum + (int.end - int.start), 0);
+  return totalMinutes / 60;
 }
 
 function parseExpenseRow(raw: RawExpenseClaim): ExpenseRow {
@@ -282,29 +380,26 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── KPI Card ───────────────────────────────────────────────────────────────
+// ── Redesigned KPI Card: Heading & Value ONLY (No Subtitles) ─────────────────
 
-function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
+function KpiCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div style={{
       background: 'var(--bg-surface)',
       border: `1.5px solid ${accent || 'var(--border)'}`,
       borderRadius: 14,
-      padding: '12px 14px',
+      padding: '14px 16px',
       display: 'flex',
       flexDirection: 'column',
-      gap: 3,
+      gap: 6,
       boxShadow: 'var(--e1)',
     }}>
-      <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
         {label}
       </span>
-      <span style={{ fontSize: 20, fontWeight: 800, color: accent || 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ fontSize: 22, fontWeight: 800, color: accent || 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </span>
-      {sub && (
-        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.25 }}>{sub}</span>
-      )}
     </div>
   );
 }
@@ -320,12 +415,14 @@ export function BatchExpenseDetailsDrawer({
   batch,
 }: BatchExpenseDetailsDrawerProps) {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  const [workSessions, setWorkSessions] = useState<BatchWorkSession[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'log' | 'mileage'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'workhours' | 'log'>('overview');
   const [scheduledHoursTotal, setScheduledHoursTotal] = useState<number>(0);
   const [sessionCount, setSessionCount] = useState<number>(0);
+  const [expandedSubmitters, setExpandedSubmitters] = useState<Record<string, boolean>>({});
 
-  // Filters & Sorting for Table
+  // Filters & Sorting for Expense Log Table
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSubmitter, setFilterSubmitter] = useState('ALL');
   const [filterCategory, setFilterCategory] = useState('ALL');
@@ -337,7 +434,7 @@ export function BatchExpenseDetailsDrawer({
     if (!open || (!batchName && !batchCode && !batch)) return;
 
     setLoading(true);
-    const fetched: ExpenseRow[] = [];
+    const fetchedExpenses: ExpenseRow[] = [];
 
     (async () => {
       // 1. Fetch expenses from Supabase
@@ -351,7 +448,7 @@ export function BatchExpenseDetailsDrawer({
         if (data && data.length > 0) {
           data
             .filter((r: RawExpenseClaim) => isBatchMatch(r.notes, batchName, batchCode, batch))
-            .forEach((r: RawExpenseClaim) => fetched.push(parseExpenseRow(r)));
+            .forEach((r: RawExpenseClaim) => fetchedExpenses.push(parseExpenseRow(r)));
         }
       } catch { /* fall through */ }
 
@@ -365,8 +462,8 @@ export function BatchExpenseDetailsDrawer({
               return isBatchMatch(r.batch || notesField, batchName, batchCode, batch);
             })
             .forEach((r: any) => {
-              if (!fetched.find((f) => f.id === r.id)) {
-                fetched.push({
+              if (!fetchedExpenses.find((f) => f.id === r.id)) {
+                fetchedExpenses.push({
                   id: r.id,
                   date: r.date || formatDate(r.createdAt),
                   rawDate: r.date || (r.createdAt ? r.createdAt.slice(0, 10) : ''),
@@ -385,7 +482,88 @@ export function BatchExpenseDetailsDrawer({
         }
       } catch { /* noop */ }
 
-      // 3. Fetch batch workhours & sessions from Calendar and Schedule tables
+      // 3. Fetch attendance work sessions for this batch
+      const matchedSessions: BatchWorkSession[] = [];
+      try {
+        // Query flwdsk_work_sessions with joined attendance records
+        const { data: wsData } = await supabase
+          .from('flwdsk_work_sessions')
+          .select(`
+            id,
+            clock_in,
+            clock_out,
+            work_type,
+            notes,
+            attendance_record_id,
+            flwdsk_attendance_records (
+              id,
+              employee_id,
+              work_date
+            )
+          `)
+          .is('deleted_at', null)
+          .order('clock_in', { ascending: true });
+
+        // Query employees map
+        const { data: empsData } = await supabase
+          .from('flwdsk_employees')
+          .select('id, first_name, last_name')
+          .is('deleted_at', null);
+
+        const empMap = new Map<string, string>();
+        empsData?.forEach((emp: any) => {
+          const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+          empMap.set(emp.id, fullName || 'Employee');
+        });
+
+        if (wsData && wsData.length > 0) {
+          wsData.forEach((ws: any) => {
+            if (isSessionForBatch(ws, batchName, batchCode, batch)) {
+              const att = Array.isArray(ws.flwdsk_attendance_records)
+                ? ws.flwdsk_attendance_records[0]
+                : ws.flwdsk_attendance_records;
+              const empId = att?.employee_id;
+              const empName = empId ? (empMap.get(empId) || 'Trainer') : 'Trainer';
+              const workDate = att?.work_date || (ws.clock_in ? ws.clock_in.slice(0, 10) : '');
+
+              let dur = 0;
+              if (ws.clock_in && ws.clock_out) {
+                const tIn = new Date(ws.clock_in).getTime();
+                const tOut = new Date(ws.clock_out).getTime();
+                if (!isNaN(tIn) && !isNaN(tOut) && tOut > tIn) {
+                  dur = (tOut - tIn) / (1000 * 60 * 60);
+                }
+              } else if (ws.clock_in && !ws.clock_out) {
+                // If unclosed session: default to 5:30 PM (17:30) of same day
+                const inDate = new Date(ws.clock_in);
+                if (!isNaN(inDate.getTime())) {
+                  const outDate = new Date(inDate);
+                  outDate.setHours(17, 30, 0, 0);
+                  if (outDate.getTime() > inDate.getTime()) {
+                    dur = (outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60);
+                  } else {
+                    dur = 1.0;
+                  }
+                }
+              }
+
+              matchedSessions.push({
+                id: ws.id,
+                employeeId: empId,
+                employeeName: empName,
+                workDate,
+                clockIn: ws.clock_in || '',
+                clockOut: ws.clock_out,
+                durationHours: Math.round(dur * 100) / 100,
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Could not load training work sessions:', err);
+      }
+
+      // 4. Fetch batch calendar sessions for backup/schedule verification
       try {
         let calHours = 0;
         let count = 0;
@@ -428,40 +606,111 @@ export function BatchExpenseDetailsDrawer({
         console.warn('Could not load calendar workhours:', err);
       }
 
-      setExpenses(fetched);
+      setExpenses(fetchedExpenses);
+      setWorkSessions(matchedSessions);
       setLoading(false);
     })();
   }, [open, batchName, batchCode, batch]);
 
   // ── Core Calculations & Unit Economics ───────────────────────────────────
-  const totalExpense = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-  const avgExpense   = useMemo(() => expenses.length > 0 ? totalExpense / expenses.length : 0, [totalExpense, expenses]);
-  const costPerStudent = useMemo(() => studentCount > 0 ? totalExpense / studentCount : 0, [totalExpense, studentCount]);
 
-  // Unique training entry dates
-  const uniqueEntryDates = useMemo(() => {
-    const datesSet = new Set(expenses.map((e) => e.date).filter((d) => d && d !== '—'));
-    return datesSet.size;
-  }, [expenses]);
-
-  const activeDaysCount = useMemo(() => Math.max(uniqueEntryDates, 1), [uniqueEntryDates]);
-  const avgExpensePerDay = useMemo(() => totalExpense / activeDaysCount, [totalExpense, activeDaysCount]);
-
-  // Workhours calculation:
-  // Each conducted training day delivered by trainers represents standard 6.0h curriculum delivery.
-  // We take the max of calendar scheduled hours vs active delivered training hours.
-  const batchWorkhours = useMemo(() => {
-    const deliveredHours = uniqueEntryDates * 6.0;
-    if (scheduledHoursTotal > 0) {
-      return Math.max(scheduledHoursTotal, deliveredHours);
+  // 1. Total Students: directly from batch creation capacity/roster
+  const effectiveStudentCount = useMemo(() => {
+    const fromBatch = batch?.capacity ?? (batch as any)?.no_of_students ?? (batch as any)?.student_count;
+    if (fromBatch !== undefined && fromBatch !== null && !isNaN(Number(fromBatch)) && Number(fromBatch) > 0) {
+      return Number(fromBatch);
     }
-    return deliveredHours > 0 ? deliveredHours : (sessionCount * 6.0 || 6.0);
-  }, [uniqueEntryDates, scheduledHoursTotal, sessionCount]);
+    return Number(studentCount) || 0;
+  }, [batch, studentCount]);
 
-  // Financial Efficiency Metrics
-  const costPerWorkhour = useMemo(() => {
-    return batchWorkhours > 0 ? totalExpense / batchWorkhours : 0;
-  }, [totalExpense, batchWorkhours]);
+  // 2. Total Expenses
+  const totalExpense = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+
+  // 3. Cost Per Student: protected against division by zero
+  const costPerStudent = useMemo(() => {
+    return effectiveStudentCount > 0 ? totalExpense / effectiveStudentCount : 0;
+  }, [totalExpense, effectiveStudentCount]);
+
+  // 4. Unique Training Dates (strictly from actual attendance sessions)
+  const uniqueTrainingDates = useMemo(() => {
+    const set = new Set<string>();
+    workSessions.forEach((s) => {
+      if (s.workDate && s.workDate !== '—') {
+        set.add(s.workDate);
+      }
+    });
+    return Array.from(set).sort();
+  }, [workSessions]);
+
+  const uniqueTrainingDaysCount = uniqueTrainingDates.length;
+
+  // 5. Batch Workhours Calculation (Merged overlapping intervals per training date)
+  // Scenarios A, B, C compliant:
+  // - Scenario A: Simultaneous Trainers (9-3 & 9-3 -> 6h)
+  // - Scenario B: Sequential Trainers (9-1 & 1-4 -> 7h)
+  // - Scenario C: Different Clock-Out (9-4 & 9-12 -> 7h)
+  const batchWorkhours = useMemo(() => {
+    if (workSessions.length === 0) {
+      return scheduledHoursTotal > 0 ? scheduledHoursTotal : (sessionCount * 6.0 || 0);
+    }
+
+    const dateIntervalsMap = new Map<string, TimeInterval[]>();
+    workSessions.forEach((s) => {
+      if (!s.workDate) return;
+      const startM = parseTimeToMinutes(s.clockIn);
+      let endM = parseTimeToMinutes(s.clockOut);
+      if (endM === null && startM !== null) {
+        endM = Math.max(startM + 60, 17 * 60 + 30); // 17:30 default
+      }
+      if (startM !== null && endM !== null && endM > startM) {
+        const list = dateIntervalsMap.get(s.workDate) || [];
+        list.push({ start: startM, end: endM });
+        dateIntervalsMap.set(s.workDate, list);
+      }
+    });
+
+    let totalDeliveredMinutes = 0;
+    dateIntervalsMap.forEach((intervals) => {
+      const merged = mergeTimeIntervals(intervals);
+      totalDeliveredMinutes += merged.reduce((acc, int) => acc + (int.end - int.start), 0);
+    });
+
+    const deliveredHours = totalDeliveredMinutes / 60;
+    return Math.round(deliveredHours * 10) / 10;
+  }, [workSessions, scheduledHoursTotal, sessionCount]);
+
+  // 6. Overall Batch Man-hours: Sum of all individual employee workhours
+  const totalManHours = useMemo(() => {
+    const sum = workSessions.reduce((acc, s) => acc + s.durationHours, 0);
+    return Math.round(sum * 10) / 10;
+  }, [workSessions]);
+
+  // 7. Average Expense Per Day = Total Batch Expenses / Unique Training Dates (attendance-based)
+  const avgExpensePerDay = useMemo(() => {
+    return uniqueTrainingDaysCount > 0 ? totalExpense / uniqueTrainingDaysCount : 0;
+  }, [totalExpense, uniqueTrainingDaysCount]);
+
+  // ── Work Hours Tab Analytics (Sections A & B) ────────────────────────────
+
+  // Section A: Employee-wise Work Hours Summary
+  const employeeWorkHoursSummary = useMemo(() => {
+    const map = new Map<string, { employeeName: string; dates: Set<string>; totalHours: number }>();
+    workSessions.forEach((s) => {
+      const name = s.employeeName || 'Trainer';
+      const existing = map.get(name) || { employeeName: name, dates: new Set<string>(), totalHours: 0 };
+      if (s.workDate) existing.dates.add(s.workDate);
+      existing.totalHours += s.durationHours;
+      map.set(name, existing);
+    });
+
+    return Array.from(map.values())
+      .map((item) => ({
+        employeeName: item.employeeName,
+        trainingDays: item.dates.size,
+        totalHours: Math.round(item.totalHours * 10) / 10,
+      }))
+      .sort((a, b) => b.totalHours - a.totalHours);
+  }, [workSessions]);
 
   // ── Expense Category Breakdown ───────────────────────────────────────────
   const categoryBreakdown = useMemo(() => {
@@ -519,43 +768,49 @@ export function BatchExpenseDetailsDrawer({
       .sort((a, b) => b.amount - a.amount);
   }, [expenses, totalExpense]);
 
-  // ── Mileage & Vehicle Analytics ──────────────────────────────────────────
-  const mileageAnalysis = useMemo(() => {
-    let totalKm = 0;
-    let travelExpenseTotal = 0;
-    const routesList: Array<{ date: string; person: string; route: string; vehicle?: string; km: number; amount: number }> = [];
+  const toggleSubmitterExpand = (name: string) => {
+    setExpandedSubmitters((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
 
-    expenses.forEach((e) => {
-      if (e.km && e.km > 0) {
-        totalKm += e.km;
-        routesList.push({
-          date: e.date,
-          person: e.submittedBy,
-          route: e.route || 'Travel Route',
-          vehicle: e.vehicle || 'Car',
-          km: e.km,
-          amount: e.amount,
-        });
-      }
-      if (classifyExpense(e) === 'Travel') {
-        travelExpenseTotal += e.amount;
+  // ── Daily Expense & Workhours Timeline (Attendance-derived) ───────────────
+  const dailyTimeline = useMemo(() => {
+    const dateMap = new Map<string, {
+      displayDate: string;
+      totalAmount: number;
+      claimsCount: number;
+      people: Set<string>;
+      types: Set<string>;
+      workHours: number;
+    }>();
+
+    // 1. Ingest actual training dates from workSessions
+    const sessionIntervalsByDate = new Map<string, TimeInterval[]>();
+    workSessions.forEach((s) => {
+      if (!s.workDate) return;
+      const startM = parseTimeToMinutes(s.clockIn);
+      let endM = parseTimeToMinutes(s.clockOut);
+      if (endM === null && startM !== null) endM = Math.max(startM + 60, 17 * 60 + 30);
+      if (startM !== null && endM !== null && endM > startM) {
+        const list = sessionIntervalsByDate.get(s.workDate) || [];
+        list.push({ start: startM, end: endM });
+        sessionIntervalsByDate.set(s.workDate, list);
       }
     });
 
-    const costPerKm = totalKm > 0 ? travelExpenseTotal / totalKm : 0;
+    sessionIntervalsByDate.forEach((intervals, dKey) => {
+      const merged = mergeTimeIntervals(intervals);
+      const totalMinutes = merged.reduce((sum, int) => sum + (int.end - int.start), 0);
+      dateMap.set(dKey, {
+        displayDate: formatDate(dKey),
+        totalAmount: 0,
+        claimsCount: 0,
+        people: new Set<string>(),
+        types: new Set<string>(),
+        workHours: Math.round((totalMinutes / 60) * 10) / 10,
+      });
+    });
 
-    return {
-      totalKm,
-      travelExpenseTotal,
-      costPerKm,
-      routesList: routesList.sort((a, b) => b.km - a.km),
-    };
-  }, [expenses]);
-
-  // ── Daily Expense & Workhours Timeline ────────────────────────────────────
-  const dailyTimeline = useMemo(() => {
-    const dateMap = new Map<string, { displayDate: string; totalAmount: number; claimsCount: number; people: Set<string>; types: Set<string> }>();
-
+    // 2. Ingest expense records into matching dates
     expenses.forEach((e) => {
       const dKey = e.rawDate || e.date;
       if (!dKey || dKey === '—') return;
@@ -565,32 +820,29 @@ export function BatchExpenseDetailsDrawer({
         claimsCount: 0,
         people: new Set<string>(),
         types: new Set<string>(),
+        workHours: 6.0,
       };
       existing.totalAmount += e.amount;
       existing.claimsCount += 1;
-      if (e.submittedBy) existing.people.add(e.submittedBy);
+      if (e.submittedBy && e.submittedBy !== '—') existing.people.add(e.submittedBy);
       if (e.expenseType) existing.types.add(e.expenseType);
       dateMap.set(dKey, existing);
     });
 
     return Array.from(dateMap.entries())
-      .map(([rawDate, data]) => {
-        const workHoursOnDay = 6.0; // standard delivery day
-        return {
-          rawDate,
-          displayDate: data.displayDate,
-          totalAmount: data.totalAmount,
-          claimsCount: data.claimsCount,
-          workHours: workHoursOnDay,
-          costPerHour: workHoursOnDay > 0 ? data.totalAmount / workHoursOnDay : 0,
-          people: Array.from(data.people).join(', '),
-          types: Array.from(data.types).join(', '),
-        };
-      })
+      .map(([rawDate, data]) => ({
+        rawDate,
+        displayDate: data.displayDate,
+        totalAmount: data.totalAmount,
+        claimsCount: data.claimsCount,
+        workHours: data.workHours,
+        people: Array.from(data.people).join(', '),
+        types: Array.from(data.types).join(', '),
+      }))
       .sort((a, b) => a.rawDate.localeCompare(b.rawDate));
-  }, [expenses]);
+  }, [workSessions, expenses]);
 
-  // ── Table Filtering & Sorting ─────────────────────────────────────────────
+  // ── Table Filtering & Sorting for Expense Log ─────────────────────────────
   const submitterOptions = useMemo(() => {
     const set = new Set(expenses.map((e) => e.submittedBy).filter((s) => s && s !== '—'));
     return Array.from(set).sort();
@@ -690,14 +942,14 @@ export function BatchExpenseDetailsDrawer({
           borderRadius: 20,
           boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px var(--border)',
           width: '100%',
-          maxWidth: 1040,
+          maxWidth: 1060,
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
         }}
       >
-        {/* ── Header ── */}
+        {/* ── Header: Subtitle Removed ── */}
         <div style={{
           padding: '16px 24px',
           background: 'var(--bg-sunken)',
@@ -713,9 +965,6 @@ export function BatchExpenseDetailsDrawer({
               <span>💰 Expense Details</span>
               <span style={{ color: 'var(--text-muted)' }}>—</span>
               <span style={{ color: 'var(--brand)' }}>{batchCode || batchName}</span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Batch Financial Intelligence, Delivery Workhours & Resource Analysis
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -765,7 +1014,7 @@ export function BatchExpenseDetailsDrawer({
           </div>
         </div>
 
-        {/* ── Top Multi-Card Metric Strip (7 KPI Cards) ── */}
+        {/* ── Top Metric Strip: 5 KPI Cards Only (No Subtitles) ── */}
         <div style={{
           padding: '16px 24px 12px 24px',
           background: 'var(--bg-sunken)',
@@ -774,50 +1023,33 @@ export function BatchExpenseDetailsDrawer({
         }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-            gap: 10,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: 12,
           }}>
             <KpiCard
               label="Total Students"
-              value={String(studentCount || 0)}
-              sub="enrolled students"
+              value={String(effectiveStudentCount)}
               accent="var(--brand)"
             />
             <KpiCard
               label="Batch Workhours"
               value={`${batchWorkhours.toFixed(1)} hrs`}
-              sub={`${activeDaysCount} training day${activeDaysCount !== 1 ? 's' : ''}`}
               accent="#0284c7"
             />
             <KpiCard
               label="Total Expense"
               value={fmt(totalExpense)}
-              sub={`${expenses.length} total claim${expenses.length !== 1 ? 's' : ''}`}
               accent="var(--status-info, #2563eb)"
             />
             <KpiCard
               label="Cost / Student"
-              value={studentCount > 0 ? fmt(costPerStudent) : '—'}
-              sub={studentCount > 0 ? `Expense / ${studentCount} students` : 'No students'}
+              value={effectiveStudentCount > 0 ? fmt(costPerStudent) : '—'}
               accent="var(--purple-600, #9333ea)"
             />
             <KpiCard
-              label="Cost / Workhour"
-              value={batchWorkhours > 0 ? `${fmt(costPerWorkhour)}/hr` : '—'}
-              sub="hourly batch cost"
-              accent="#059669"
-            />
-            <KpiCard
               label="Avg / Day"
-              value={fmt(avgExpensePerDay)}
-              sub={`over ${uniqueEntryDates} dates`}
+              value={uniqueTrainingDaysCount > 0 ? fmt(avgExpensePerDay) : '—'}
               accent="var(--status-success, #16a34a)"
-            />
-            <KpiCard
-              label="Avg / Claim"
-              value={fmt(avgExpense)}
-              sub="per submission"
-              accent="var(--status-warning, #d97706)"
             />
           </div>
 
@@ -825,8 +1057,8 @@ export function BatchExpenseDetailsDrawer({
           <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
             {[
               { id: 'overview', label: '📊 Expense & Workhour Analytics' },
+              { id: 'workhours', label: `⏱️ Work Hours (${workSessions.length})` },
               { id: 'log', label: `📋 Detailed Expense Log (${expenses.length})` },
-              ...(mileageAnalysis.totalKm > 0 ? [{ id: 'mileage', label: `🚗 Travel & Mileage (${mileageAnalysis.totalKm} km)` }] : []),
             ].map((tab) => {
               const active = activeTab === tab.id;
               return (
@@ -859,102 +1091,134 @@ export function BatchExpenseDetailsDrawer({
             <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
               Loading expense and workhours data…
             </div>
-          ) : expenses.length === 0 ? (
-            <div style={{
-              padding: '60px 24px', textAlign: 'center',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-            }}>
-              <span style={{ fontSize: 40 }}>📭</span>
-              <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                No expense claims found for <strong>{batchCode || batchName}</strong>.
-              </p>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-                Expenses tagged to this batch will automatically appear here once submitted.
-              </p>
-            </div>
           ) : activeTab === 'overview' ? (
             /* ═══════════════════════════════════════════════════════════════
                TAB 1: EXPENSE & WORKHOUR ANALYTICS
                ═══════════════════════════════════════════════════════════════ */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* 1. Category Distribution Progress Bar & Cards */}
+              {/* 1. Redesigned Category Distribution: 2 Side-by-Side Bar Charts */}
               <div style={{
                 background: 'var(--bg-surface)',
                 borderRadius: 14,
                 border: '1px solid var(--border)',
-                padding: '16px 18px',
+                padding: '18px 20px',
                 boxShadow: 'var(--e1)',
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>🏷️ Expense Category Distribution</span>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🏷️ Expense Category Distribution</span>
+                </div>
+                {categoryBreakdown.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                    No expense claims recorded for this batch.
                   </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    Total: <strong>{fmt(totalExpense)}</strong> across {categoryBreakdown.length} categories
-                  </span>
-                </div>
-
-                {/* Multi-segmented Progress Bar */}
-                <div style={{
-                  height: 10,
-                  borderRadius: 6,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  background: 'var(--bg-sunken)',
-                  marginBottom: 14,
-                }}>
-                  {categoryBreakdown.map((cat) => (
-                    <div
-                      key={cat.category}
-                      style={{
-                        width: `${Math.max(cat.percentage, 1.5)}%`,
-                        background: cat.color,
-                        transition: 'width 200ms ease',
-                      }}
-                      title={`${cat.label}: ${fmt(cat.amount)} (${cat.percentage.toFixed(1)}%)`}
-                    />
-                  ))}
-                </div>
-
-                {/* Category Cards Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-                  {categoryBreakdown.map((cat) => (
-                    <div
-                      key={cat.category}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-sunken)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 4,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span>{cat.icon}</span>
-                          <span>{cat.label}</span>
+                ) : (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                    gap: 20,
+                  }}>
+                    {/* Left Bar Chart: Category-wise Expense Amount */}
+                    <div style={{
+                      background: 'var(--bg-sunken)',
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Category Expense Amount
                         </span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: cat.color }}>
-                          {cat.percentage.toFixed(1)}%
+                        <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)' }}>
+                          Total: {fmt(totalExpense)}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
-                          {fmt(cat.amount)}
-                        </span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {cat.count} claim{cat.count !== 1 ? 's' : ''}
-                        </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {categoryBreakdown.map((cat) => {
+                          const maxAmount = Math.max(...categoryBreakdown.map((c) => c.amount), 1);
+                          const barWidth = Math.max((cat.amount / maxAmount) * 100, 2);
+                          return (
+                            <div key={cat.category} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span>{cat.icon}</span>
+                                  <span>{cat.label}</span>
+                                </span>
+                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                                  {fmt(cat.amount)}
+                                </span>
+                              </div>
+                              <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 6, overflow: 'hidden', display: 'flex', border: '1px solid var(--border)' }}>
+                                <div
+                                  style={{
+                                    width: `${barWidth}%`,
+                                    background: cat.color,
+                                    borderRadius: 5,
+                                    transition: 'width 250ms ease',
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Right Bar Chart: Expense Percentage Distribution */}
+                    <div style={{
+                      background: 'var(--bg-sunken)',
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Percentage Distribution
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--status-info, #2563eb)' }}>
+                          Total: 100%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {categoryBreakdown.map((cat) => {
+                          const barWidth = Math.max(cat.percentage, 2);
+                          return (
+                            <div key={cat.category} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span>{cat.icon}</span>
+                                  <span>{cat.label}</span>
+                                </span>
+                                <span style={{ fontWeight: 700, color: cat.color }}>
+                                  {cat.percentage.toFixed(1)}%
+                                </span>
+                              </div>
+                              <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 6, overflow: 'hidden', display: 'flex', border: '1px solid var(--border)' }}>
+                                <div
+                                  style={{
+                                    width: `${barWidth}%`,
+                                    background: cat.color,
+                                    borderRadius: 5,
+                                    transition: 'width 250ms ease',
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* 2. Submitter (Trainer / Staff) Spending Share */}
+              {/* 2. Trainer & Submitter Allocation (With Expandable View Details) */}
               <div style={{
                 background: 'var(--bg-surface)',
                 borderRadius: 14,
@@ -971,54 +1235,131 @@ export function BatchExpenseDetailsDrawer({
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-                  {submitterBreakdown.map((person) => (
-                    <div
-                      key={person.name}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: 10,
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-sunken)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
-                          {person.name}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+                  {submitterBreakdown.map((person) => {
+                    const isExpanded = !!expandedSubmitters[person.name];
+                    const personExpenses = expenses.filter((e) => (e.submittedBy || 'Unknown') === person.name);
+                    return (
+                      <div
+                        key={person.name}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: 12,
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-sunken)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
+                              {person.name}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                              {person.count} claim{person.count !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                          <span style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(37, 99, 235, 0.1)',
+                            color: '#2563eb',
+                          }}>
+                            {person.percentage.toFixed(1)}%
+                          </span>
                         </div>
-                        <span style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: '1px 6px',
-                          borderRadius: 6,
-                          background: 'rgba(37, 99, 235, 0.1)',
-                          color: '#2563eb',
-                        }}>
-                          {person.percentage.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--brand)' }}>
-                          {fmt(person.amount)}
-                        </span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {person.count} claim{person.count !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      {person.types && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          Types: {person.types}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--brand)' }}>
+                            {fmt(person.amount)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleSubmitterExpand(person.name)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 6,
+                              border: '1px solid var(--border)',
+                              background: isExpanded ? 'var(--brand)' : 'var(--bg-surface)',
+                              color: isExpanded ? '#fff' : 'var(--text-secondary)',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              transition: 'all 120ms ease',
+                            }}
+                          >
+                            {isExpanded ? '▲ Hide Details' : '👁️ View Details'}
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {person.types && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            Types: {person.types}
+                          </div>
+                        )}
+
+                        {/* Expandable submitted batch expenses */}
+                        {isExpanded && (
+                          <div style={{
+                            marginTop: 8,
+                            paddingTop: 8,
+                            borderTop: '1px dashed var(--border)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 6,
+                          }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                              Submitted Claims
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                              {personExpenses.map((exp) => (
+                                <div
+                                  key={exp.id}
+                                  style={{
+                                    background: 'var(--bg-surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 6,
+                                    padding: '8px 10px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 3,
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{exp.date}</span>
+                                    <span style={{ fontWeight: 700, color: 'var(--brand)' }}>{fmt(exp.amount)}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                                    <span>{exp.category} · {exp.expenseType}</span>
+                                    {exp.receipt ? (
+                                      <a href={exp.receipt} target="_blank" rel="noreferrer" style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>
+                                        📎 Receipt
+                                      </a>
+                                    ) : null}
+                                  </div>
+                                  {exp.route && (
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: 10.5 }}>
+                                      📍 {exp.route} {exp.km ? `(${exp.km} km)` : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* 3. Daily Expense & Workhours Correlation Timeline */}
+              {/* 3. Daily Expense & Workhours Correlation Timeline (Without Cost Per Hour) */}
               <div style={{
                 background: 'var(--bg-surface)',
                 borderRadius: 14,
@@ -1031,7 +1372,7 @@ export function BatchExpenseDetailsDrawer({
                     <span>📅 Daily Expense & Workhours Delivery Timeline</span>
                   </div>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    {dailyTimeline.length} active training delivery days
+                    {dailyTimeline.length} active training delivery day{dailyTimeline.length !== 1 ? 's' : ''}
                   </span>
                 </div>
 
@@ -1042,81 +1383,141 @@ export function BatchExpenseDetailsDrawer({
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Date</th>
                         <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Delivery Hours</th>
                         <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Day Expense</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Cost / Hour</th>
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Claimants</th>
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Expense Items</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dailyTimeline.map((row, idx) => (
-                        <tr
-                          key={row.rawDate}
-                          style={{
-                            background: idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)',
-                            borderBottom: '1px solid var(--border)',
-                          }}
-                        >
-                          <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                            {row.displayDate}
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', color: '#0284c7', fontWeight: 700 }}>
-                            ⏱ {row.workHours.toFixed(1)} hrs
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {fmt(row.totalAmount)}
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--status-success, #16a34a)', fontWeight: 600 }}>
-                            {fmt(row.costPerHour)}/hr
-                          </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
-                            {row.people}
-                          </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
-                            {row.types} ({row.claimsCount} claim{row.claimsCount !== 1 ? 's' : ''})
+                      {dailyTimeline.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No training days or expenses recorded for this batch.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        dailyTimeline.map((row, idx) => (
+                          <tr
+                            key={row.rawDate}
+                            style={{
+                              background: idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)',
+                              borderBottom: '1px solid var(--border)',
+                            }}
+                          >
+                            <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                              {row.displayDate}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', color: '#0284c7', fontWeight: 700 }}>
+                              ⏱ {row.workHours.toFixed(1)} hrs
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {fmt(row.totalAmount)}
+                            </td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
+                              {row.people || '—'}
+                            </td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
+                              {row.types ? `${row.types} (${row.claimsCount} claim${row.claimsCount !== 1 ? 's' : ''})` : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
-                    <tfoot>
-                      <tr style={{ background: 'var(--bg-sunken)', borderTop: '2px solid var(--border)', fontWeight: 700 }}>
-                        <td style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>Total ({dailyTimeline.length} Days)</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', color: '#0284c7' }}>⏱ {batchWorkhours.toFixed(1)} hrs</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--brand)' }}>{fmt(totalExpense)}</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--status-success)' }}>{fmt(costPerWorkhour)}/hr</td>
-                        <td colSpan={2} />
-                      </tr>
-                    </tfoot>
+                    {dailyTimeline.length > 0 && (
+                      <tfoot>
+                        <tr style={{ background: 'var(--bg-sunken)', borderTop: '2px solid var(--border)', fontWeight: 700 }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>Total ({dailyTimeline.length} Days)</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', color: '#0284c7' }}>⏱ {batchWorkhours.toFixed(1)} hrs</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--brand)' }}>{fmt(totalExpense)}</td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               </div>
 
             </div>
-          ) : activeTab === 'mileage' ? (
+          ) : activeTab === 'workhours' ? (
             /* ═══════════════════════════════════════════════════════════════
-               TAB 3: MILEAGE & TRAVEL ANALYSIS
+               TAB 2: WORK HOURS (Replaces Travel & Mileage)
                ═══════════════════════════════════════════════════════════════ */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-                <KpiCard
-                  label="Total Travelled"
-                  value={`${mileageAnalysis.totalKm} km`}
-                  sub="claimed distance"
-                  accent="#2563eb"
-                />
-                <KpiCard
-                  label="Travel Expense"
-                  value={fmt(mileageAnalysis.travelExpenseTotal)}
-                  sub="conveyance & fuel"
-                  accent="#9333ea"
-                />
-                <KpiCard
-                  label="Effective Cost / KM"
-                  value={mileageAnalysis.costPerKm > 0 ? `${fmt(mileageAnalysis.costPerKm)}/km` : '—'}
-                  sub="rate efficiency"
-                  accent="#059669"
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Summary Metric Badges */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 12,
+              }}>
+                <div style={{
+                  background: 'var(--bg-surface)',
+                  borderRadius: 12,
+                  border: '1.5px solid var(--border)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Batch Man-hours
+                  </span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--brand)' }}>
+                    {totalManHours.toFixed(1)} hrs
+                  </span>
+                </div>
+
+                <div style={{
+                  background: 'var(--bg-surface)',
+                  borderRadius: 12,
+                  border: '1.5px solid var(--border)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Batch Workhours
+                  </span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: '#0284c7' }}>
+                    {batchWorkhours.toFixed(1)} hrs
+                  </span>
+                </div>
+
+                <div style={{
+                  background: 'var(--bg-surface)',
+                  borderRadius: 12,
+                  border: '1.5px solid var(--border)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Training Days
+                  </span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-success, #16a34a)' }}>
+                    {uniqueTrainingDaysCount} days
+                  </span>
+                </div>
+
+                <div style={{
+                  background: 'var(--bg-surface)',
+                  borderRadius: 12,
+                  border: '1.5px solid var(--border)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    Active Trainers
+                  </span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: '#9333ea' }}>
+                    {employeeWorkHoursSummary.length}
+                  </span>
+                </div>
               </div>
 
+              {/* Section A: Employee-wise Work Hours Summary */}
               <div style={{
                 background: 'var(--bg-surface)',
                 borderRadius: 14,
@@ -1125,39 +1526,137 @@ export function BatchExpenseDetailsDrawer({
                 boxShadow: 'var(--e1)',
               }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
-                  🚗 Route & Distance Drilldown
+                  👥 Employee-wise Work Hours Summary
                 </div>
                 <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Date</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Trainer</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Route Description</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Vehicle</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Distance</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Amount</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Employee Name</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Training Days</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Total Work Hours</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {mileageAnalysis.routesList.map((r, i) => (
-                        <tr key={i} style={{ background: i % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{r.date}</td>
-                          <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>{r.person}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{r.route}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{r.vehicle || 'Car'}</td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#2563eb' }}>{r.km} km</td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(r.amount)}</td>
+                      {employeeWorkHoursSummary.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No training attendance punches recorded for this batch.
+                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        employeeWorkHoursSummary.map((emp, idx) => (
+                          <tr
+                            key={emp.employeeName}
+                            style={{
+                              background: idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)',
+                              borderBottom: '1px solid var(--border)',
+                            }}
+                          >
+                            <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {emp.employeeName}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                              {emp.trainingDays} day{emp.trainingDays !== 1 ? 's' : ''}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
+                              ⏱ {emp.totalHours.toFixed(1)} hrs
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
+                    {employeeWorkHoursSummary.length > 0 && (
+                      <tfoot>
+                        <tr style={{ background: 'var(--bg-sunken)', borderTop: '2px solid var(--border)', fontWeight: 700 }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>Total ({employeeWorkHoursSummary.length} Employees)</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>—</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--brand)' }}>
+                            ⏱ {totalManHours.toFixed(1)} hrs
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+
+              {/* Section B: Detailed Work Hours Log (Strictly No Overtime) */}
+              <div style={{
+                background: 'var(--bg-surface)',
+                borderRadius: 14,
+                border: '1px solid var(--border)',
+                padding: '16px 18px',
+                boxShadow: 'var(--e1)',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
+                  🕒 Detailed Work Hours Log
+                </div>
+                <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Employee Name</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Training Date</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Clock-In Time</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Clock-Out Time</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Work Hours</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workSessions.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No training attendance punches recorded for this batch.
+                          </td>
+                        </tr>
+                      ) : (
+                        workSessions.map((session, idx) => (
+                          <tr
+                            key={session.id}
+                            style={{
+                              background: idx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-sunken)',
+                              borderBottom: '1px solid var(--border)',
+                            }}
+                          >
+                            <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {session.employeeName}
+                            </td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                              {formatDate(session.workDate)}
+                            </td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                              {formatClockTime(session.clockIn)}
+                            </td>
+                            <td style={{ padding: '8px 12px', color: session.clockOut ? 'var(--text-primary)' : 'var(--status-warning, #d97706)', whiteSpace: 'nowrap' }}>
+                              {session.clockOut ? formatClockTime(session.clockOut) : '05:30 PM (Default)'}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
+                              ⏱ {session.durationHours.toFixed(1)} hrs
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {workSessions.length > 0 && (
+                      <tfoot>
+                        <tr style={{ background: 'var(--bg-sunken)', borderTop: '2px solid var(--border)', fontWeight: 700 }}>
+                          <td colSpan={4} style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>
+                            Total Sessions ({workSessions.length})
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--brand)' }}>
+                            ⏱ {totalManHours.toFixed(1)} hrs
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               </div>
             </div>
           ) : (
             /* ═══════════════════════════════════════════════════════════════
-               TAB 2: DETAILED EXPENSE LOG (Interactive Search & Filters)
+               TAB 3: DETAILED EXPENSE LOG (Interactive Search & Filters)
                ═══════════════════════════════════════════════════════════════ */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Filter & Search Bar */}

@@ -151,6 +151,22 @@ export function ExpenseAnalyticsPage() {
   // ── Filters State ────────────────────────────────────────────────────────
   const [academicYear, setAcademicYear] = useState<string>('2026-2027');
   const [comparisonYear, setComparisonYear] = useState<string>('2025-2026');
+
+  // Automatically update comparison benchmark year to prior academic year
+  useEffect(() => {
+    if (!academicYear || academicYear === 'all') {
+      setComparisonYear('2025-2026');
+      return;
+    }
+    const m = academicYear.match(/^(\d{4})-(\d{4})/);
+    if (m) {
+      const y1 = Number(m[1]) - 1;
+      const y2 = Number(m[2]) - 1;
+      setComparisonYear(`${y1}-${y2}`);
+    } else {
+      setComparisonYear('2025-2026');
+    }
+  }, [academicYear]);
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
@@ -1096,7 +1112,7 @@ export function ExpenseAnalyticsPage() {
 
   return (
     <AppShell>
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '0 8px 60px 8px' }}>
+      <div style={{ maxWidth: 1440, width: '100%', margin: '0 auto', padding: '0 12px 60px 12px', boxSizing: 'border-box' }}>
         {/* ── Page Header ─────────────────────────────────────────────────── */}
         <PageHeader
           title="Expense Analytics"
@@ -1167,7 +1183,7 @@ export function ExpenseAnalyticsPage() {
             </Button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             {/* Filter 1: Academic Year */}
             <div>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: 4 }}>
@@ -1189,32 +1205,6 @@ export function ExpenseAnalyticsPage() {
                 }}
               >
                 <option value="all">All Academic Years</option>
-                {availableYears.map(yr => (
-                  <option key={yr} value={yr}>{yr}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Benchmark Academic Year (For YoY M15-M20) */}
-            <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: 4 }}>
-                Comparison Benchmark Year
-              </label>
-              <select
-                value={comparisonYear}
-                onChange={e => setComparisonYear(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '7px 10px',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
-              >
                 {availableYears.map(yr => (
                   <option key={yr} value={yr}>{yr}</option>
                 ))}
@@ -1364,6 +1354,37 @@ export function ExpenseAnalyticsPage() {
                 ))}
               </select>
             </div>
+
+            {/* Filter 7: Expense Type Dropdown (Replaces Buttons/Chips) */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: 4 }}>
+                Expense Type
+              </label>
+              <select
+                value={selectedTypes.length === 1 ? selectedTypes[0] : (selectedTypes.length === 0 ? 'all' : selectedTypes[0])}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === 'all') setSelectedTypes([]);
+                  else setSelectedTypes([val]);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">All Expense Types ({availableExpenseTypes.length})</option>
+                {availableExpenseTypes.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Custom Date Pickers if selected */}
@@ -1403,56 +1424,6 @@ export function ExpenseAnalyticsPage() {
               </div>
             </div>
           )}
-
-          {/* Expense Type Quick Filter Chips */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginRight: 4 }}>
-              Expense Types:
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedTypes([])}
-              style={{
-                fontSize: 11,
-                padding: '3px 10px',
-                borderRadius: 20,
-                border: 'none',
-                cursor: 'pointer',
-                background: selectedTypes.length === 0 ? 'var(--brand)' : 'var(--bg-card)',
-                color: selectedTypes.length === 0 ? '#FFFFFF' : 'var(--text-secondary)',
-                fontWeight: 600,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              All Types
-            </button>
-            {availableExpenseTypes.map(t => {
-              const active = selectedTypes.includes(t);
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    if (active) setSelectedTypes(selectedTypes.filter(x => x !== t));
-                    else setSelectedTypes([...selectedTypes, t]);
-                  }}
-                  style={{
-                    fontSize: 11,
-                    padding: '3px 10px',
-                    borderRadius: 20,
-                    border: active ? '1px solid var(--brand)' : '1px solid var(--border)',
-                    cursor: 'pointer',
-                    background: active ? 'var(--brand-muted)' : 'var(--bg-card)',
-                    color: active ? 'var(--brand)' : 'var(--text-secondary)',
-                    fontWeight: active ? 700 : 500,
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {/* ── Top Executive KPI Cards (Metrics 1–4, 15–16) ────────────────── */}
@@ -1699,17 +1670,18 @@ export function ExpenseAnalyticsPage() {
             TAB 1: EXECUTIVE OVERVIEW
         ══════════════════════════════════════════════════════════════════ */}
         {activeTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20, width: '100%', boxSizing: 'border-box' }}>
             {/* M9: Monthly Trajectory Area Chart */}
             <div
               style={{
-                gridColumn: 'span 7',
                 padding: '20px 24px',
                 borderRadius: 16,
                 background: 'var(--bg-surface)',
-                backdropFilter: 'blur(16px)',
                 border: '1px solid var(--border)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                minWidth: 0,
+                overflow: 'hidden',
+                boxSizing: 'border-box',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -1727,7 +1699,7 @@ export function ExpenseAnalyticsPage() {
               {monthlyProgression.length > 0 ? (
                 <div>
                   {/* Responsive SVG Area Chart */}
-                  <svg viewBox="0 0 500 200" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                  <svg viewBox="0 0 500 200" style={{ width: '100%', height: 'auto', overflow: 'hidden' }}>
                     <defs>
                       <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.4" />
@@ -1782,13 +1754,14 @@ export function ExpenseAnalyticsPage() {
             {/* M8: Expense Type Distribution (Interactive Donut) */}
             <div
               style={{
-                gridColumn: 'span 5',
                 padding: '20px 24px',
                 borderRadius: 16,
                 background: 'var(--bg-surface)',
-                backdropFilter: 'blur(16px)',
                 border: '1px solid var(--border)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                minWidth: 0,
+                overflow: 'hidden',
+                boxSizing: 'border-box',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -2170,17 +2143,19 @@ export function ExpenseAnalyticsPage() {
             TAB 3: EXPENSE TYPES & MONTHLY BREAKDOWN (M8, M9, M10, M11)
         ══════════════════════════════════════════════════════════════════ */}
         {activeTab === 'types-monthly' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20, width: '100%', boxSizing: 'border-box' }}>
             {/* M10: Monthly Expense by Expense Type (Stacked Visualization) */}
             <div
               style={{
-                gridColumn: 'span 12',
+                gridColumn: '1 / -1',
                 padding: '20px 24px',
                 borderRadius: 16,
                 background: 'var(--bg-surface)',
-                backdropFilter: 'blur(16px)',
                 border: '1px solid var(--border)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                minWidth: 0,
+                overflow: 'hidden',
+                boxSizing: 'border-box',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -2246,13 +2221,14 @@ export function ExpenseAnalyticsPage() {
             {/* M11: Expense by Employees Leaderboard */}
             <div
               style={{
-                gridColumn: 'span 6',
                 padding: '20px 24px',
                 borderRadius: 16,
                 background: 'var(--bg-surface)',
-                backdropFilter: 'blur(16px)',
                 border: '1px solid var(--border)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                minWidth: 0,
+                overflow: 'hidden',
+                boxSizing: 'border-box',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -2317,13 +2293,14 @@ export function ExpenseAnalyticsPage() {
             {/* M8: Detailed Expense Types Table */}
             <div
               style={{
-                gridColumn: 'span 6',
                 padding: '20px 24px',
                 borderRadius: 16,
                 background: 'var(--bg-surface)',
-                backdropFilter: 'blur(16px)',
                 border: '1px solid var(--border)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                minWidth: 0,
+                overflow: 'hidden',
+                boxSizing: 'border-box',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -2514,10 +2491,11 @@ export function ExpenseAnalyticsPage() {
             style={{
               borderRadius: 16,
               background: 'var(--bg-surface)',
-              backdropFilter: 'blur(16px)',
               border: '1px solid var(--border)',
               overflow: 'hidden',
               boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+              width: '100%',
+              boxSizing: 'border-box',
             }}
           >
             <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
@@ -2537,7 +2515,7 @@ export function ExpenseAnalyticsPage() {
               </div>
             </div>
 
-            <div style={{ overflowX: 'auto', maxHeight: 600 }}>
+            <div style={{ overflowX: 'auto', maxHeight: 600, width: '100%', boxSizing: 'border-box' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'right' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
