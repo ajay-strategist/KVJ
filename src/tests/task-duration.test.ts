@@ -161,4 +161,75 @@ describe('Continuous Task Duration Accumulation and Resume Across Start/Pause Cy
 
     expect(active).toBe(false);
   });
+
+  it('accurately calculates duration for task created and started 13 minutes ago without inflating to > 1 hour', () => {
+    const taskId = 'task-mim-ug-tracker';
+    const startTimeIso = '2026-11-05T05:17:00.000Z'; // 10:47 AM
+    const nowIso = '2026-11-05T05:30:00.000Z'; // 11:00 AM (13 minutes later)
+    const now = new Date(nowIso).getTime();
+    const sessionStartMs = new Date(startTimeIso).getTime();
+
+    // 1. Task has only 1 active running session, 0 completed sessions
+    const taskSessions = [
+      {
+        id: 'sess-1',
+        task_id: taskId,
+        employee_id: 'emp-ajay',
+        status: 'running',
+        start_time: startTimeIso,
+        end_time: null,
+      },
+    ];
+
+    // Simulate task record in DB which might have corrupted actualHours
+    const taskRecord = {
+      id: taskId,
+      title: 'MIM UG Tracker',
+      actualHours: 1.83, // Corrupted by runaway loop in previous versions
+      status: 'in_progress',
+    };
+
+    // Calculate completed sessions duration
+    const completedSessions = taskSessions.filter((s) => s.end_time || s.status !== 'running');
+    const completedSeconds = completedSessions.reduce((sum: number, s: any) => {
+      if (s.duration_minutes || s.durationMinutes) {
+        return sum + Number(s.duration_minutes || s.durationMinutes) * 60;
+      }
+      return sum;
+    }, 0);
+
+    const runningSession = taskSessions.find((s) => s.status === 'running' && !s.end_time);
+    const liveSeconds = runningSession?.start_time
+      ? Math.max(0, Math.floor((now - new Date(runningSession.start_time).getTime()) / 1000))
+      : 0;
+
+    let secondsToday = 0;
+    if (taskSessions.length > 0) {
+      secondsToday = completedSeconds + liveSeconds;
+    } else {
+      secondsToday = Math.round(((taskRecord as any).actualHours || 0) * 3600) + liveSeconds;
+    }
+
+    // 13 minutes = 780 seconds
+    expect(liveSeconds).toBe(780);
+    expect(completedSeconds).toBe(0);
+    expect(secondsToday).toBe(780);
+    expect(formatHoursMinutes(secondsToday)).toBe('0h 13m');
+    // Ensure it is NOT 1h 50m (6600s)
+    expect(secondsToday).toBeLessThan(3600);
+
+    // Verify taskTimerStore handles customStartTime accurately
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    taskTimerStore.startTask(taskId, completedSeconds * 1000, sessionStartMs);
+    const timer = taskTimerStore.getTimer(taskId);
+    expect(timer?.isRunning).toBe(true);
+    expect(timer?.startTime).toBe(sessionStartMs);
+    expect(timer?.elapsedMs).toBe(0);
+
+    const totalTimerSec = Math.floor((timer?.elapsedMs || 0) / 1000) + Math.floor((now - (timer?.startTime || now)) / 1000);
+    expect(totalTimerSec).toBe(780);
+    expect(formatHoursMinutes(totalTimerSec)).toBe('0h 13m');
+
+    vi.restoreAllMocks();
+  });
 });

@@ -1414,23 +1414,14 @@ export const TaskWidget = memo(function TaskWidget({
 
   useEffect(() => {
     // The running-task clock advances once a MINUTE (adds 60s), not every second,
-    // so My Day is not redrawn 60× a minute. The exact worked time is still
-    // recomputed from the start timestamp on refresh, so accuracy is preserved.
+    // so My Day is not redrawn 60× a minute.
     const timer = setInterval(() => {
-      let syncTaskId: string | null = null;
-      let syncSec = 0;
-      let syncUnderReview = false;
-
       setTasks((prev) => {
         let changed = false;
         const next = prev.map((t) => {
           if (t.active) {
             changed = true;
-            const nextSec = t.secondsToday + 60;
-            syncTaskId = t.id;
-            syncSec = nextSec;
-            syncUnderReview = !!t.underReview;
-            return { ...t, secondsToday: nextSec };
+            return { ...t, secondsToday: t.secondsToday + 60 };
           }
           return t;
         });
@@ -1453,13 +1444,9 @@ export const TaskWidget = memo(function TaskWidget({
         }
         return next;
       });
-
-      if (syncTaskId && onSyncTask) {
-        onSyncTask(syncTaskId, syncSec, true, syncUnderReview);
-      }
     }, 60000);
     return () => clearInterval(timer);
-  }, [setTasks, onSyncTask]);
+  }, [setTasks]);
 
   const formatSec = (sec: number) => {
     const h = Math.floor(sec / 3600);
@@ -1693,11 +1680,7 @@ export const TaskWidget = memo(function TaskWidget({
                      </div>
                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
                         {(() => {
-                          const accumulatedSec = Math.max(
-                            t.secondsToday || 0,
-                            Math.round((t.totalHoursWorked || 0) * 3600)
-                          );
-                          const durationFormatted = formatSec(accumulatedSec);
+                          const durationFormatted = formatSec(t.secondsToday || 0);
 
                           return (
                             <span
@@ -1797,11 +1780,7 @@ export const TaskWidget = memo(function TaskWidget({
                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingLeft: 32, flexWrap: 'wrap' }}>
                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                           {(() => {
-                            const accumulatedSec = Math.max(
-                              t.secondsToday || 0,
-                              Math.round((t.totalHoursWorked || 0) * 3600)
-                            );
-                            const durationFormatted = formatSec(accumulatedSec);
+                            const durationFormatted = formatSec(t.secondsToday || 0);
 
                             return (
                               <span
@@ -1992,39 +1971,42 @@ export function MyDayPage() {
     return `${TIMELINE_STORAGE_KEY}_${activeKey}`;
   }, [selectedEmpId, user]);
 
-  // Load live running work sessions directly from DB so active task state is 100% synchronized across tabs and refreshes
-  const [runningDbSessions, setRunningDbSessions] = useState<any[]>([]);
+  // Load live task work sessions directly from DB so active task state and accumulated duration are 100% accurate across tabs and refreshes
+  const [userDbSessions, setUserDbSessions] = useState<any[]>([]);
 
   useEffect(() => {
     const userId = user?.id;
     if (!userId) return;
     let isSubscribed = true;
 
-    async function loadRunningSessions() {
+    async function loadSessions() {
       try {
         const { data } = await supabase
           .from('flwdsk_task_work_sessions')
           .select('*')
           .eq('employee_id', userId)
-          .eq('status', 'running')
-          .is('end_time', null)
-          .is('deleted_at', null);
+          .is('deleted_at', null)
+          .order('start_time', { ascending: false });
 
         if (isSubscribed && data) {
-          setRunningDbSessions(data);
+          setUserDbSessions(data);
         }
       } catch (e) {
-        console.warn('Could not load running task work sessions:', e);
+        console.warn('Could not load task work sessions:', e);
       }
     }
 
-    loadRunningSessions();
-    const interval = setInterval(loadRunningSessions, 5000);
+    loadSessions();
+    const interval = setInterval(loadSessions, 5000);
     return () => {
       isSubscribed = false;
       clearInterval(interval);
     };
   }, [user?.id]);
+
+  const runningDbSessions = useMemo(() => {
+    return (userDbSessions || []).filter((s) => s.status === 'running' && !s.end_time);
+  }, [userDbSessions]);
 
   const [timelineEntries, setTimelineEntries] = useState<Array<{ id: string; title: string; time: string; tone: 'success' | 'progress' | 'info' | 'neutral' }>>([]);
 
@@ -2205,9 +2187,19 @@ export function MyDayPage() {
     const now = Date.now();
     const updatedStates = { ...storedStates };
 
-    // Synchronize global timer store with database actualHours for loaded tasks
+    // Synchronize global timer store with accurate past hours for loaded tasks
     (projectTasks || []).forEach((t) => {
-      taskTimerStore.syncTaskTime(t.id, t.actualHours || 0);
+      const taskSessions = (userDbSessions || []).filter((s) => s.task_id === t.id);
+      const completedSessions = taskSessions.filter((s) => s.end_time || s.status !== 'running');
+      const completedSeconds = completedSessions.reduce((sum: number, s: any) => {
+        if (s.duration_minutes || s.durationMinutes) return sum + Number(s.duration_minutes || s.durationMinutes) * 60;
+        if (s.start_time && s.end_time) {
+          return sum + Math.max(0, Math.floor((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 1000));
+        }
+        return sum;
+      }, 0);
+      const effectiveHours = taskSessions.length > 0 ? completedSeconds / 3600 : (t.actualHours || 0);
+      taskTimerStore.syncTaskTime(t.id, effectiveHours);
     });
 
     const mapped: TaskItem[] = (projectTasks || [])
@@ -2283,8 +2275,6 @@ export function MyDayPage() {
       .map((t) => {
         const proj = (projects || []).find((p) => p.id === t.projectId);
         const stored = storedStates[t.id];
-        let secondsToday = Math.round((t.actualHours || 0) * 3600);
-        let active = t.status === 'in_progress';
         const isRework = (t as any).approvalStatus === 'rework';
         const reworkNotes = (t as any).reworkNotes;
         let underReview = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval';
@@ -2294,7 +2284,8 @@ export function MyDayPage() {
           underReview = false;
         }
 
-        const dbRunningSession = (runningDbSessions || []).find((s: any) => s.task_id === t.id);
+        const taskSessions = (userDbSessions || []).filter((s) => s.task_id === t.id);
+        const dbRunningSession = taskSessions.find((s) => s.status === 'running' && !s.end_time);
         const isExplicitlyPaused = stored?.active === false || t.status === 'todo';
         const isExplicitlyDoneOrReview = underReview || isApproved;
 
@@ -2303,26 +2294,41 @@ export function MyDayPage() {
           isDbRunning = Boolean(dbRunningSession) || t.status === 'in_progress';
         }
 
+        // Calculate past completed sessions duration from DB ledger
+        const completedSessions = taskSessions.filter((s) => s.end_time || s.status !== 'running');
+        const completedSeconds = completedSessions.reduce((sum: number, s: any) => {
+          if (s.duration_minutes || s.durationMinutes) {
+            return sum + Number(s.duration_minutes || s.durationMinutes) * 60;
+          }
+          if (s.start_time && s.end_time) {
+            const diff = Math.max(0, Math.floor((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 1000));
+            return sum + diff;
+          }
+          return sum;
+        }, 0);
+
+        // Fallback for legacy tasks with no sessions in task_work_sessions
+        const legacyPastSeconds = Math.round(((t as any).actualHours || 0) * 3600);
+        const pastBaseSeconds = taskSessions.length > 0 ? completedSeconds : legacyPastSeconds;
+
+        let active = false;
+        let secondsToday = 0;
+
         if (isDbRunning) {
           active = true;
-          if (dbRunningSession?.start_time) {
-            const elapsedFromSession = Math.max(0, Math.floor((now - new Date(dbRunningSession.start_time).getTime()) / 1000));
-            secondsToday = Math.max(secondsToday, Math.round(((t as any).actualHours || 0) * 3600) + elapsedFromSession);
-          }
+          const sessionStartMs = dbRunningSession?.start_time
+            ? new Date(dbRunningSession.start_time).getTime()
+            : (stored?.lastStartTime || now);
+          const liveSeconds = Math.max(0, Math.floor((now - sessionStartMs) / 1000));
+          secondsToday = pastBaseSeconds + liveSeconds;
         } else if (stored) {
-          // Continuous Task Accumulation: trust accumulated stored seconds or DB actualHours.
-          // When resuming or reloading, start from previously accumulated mark rather than resetting to zero.
           if (stored.active && stored.lastStartTime && !isExplicitlyPaused && !isExplicitlyDoneOrReview) {
-            const elapsed = Math.floor((now - stored.lastStartTime) / 1000);
-            if (elapsed > 0 && elapsed < 86400 * 30) {
-              secondsToday = Math.max(secondsToday, (stored.secondsToday || 0) + elapsed);
-            }
             active = true;
+            const liveSeconds = Math.max(0, Math.floor((now - stored.lastStartTime) / 1000));
+            secondsToday = pastBaseSeconds + liveSeconds;
           } else {
             active = false;
-            if (stored.secondsToday && stored.secondsToday > secondsToday) {
-              secondsToday = stored.secondsToday;
-            }
+            secondsToday = taskSessions.length > 0 ? completedSeconds : (stored.secondsToday || legacyPastSeconds);
           }
           const dbUnderReview = t.status === 'review' || (t as any).approvalStatus === 'pending_task_approval';
           if (dbUnderReview) {
@@ -2332,14 +2338,17 @@ export function MyDayPage() {
           }
         } else {
           active = false;
+          secondsToday = pastBaseSeconds;
         }
 
-        // If the task is active, ensure the timer in taskTimerStore is actively ticking.
-        // If not active, ensure taskTimerStore is paused!
+        // If the task is active, ensure the timer in taskTimerStore is actively ticking with accurate start timestamp.
         if (active) {
+          const sessionStartMs = dbRunningSession?.start_time
+            ? new Date(dbRunningSession.start_time).getTime()
+            : (stored?.lastStartTime || now);
           const curTimer = taskTimerStore.getTimer(t.id);
-          if (!curTimer || !curTimer.isRunning) {
-            taskTimerStore.startTask(t.id, secondsToday * 1000);
+          if (!curTimer || !curTimer.isRunning || Math.abs(curTimer.startTime - sessionStartMs) > 5000) {
+            taskTimerStore.startTask(t.id, pastBaseSeconds * 1000, sessionStartMs);
           }
         } else {
           taskTimerStore.pauseTask(t.id);
@@ -2386,7 +2395,7 @@ export function MyDayPage() {
           isRework,
           reworkNotes,
           secondsToday,
-          totalHoursWorked: Number((t as any).actualHours || (t as any).totalHoursWorked || 0),
+          totalHoursWorked: secondsToday / 3600,
           assignee: assigneeName,
           assigneeId: t.assigneeId,
           supervisor: supervisorName,
@@ -2399,7 +2408,7 @@ export function MyDayPage() {
     const savedOrder = getStoredTaskOrder(user?.id);
     const sorted = sortTasksWithSupervisorTier(mapped, savedOrder, user);
     setTasks(sorted);
-  }, [projectTasks, projects, employees, user, runningDbSessions]);
+  }, [projectTasks, projects, employees, user, userDbSessions]);
 
   useEffect(() => {
     const unsubscribe = taskTimerStore.subscribe((allTimers) => {
@@ -2499,7 +2508,7 @@ export function MyDayPage() {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskIdToPause ? { ...t, active: false, secondsToday } : t))
       );
-      setRunningDbSessions((prev) => (prev || []).filter((s: any) => s.task_id !== taskIdToPause));
+      setUserDbSessions((prev: any[]) => (prev || []).map((s: any) => s.task_id === taskIdToPause ? { ...s, status: 'paused', end_time: new Date().toISOString() } : s));
 
       const states = getStoredTaskStates();
       const todayDateStr = toLocalISODate(new Date());
@@ -2575,8 +2584,19 @@ export function MyDayPage() {
       const now = Date.now();
       const existingTaskItem = tasks.find((t) => t.id === id);
       const existingRaw = (projectTasks || []).find((t) => t.id === id);
-      const initialSec = existingTaskItem?.secondsToday ?? Math.round(((existingRaw as any)?.actualHours || 0) * 3600);
-      taskTimerStore.startTask(id, initialSec * 1000);
+      const taskSessions = (userDbSessions || []).filter((s) => s.task_id === id);
+      const completedSessions = taskSessions.filter((s) => s.end_time || s.status !== 'running');
+      const completedSeconds = completedSessions.reduce((sum: number, s: any) => {
+        if (s.duration_minutes || s.durationMinutes) return sum + Number(s.duration_minutes || s.durationMinutes) * 60;
+        if (s.start_time && s.end_time) {
+          return sum + Math.max(0, Math.floor((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 1000));
+        }
+        return sum;
+      }, 0);
+      const initialSec = taskSessions.length > 0
+        ? completedSeconds
+        : (existingTaskItem?.secondsToday ?? Math.round(((existingRaw as any)?.actualHours || 0) * 3600));
+      taskTimerStore.startTask(id, initialSec * 1000, now);
       const timer = taskTimerStore.getTimer(id);
       const secondsToday = timer ? Math.floor(timer.elapsedMs / 1000) : initialSec;
 
@@ -2605,7 +2625,6 @@ export function MyDayPage() {
 
       updateTask(id, {
         status: 'in_progress',
-        actualHours: secondsToday / 3600,
       }).catch((e) => console.warn('Failed to update task status in DB:', e));
 
       const raw = (projectTasks || []).find((t) => t.id === id);
@@ -2629,7 +2648,7 @@ export function MyDayPage() {
     } finally {
       setTogglingTaskId(null);
     }
-  }, [projectTasks, projects, startSession, updateTask]);
+  }, [projectTasks, projects, startSession, updateTask, tasks, userDbSessions]);
 
   const handleConfirmPauseTask = async () => {
     if (!pauseTargetTaskId) return;
@@ -2647,7 +2666,7 @@ export function MyDayPage() {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, active: false, secondsToday } : t))
     );
-    setRunningDbSessions((prev) => (prev || []).filter((s: any) => s.task_id !== taskId));
+    setUserDbSessions((prev: any[]) => (prev || []).map((s: any) => s.task_id === taskId ? { ...s, status: 'paused', end_time: new Date().toISOString() } : s));
 
     const states = getStoredTaskStates();
     const todayDateStr = toLocalISODate(new Date());
@@ -2757,7 +2776,7 @@ export function MyDayPage() {
       saveStoredTaskStates(states);
     };
     applyUnderReview(true);
-    setRunningDbSessions((prev) => (prev || []).filter((s: any) => s.task_id !== id));
+    setUserDbSessions((prev: any[]) => (prev || []).map((s: any) => s.task_id === id ? { ...s, status: 'completed', end_time: new Date().toISOString() } : s));
 
     // Save final actualHours to the DB before submitting
     try {

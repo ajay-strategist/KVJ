@@ -139,9 +139,10 @@ export const taskTimerStore = {
     } catch {}
   },
 
-  startTask(taskId: string, initialElapsedMs?: number) {
+  startTask(taskId: string, initialElapsedMs?: number, customStartTime?: number) {
     const current = loadTimers();
     const now = Date.now();
+    const startTimeToUse = customStartTime && customStartTime <= now ? customStartTime : now;
 
     // Auto-pause any other running task in the global store to ensure
     // only one task runs at a time and prevent timesheet corruption
@@ -160,16 +161,22 @@ export const taskTimerStore = {
 
     const existing = current[taskId];
     if (existing?.isRunning) {
-      // Already running; avoid resetting startTime or triggering redundant updates
+      if (customStartTime && Math.abs(existing.startTime - customStartTime) > 5000) {
+        existing.startTime = customStartTime;
+        if (initialElapsedMs !== undefined) {
+          existing.elapsedMs = initialElapsedMs;
+        }
+        saveTimers(current);
+        this.notify();
+      }
       return;
     }
-    const baseElapsed = Math.max(
-      existing ? existing.elapsedMs : 0,
-      initialElapsedMs || 0
-    );
+    const baseElapsed = initialElapsedMs !== undefined
+      ? initialElapsedMs
+      : (existing ? existing.elapsedMs : 0);
     current[taskId] = {
       taskId,
-      startTime: now,
+      startTime: startTimeToUse,
       elapsedMs: baseElapsed,
       isRunning: true,
     };

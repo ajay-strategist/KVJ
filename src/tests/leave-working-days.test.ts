@@ -48,3 +48,4 @@ describe('Leave Working Days Calculation under No-Sandwich Policy', () => {
     expect(calculateWorkingDays('2026-11-14', '2026-11-05', 'Full Day')).toBe(0);
   });
 });
+
