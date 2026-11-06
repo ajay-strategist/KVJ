@@ -895,30 +895,6 @@ function AppShellFrame({ children }: { children: ReactNode }) {
             minHeight: 0,
           }}>
             {children}
-            <footer style={{
-              marginTop: 'auto',
-              paddingTop: 24,
-              paddingBottom: 8,
-              borderTop: '1px solid var(--border)',
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: 12,
-              color: 'var(--text-secondary)',
-              gap: 12
-            }}>
-              <div>
-                <span style={{ fontWeight: 900, color: 'var(--text-primary)' }}>{appConfig.app.productTitle || appConfig.app.company}</span>{' '}
-                <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{appConfig.app.productTitle ? appConfig.app.byCompany : ''}</span>{' '}
-                <span style={{ color: 'var(--border)', margin: '0 6px' }}>|</span>{' '}
-                <span>Enterprise Operations Platform</span>
-              </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--brand)', fontWeight: 600, fontSize: 12 }}>Connect. Manage. Transform.</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>© 2026 KVJ Analytics. All Rights Reserved.</span>
-              </div>
-            </footer>
           </main>
 
           {/* ── Mobile Bottom Navigation Bar (< 640px) ── */}

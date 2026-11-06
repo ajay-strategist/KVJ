@@ -2954,7 +2954,6 @@ export function MyDayPage() {
     <AppShell>
       <PageHeader
         title="My Day"
-        subtitle="Manage your daily attendance, tasks, breaks, and workspace activity."
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Button

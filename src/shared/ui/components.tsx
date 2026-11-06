@@ -188,6 +188,9 @@ export function Avatar({
   );
 }
 
+// Temporarily disabled per user request; re-enable to true when ready
+const ENABLE_GUIDE_FEATURE = false;
+
 // ── Headers ──────────────────────────────────────────────────────────────────
 export function PageHeader({
   title,
@@ -249,7 +252,7 @@ export function PageHeader({
               {title}
             </h1>
 
-            {!hideTutorial && (
+            {ENABLE_GUIDE_FEATURE && !hideTutorial && (
               <button
                 type="button"
                 onClick={handleOpenHelp}
