@@ -22,6 +22,8 @@ import { Avatar, Badge } from '../ui/components';
 import { appConfig } from '../../config/app-config';
 import { IdleEmployeeAlertPopup } from '../notifications/IdleEmployeeAlertPopup';
 import { TutorialModal } from '../../modules/tutorial/TutorialModal';
+import { TutorialWalkthroughOverlay } from '../../modules/tutorial/TutorialWalkthroughOverlay';
+import { SafeDemoModeBanner } from '../../modules/tutorial/SafeDemoModeBanner';
 import { useTutorial } from '../../modules/tutorial/TutorialContext';
 
 // ── Inline icons (no icon library import in shell for bundle performance) ──
@@ -1010,6 +1012,8 @@ function AppShellFrame({ children }: { children: ReactNode }) {
       </div>
       <IdleEmployeeAlertPopup />
       <TutorialModal />
+      <TutorialWalkthroughOverlay />
+      <SafeDemoModeBanner />
     </InsideShellContext.Provider>
   );
 }

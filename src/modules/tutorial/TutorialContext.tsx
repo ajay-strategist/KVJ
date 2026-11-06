@@ -1,21 +1,51 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo } from 'react';
 import { TUTORIAL_MODULES, TutorialItem } from './tutorial-data';
+import {
+  UserRoleFilter,
+  normalizeUserRole,
+  getAllowedRoleFilters,
+  isModuleAllowedForUser,
+  isWorkflowAllowedForUser,
+} from './tutorial-roles';
+import { useAuth } from '../auth/AuthProvider';
 
-export type UserRoleFilter = 'ALL' | 'EMPLOYEE' | 'SUPERVISOR' | 'MANAGER' | 'ADMIN' | 'CEO';
+export type { UserRoleFilter };
 
 interface TutorialContextValue {
   isOpen: boolean;
   activeModuleId: string;
   selectedRole: UserRoleFilter;
+  currentUserRole: UserRoleFilter;
+  allowedRoleFilters: UserRoleFilter[];
   searchQuery: string;
   activeSimulation: string | null;
+  activeTourId: string | null;
+  isTourActive: boolean;
+  isDemoMode: boolean;
+  userXP: number;
+  completedTours: string[];
+
+  // Modal actions
   openTutorial: (tabOrModuleKey?: string, simulationKey?: string) => void;
   closeTutorial: () => void;
   setActiveModuleId: (id: string) => void;
   setSelectedRole: (role: UserRoleFilter) => void;
   setSearchQuery: (query: string) => void;
+
+  // Practice Simulator actions
   startSimulation: (key: string) => void;
   closeSimulation: () => void;
+
+  // Guided Walkthrough Tour actions
+  startTour: (tourId?: string) => void;
+  closeTour: () => void;
+  completeTour: (tourId: string, xpEarned: number) => void;
+
+  // Safe Demo Mode actions
+  setDemoMode: (active: boolean) => void;
+  resetDemoState: () => void;
+
+  // Filtered dataset
   filteredModules: TutorialItem[];
 }
 
@@ -42,12 +72,50 @@ export function resolveTutorialKey(input?: string): string {
 }
 
 export function TutorialProvider({ children }: { children: ReactNode }) {
+  // Gracefully obtain current authenticated user's role
+  let rawRole: string | undefined;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const auth = useAuth();
+    rawRole = auth.user?.role;
+  } catch {
+    // Graceful fallback for test runners or environments outside AuthProvider
+    rawRole = undefined;
+  }
+
+  const currentUserRole = useMemo(() => normalizeUserRole(rawRole), [rawRole]);
+  const allowedRoleFilters = useMemo(() => getAllowedRoleFilters(rawRole), [rawRole]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [activeModuleId, setActiveModuleId] = useState<string>('my-day');
-  const [selectedRole, setSelectedRole] = useState<UserRoleFilter>('ALL');
+  const [selectedRole, setSelectedRole] = useState<UserRoleFilter>(currentUserRole);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSimulation, setActiveSimulation] = useState<string | null>(null);
+  const [activeTourId, setActiveTourId] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [userXP, setUserXP] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('flwdsk_tutorial_xp') || 0);
+    } catch {
+      return 0;
+    }
+  });
+  const [completedTours, setCompletedTours] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('flwdsk_completed_tours') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
+  // Synchronize selectedRole when user changes
+  useEffect(() => {
+    if (!allowedRoleFilters.includes(selectedRole)) {
+      setSelectedRole(currentUserRole);
+    }
+  }, [currentUserRole, allowedRoleFilters, selectedRole]);
+
+  // Modal triggers
   const openTutorial = useCallback((tabOrModuleKey?: string, simulationKey?: string) => {
     if (tabOrModuleKey) {
       const resolved = resolveTutorialKey(tabOrModuleKey);
@@ -66,12 +134,61 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     setIsOpen(false);
   }, []);
 
+  // Practice Simulation triggers
   const startSimulation = useCallback((key: string) => {
     setActiveSimulation(key);
   }, []);
 
   const closeSimulation = useCallback(() => {
     setActiveSimulation(null);
+  }, []);
+
+  // Guided Walkthrough Tour triggers
+  const startTour = useCallback((tourId?: string) => {
+    const tId = tourId || activeModuleId || 'my-day';
+    setActiveTourId(tId);
+    setIsOpen(false); // Close modal so user can view the actual page spotlight
+  }, [activeModuleId]);
+
+  const closeTour = useCallback(() => {
+    setActiveTourId(null);
+  }, []);
+
+  const completeTour = useCallback((tourId: string, xpEarned: number) => {
+    setCompletedTours(prev => {
+      if (prev.includes(tourId)) return prev;
+      const next = [...prev, tourId];
+      try {
+        localStorage.setItem('flwdsk_completed_tours', JSON.stringify(next));
+      } catch { /* noop */ }
+      return next;
+    });
+
+    setUserXP(prev => {
+      const next = prev + xpEarned;
+      try {
+        localStorage.setItem('flwdsk_tutorial_xp', String(next));
+      } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
+  // Safe Demo Mode triggers
+  const setDemoMode = useCallback((active: boolean) => {
+    setIsDemoMode(active);
+    try {
+      if (active) {
+        localStorage.setItem('flwdsk_safe_demo_mode', 'true');
+      } else {
+        localStorage.removeItem('flwdsk_safe_demo_mode');
+      }
+    } catch { /* noop */ }
+  }, []);
+
+  const resetDemoState = useCallback(() => {
+    try {
+      localStorage.removeItem('flwdsk_demo_data');
+    } catch { /* noop */ }
   }, []);
 
   // Global keyboard shortcut: '?' or 'Shift + /'
@@ -93,7 +210,9 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
         e.preventDefault();
         setIsOpen(prev => !prev);
       } else if (e.key === 'Escape') {
-        if (activeSimulation) {
+        if (activeTourId) {
+          setActiveTourId(null);
+        } else if (activeSimulation) {
           setActiveSimulation(null);
         } else if (isOpen) {
           setIsOpen(false);
@@ -103,21 +222,26 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, activeSimulation]);
+  }, [isOpen, activeSimulation, activeTourId]);
 
-  // Role & Search filtered modules
-  const filteredModules = React.useMemo(() => {
+  // Strict Role-Based & Search filtered modules
+  const filteredModules = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
 
     return TUTORIAL_MODULES.filter(item => {
-      // Role filter
+      // 1. Mandatory Security Rule: Enforce user's actual authorized role
+      if (!isModuleAllowedForUser(item.rolesAllowed, currentUserRole)) {
+        return false;
+      }
+
+      // 2. Secondary preview filter (for Admin / Executive inspecting specific role view)
       if (selectedRole !== 'ALL') {
-        if (!item.rolesAllowed.includes('ALL') && !item.rolesAllowed.includes(selectedRole)) {
+        if (!isModuleAllowedForUser(item.rolesAllowed, selectedRole)) {
           return false;
         }
       }
 
-      // Search filter
+      // 3. Search query filter
       if (!q) return true;
 
       const titleMatch = item.title.toLowerCase().includes(q);
@@ -133,8 +257,14 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
       const faqMatch = item.faq.some(f => f.q.toLowerCase().includes(q) || f.a.toLowerCase().includes(q));
 
       return titleMatch || summaryMatch || moduleMatch || workflowMatch || faqMatch;
+    }).map(item => {
+      // Also filter individual workflows within each module based on role
+      return {
+        ...item,
+        workflows: item.workflows.filter(w => isWorkflowAllowedForUser(w.whoCanUse, currentUserRole)),
+      };
     });
-  }, [selectedRole, searchQuery]);
+  }, [currentUserRole, selectedRole, searchQuery]);
 
   return (
     <TutorialContext.Provider
@@ -142,8 +272,15 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
         isOpen,
         activeModuleId,
         selectedRole,
+        currentUserRole,
+        allowedRoleFilters,
         searchQuery,
         activeSimulation,
+        activeTourId,
+        isTourActive: Boolean(activeTourId),
+        isDemoMode,
+        userXP,
+        completedTours,
         openTutorial,
         closeTutorial,
         setActiveModuleId,
@@ -151,6 +288,11 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
         setSearchQuery,
         startSimulation,
         closeSimulation,
+        startTour,
+        closeTour,
+        completeTour,
+        setDemoMode,
+        resetDemoState,
         filteredModules,
       }}
     >
@@ -166,4 +308,3 @@ export function useTutorial() {
   }
   return ctx;
 }
-

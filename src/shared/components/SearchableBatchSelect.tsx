@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
-import type { Batch, TrainingPhase, ApprovedBatchStatus } from '../../modules/training/training.repository';
+import type { Batch, ApprovedBatchStatus } from '../../modules/training/training.repository';
 import { normalizeBatchPhase } from '../../modules/training/training.repository';
 
 export interface SearchableBatchSelectProps {
@@ -18,10 +18,10 @@ export interface SearchableBatchSelectProps {
 }
 
 const STATUS_BADGE_STYLE: Record<ApprovedBatchStatus, { bg: string; fg: string; border: string }> = {
-  'Not Started': { bg: 'rgba(148, 163, 184, 0.14)', fg: '#64748b', border: 'rgba(148, 163, 184, 0.3)' },
-  'In Progress': { bg: 'rgba(59, 130, 246, 0.14)', fg: '#2563eb', border: 'rgba(59, 130, 246, 0.3)' },
-  'Completed':   { bg: 'rgba(16, 185, 129, 0.14)', fg: '#059669', border: 'rgba(16, 185, 129, 0.3)' },
-  'Closed':      { bg: 'rgba(100, 116, 139, 0.18)', fg: '#475569', border: 'rgba(100, 116, 139, 0.4)' },
+  'Not Started': { bg: 'rgba(148, 163, 184, 0.12)', fg: '#475569', border: 'rgba(148, 163, 184, 0.35)' },
+  'In Progress': { bg: 'rgba(59, 130, 246, 0.12)', fg: '#1d4ed8', border: 'rgba(59, 130, 246, 0.35)' },
+  'Completed':   { bg: 'rgba(16, 185, 129, 0.12)', fg: '#047857', border: 'rgba(16, 185, 129, 0.35)' },
+  'Closed':      { bg: 'rgba(100, 116, 139, 0.14)', fg: '#64748b', border: 'rgba(100, 116, 139, 0.3)' },
 };
 
 export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
@@ -49,7 +49,15 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
 
   // Find currently selected batch
   const selectedBatch = useMemo(() => {
-    return batches.find((b) => b.id === value || b.code === value);
+    if (!value) return undefined;
+    return batches.find(
+      (b) =>
+        b.id === value ||
+        b.code === value ||
+        b.trainingName === value ||
+        (b.code && value.startsWith(b.code)) ||
+        (b.trainingName && value.includes(b.trainingName))
+    );
   }, [batches, value]);
 
   // Filter batches based on search query
@@ -161,21 +169,33 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
 
   const displayTitle = selectedBatch
     ? selectedBatch.code || selectedBatch.trainingName || 'Selected Batch'
-    : '';
+    : value || '';
+
+  const selectedPhase = selectedBatch ? normalizeBatchPhase(selectedBatch.phase) : null;
+  const selectedBadgeStyle = selectedPhase ? STATUS_BADGE_STYLE[selectedPhase] : null;
 
   return (
     <div
       ref={containerRef}
-      className={`relative w-full ${className}`}
+      className={className}
       onKeyDown={handleKeyDown}
-      style={{ minWidth: 200 }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        minWidth: 200,
+        boxSizing: 'border-box',
+      }}
     >
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-xs font-semibold text-[var(--text-secondary,#475569)] mb-1.5"
+          className="kvj-label"
+          style={{
+            display: 'block',
+            marginBottom: 6,
+          }}
         >
-          {label} {required && <span className="text-red-500">*</span>}
+          {label} {required && <span style={{ color: 'var(--status-danger, #ef4444)' }}>*</span>}
         </label>
       )}
 
@@ -188,58 +208,189 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between text-left px-3 py-2 text-sm rounded-lg border transition-all duration-150 ${
-          disabled
-            ? 'opacity-60 bg-[var(--bg-sunken,#f1f5f9)] cursor-not-allowed border-[var(--border,#e2e8f0)]'
+        style={{
+          width: '100%',
+          minHeight: 42,
+          padding: '9px 14px',
+          borderRadius: 'var(--radius-lg, 10px)',
+          border: error
+            ? '1.5px solid var(--status-danger, #ef4444)'
             : isOpen
-            ? 'border-[var(--primary,#2563eb)] ring-2 ring-[var(--primary,#2563eb)]/20 bg-[var(--bg-surface,#ffffff)]'
-            : 'border-[var(--border,#cbd5e1)] hover:border-[var(--text-muted,#94a3b8)] bg-[var(--bg-surface,#ffffff)]'
-        } ${error ? 'border-red-500 ring-1 ring-red-500/20' : ''}`}
+            ? '1.5px solid var(--brand, #4f46e5)'
+            : '1px solid var(--border, #cbd5e1)',
+          boxShadow: isOpen ? '0 0 0 3px var(--focus-ring, rgba(79, 70, 229, 0.15))' : 'none',
+          background: disabled
+            ? 'var(--bg-sunken, #f1f5f9)'
+            : 'var(--bg-form, var(--bg-sunken, #ffffff))',
+          color: 'var(--text-primary, #0f172a)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          textAlign: 'left',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          outline: 'none',
+          boxSizing: 'border-box',
+          transition: 'border-color 140ms ease, box-shadow 140ms ease, background 140ms ease',
+        }}
       >
-        <div className="flex items-center gap-2 truncate flex-1 mr-2">
-          {selectedBatch ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            overflow: 'hidden',
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          {displayTitle ? (
             <>
-              <span className="font-medium text-[var(--text-primary,#0f172a)] truncate">
+              <span
+                style={{
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: 'var(--text-primary, #0f172a)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {displayTitle}
               </span>
-              {showStatus && (
+              {showStatus && selectedBadgeStyle && selectedPhase && (
                 <span
                   style={{
-                    backgroundColor: STATUS_BADGE_STYLE[normalizeBatchPhase(selectedBatch.phase)].bg,
-                    color: STATUS_BADGE_STYLE[normalizeBatchPhase(selectedBatch.phase)].fg,
-                    borderColor: STATUS_BADGE_STYLE[normalizeBatchPhase(selectedBatch.phase)].border,
+                    backgroundColor: selectedBadgeStyle.bg,
+                    color: selectedBadgeStyle.fg,
+                    borderColor: selectedBadgeStyle.border,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                   }}
-                  className="px-2 py-0.5 text-[11px] font-semibold rounded-full border shrink-0"
                 >
-                  {normalizeBatchPhase(selectedBatch.phase)}
+                  {selectedPhase}
                 </span>
               )}
             </>
           ) : (
-            <span className="text-[var(--text-muted,#94a3b8)] truncate">{placeholder}</span>
+            <span
+              style={{
+                color: 'var(--text-muted, #94a3b8)',
+                fontSize: 13,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {placeholder}
+            </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0 text-[var(--text-muted,#94a3b8)]">
-          {selectedBatch && !disabled && !required && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexShrink: 0,
+          }}
+        >
+          {displayTitle && !disabled && (
             <span
+              role="button"
+              tabIndex={0}
               onClick={handleClear}
-              className="p-1 hover:text-[var(--text-primary,#0f172a)] hover:bg-[var(--bg-sunken,#f1f5f9)] rounded transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleClear(e as any);
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                background: 'var(--border, #cbd5e1)',
+                color: 'var(--text-secondary, #475569)',
+                fontSize: 10,
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 120ms ease',
+              }}
               title="Clear selection"
             >
               ✕
             </span>
           )}
-          <span className={`transform transition-transform text-xs ${isOpen ? 'rotate-180' : ''}`}>
-            ▼
-          </span>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 180ms ease',
+              color: 'var(--text-muted, #64748b)',
+              flexShrink: 0,
+            }}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </div>
       </button>
 
-      {/* Dropdown panel */}
+      {/* Floating Dropdown popover panel */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-[var(--bg-surface,#ffffff)] border border-[var(--border,#cbd5e1)] rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-          <div className="p-2 border-b border-[var(--border,#f1f5f9)] bg-[var(--bg-sunken,#f8fafc)]">
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 1050,
+            background: 'var(--bg-surface, #ffffff)',
+            border: '1px solid var(--border, #cbd5e1)',
+            borderRadius: 'var(--radius-lg, 10px)',
+            boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.2), 0 4px 12px -2px rgba(0, 0, 0, 0.08)',
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+            animation: 'fadeIn 120ms ease-out',
+          }}
+        >
+          {/* Search box inside dropdown */}
+          <div
+            style={{
+              padding: '8px 10px',
+              borderBottom: '1px solid var(--border, #f1f5f9)',
+              background: 'var(--bg-sunken, #f8fafc)',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                left: 18,
+                color: 'var(--text-muted, #94a3b8)',
+                fontSize: 13,
+                pointerEvents: 'none',
+              }}
+            >
+              🔍
+            </span>
             <input
               ref={searchInputRef}
               type="text"
@@ -249,23 +400,86 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
                 setHighlightedIndex(0);
               }}
               placeholder="Search by code, college, program..."
-              className="w-full px-2.5 py-1.5 text-xs bg-[var(--bg-surface,#ffffff)] border border-[var(--border,#cbd5e1)] rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--primary,#2563eb)] text-[var(--text-primary,#0f172a)]"
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 32px',
+                fontSize: 13,
+                background: 'var(--bg-surface, #ffffff)',
+                border: '1px solid var(--border, #cbd5e1)',
+                borderRadius: 'var(--radius-md, 6px)',
+                outline: 'none',
+                color: 'var(--text-primary, #0f172a)',
+                boxSizing: 'border-box',
+              }}
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  searchInputRef.current?.focus();
+                }}
+                style={{
+                  position: 'absolute',
+                  right: 18,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted, #94a3b8)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  padding: 2,
+                }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
+          {/* Batches count info */}
+          <div
+            style={{
+              padding: '6px 14px',
+              background: 'var(--bg-surface, #ffffff)',
+              borderBottom: '1px solid var(--border-subtle, #f1f5f9)',
+              fontSize: 11,
+              fontWeight: 600,
+              color: 'var(--text-muted, #64748b)',
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span>Available Training Batches</span>
+            <span>{filteredBatches.length} found</span>
+          </div>
+
+          {/* Options list — strictly reset list style and margins */}
           <ul
             ref={listboxRef}
             role="listbox"
             tabIndex={-1}
-            className="max-h-60 overflow-y-auto py-1 divide-y divide-[var(--border,#f8fafc)]"
+            style={{
+              listStyle: 'none',
+              margin: 0,
+              padding: '4px 0',
+              maxHeight: 250,
+              overflowY: 'auto',
+            }}
           >
             {filteredBatches.length === 0 ? (
-              <li className="px-3 py-4 text-xs text-center text-[var(--text-muted,#94a3b8)]">
-                No matching batches found
+              <li
+                style={{
+                  listStyle: 'none',
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  fontSize: 13,
+                  color: 'var(--text-muted, #94a3b8)',
+                }}
+              >
+                No matching batches found for "{search}"
               </li>
             ) : (
               filteredBatches.map((b, idx) => {
-                const isSelected = selectedBatch?.id === b.id;
+                const isSelected = selectedBatch?.id === b.id || (b.code && value === b.code);
                 const isHighlighted = highlightedIndex === idx;
                 const phase = normalizeBatchPhase(b.phase);
                 const badgeStyle = STATUS_BADGE_STYLE[phase];
@@ -277,37 +491,84 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
                     aria-selected={isSelected}
                     onClick={() => handleSelect(b)}
                     onMouseEnter={() => setHighlightedIndex(idx)}
-                    className={`px-3 py-2 cursor-pointer text-xs flex items-center justify-between gap-2 transition-colors ${
-                      isHighlighted
-                        ? 'bg-[var(--bg-sunken,#f1f5f9)] text-[var(--text-primary,#0f172a)]'
+                    style={{
+                      listStyle: 'none',
+                      margin: 0,
+                      padding: '10px 14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      borderBottom: '1px solid var(--border-subtle, #f8fafc)',
+                      background: isHighlighted
+                        ? 'var(--bg-sunken, #f1f5f9)'
                         : isSelected
-                        ? 'bg-[var(--primary,#2563eb)]/10 font-medium'
-                        : 'text-[var(--text-primary,#0f172a)] hover:bg-[var(--bg-sunken,#f8fafc)]'
-                    }`}
+                        ? 'rgba(79, 70, 229, 0.08)'
+                        : 'transparent',
+                      transition: 'background 100ms ease',
+                    }}
                   >
-                    <div className="truncate flex-1">
-                      <div className="font-semibold truncate">
+                    <div
+                      style={{
+                        overflow: 'hidden',
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: isSelected ? 700 : 600,
+                          fontSize: 13,
+                          color: isSelected ? 'var(--brand, #4f46e5)' : 'var(--text-primary, #0f172a)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {b.code || b.trainingName || 'Unnamed Batch'}
                       </div>
                       {(b.college || b.program) && (
-                        <div className="text-[11px] text-[var(--text-muted,#64748b)] truncate">
-                          {[b.college, b.program, b.batchNo].filter(Boolean).join(' · ')}
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: 'var(--text-muted, #64748b)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginTop: 2,
+                          }}
+                        >
+                          {[b.college, b.program, b.batchNo ? `Batch ${b.batchNo}` : ''].filter(Boolean).join(' · ')}
                         </div>
                       )}
                     </div>
 
-                    {showStatus && (
-                      <span
-                        style={{
-                          backgroundColor: badgeStyle.bg,
-                          color: badgeStyle.fg,
-                          borderColor: badgeStyle.border,
-                        }}
-                        className="px-2 py-0.5 text-[10px] font-semibold rounded-full border shrink-0"
-                      >
-                        {phase}
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {showStatus && (
+                        <span
+                          style={{
+                            backgroundColor: badgeStyle.bg,
+                            color: badgeStyle.fg,
+                            borderColor: badgeStyle.border,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderStyle: 'solid',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {phase}
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span style={{ color: 'var(--brand, #4f46e5)', fontSize: 13, fontWeight: 800 }}>
+                          ✓
+                        </span>
+                      )}
+                    </div>
                   </li>
                 );
               })
@@ -316,7 +577,18 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
         </div>
       )}
 
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && (
+        <p
+          style={{
+            margin: '4px 0 0',
+            fontSize: 11,
+            color: 'var(--status-danger, #ef4444)',
+            fontWeight: 600,
+          }}
+        >
+          {error}
+        </p>
+      )}
     </div>
   );
 };

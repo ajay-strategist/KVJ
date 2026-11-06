@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTutorial, UserRoleFilter } from './TutorialContext';
 import { TUTORIAL_MODULES, TutorialItem, TutorialWorkflow } from './tutorial-data';
 import { TutorialSimulatorModal } from './TutorialSimulators';
+import { WALKTHROUGH_TOURS } from './walkthrough-data';
 
 export function TutorialModal() {
   const {
@@ -17,6 +18,14 @@ export function TutorialModal() {
     activeSimulation,
     startSimulation,
     closeSimulation,
+    currentUserRole,
+    allowedRoleFilters,
+    startTour,
+    isDemoMode,
+    setDemoMode,
+    resetDemoState,
+    userXP,
+    completedTours,
   } = useTutorial();
 
   const [expandedWorkflowId, setExpandedWorkflowId] = useState<string | null>(null);
@@ -36,7 +45,7 @@ export function TutorialModal() {
     setExpandedFaqIndex(null);
   };
 
-  const roles: { key: UserRoleFilter; label: string }[] = [
+  const allRoles: { key: UserRoleFilter; label: string }[] = [
     { key: 'ALL', label: 'All Roles' },
     { key: 'EMPLOYEE', label: 'Employee' },
     { key: 'SUPERVISOR', label: 'Supervisor' },
@@ -44,6 +53,10 @@ export function TutorialModal() {
     { key: 'ADMIN', label: 'Admin' },
     { key: 'CEO', label: 'CEO' },
   ];
+
+  const visibleRoles = allRoles.filter((r) => allowedRoleFilters.includes(r.key));
+  const hasTour = !!WALKTHROUGH_TOURS[currentModule.id];
+  const isTourCompleted = completedTours.includes(currentModule.id);
 
   return (
     <>
@@ -134,7 +147,51 @@ export function TutorialModal() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {/* Gamified XP & Role Badge */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 10px',
+                  borderRadius: 20,
+                  background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+                  color: '#92400e',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  border: '1px solid #f59e0b',
+                }}
+              >
+                <span>⭐ {userXP} XP</span>
+                <span style={{ opacity: 0.5 }}>|</span>
+                <span>Role: {currentUserRole}</span>
+              </div>
+
+              {/* Safe Demo Mode Toggle */}
+              <button
+                type="button"
+                onClick={() => setDemoMode(!isDemoMode)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 12px',
+                  borderRadius: 20,
+                  border: isDemoMode ? '1px solid #d97706' : '1px solid var(--border, #cbd5e1)',
+                  background: isDemoMode ? '#fef3c7' : 'var(--bg-sunken, #f1f5f9)',
+                  color: isDemoMode ? '#92400e' : 'var(--text-secondary, #475569)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 120ms ease',
+                }}
+                title="Practice without modifying live database records"
+              >
+                <span>🧪</span>
+                <span>Demo Mode: {isDemoMode ? 'ON' : 'OFF'}</span>
+              </button>
+
               <span
                 style={{
                   fontSize: 12,
@@ -146,7 +203,7 @@ export function TutorialModal() {
                   fontFamily: 'monospace',
                 }}
               >
-                Shortcut: ? or Shift + /
+                ? / Shift + /
               </span>
               <button
                 type="button"
@@ -241,7 +298,7 @@ export function TutorialModal() {
               <span style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>
                 Role:
               </span>
-              {roles.map((r) => {
+              {visibleRoles.map((r) => {
                 const isSelected = selectedRole === r.key;
                 return (
                   <button
@@ -420,6 +477,100 @@ export function TutorialModal() {
                           {role}
                         </span>
                       ))}
+                    </div>
+
+                    {/* Interactive Walkthrough Action Bar */}
+                    <div
+                      style={{
+                        marginTop: 16,
+                        paddingTop: 14,
+                        borderTop: '1px solid var(--border, #e2e8f0)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeTutorial();
+                            startTour(currentModule.id);
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '9px 16px',
+                            borderRadius: 10,
+                            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                            color: '#ffffff',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.3)',
+                          }}
+                          title="Start live spotlight walkthrough directly on the FlowDesk interface"
+                        >
+                          <span>🎮</span>
+                          <span>Start Guided UI Walkthrough</span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              background: 'rgba(255,255,255,0.25)',
+                              padding: '2px 6px',
+                              borderRadius: 10,
+                            }}
+                          >
+                            +50 XP
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDemoMode(true);
+                            closeTutorial();
+                            startTour(currentModule.id);
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '8px 14px',
+                            borderRadius: 10,
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            fontWeight: 700,
+                            fontSize: 12,
+                            border: '1px solid #f59e0b',
+                            cursor: 'pointer',
+                          }}
+                          title="Enter Safe Demo Mode and practice with sandbox dummy data"
+                        >
+                          <span>🧪</span>
+                          <span>Practice in Safe Demo Mode</span>
+                        </button>
+                      </div>
+
+                      {isTourCompleted && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            color: '#059669',
+                            fontSize: 12,
+                            fontWeight: 700,
+                          }}
+                        >
+                          <span>✅</span>
+                          <span>Walkthrough Completed</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

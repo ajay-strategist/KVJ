@@ -516,9 +516,9 @@ export function ExpenseClaimModal({
     <Drawer open={open} onClose={handleClose} title="Submit Expense Claim">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Expense Date */}
-          <div>
+          <div className="kvj-field">
             <label className="kvj-label">
               Expense Date <span style={{ color: 'var(--status-danger)' }}>*</span>
             </label>
@@ -533,7 +533,7 @@ export function ExpenseClaimModal({
           </div>
 
           {/* Classification */}
-          <div>
+          <div className="kvj-field">
             <label className="kvj-label">Expense Classification</label>
             <select
               className="kvj-select"
@@ -548,7 +548,7 @@ export function ExpenseClaimModal({
 
           {/* Dynamic Batch Selector if Training Expense */}
           {isTraining && (
-            <div>
+            <div className="kvj-field">
               <SearchableBatchSelect
                 label="Training Batch"
                 required
@@ -564,7 +564,7 @@ export function ExpenseClaimModal({
           )}
 
           {/* Expense Type */}
-          <div>
+          <div className="kvj-field">
             <label className="kvj-label">Expense Type</label>
             <select
               className="kvj-select"
@@ -686,9 +686,9 @@ export function ExpenseClaimModal({
             </div>
           ) : (
             /* NON-SELF-TRAVEL EXPENSE (e.g. Bus Travelling, Refreshments, Supplies) */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {isTravelRelated && (
-                <div>
+                <div className="kvj-field">
                   <label className="kvj-label">
                     Travel Route <span style={{ color: 'var(--status-danger)' }}>*</span>
                   </label>
@@ -703,7 +703,7 @@ export function ExpenseClaimModal({
                   />
                 </div>
               )}
-              <div>
+              <div className="kvj-field">
                 <label className="kvj-label">
                   Expense Amount (₹) <span style={{ color: 'var(--status-danger)' }}>*</span>
                 </label>
@@ -714,17 +714,17 @@ export function ExpenseClaimModal({
                   step="1"
                   placeholder="e.g. 250"
                   className="kvj-input"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                style={{ width: '100%' }}
-              />
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  style={{ width: '100%' }}
+                />
+              </div>
             </div>
-          </div>
           )}
 
           {/* Receipt Upload (only in single mode — batch skips file upload) */}
           {!batchMode && (
-            <div>
+            <div className="kvj-field">
               <label className="kvj-label">Receipt / Bill Upload (Optional)</label>
               <input
                 type="file"
@@ -737,7 +737,7 @@ export function ExpenseClaimModal({
           )}
 
           {/* Notes */}
-          <div>
+          <div className="kvj-field">
             <label className="kvj-label">Notes / Remarks</label>
             <textarea
               rows={2}
