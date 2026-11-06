@@ -1535,37 +1535,56 @@ export const TaskWidget = memo(function TaskWidget({
 
   return (
     <Card>
-      <SectionHeader 
-        title={searchQuery.trim() ? "Today's Tasks" : "Today's Tasks (Drag & Drop Reorder)"} 
-        subtitle={searchQuery.trim() ? `Showing results for "${searchQuery.trim()}" (Drag & drop reordering paused)` : undefined}
-        action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <SearchInput 
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search tasks..."
-              style={{ width: isDesktop ? 200 : '100%', minWidth: 150 }}
-            />
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowSubmitted(!showSubmitted)}
-              style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
-            >
-              {showSubmitted ? '🙈 Hide Submitted' : '👁️ Show Submitted'}
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleResetOrder}
-              title="Reset task order to default: your tasks at top, supervisor tasks at bottom"
-              style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
-            >
-              🔄 Reset Order
-            </Button>
-          </div>
-        }
-      />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 14,
+          gap: 12,
+          flexWrap: isDesktop ? 'nowrap' : 'wrap',
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 'var(--font-size-md)',
+            fontWeight: 'var(--font-weight-semibold)',
+            color: 'var(--text-primary)',
+            letterSpacing: 'var(--letter-spacing-tight)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          Today's Tasks
+        </h2>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', flexShrink: 0 }}>
+          <SearchInput 
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search tasks..."
+            style={{ width: isDesktop ? 180 : 140, minWidth: 120 }}
+          />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowSubmitted(!showSubmitted)}
+            style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
+          >
+            {showSubmitted ? '🙈 Hide Submitted' : '👁️ Show Submitted'}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleResetOrder}
+            title="Reset task order to default: your tasks at top, supervisor tasks at bottom"
+            style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
+          >
+            🔄 Reset Order
+          </Button>
+        </div>
+      </div>
       <style>{`
         .task-card-hover {
           transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
