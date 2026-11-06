@@ -6,6 +6,7 @@ import {
   isBatchMatch,
   isSessionForBatch,
   calculateExpensePivotTable,
+  calculateUniqueTrainingDays,
   ExpenseRow,
   TimeInterval,
 } from '../modules/training/components/BatchExpenseDetailsDrawer';
@@ -134,6 +135,25 @@ describe('BatchExpenseDetailsDrawer Revamp & Calculations', () => {
       const uniqueTrainingDays = 5;
       const avgExpensePerDay = uniqueTrainingDays > 0 ? totalExpense / uniqueTrainingDays : 0;
       expect(avgExpensePerDay).toBe(10000);
+    });
+
+    it('calculates unique training days strictly from attendance work sessions deduplicating same-day sessions', () => {
+      const sessions = [
+        { workDate: '2026-10-26' },
+        { workDate: '2026-10-26' }, // duplicate same date from trainer B
+        { workDate: '2026-10-27T00:00:00Z' }, // ISO date timestamp
+        { workDate: '2026-10-28' },
+        { workDate: '2026-10-29' },
+        { workDate: '2026-10-30' },
+        { workDate: '—' }, // invalid / placeholder date
+        { workDate: '' },
+      ];
+      const count = calculateUniqueTrainingDays(sessions);
+      expect(count).toBe(5);
+    });
+
+    it('returns 0 unique training days when sessions list is empty', () => {
+      expect(calculateUniqueTrainingDays([])).toBe(0);
     });
   });
 

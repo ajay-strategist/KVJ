@@ -2,12 +2,13 @@
  * BatchExpenseDetailsDrawer (Current Screen Popup Modal)
  *
  * Displays financial analytics and workhour intelligence for a training batch:
- *  - 5 KPI Cards:
+ *  - 6 KPI Cards:
  *      1. Total Students (sourced directly from batch creation capacity/roster)
  *      2. Batch Workhours (actual training delivery duration with merged overlapping intervals)
- *      3. Total Expense (sum of valid batch expenses)
- *      4. Cost Per Student (Total Expense / Total Students, zero protected)
- *      5. Average Expense / Day (Total Expense / Unique Attendance Training Dates)
+ *      3. Total Days (unique training delivery days strictly from attendance)
+ *      4. Total Expense (sum of valid batch expenses)
+ *      5. Cost Per Student (Total Expense / Total Students, zero protected)
+ *      6. Average Expense / Day (Total Expense / Unique Attendance Training Dates)
  *  - Expense Category Distribution: Single container with 2 side-by-side bar charts (Amounts & Percentages)
  *  - Trainer & Submitter Allocation with expandable detail drilldown
  *  - Daily Expense & Workhours Delivery Timeline (attendance-based, without cost-per-hour)
@@ -477,18 +478,32 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Redesigned KPI Card: Heading & Value ONLY (No Subtitles) ─────────────────
 
-function KpiCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
+export function calculateUniqueTrainingDays(sessions: Array<{ workDate?: string | null }>): number {
+  const set = new Set<string>();
+  sessions.forEach((s) => {
+    if (s.workDate && s.workDate !== '—') {
+      const clean = s.workDate.slice(0, 10);
+      if (clean) set.add(clean);
+    }
+  });
+  return set.size;
+}
+
+function KpiCard({ label, value, accent, title }: { label: string; value: string; accent?: string; title?: string }) {
   return (
-    <div style={{
-      background: 'var(--bg-surface)',
-      border: `1.5px solid ${accent || 'var(--border)'}`,
-      borderRadius: 14,
-      padding: '14px 16px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 6,
-      boxShadow: 'var(--e1)',
-    }}>
+    <div
+      title={title}
+      style={{
+        background: 'var(--bg-surface)',
+        border: `1.5px solid ${accent || 'var(--border)'}`,
+        borderRadius: 14,
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        boxShadow: 'var(--e1)',
+      }}
+    >
       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
         {label}
       </span>
@@ -735,7 +750,8 @@ export function BatchExpenseDetailsDrawer({
     const set = new Set<string>();
     workSessions.forEach((s) => {
       if (s.workDate && s.workDate !== '—') {
-        set.add(s.workDate);
+        const clean = s.workDate.slice(0, 10);
+        if (clean) set.add(clean);
       }
     });
     return Array.from(set).sort();
@@ -1080,9 +1096,10 @@ export function BatchExpenseDetailsDrawer({
           background: 'var(--bg-card, var(--bg-surface))',
           borderRadius: 20,
           boxShadow: '0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px var(--border)',
-          width: '100%',
-          maxWidth: 1060,
-          maxHeight: '92vh',
+          width: '90vw',
+          maxWidth: '90vw',
+          height: '90vh',
+          maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -1153,7 +1170,7 @@ export function BatchExpenseDetailsDrawer({
           </div>
         </div>
 
-        {/* ── Top Metric Strip: 5 KPI Cards Only (No Subtitles) ── */}
+        {/* ── Top Metric Strip: 6 KPI Cards (Including Unique Attendance Days) ── */}
         <div style={{
           padding: '16px 24px 12px 24px',
           background: 'var(--bg-sunken)',
@@ -1162,7 +1179,7 @@ export function BatchExpenseDetailsDrawer({
         }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
             gap: 12,
           }}>
             <KpiCard
@@ -1174,6 +1191,12 @@ export function BatchExpenseDetailsDrawer({
               label="Batch Workhours"
               value={`${batchWorkhours.toFixed(1)} hrs`}
               accent="#0284c7"
+            />
+            <KpiCard
+              label="Total Days"
+              value={`${uniqueTrainingDaysCount} day${uniqueTrainingDaysCount !== 1 ? 's' : ''}`}
+              accent="#0891b2"
+              title="Unique training delivery days from attendance"
             />
             <KpiCard
               label="Total Expense"
