@@ -99,13 +99,8 @@ export const TimelineWidget = memo(function TimelineWidget({
       {/* Widget Header with Status & Navigation Controls */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-              Daily Activity Timeline
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Clock In → Work → Clock Out Logs
-            </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+            Daily Activity Timeline
           </div>
           <Badge tone={isToday ? 'success' : 'info'}>
             {isToday ? '🟢 Current Day' : '📅 History Log'}
