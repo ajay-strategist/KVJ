@@ -1378,7 +1378,7 @@ export function BatchExpenseDetailsDrawer({
                         type="button"
                         onClick={() => handleOpenPivot('ALL')}
                         style={{
-                          padding: '3px 8px',
+                          padding: '4px 10px',
                           borderRadius: 6,
                           border: '1px solid var(--border)',
                           background: 'var(--bg-surface)',
@@ -1388,12 +1388,12 @@ export function BatchExpenseDetailsDrawer({
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: 4,
+                          gap: 5,
                           transition: 'all 120ms ease',
                         }}
-                        title="Open Pivot Table breakdown for all claimants"
+                        title="Open Employee wise Expense Breakdown"
                       >
-                        <span>📊 Pivot Breakdown</span>
+                        <span>📊 Employee wise Expense Breakdown</span>
                       </button>
                     )}
                   </div>
@@ -1423,7 +1423,7 @@ export function BatchExpenseDetailsDrawer({
                               {person.count} claim{person.count !== 1 ? 's' : ''}
                             </div>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
                             <span style={{
                               fontSize: 11,
                               fontWeight: 700,
@@ -1434,39 +1434,6 @@ export function BatchExpenseDetailsDrawer({
                             }}>
                               {person.percentage.toFixed(1)}%
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenPivot(person.name)}
-                              style={{
-                                padding: '4px 6px',
-                                borderRadius: 6,
-                                border: '1px solid var(--border)',
-                                background: 'var(--bg-surface)',
-                                color: 'var(--brand)',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                lineHeight: 1,
-                                transition: 'all 120ms ease',
-                              }}
-                              title={`View Claims Pivot Breakdown for ${person.name}`}
-                              aria-label={`View Claims Pivot Breakdown for ${person.name}`}
-                            >
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                              </svg>
-                            </button>
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -2035,7 +2002,7 @@ export function BatchExpenseDetailsDrawer({
             }}>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>📊 Submitted Claims — Pivot Table Breakdown</span>
+                  <span>📊 Employee wise Expense Breakdown</span>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
                   Batch: <strong style={{ color: 'var(--text-primary)' }}>{batchCode || batchName || 'Training Batch'}</strong> • Grand Total Expense: <strong style={{ color: 'var(--brand)' }}>{fmt(pivotData.grandTotal)}</strong>
