@@ -7,6 +7,7 @@ import {
   isSessionForBatch,
   calculateExpensePivotTable,
   calculateUniqueTrainingDays,
+  calculateDailyTimeline,
   ExpenseRow,
   TimeInterval,
 } from '../modules/training/components/BatchExpenseDetailsDrawer';
@@ -257,6 +258,65 @@ describe('BatchExpenseDetailsDrawer Revamp & Calculations', () => {
       expect(emptyPivot.grandTotal).toBe(0);
       expect(emptyPivot.rows).toEqual([]);
       expect(emptyPivot.percentOfGrandTotal).toBe(100.0);
+    });
+  });
+
+  describe('Daily Expense & Workhours Delivery Timeline with Employees Column', () => {
+    it('correlates delivery hours, day expense, batch login employees, claimants, and items', () => {
+      const mockSessions = [
+        // 26/10/2026: Linto and Ajay logged in
+        { workDate: '2026-10-26', employeeName: 'Linto George', clockIn: '09:00', clockOut: '12:00' },
+        { workDate: '2026-10-26', employeeName: 'Ajay Thomas', clockIn: '10:00', clockOut: '14:00' },
+        // 27/10/2026: Anoop logged in
+        { workDate: '2026-10-27', employeeName: 'Anoop Baiju', clockIn: '09:00', clockOut: '15:00' },
+      ];
+
+      const mockExpenses = [
+        // 26/10: Linto and Jomon claimed expenses (Jomon did not log attendance in this batch)
+        { date: '26/10/2026', rawDate: '2026-10-26', amount: 50, submittedBy: 'Linto George', expenseType: 'Metro' },
+        { date: '26/10/2026', rawDate: '2026-10-26', amount: 843, submittedBy: 'Jomon Joseph', expenseType: 'Self Travel' },
+        // 27/10: Anoop claimed
+        { date: '27/10/2026', rawDate: '2026-10-27', amount: 355, submittedBy: 'Anoop Baiju', expenseType: 'Auto' },
+      ];
+
+      const timeline = calculateDailyTimeline(mockSessions as any, mockExpenses as any);
+      expect(timeline).toHaveLength(2);
+
+      // Row 1: 26/10/2026
+      const r1 = timeline[0];
+      expect(r1.rawDate).toBe('2026-10-26');
+      expect(r1.displayDate).toBe('26/10/2026');
+      expect(r1.workHours).toBe(5); // 09:00 - 14:00 merged = 5h
+      expect(r1.totalAmount).toBe(893);
+      // Employees who logged in that day in that batch:
+      expect(r1.employees).toContain('Linto George');
+      expect(r1.employees).toContain('Ajay Thomas');
+      expect(r1.employees).not.toContain('Jomon Joseph');
+      // Claimants who claimed that day:
+      expect(r1.claimants).toContain('Linto George');
+      expect(r1.claimants).toContain('Jomon Joseph');
+      // Expense items:
+      expect(r1.types).toContain('Metro');
+      expect(r1.types).toContain('Self Travel');
+
+      // Row 2: 27/10/2026
+      const r2 = timeline[1];
+      expect(r2.rawDate).toBe('2026-10-27');
+      expect(r2.employees).toBe('Anoop Baiju');
+      expect(r2.claimants).toBe('Anoop Baiju');
+      expect(r2.workHours).toBe(6);
+      expect(r2.totalAmount).toBe(355);
+    });
+
+    it('gracefully handles days with only expenses and no attendance login', () => {
+      const mockExpenses = [
+        { date: '29/10/2026', rawDate: '2026-10-29', amount: 500, submittedBy: 'Ajay Thomas', expenseType: 'Food' },
+      ];
+      const timeline = calculateDailyTimeline([], mockExpenses as any);
+      expect(timeline).toHaveLength(1);
+      expect(timeline[0].employees).toBe('—');
+      expect(timeline[0].claimants).toBe('Ajay Thomas');
+      expect(timeline[0].totalAmount).toBe(500);
     });
   });
 });

@@ -478,6 +478,120 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Redesigned KPI Card: Heading & Value ONLY (No Subtitles) ─────────────────
 
+export interface DailyTimelineRow {
+  rawDate: string;
+  displayDate: string;
+  totalAmount: number;
+  claimsCount: number;
+  workHours: number;
+  employees: string;
+  claimants: string;
+  types: string;
+}
+
+export function calculateDailyTimeline(
+  workSessions: Array<Pick<BatchWorkSession, 'workDate' | 'employeeName' | 'clockIn' | 'clockOut'>>,
+  expenses: Array<Pick<ExpenseRow, 'date' | 'rawDate' | 'amount' | 'submittedBy' | 'expenseType'>>
+): DailyTimelineRow[] {
+  const dateMap = new Map<string, {
+    displayDate: string;
+    totalAmount: number;
+    claimsCount: number;
+    employees: Set<string>;
+    claimants: Set<string>;
+    types: Set<string>;
+    workHours: number;
+  }>();
+
+  // 1. Ingest actual training dates & logged-in employees from workSessions
+  const sessionIntervalsByDate = new Map<string, TimeInterval[]>();
+  workSessions.forEach((s) => {
+    if (!s.workDate || s.workDate === '—') return;
+    const dKey = s.workDate.slice(0, 10);
+    let entry = dateMap.get(dKey);
+    if (!entry) {
+      entry = {
+        displayDate: formatDate(dKey),
+        totalAmount: 0,
+        claimsCount: 0,
+        employees: new Set<string>(),
+        claimants: new Set<string>(),
+        types: new Set<string>(),
+        workHours: 0,
+      };
+      dateMap.set(dKey, entry);
+    }
+    if (s.employeeName && s.employeeName !== '—') {
+      entry.employees.add(s.employeeName);
+    }
+
+    const startM = parseTimeToMinutes(s.clockIn);
+    let endM = parseTimeToMinutes(s.clockOut);
+    if (endM === null && startM !== null) endM = Math.max(startM + 60, 17 * 60 + 30);
+    if (startM !== null && endM !== null && endM > startM) {
+      const list = sessionIntervalsByDate.get(dKey) || [];
+      list.push({ start: startM, end: endM });
+      sessionIntervalsByDate.set(dKey, list);
+    }
+  });
+
+  sessionIntervalsByDate.forEach((intervals, dKey) => {
+    const merged = mergeTimeIntervals(intervals);
+    const totalMinutes = merged.reduce((sum, int) => sum + (int.end - int.start), 0);
+    const entry = dateMap.get(dKey);
+    if (entry) {
+      entry.workHours = Math.round((totalMinutes / 60) * 10) / 10;
+    }
+  });
+
+  // 2. Ingest expense records into matching dates
+  expenses.forEach((e) => {
+    let dKey = e.rawDate;
+    if (!dKey || dKey === '—') {
+      const parsed = parseDateStr(e.date);
+      if (parsed) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        dKey = `${y}-${m}-${d}`;
+      } else {
+        dKey = e.date;
+      }
+    }
+    if (!dKey || dKey === '—') return;
+    let existing = dateMap.get(dKey);
+    if (!existing) {
+      existing = {
+        displayDate: formatDate(dKey) || e.date,
+        totalAmount: 0,
+        claimsCount: 0,
+        employees: new Set<string>(),
+        claimants: new Set<string>(),
+        types: new Set<string>(),
+        workHours: 0,
+      };
+      dateMap.set(dKey, existing);
+    }
+    existing.totalAmount += e.amount;
+    existing.claimsCount += 1;
+    if (e.submittedBy && e.submittedBy !== '—') existing.claimants.add(e.submittedBy);
+    if (e.expenseType) existing.types.add(e.expenseType);
+  });
+
+  return Array.from(dateMap.entries())
+    .map(([rawDate, data]) => ({
+      rawDate,
+      displayDate: data.displayDate,
+      totalAmount: data.totalAmount,
+      claimsCount: data.claimsCount,
+      workHours: data.workHours,
+      employees: Array.from(data.employees).join(', ') || '—',
+      claimants: Array.from(data.claimants).join(', ') || '—',
+      types: Array.from(data.types).join(', ') || '—',
+    }))
+    .sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+}
+
 export function calculateUniqueTrainingDays(sessions: Array<{ workDate?: string | null }>): number {
   const set = new Set<string>();
   sessions.forEach((s) => {
@@ -929,72 +1043,7 @@ export function BatchExpenseDetailsDrawer({
 
   // ── Daily Expense & Workhours Timeline (Attendance-derived) ───────────────
   const dailyTimeline = useMemo(() => {
-    const dateMap = new Map<string, {
-      displayDate: string;
-      totalAmount: number;
-      claimsCount: number;
-      people: Set<string>;
-      types: Set<string>;
-      workHours: number;
-    }>();
-
-    // 1. Ingest actual training dates from workSessions
-    const sessionIntervalsByDate = new Map<string, TimeInterval[]>();
-    workSessions.forEach((s) => {
-      if (!s.workDate) return;
-      const startM = parseTimeToMinutes(s.clockIn);
-      let endM = parseTimeToMinutes(s.clockOut);
-      if (endM === null && startM !== null) endM = Math.max(startM + 60, 17 * 60 + 30);
-      if (startM !== null && endM !== null && endM > startM) {
-        const list = sessionIntervalsByDate.get(s.workDate) || [];
-        list.push({ start: startM, end: endM });
-        sessionIntervalsByDate.set(s.workDate, list);
-      }
-    });
-
-    sessionIntervalsByDate.forEach((intervals, dKey) => {
-      const merged = mergeTimeIntervals(intervals);
-      const totalMinutes = merged.reduce((sum, int) => sum + (int.end - int.start), 0);
-      dateMap.set(dKey, {
-        displayDate: formatDate(dKey),
-        totalAmount: 0,
-        claimsCount: 0,
-        people: new Set<string>(),
-        types: new Set<string>(),
-        workHours: Math.round((totalMinutes / 60) * 10) / 10,
-      });
-    });
-
-    // 2. Ingest expense records into matching dates
-    expenses.forEach((e) => {
-      const dKey = e.rawDate || e.date;
-      if (!dKey || dKey === '—') return;
-      const existing = dateMap.get(dKey) || {
-        displayDate: e.date,
-        totalAmount: 0,
-        claimsCount: 0,
-        people: new Set<string>(),
-        types: new Set<string>(),
-        workHours: 6.0,
-      };
-      existing.totalAmount += e.amount;
-      existing.claimsCount += 1;
-      if (e.submittedBy && e.submittedBy !== '—') existing.people.add(e.submittedBy);
-      if (e.expenseType) existing.types.add(e.expenseType);
-      dateMap.set(dKey, existing);
-    });
-
-    return Array.from(dateMap.entries())
-      .map(([rawDate, data]) => ({
-        rawDate,
-        displayDate: data.displayDate,
-        totalAmount: data.totalAmount,
-        claimsCount: data.claimsCount,
-        workHours: data.workHours,
-        people: Array.from(data.people).join(', '),
-        types: Array.from(data.types).join(', '),
-      }))
-      .sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+    return calculateDailyTimeline(workSessions, expenses);
   }, [workSessions, expenses]);
 
   // ── Table Filtering & Sorting for Expense Log ─────────────────────────────
@@ -1499,6 +1548,9 @@ export function BatchExpenseDetailsDrawer({
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Date</th>
                         <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Delivery Hours</th>
                         <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Day Expense</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }} title="Those who logged in that day in that batch">
+                          Employees
+                        </th>
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Claimants</th>
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11 }}>Expense Items</th>
                       </tr>
@@ -1506,7 +1558,7 @@ export function BatchExpenseDetailsDrawer({
                     <tbody>
                       {dailyTimeline.length === 0 ? (
                         <tr>
-                          <td colSpan={5} style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
+                          <td colSpan={6} style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
                             No training days or expenses recorded for this batch.
                           </td>
                         </tr>
@@ -1522,17 +1574,20 @@ export function BatchExpenseDetailsDrawer({
                             <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                               {row.displayDate}
                             </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'right', color: '#0284c7', fontWeight: 700 }}>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', color: '#0284c7', fontWeight: 700, whiteSpace: 'nowrap' }}>
                               ⏱ {row.workHours.toFixed(1)} hrs
                             </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                               {fmt(row.totalAmount)}
                             </td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                              {row.employees}
+                            </td>
                             <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
-                              {row.people || '—'}
+                              {row.claimants}
                             </td>
                             <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
-                              {row.types ? `${row.types} (${row.claimsCount} claim${row.claimsCount !== 1 ? 's' : ''})` : '—'}
+                              {row.types !== '—' ? `${row.types} (${row.claimsCount} claim${row.claimsCount !== 1 ? 's' : ''})` : '—'}
                             </td>
                           </tr>
                         ))
@@ -1544,7 +1599,7 @@ export function BatchExpenseDetailsDrawer({
                           <td style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>Total ({dailyTimeline.length} Days)</td>
                           <td style={{ padding: '8px 12px', textAlign: 'right', color: '#0284c7' }}>⏱ {batchWorkhours.toFixed(1)} hrs</td>
                           <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--brand)' }}>{fmt(totalExpense)}</td>
-                          <td colSpan={2} />
+                          <td colSpan={3} />
                         </tr>
                       </tfoot>
                     )}
