@@ -1261,41 +1261,56 @@ export function BatchExpenseDetailsDrawer({
                               {person.count} claim{person.count !== 1 ? 's' : ''}
                             </div>
                           </div>
-                          <span style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            padding: '2px 8px',
-                            borderRadius: 6,
-                            background: 'rgba(37, 99, 235, 0.1)',
-                            color: '#2563eb',
-                          }}>
-                            {person.percentage.toFixed(1)}%
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              background: 'rgba(37, 99, 235, 0.1)',
+                              color: '#2563eb',
+                            }}>
+                              {person.percentage.toFixed(1)}%
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleSubmitterExpand(person.name)}
+                              style={{
+                                padding: '4px 6px',
+                                borderRadius: 6,
+                                border: isExpanded ? '1px solid var(--brand)' : '1px solid var(--border)',
+                                background: isExpanded ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-surface)',
+                                color: isExpanded ? 'var(--brand)' : 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                lineHeight: 1,
+                                transition: 'all 120ms ease',
+                              }}
+                              title={isExpanded ? 'Hide Details' : 'View Details'}
+                              aria-label={isExpanded ? 'Hide Details' : 'View Details'}
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
                           <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--brand)' }}>
                             {fmt(person.amount)}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => toggleSubmitterExpand(person.name)}
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: 6,
-                              border: '1px solid var(--border)',
-                              background: isExpanded ? 'var(--brand)' : 'var(--bg-surface)',
-                              color: isExpanded ? '#fff' : 'var(--text-secondary)',
-                              fontSize: 11,
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              transition: 'all 120ms ease',
-                            }}
-                          >
-                            {isExpanded ? '▲ Hide Details' : '👁️ View Details'}
-                          </button>
                         </div>
                         {person.types && (
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
