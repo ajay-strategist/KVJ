@@ -329,47 +329,49 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       return `📝 ${dbSession.work_title || dbSession.workTitle}`;
     }
 
-    // 2. Read actively RUNNING timers from taskTimerStore (kvj_task_timers)
-    const runningTaskIds = new Set<string>();
-    try {
-      const rawTimers = localStorage.getItem('kvj_task_timers');
-      if (rawTimers) {
-        const parsed: Record<string, { isRunning: boolean }> = JSON.parse(rawTimers);
-        for (const [tId, s] of Object.entries(parsed)) {
-          if (s?.isRunning === true) runningTaskIds.add(tId);
-        }
-      }
-      const rawMyDay = localStorage.getItem('kvj_task_timer_state_v1');
-      if (rawMyDay) {
-        const parsed: Record<string, { active: boolean; underReview?: boolean }> = JSON.parse(rawMyDay);
-        for (const [tId, s] of Object.entries(parsed)) {
-          if (s?.underReview) {
-            runningTaskIds.delete(tId);
-          } else if (s?.active === true) {
-            runningTaskIds.add(tId);
-          } else {
-            runningTaskIds.delete(tId);
+    // 2. Read actively RUNNING timers from taskTimerStore (kvj_task_timers) - strictly scoped to current user
+    if (isCurrentUser) {
+      const runningTaskIds = new Set<string>();
+      try {
+        const rawTimers = localStorage.getItem('kvj_task_timers');
+        if (rawTimers) {
+          const parsed: Record<string, { isRunning: boolean }> = JSON.parse(rawTimers);
+          for (const [tId, s] of Object.entries(parsed)) {
+            if (s?.isRunning === true) runningTaskIds.add(tId);
           }
         }
+        const rawMyDay = localStorage.getItem('kvj_task_timer_state_v1');
+        if (rawMyDay) {
+          const parsed: Record<string, { active: boolean; underReview?: boolean }> = JSON.parse(rawMyDay);
+          for (const [tId, s] of Object.entries(parsed)) {
+            if (s?.underReview) {
+              runningTaskIds.delete(tId);
+            } else if (s?.active === true) {
+              runningTaskIds.add(tId);
+            } else {
+              runningTaskIds.delete(tId);
+            }
+          }
+        }
+      } catch {}
+
+      const runningTask = (tasks || []).find((t: any) => {
+        if (!runningTaskIds.has(t.id)) return false;
+        // Must genuinely be in progress — submitted, under review, or completed tasks can never be running
+        if (!isTaskTrulyInProgress(t)) return false;
+
+        const isForThisEmp =
+          t.assigneeId === empId ||
+          (t.assigneeId && empEmail && t.assigneeId.toLowerCase() === empEmail) ||
+          (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName) ||
+          (user && (t.assigneeId === user.id || (t.assignee && t.assignee.toLowerCase() === user.fullName?.toLowerCase())));
+
+        return isForThisEmp;
+      });
+
+      if (runningTask) {
+        return `📝 ${runningTask.title || (runningTask as any).name}`;
       }
-    } catch {}
-
-    const runningTask = (tasks || []).find((t: any) => {
-      if (!runningTaskIds.has(t.id)) return false;
-      // Must genuinely be in progress — submitted, under review, or completed tasks can never be running
-      if (!isTaskTrulyInProgress(t)) return false;
-
-      const isForThisEmp =
-        t.assigneeId === empId ||
-        (t.assigneeId && empEmail && t.assigneeId.toLowerCase() === empEmail) ||
-        (t.assignee && empFullName && t.assignee.toLowerCase() === empFullName) ||
-        (isCurrentUser && (t.assigneeId === user?.id || (t.assignee && t.assignee.toLowerCase() === user?.fullName?.toLowerCase())));
-
-      return isForThisEmp;
-    });
-
-    if (runningTask) {
-      return `📝 ${runningTask.title || (runningTask as any).name}`;
     }
 
     // If no timer is actively running, display 'No active task in progress'
@@ -420,6 +422,13 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   };
 
   const getEmployeeIdleInfo = (emp: Employee) => {
+    // Admin and CEO conduct organizational administration, approvals, and meetings — exempt from task-idle tracking
+    const roleUpper = (emp.role || '').toUpperCase();
+    const desigUpper = (emp.designation || '').toUpperCase();
+    if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || desigUpper.includes('ADMIN') || desigUpper.includes('CEO')) {
+      return { isIdle: false, idleMinutes: 0 };
+    }
+
     // If the employee is clocked in for a training batch, they are conducting training and are never idle
     if (isEmployeeInTraining(emp)) {
       return { isIdle: false, idleMinutes: 0 };

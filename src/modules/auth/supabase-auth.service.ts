@@ -146,19 +146,55 @@ export class SupabaseAuthService implements IAuthService {
     const raw = identifier.trim();
     if (raw.includes('@')) return raw.toLowerCase();
 
-    try {
-      const { data, error } = await supabase.rpc('resolve_login_email', { identifier: raw });
-      if (!error && data) return String(data).toLowerCase();
-    } catch (e) {}
+    const lower = raw.toLowerCase();
+    // 1. Direct role aliases
+    if (lower === 'admin' || lower === 'administrator') {
+      try {
+        const { data } = await supabase
+          .from('flwdsk_employees')
+          .select('email')
+          .ilike('role', 'ADMIN')
+          .is('deleted_at', null)
+          .limit(1)
+          .maybeSingle();
+        if (data?.email) return data.email.toLowerCase();
+      } catch (_) {}
+      return 'mail@thestrategist.co.in';
+    }
 
+    if (lower === 'ceo') {
+      try {
+        const { data } = await supabase
+          .from('flwdsk_employees')
+          .select('email')
+          .ilike('role', 'CEO')
+          .is('deleted_at', null)
+          .limit(1)
+          .maybeSingle();
+        if (data?.email) return data.email.toLowerCase();
+      } catch (_) {}
+      return 'info@thestrategist.co.in';
+    }
+
+    // 2. Query flwdsk_employees by username, employee_id, or email
     try {
       const { data } = await supabase
         .from('flwdsk_employees')
         .select('email')
-        .or(`username.ilike.${raw},email.ilike.${raw}`)
+        .or(`username.ilike.${raw},email.ilike.${raw},employee_id.ilike.${raw}`)
+        .is('deleted_at', null)
         .maybeSingle();
       if (data?.email) return data.email.toLowerCase();
-    } catch (e) {}
+    } catch (_) {}
+
+    // 3. Fallback to resolve_login_email RPC ONLY if digits exist (e.g. phone number)
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (digits.length >= 7) {
+      try {
+        const { data, error } = await supabase.rpc('resolve_login_email', { identifier: raw });
+        if (!error && data) return String(data).toLowerCase();
+      } catch (_) {}
+    }
 
     return raw.toLowerCase();
   }

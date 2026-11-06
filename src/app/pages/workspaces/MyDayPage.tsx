@@ -1975,6 +1975,12 @@ export function MyDayPage() {
   const [userDbSessions, setUserDbSessions] = useState<any[]>([]);
 
   useEffect(() => {
+    // Reset tasks and sessions state immediately when switching accounts
+    setTasks([]);
+    setUserDbSessions([]);
+  }, [user?.id]);
+
+  useEffect(() => {
     const userId = user?.id;
     if (!userId) return;
     let isSubscribed = true;
@@ -2234,19 +2240,15 @@ export function MyDayPage() {
         });
 
         const projectObj = t.projectId && t.projectId !== 'OFFICE_TASK' ? (projects || []).find((p) => p.id === t.projectId) : null;
-        const pSupervisorId = (projectObj ? ((projectObj as any).supervisorId || (projectObj as any).supervisor_id || '') : '').toLowerCase();
         const tAssigneeId = (t.assigneeId || '').toLowerCase();
         const tAssigneeName = (typeof (t as any).assignee === 'string' ? (t as any).assignee : '').toLowerCase();
-        const tSupervisorId = ((t.supervisorId && t.supervisorId !== t.assigneeId ? t.supervisorId : '') ||
-          ((t as any).assignedByEmployeeId && (t as any).assignedByEmployeeId !== t.assigneeId ? (t as any).assignedByEmployeeId : '')).toLowerCase();
-        const effectiveSupervisorId = pSupervisorId || tSupervisorId;
-        const tSupervisorName = (typeof (t as any).supervisor === 'string' ? (t as any).supervisor : (t as any).supervisorName || '').toLowerCase();
 
+        // My Day is the employee's personal work queue for tasks assigned to them to execute.
+        // Projects supervised by Admin/CEO/Manager belong in Project Management / Approvals Queue,
+        // and must never cross-pollinate into the user's personal My Day task list.
         const isMyTask =
           (tAssigneeId && myIdentifiers.has(tAssigneeId)) ||
-          (effectiveSupervisorId && myIdentifiers.has(effectiveSupervisorId)) ||
-          (tAssigneeName && myName && (tAssigneeName === myName || tAssigneeName.includes(myName) || myName.includes(tAssigneeName))) ||
-          (tSupervisorName && myName && (tSupervisorName === myName || tSupervisorName.includes(myName) || myName.includes(tSupervisorName)));
+          (tAssigneeName && myName && (tAssigneeName === myName || tAssigneeName.includes(myName) || myName.includes(tAssigneeName)));
 
         if (!isMyTask) return false;
 

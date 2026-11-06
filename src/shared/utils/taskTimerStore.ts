@@ -214,6 +214,14 @@ export const taskTimerStore = {
     this.notify();
   },
 
+  clearAll() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(MY_DAY_KEY);
+    } catch {}
+    this.notify();
+  },
+
   syncTaskTime(taskId: string, actualHours: number) {
     const current = loadTimers();
     const dbMs = Math.round((actualHours || 0) * 3600 * 1000);

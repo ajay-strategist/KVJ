@@ -10,6 +10,7 @@ import { AUTH_SERVICE_TOKEN, type Credentials, type IAuthService, type Session }
 import { eventBus } from '../../core/event-bus';
 import { container } from '../../core/registry';
 import type { PrincipalLike } from '../../shared/permissions/permission-engine';
+import { taskTimerStore } from '../../shared/utils/taskTimerStore';
 
 interface AuthContextValue {
   session: Session | null;
@@ -90,6 +91,14 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
   }, [authService]);
 
   const login = useCallback(async (creds: Credentials) => {
+    // Clear any previous user timer and session state before authenticating
+    taskTimerStore.clearAll();
+    try {
+      localStorage.removeItem('kvj_task_timers');
+      localStorage.removeItem('kvj_task_timer_state_v1');
+      localStorage.removeItem('kvj_active_task_id');
+    } catch (_) {}
+
     const s = await authService.login(creds);
     setSession(s);
     setStatus('authenticated');
@@ -102,6 +111,20 @@ export function AuthProvider({ children, service }: { children: ReactNode; servi
     // Clear session state synchronously to prevent render of protected pages with stale auth state
     setSession(null);
     setStatus('unauthenticated');
+
+    // Wipe all active timers and local caches belonging to the logged-out user
+    taskTimerStore.clearAll();
+    try {
+      localStorage.removeItem('kvj_task_timers');
+      localStorage.removeItem('kvj_task_timer_state_v1');
+      localStorage.removeItem('kvj_active_task_id');
+      if (id) {
+        localStorage.removeItem(`flwdsk_idle_start_${id}`);
+        localStorage.removeItem(`flwdsk_idle_notified_${id}`);
+        localStorage.removeItem(`kvj_break_paused_tasks_${id}`);
+        localStorage.removeItem(`kvj_myday_order_${id}`);
+      }
+    } catch (_) {}
 
     // Redirect immediately to login page
     navigate('/login', { replace: true });

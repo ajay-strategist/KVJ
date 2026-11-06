@@ -77,7 +77,7 @@ export function IdleEmployeeAlertPopup() {
       // 1. Fetch active employees
       const { data: empsData } = await supabase
         .from('flwdsk_employees')
-        .select('id, employee_id, first_name, last_name, designation, status, email')
+        .select('id, employee_id, first_name, last_name, designation, status, email, role')
         .is('deleted_at', null);
 
       if (!empsData || empsData.length === 0) return;
@@ -201,6 +201,13 @@ export function IdleEmployeeAlertPopup() {
 
       for (const emp of activeEmps) {
         if (onLeaveEmpIds.has(emp.id)) continue;
+
+        // Admin and CEO conduct organizational administration, approvals, and meetings — exempt from task-idle tracking
+        const roleUpper = (emp.role || '').toUpperCase();
+        const desigUpper = (emp.designation || '').toUpperCase();
+        if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || desigUpper.includes('ADMIN') || desigUpper.includes('CEO')) {
+          continue;
+        }
 
         const empId = emp.id;
         const empEmail = emp.email?.toLowerCase();

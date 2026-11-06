@@ -19,7 +19,7 @@
  *  - Detailed Filterable Expense Log with Search, Submitter Filters, and CSV Export
  */
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../../shared/integration/supabase';
 
@@ -256,6 +256,101 @@ export function calculateMergedHours(intervals: TimeInterval[]): number {
   return totalMinutes / 60;
 }
 
+// ── Excel Pivot Table Data Structures & Calculator ──────────────────────────
+
+export interface PivotCategoryRow {
+  category: string;
+  amount: number;
+  claimsCount: number;
+  percentOfRowTotal: number;    // Category Amount / Employee Amount * 100
+  percentOfGrandTotal: number;  // Category Amount / Grand Total * 100
+  claims: ExpenseRow[];
+}
+
+export interface PivotEmployeeRow {
+  employeeName: string;
+  amount: number;
+  claimsCount: number;
+  percentOfRowTotal: number;    // 100.0%
+  percentOfGrandTotal: number;  // Employee Amount / Grand Total * 100
+  categories: PivotCategoryRow[];
+}
+
+export interface PivotTableData {
+  rows: PivotEmployeeRow[];
+  grandTotal: number;
+  totalClaimsCount: number;
+  percentOfGrandTotal: number;  // 100.0%
+}
+
+export function calculateExpensePivotTable(
+  expenses: ExpenseRow[],
+  totalExpenseOverride?: number
+): PivotTableData {
+  const grandTotal = typeof totalExpenseOverride === 'number' && totalExpenseOverride > 0
+    ? totalExpenseOverride
+    : expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+  const empMap = new Map<string, {
+    total: number;
+    count: number;
+    catMap: Map<string, { total: number; count: number; claims: ExpenseRow[] }>;
+  }>();
+
+  expenses.forEach((e) => {
+    const empName = (e.submittedBy || 'Unknown').trim();
+    const amt = Number(e.amount) || 0;
+    const catName = (e.expenseType || e.category || 'Other').trim();
+
+    if (!empMap.has(empName)) {
+      empMap.set(empName, { total: 0, count: 0, catMap: new Map() });
+    }
+    const empData = empMap.get(empName)!;
+    empData.total += amt;
+    empData.count += 1;
+
+    if (!empData.catMap.has(catName)) {
+      empData.catMap.set(catName, { total: 0, count: 0, claims: [] });
+    }
+    const catData = empData.catMap.get(catName)!;
+    catData.total += amt;
+    catData.count += 1;
+    catData.claims.push(e);
+  });
+
+  const rows: PivotEmployeeRow[] = Array.from(empMap.entries())
+    .map(([employeeName, data]) => {
+      const empAmount = data.total;
+      const categories: PivotCategoryRow[] = Array.from(data.catMap.entries())
+        .map(([category, catData]) => ({
+          category,
+          amount: catData.total,
+          claimsCount: catData.count,
+          percentOfRowTotal: empAmount > 0 ? (catData.total / empAmount) * 100 : 0,
+          percentOfGrandTotal: grandTotal > 0 ? (catData.total / grandTotal) * 100 : 0,
+          claims: catData.claims.sort((a, b) => (b.rawDate || '').localeCompare(a.rawDate || '')),
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      return {
+        employeeName,
+        amount: empAmount,
+        claimsCount: data.count,
+        percentOfRowTotal: 100.0,
+        percentOfGrandTotal: grandTotal > 0 ? (empAmount / grandTotal) * 100 : 0,
+        categories,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+
+  return {
+    rows,
+    grandTotal,
+    totalClaimsCount: expenses.length,
+    percentOfGrandTotal: 100.0,
+  };
+}
+
 function parseExpenseRow(raw: RawExpenseClaim): ExpenseRow {
   let expenseType = 'Expense';
   let submittedBy = '—';
@@ -420,7 +515,11 @@ export function BatchExpenseDetailsDrawer({
   const [activeTab, setActiveTab] = useState<'overview' | 'workhours' | 'log'>('overview');
   const [scheduledHoursTotal, setScheduledHoursTotal] = useState<number>(0);
   const [sessionCount, setSessionCount] = useState<number>(0);
-  const [expandedSubmitters, setExpandedSubmitters] = useState<Record<string, boolean>>({});
+  // Pivot Table Modal State for Trainer & Submitter Allocation
+  const [pivotModalOpen, setPivotModalOpen] = useState(false);
+  const [pivotSelectedSubmitter, setPivotSelectedSubmitter] = useState<string>('ALL');
+  const [expandedPivotRows, setExpandedPivotRows] = useState<Record<string, boolean>>({});
+  const [expandedPivotClaims, setExpandedPivotClaims] = useState<Record<string, boolean>>({});
 
   // Filters & Sorting for Expense Log Table
   const [searchQuery, setSearchQuery] = useState('');
@@ -768,9 +867,49 @@ export function BatchExpenseDetailsDrawer({
       .sort((a, b) => b.amount - a.amount);
   }, [expenses, totalExpense]);
 
-  const toggleSubmitterExpand = (name: string) => {
-    setExpandedSubmitters((prev) => ({ ...prev, [name]: !prev[name] }));
+  // Calculate complete Excel Pivot breakdown
+  const pivotData = useMemo(() => {
+    return calculateExpensePivotTable(expenses, totalExpense);
+  }, [expenses, totalExpense]);
+
+  const handleOpenPivot = (personName: string) => {
+    setPivotSelectedSubmitter(personName);
+    // Expand rows by default so categories are immediately visible
+    const initialExpanded: Record<string, boolean> = {};
+    pivotData.rows.forEach((r) => {
+      initialExpanded[r.employeeName] = true;
+    });
+    setExpandedPivotRows(initialExpanded);
+    setPivotModalOpen(true);
   };
+
+  const togglePivotRow = (employeeName: string) => {
+    setExpandedPivotRows((prev) => ({ ...prev, [employeeName]: !prev[employeeName] }));
+  };
+
+  const togglePivotClaims = (key: string) => {
+    setExpandedPivotClaims((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Close Pivot Modal on ESC
+  useEffect(() => {
+    if (!pivotModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setPivotModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pivotModalOpen]);
+
+  const displayedPivotRows = useMemo(() => {
+    if (pivotSelectedSubmitter === 'ALL') {
+      return pivotData.rows;
+    }
+    return pivotData.rows.filter((r) => r.employeeName === pivotSelectedSubmitter);
+  }, [pivotData.rows, pivotSelectedSubmitter]);
 
   // ── Daily Expense & Workhours Timeline (Attendance-derived) ───────────────
   const dailyTimeline = useMemo(() => {
@@ -1230,15 +1369,38 @@ export function BatchExpenseDetailsDrawer({
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span>👤 Trainer & Submitter Allocation</span>
                   </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    {submitterBreakdown.length} claimant{submitterBreakdown.length !== 1 ? 's' : ''}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {submitterBreakdown.length} claimant{submitterBreakdown.length !== 1 ? 's' : ''}
+                    </span>
+                    {submitterBreakdown.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPivot('ALL')}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-surface)',
+                          color: 'var(--brand)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          transition: 'all 120ms ease',
+                        }}
+                        title="Open Pivot Table breakdown for all claimants"
+                      >
+                        <span>📊 Pivot Breakdown</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
                   {submitterBreakdown.map((person) => {
-                    const isExpanded = !!expandedSubmitters[person.name];
-                    const personExpenses = expenses.filter((e) => (e.submittedBy || 'Unknown') === person.name);
                     return (
                       <div
                         key={person.name}
@@ -1274,13 +1436,13 @@ export function BatchExpenseDetailsDrawer({
                             </span>
                             <button
                               type="button"
-                              onClick={() => toggleSubmitterExpand(person.name)}
+                              onClick={() => handleOpenPivot(person.name)}
                               style={{
                                 padding: '4px 6px',
                                 borderRadius: 6,
-                                border: isExpanded ? '1px solid var(--brand)' : '1px solid var(--border)',
-                                background: isExpanded ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-surface)',
-                                color: isExpanded ? 'var(--brand)' : 'var(--text-secondary)',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-surface)',
+                                color: 'var(--brand)',
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -1288,8 +1450,8 @@ export function BatchExpenseDetailsDrawer({
                                 lineHeight: 1,
                                 transition: 'all 120ms ease',
                               }}
-                              title={isExpanded ? 'Hide Details' : 'View Details'}
-                              aria-label={isExpanded ? 'Hide Details' : 'View Details'}
+                              title={`View Claims Pivot Breakdown for ${person.name}`}
+                              aria-label={`View Claims Pivot Breakdown for ${person.name}`}
                             >
                               <svg
                                 width="14"
@@ -1315,57 +1477,6 @@ export function BatchExpenseDetailsDrawer({
                         {person.types && (
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             Types: {person.types}
-                          </div>
-                        )}
-
-                        {/* Expandable submitted batch expenses */}
-                        {isExpanded && (
-                          <div style={{
-                            marginTop: 8,
-                            paddingTop: 8,
-                            borderTop: '1px dashed var(--border)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 6,
-                          }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                              Submitted Claims
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-                              {personExpenses.map((exp) => (
-                                <div
-                                  key={exp.id}
-                                  style={{
-                                    background: 'var(--bg-surface)',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 6,
-                                    padding: '8px 10px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 3,
-                                    fontSize: 11,
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{exp.date}</span>
-                                    <span style={{ fontWeight: 700, color: 'var(--brand)' }}>{fmt(exp.amount)}</span>
-                                  </div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                                    <span>{exp.category} · {exp.expenseType}</span>
-                                    {exp.receipt ? (
-                                      <a href={exp.receipt} target="_blank" rel="noreferrer" style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>
-                                        📎 Receipt
-                                      </a>
-                                    ) : null}
-                                  </div>
-                                  {exp.route && (
-                                    <div style={{ color: 'var(--text-secondary)', fontSize: 10.5 }}>
-                                      📍 {exp.route} {exp.km ? `(${exp.km} km)` : ''}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
                           </div>
                         )}
                       </div>
@@ -1879,6 +1990,438 @@ export function BatchExpenseDetailsDrawer({
           )}
         </div>
       </div>
+
+      {/* ── Pivot Table Modal Popup (Excel Pivot Style) ────────────────────────── */}
+      {pivotModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1400,
+            background: 'rgba(15, 23, 42, 0.72)',
+            backdropFilter: 'blur(5px)',
+            WebkitBackdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={() => setPivotModalOpen(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-surface, #ffffff)',
+              color: 'var(--text-primary, #0f172a)',
+              borderRadius: 16,
+              border: '1px solid var(--border, #e2e8f0)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              width: '100%',
+              maxWidth: 880,
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border, #e2e8f0)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              background: 'var(--bg-sunken, #f8fafc)',
+            }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>📊 Submitted Claims — Pivot Table Breakdown</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  Batch: <strong style={{ color: 'var(--text-primary)' }}>{batchCode || batchName || 'Training Batch'}</strong> • Grand Total Expense: <strong style={{ color: 'var(--brand)' }}>{fmt(pivotData.grandTotal)}</strong>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPivotModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 6,
+                  borderRadius: 6,
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Close Popup (Esc)"
+                aria-label="Close Popup"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Submitter Filter Tabs & Controls */}
+            <div style={{
+              padding: '10px 18px',
+              background: 'var(--bg-surface)',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setPivotSelectedSubmitter('ALL')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: pivotSelectedSubmitter === 'ALL' ? 700 : 500,
+                    border: pivotSelectedSubmitter === 'ALL' ? '1px solid var(--brand)' : '1px solid var(--border)',
+                    background: pivotSelectedSubmitter === 'ALL' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-surface)',
+                    color: pivotSelectedSubmitter === 'ALL' ? 'var(--brand)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 120ms ease',
+                  }}
+                >
+                  All Claimants ({pivotData.rows.length})
+                </button>
+                {pivotData.rows.map((r) => {
+                  const isSelected = pivotSelectedSubmitter === r.employeeName;
+                  return (
+                    <button
+                      key={r.employeeName}
+                      type="button"
+                      onClick={() => setPivotSelectedSubmitter(r.employeeName)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: isSelected ? 700 : 500,
+                        border: isSelected ? '1px solid var(--brand)' : '1px solid var(--border)',
+                        background: isSelected ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-surface)',
+                        color: isSelected ? 'var(--brand)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        transition: 'all 120ms ease',
+                      }}
+                    >
+                      <span>{r.employeeName}</span>
+                      <span style={{ fontSize: 10.5, opacity: 0.85 }}>({r.percentOfGrandTotal.toFixed(1)}%)</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {pivotData.rows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allExpanded = pivotData.rows.every((r) => expandedPivotRows[r.employeeName]);
+                    const next: Record<string, boolean> = {};
+                    pivotData.rows.forEach((r) => {
+                      next[r.employeeName] = !allExpanded;
+                    });
+                    setExpandedPivotRows(next);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--brand)',
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                  }}
+                >
+                  {pivotData.rows.every((r) => expandedPivotRows[r.employeeName]) ? 'Collapse All ▲' : 'Expand All ▼'}
+                </button>
+              )}
+            </div>
+
+            {/* Table Area */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{
+                    background: 'var(--bg-sunken, #f8fafc)',
+                    borderBottom: '2px solid var(--border, #e2e8f0)',
+                    color: 'var(--text-secondary, #64748b)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                  }}>
+                    <th style={{ padding: '10px 16px', width: '46%' }}>Employee Name / Expense Category</th>
+                    <th style={{ padding: '10px 16px', textAlign: 'right', width: '18%' }}>Amount</th>
+                    <th style={{ padding: '10px 16px', textAlign: 'right', width: '18%' }}>% of Row Total</th>
+                    <th style={{ padding: '10px 16px', textAlign: 'right', width: '18%' }}>% of Grand Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedPivotRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No submitted expense claims found for this batch.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayedPivotRows.map((row) => {
+                      const isExpanded = !!expandedPivotRows[row.employeeName];
+                      return (
+                        <Fragment key={row.employeeName}>
+                          {/* Employee Main Row */}
+                          <tr
+                            style={{
+                              background: 'var(--bg-sunken, #f8fafc)',
+                              borderTop: '1px solid var(--border, #e2e8f0)',
+                              borderBottom: '1px solid var(--border, #e2e8f0)',
+                              fontWeight: 700,
+                            }}
+                          >
+                            <td style={{ padding: '10px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePivotRow(row.employeeName)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--text-muted)',
+                                    fontSize: 11,
+                                    width: 16,
+                                  }}
+                                  title={isExpanded ? 'Collapse categories' : 'Expand categories'}
+                                >
+                                  {isExpanded ? '▼' : '▶'}
+                                </button>
+                                <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                                  👤 {row.employeeName}
+                                </span>
+                                <span style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: 'var(--text-muted)',
+                                  background: 'var(--bg-surface)',
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  border: '1px solid var(--border)',
+                                }}>
+                                  {row.claimsCount} claim{row.claimsCount !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{
+                              padding: '10px 16px',
+                              textAlign: 'right',
+                              fontVariantNumeric: 'tabular-nums',
+                              color: 'var(--brand)',
+                              fontSize: 13,
+                              fontWeight: 800,
+                            }}>
+                              {fmt(row.amount)}
+                            </td>
+                            <td style={{
+                              padding: '10px 16px',
+                              textAlign: 'right',
+                              fontVariantNumeric: 'tabular-nums',
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: 'var(--text-secondary)',
+                            }}>
+                              100.0%
+                            </td>
+                            <td style={{
+                              padding: '10px 16px',
+                              textAlign: 'right',
+                              fontVariantNumeric: 'tabular-nums',
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: '#2563eb',
+                            }}>
+                              {row.percentOfGrandTotal.toFixed(1)}%
+                            </td>
+                          </tr>
+
+                          {/* Category Child Rows (Under Employee Name) */}
+                          {isExpanded && row.categories.map((cat) => {
+                            const claimKey = `${row.employeeName}-${cat.category}`;
+                            const isClaimsOpen = !!expandedPivotClaims[claimKey];
+                            return (
+                              <Fragment key={claimKey}>
+                                <tr
+                                  style={{
+                                    borderBottom: '1px dashed var(--border, #e2e8f0)',
+                                    background: 'var(--bg-surface)',
+                                    transition: 'background 100ms ease',
+                                  }}
+                                >
+                                  <td style={{ padding: '9px 16px 9px 40px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>↳</span>
+                                        <span style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--text-primary)' }}>
+                                          🏷️ {cat.category}
+                                        </span>
+                                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                          ({cat.claimsCount} claim{cat.claimsCount !== 1 ? 's' : ''})
+                                        </span>
+                                      </div>
+                                      {cat.claims.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => togglePivotClaims(claimKey)}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontSize: 10.5,
+                                            fontWeight: 600,
+                                            color: 'var(--brand)',
+                                            padding: '2px 6px',
+                                            borderRadius: 4,
+                                          }}
+                                          title={isClaimsOpen ? 'Hide individual claim records' : 'View individual claim records'}
+                                        >
+                                          {isClaimsOpen ? 'Hide Claims ▲' : 'View Claims ▼'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td style={{
+                                    padding: '9px 16px',
+                                    textAlign: 'right',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    fontSize: 12.5,
+                                    fontWeight: 600,
+                                    color: 'var(--text-primary)',
+                                  }}>
+                                    {fmt(cat.amount)}
+                                  </td>
+                                  <td style={{
+                                    padding: '9px 16px',
+                                    textAlign: 'right',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    fontSize: 12,
+                                    color: 'var(--text-secondary)',
+                                  }}>
+                                    {cat.percentOfRowTotal.toFixed(1)}%
+                                  </td>
+                                  <td style={{
+                                    padding: '9px 16px',
+                                    textAlign: 'right',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    fontSize: 12,
+                                    color: 'var(--text-secondary)',
+                                  }}>
+                                    {cat.percentOfGrandTotal.toFixed(1)}%
+                                  </td>
+                                </tr>
+
+                                {/* Individual Claims Drilldown under Category */}
+                                {isClaimsOpen && (
+                                  <tr style={{ background: 'var(--bg-sunken)' }}>
+                                    <td colSpan={4} style={{ padding: '8px 16px 12px 48px' }}>
+                                      <div style={{
+                                        background: 'var(--bg-surface)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 8,
+                                        padding: '8px 12px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 6,
+                                      }}>
+                                        {cat.claims.map((cl) => (
+                                          <div
+                                            key={cl.id}
+                                            style={{
+                                              display: 'flex',
+                                              justifyContent: 'space-between',
+                                              alignItems: 'center',
+                                              fontSize: 11,
+                                              padding: '4px 0',
+                                              borderBottom: '1px solid var(--border-subtle, #f1f5f9)',
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{cl.date}</span>
+                                              {cl.route && (
+                                                <span style={{ color: 'var(--text-secondary)' }}>
+                                                  📍 {cl.route} {cl.km ? `(${cl.km} km)` : ''}
+                                                </span>
+                                              )}
+                                              {cl.receipt && (
+                                                <a
+                                                  href={cl.receipt}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
+                                                >
+                                                  📎 Receipt
+                                                </a>
+                                              )}
+                                            </div>
+                                            <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--brand)' }}>
+                                              {fmt(cl.amount)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr style={{
+                    background: 'var(--bg-sunken)',
+                    borderTop: '2px solid var(--border)',
+                    fontWeight: 800,
+                    fontSize: 13,
+                  }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>
+                      📊 Grand Total ({pivotData.totalClaimsCount} claims across {pivotData.rows.length} claimants)
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--brand)', fontSize: 14 }}>
+                      {fmt(pivotData.grandTotal)}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>
+                      100.0%
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#2563eb' }}>
+                      100.0%
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );
