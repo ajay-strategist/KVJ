@@ -1394,9 +1394,6 @@ export function TrainingCalendar() {
               <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                 Training Resource Planner
               </h1>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-                Resource Allocation &amp; Matrix Scheduling
-              </div>
             </div>
           </div>
 

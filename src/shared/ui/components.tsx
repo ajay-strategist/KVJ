@@ -190,6 +190,7 @@ export function Avatar({
 
 // Temporarily disabled per user request; re-enable to true when ready
 const ENABLE_GUIDE_FEATURE = false;
+const SHOW_PAGE_SUBTITLE = false; // Disabled per user request: "Remove all Description under the Title"
 
 // ── Headers ──────────────────────────────────────────────────────────────────
 export function PageHeader({
@@ -303,7 +304,7 @@ export function PageHeader({
               </button>
             )}
           </div>
-          {subtitle && (
+          {SHOW_PAGE_SUBTITLE && subtitle && (
             <p
               style={{
                 margin: '6px 0 0',
