@@ -12,6 +12,8 @@ export interface TutorialWorkflow {
   title: string;
   summary: string;
   whoCanUse: string[];
+  rolesAllowed?: ('ALL' | 'EMPLOYEE' | 'SUPERVISOR' | 'MANAGER' | 'ADMIN' | 'CEO')[];
+  description?: string;
   prerequisites?: string[];
   steps: string[];
   fields?: TutorialField[];

@@ -86,7 +86,7 @@ export function IdleEmployeeAlertPopup() {
 
       // 2. Fetch today's attendance records
       const { data: attData } = await supabase
-        .from('flwdsk_attendance')
+        .from('flwdsk_attendance_records')
         .select('*')
         .eq('work_date', todayStr)
         .is('deleted_at', null);
@@ -94,7 +94,7 @@ export function IdleEmployeeAlertPopup() {
       let finalAttData = attData || [];
       if (!finalAttData.length) {
         const { data: altAttData } = await supabase
-          .from('flwdsk_attendance_records')
+          .from('flwdsk_attendance')
           .select('*')
           .eq('work_date', todayStr)
           .is('deleted_at', null);
@@ -270,11 +270,30 @@ export function IdleEmployeeAlertPopup() {
         });
         if (hasRunningTaskSession) continue;
 
-        // Calculate idle duration
-        const clockInIso = att.first_clock_in || (att as any).firstClockIn;
+        // Calculate idle duration based on active work session clock-in time
+        const activeEmbeddedSession = Array.isArray(att.sessions)
+          ? att.sessions.find((s: any) => !s.clockOut && !s.clock_out)
+          : null;
+
+        const clockInIso =
+          activeWs?.clock_in ||
+          activeWs?.clockIn ||
+          activeEmbeddedSession?.clockIn ||
+          activeEmbeddedSession?.clock_in ||
+          att.first_clock_in ||
+          (att as any).firstClockIn;
+
         if (!clockInIso) continue;
 
         let idleStartMs = new Date(clockInIso).getTime();
+
+        // If there was a previous session clocked out today and no activeWs, prevent idle time before re-clocking in
+        if (att.last_clock_out || (att as any).lastClockOut) {
+          const lastOutMs = new Date(att.last_clock_out || (att as any).lastClockOut).getTime();
+          if (!isNaN(lastOutMs) && lastOutMs > idleStartMs) {
+            idleStartMs = lastOutMs;
+          }
+        }
 
         const finishedEmpSessions = (todayTaskSessions || []).filter(
           (s: any) => s.employee_id === empId && s.end_time

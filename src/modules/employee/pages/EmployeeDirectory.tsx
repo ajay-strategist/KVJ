@@ -69,7 +69,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       try {
         const todayStr = todayISO();
         const { data: attData } = await supabase
-          .from('flwdsk_attendance')
+          .from('flwdsk_attendance_records')
           .select('*')
           .eq('work_date', todayStr)
           .is('deleted_at', null);
@@ -77,7 +77,7 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
         let finalAttData = attData || [];
         if (!finalAttData.length) {
           const { data: altAttData } = await supabase
-            .from('flwdsk_attendance_records')
+            .from('flwdsk_attendance')
             .select('*')
             .eq('work_date', todayStr)
             .is('deleted_at', null);
@@ -442,12 +442,16 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
 
     const empId = emp.id;
     const empEmail = emp.email?.toLowerCase();
-    const record = attendanceRecords.find(
+    const isCurrentUser = Boolean(user && (user.id === empId || user.email?.toLowerCase() === empEmail));
+
+    const matchingAttendance = attendanceRecords.filter(
       (r) =>
         r.employee_id === empId ||
         (r.employee_email && empEmail && r.employee_email.toLowerCase() === empEmail) ||
-        (user && user.email?.toLowerCase() === empEmail && r.employee_id === user.id)
+        (isCurrentUser && user && (r.employee_id === user.id || r.employee_email?.toLowerCase() === user.email?.toLowerCase()))
     );
+
+    const record = matchingAttendance[0];
 
     // Cross-check break records: If employee is on an open break or record is on_break, they are NOT idle
     const empBreaks = (todayBreakRecords || []).filter(
@@ -458,12 +462,35 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
       return { isIdle: false, idleMinutes: 0 };
     }
 
-    const clockInIso = record?.first_clock_in || (record as any)?.firstClockIn;
+    // Determine the active work session's clock-in time (crucial for multi-session days or re-clock-ins)
+    const matchingAttIds = new Set(matchingAttendance.map((r) => r.id));
+    const activeWs = openWorkSessions.find((ws: any) => matchingAttIds.has(ws.attendance_record_id));
+    const activeEmbeddedSession = record && Array.isArray(record.sessions)
+      ? record.sessions.find((s: any) => !s.clockOut && !s.clock_out)
+      : null;
+
+    // Use current active session's clock_in, then active embedded session, then fallback to first_clock_in
+    const clockInIso =
+      activeWs?.clock_in ||
+      activeWs?.clockIn ||
+      activeEmbeddedSession?.clockIn ||
+      activeEmbeddedSession?.clock_in ||
+      record?.first_clock_in ||
+      (record as any)?.firstClockIn;
+
     if (!clockInIso) {
       return { isIdle: false, idleMinutes: 0 };
     }
 
     let idleStartMs = new Date(clockInIso).getTime();
+
+    // If there was a previous session clocked out today and no activeWs, prevent idle time before re-clocking in
+    if (record?.last_clock_out || (record as any)?.lastClockOut) {
+      const lastOutMs = new Date(record.last_clock_out || (record as any).lastClockOut).getTime();
+      if (!isNaN(lastOutMs) && lastOutMs > idleStartMs) {
+        idleStartMs = lastOutMs;
+      }
+    }
 
     // Check if employee completed/paused a task session today after clocking in
     const empFinishedSessions = (todayTaskSessions || []).filter(

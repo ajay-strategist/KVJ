@@ -129,5 +129,87 @@ describe('IdleEmployeeAlertPopup and Notification Chime', () => {
     expect(resExpiredBreak.idleMinutes).toBe(20);
     expect(resExpiredBreak.isIdle).toBe(true);
   });
+
+  it('correctly uses the active work session clock-in time on multi-session days rather than first_clock_in', () => {
+    const resolveIdleInfoForMultiSession = (params: {
+      attRecord: {
+        first_clock_in: string;
+        last_clock_out?: string;
+        status: string;
+        sessions?: any[];
+      };
+      openWorkSession?: {
+        clock_in: string;
+        work_type?: string;
+      };
+      nowMs: number;
+    }) => {
+      const { attRecord, openWorkSession, nowMs } = params;
+
+      const activeEmbeddedSession = Array.isArray(attRecord.sessions)
+        ? attRecord.sessions.find((s: any) => !s.clockOut && !s.clock_out)
+        : null;
+
+      const clockInIso =
+        openWorkSession?.clock_in ||
+        activeEmbeddedSession?.clockIn ||
+        activeEmbeddedSession?.clock_in ||
+        attRecord.first_clock_in;
+
+      let idleStartMs = new Date(clockInIso).getTime();
+
+      if (attRecord.last_clock_out) {
+        const lastOutMs = new Date(attRecord.last_clock_out).getTime();
+        if (!isNaN(lastOutMs) && lastOutMs > idleStartMs) {
+          idleStartMs = lastOutMs;
+        }
+      }
+
+      const idleMinutes = Math.max(0, Math.floor((nowMs - idleStartMs) / (1000 * 60)));
+      return {
+        isIdle: idleMinutes >= 15,
+        idleMinutes,
+      };
+    };
+
+    // User scenario:
+    // Session 1: 09:30 AM (04:00 UTC) to 11:15 AM (05:45 UTC) - Training approved & submitted
+    // Session 2: Clocked in at 01:49:39 PM (08:19:39 UTC) - WFH
+    // Current time: 01:51:39 PM (08:21:39 UTC) - exactly 2 minutes later
+    const firstClockIn = '2026-11-06T04:00:00.000Z';
+    const morningClockOut = '2026-11-06T05:45:00.000Z';
+    const afternoonClockIn = '2026-11-06T08:19:39.699Z';
+    const nowTime = new Date('2026-11-06T08:21:39.699Z').getTime();
+
+    const result = resolveIdleInfoForMultiSession({
+      attRecord: {
+        first_clock_in: firstClockIn,
+        last_clock_out: morningClockOut,
+        status: 'present',
+      },
+      openWorkSession: {
+        clock_in: afternoonClockIn,
+        work_type: 'Work From Home',
+      },
+      nowMs: nowTime,
+    });
+
+    // Must be 2 minutes idle, NOT 4 hours 21 minutes (261 mins)!
+    expect(result.idleMinutes).toBe(2);
+    expect(result.isIdle).toBe(false);
+
+    // Safeguard: even if openWorkSession was absent, idle time must never start before last_clock_out!
+    const fallbackResult = resolveIdleInfoForMultiSession({
+      attRecord: {
+        first_clock_in: firstClockIn,
+        last_clock_out: morningClockOut,
+        status: 'present',
+      },
+      openWorkSession: undefined,
+      nowMs: nowTime,
+    });
+    // From 05:45 UTC to 08:21:39 UTC is 2h 36m (156m), NOT 4h 21m (261m from 04:00 UTC)
+    expect(fallbackResult.idleMinutes).toBeLessThan(200);
+  });
 });
 

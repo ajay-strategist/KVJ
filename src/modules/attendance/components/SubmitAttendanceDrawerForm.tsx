@@ -98,13 +98,23 @@ export function SubmitAttendanceDrawerForm({
 
       try {
         const { data } = await supabase
-          .from('flwdsk_attendance')
+          .from('flwdsk_attendance_records')
           .select('id')
           .eq('employee_id', targetEmpId)
           .eq('work_date', date)
           .limit(1);
         if (data && data[0]) {
           recordId = data[0].id;
+        } else {
+          const { data: legacyData } = await supabase
+            .from('flwdsk_attendance')
+            .select('id')
+            .eq('employee_id', targetEmpId)
+            .eq('work_date', date)
+            .limit(1);
+          if (legacyData && legacyData[0]) {
+            recordId = legacyData[0].id;
+          }
         }
       } catch (err) {
         console.warn('Could not find existing attendance record id:', err);

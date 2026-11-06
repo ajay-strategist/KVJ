@@ -91,7 +91,9 @@ describe('Tutorial Revamp — Role-Based Authorization & Visibility', () => {
     const dummyWorkflow: TutorialWorkflow = {
       id: 'force-clock-out',
       title: 'Force Clock-Out Team Member',
+      summary: 'Manager overrides active session for past date',
       description: 'Manager overrides active session for past date',
+      whoCanUse: ['SUPERVISOR', 'ADMIN'],
       steps: ['Step 1'],
       rolesAllowed: ['SUPERVISOR', 'ADMIN'],
     };

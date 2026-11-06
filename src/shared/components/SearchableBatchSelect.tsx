@@ -479,7 +479,7 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
               </li>
             ) : (
               filteredBatches.map((b, idx) => {
-                const isSelected = selectedBatch?.id === b.id || (b.code && value === b.code);
+                const isSelected = Boolean(selectedBatch?.id === b.id || (b.code && value === b.code));
                 const isHighlighted = highlightedIndex === idx;
                 const phase = normalizeBatchPhase(b.phase);
                 const badgeStyle = STATUS_BADGE_STYLE[phase];
