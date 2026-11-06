@@ -2,13 +2,14 @@
  * BatchExpenseDetailsDrawer (Current Screen Popup Modal)
  *
  * Displays financial analytics and workhour intelligence for a training batch:
- *  - 6 KPI Cards:
+ *  - 7 KPI Cards:
  *      1. Total Students (sourced directly from batch creation capacity/roster)
  *      2. Batch Workhours (actual training delivery duration with merged overlapping intervals)
- *      3. Total Days (unique training delivery days strictly from attendance)
- *      4. Total Expense (sum of valid batch expenses)
- *      5. Cost Per Student (Total Expense / Total Students, zero protected)
- *      6. Average Expense / Day (Total Expense / Unique Attendance Training Dates)
+ *      3. Total Man Hours (cumulative individual trainer delivery hours)
+ *      4. Total Days (unique training delivery days strictly from attendance)
+ *      5. Total Expense (sum of valid batch expenses)
+ *      6. Cost Per Student (Total Expense / Total Students, zero protected)
+ *      7. Average Expense / Day (Total Expense / Unique Attendance Training Dates)
  *  - Expense Category Distribution: Single container with 2 side-by-side bar charts (Amounts & Percentages)
  *  - Trainer & Submitter Allocation with expandable detail drilldown
  *  - Daily Expense & Workhours Delivery Timeline (attendance-based, without cost-per-hour)
@@ -1219,7 +1220,7 @@ export function BatchExpenseDetailsDrawer({
           </div>
         </div>
 
-        {/* ── Top Metric Strip: 6 KPI Cards (Including Unique Attendance Days) ── */}
+        {/* ── Top Metric Strip: 7 KPI Cards (Students, Workhours, Man-Hours, Days, Expense Economics) ── */}
         <div style={{
           padding: '16px 24px 12px 24px',
           background: 'var(--bg-sunken)',
@@ -1228,7 +1229,7 @@ export function BatchExpenseDetailsDrawer({
         }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
             gap: 12,
           }}>
             <KpiCard
@@ -1240,6 +1241,12 @@ export function BatchExpenseDetailsDrawer({
               label="Batch Workhours"
               value={`${batchWorkhours.toFixed(1)} hrs`}
               accent="#0284c7"
+            />
+            <KpiCard
+              label="Total Man Hours"
+              value={`${totalManHours.toFixed(1)} hrs`}
+              accent="#6366f1"
+              title="Total cumulative man-hours across all trainers in this batch"
             />
             <KpiCard
               label="Total Days"

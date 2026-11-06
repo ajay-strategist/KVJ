@@ -156,6 +156,17 @@ describe('BatchExpenseDetailsDrawer Revamp & Calculations', () => {
     it('returns 0 unique training days when sessions list is empty', () => {
       expect(calculateUniqueTrainingDays([])).toBe(0);
     });
+
+    it('calculates Total Man Hours as the sum of individual trainer session durations', () => {
+      const sessions = [
+        { durationHours: 3.5 },
+        { durationHours: 4.0 },
+        { durationHours: 2.2 },
+      ];
+      const sum = sessions.reduce((acc, s) => acc + s.durationHours, 0);
+      const totalManHours = Math.round(sum * 10) / 10;
+      expect(totalManHours).toBe(9.7);
+    });
   });
 
   describe('Trainer & Submitter Allocation — Excel Pivot Table Breakdown', () => {
