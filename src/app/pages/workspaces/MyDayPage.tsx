@@ -21,7 +21,7 @@ import { useProject } from '../../../modules/project/hooks/useProject';
 import { useTaskSessions, saveSessionNote } from '../../../modules/project/hooks/useTaskSessions';
 import { useEmployee } from '../../../modules/employee/hooks/useEmployee';
 import { useTraining } from '../../../modules/training/hooks/useTraining';
-import { cleanBatchCode } from '../../../modules/training/utils/batch-formatter';
+import { cleanBatchCode, formatBatchWithCourse } from '../../../modules/training/utils/batch-formatter';
 import { container } from '../../../core/registry';
 import { ATTENDANCE_REPOSITORY_TOKEN } from '../../../modules/attendance/attendance.repository';
 import { ATTENDANCE_SERVICE_TOKEN } from '../../../modules/attendance/attendance.service';
@@ -83,10 +83,7 @@ function ConditionalAttendanceFields() {
     const batchList = batches || [];
     const options = batchList.length > 0
       ? batchList.map((b) => {
-          // Canonical batch label (corrects a stale generated code's batch number
-          // from the batch's Batch-No field) — same as everywhere else, so no
-          // duplicate/missing batch appears here.
-          const label = cleanBatchCode(b.code, b.batchNo) || b.trainingName || 'Batch';
+          const label = formatBatchWithCourse(b);
           return { value: label, label };
         })
       : [{ value: 'No Batches Available', label: 'No Batches Available' }];
@@ -1092,26 +1089,46 @@ export const AttendancePanel = memo(function AttendancePanel({
               ? `Marketing: ${values.organisationsVisited}` 
               : 'Office Work';
             
+            const isCeo = user?.role?.toUpperCase() === 'CEO';
             try {
               const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
               const targetRecordId = (record && record.workDate === values.date)
                 ? record.id
-                : (globalThis.crypto?.randomUUID?.() || String(Date.now()));
-              await attService.requestCorrection(
+                : '';
+              const actorRole = user?.role || 'Employee';
+              const actorId = user?.id || record?.employeeId || 'emp-user';
+              const res = await attService.requestCorrection(
                 targetRecordId,
                 'attendance_claim',
                 `${values.date} (${values.startTime} - ${values.endTime})`,
                 `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
-                { id: record?.employeeId || user?.id || 'emp-user', role: 'Employee' }
+                { id: actorId, role: actorRole }
               );
-            } catch (e) {
+
+              if (!res.ok) {
+                toast({
+                  variant: 'error',
+                  title: 'Submission Failed',
+                  message: res.error.message || 'Could not submit attendance request.',
+                });
+                return;
+              }
+            } catch (e: any) {
               console.warn('Attendance correction request notice:', e);
+              toast({
+                variant: 'error',
+                title: 'Submission Failed',
+                message: e?.message || 'Could not submit attendance request.',
+              });
+              return;
             }
 
             toast({
               variant: 'success',
-              title: 'Attendance Request Submitted',
-              message: `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
+              title: isCeo ? 'Attendance Auto-Approved' : 'Attendance Request Submitted',
+              message: isCeo
+                ? `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) has been automatically approved.`
+                : `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
             });
             if (onActivityLog) {
               onActivityLog(`Submitted attendance claim for ${values.date} (${locText})`, 'success');

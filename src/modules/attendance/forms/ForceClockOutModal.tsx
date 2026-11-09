@@ -91,12 +91,13 @@ export function ForceClockOutModal({ open, onClose, onSuccess, record }: ForceCl
       <form onSubmit={handleConfirm} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div
           style={{
-            padding: 12,
-            borderRadius: 8,
-            background: 'var(--status-danger-bg, #fef2f2)',
-            border: '1px solid var(--status-danger, #ef4444)',
-            fontSize: 12,
-            color: 'var(--status-danger-text, #991b1b)',
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--status-danger-bg)',
+            border: '1px solid var(--status-danger-border)',
+            fontSize: 12.5,
+            color: 'var(--status-danger)',
+            fontWeight: 500,
           }}
         >
           ⚠️ This action will terminate the employee's running attendance session and finalize net hours.

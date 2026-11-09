@@ -71,6 +71,19 @@ export function BatchManagement() {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<StudentSubTab | null>(null);
   const [dbColleges, setDbColleges] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshBatches(true);
+      toast({ variant: 'success', title: 'Batches Synchronized', message: 'Loaded the latest batches from database.' });
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Refresh Failed', message: e?.message || 'Failed to refresh batches.' });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Load Colleges
   useEffect(() => {
@@ -696,7 +709,7 @@ export function BatchManagement() {
     if (res.ok) {
       toast({ variant: 'success', title: 'Batch Created', message: 'New batch created successfully.' });
       setCreateBatchModalOpen(false);
-      refreshBatches();
+      refreshBatches(true);
     } else {
       toast({ variant: 'error', title: 'Creation Failed', message: res.error });
     }
@@ -768,7 +781,7 @@ export function BatchManagement() {
     if (res.ok) {
       toast({ variant: 'success', title: 'Batch Updated', message: 'Training batch updated successfully.' });
       setEditingBatch(null);
-      refreshBatches();
+      refreshBatches(true);
     } else {
       toast({ variant: 'error', title: 'Update Failed', message: res.error });
     }
@@ -789,7 +802,7 @@ export function BatchManagement() {
           ? 'Batch status changed back to In Progress.'
           : 'Batch successfully marked as Completed.',
       });
-      refreshBatches();
+      refreshBatches(true);
     } else {
       toast({
         variant: 'error',
@@ -875,7 +888,7 @@ export function BatchManagement() {
         toast({ variant: 'success', title: 'Roster Uploaded', message: `Successfully upserted ${processed} student records.` });
         setUploadModalOpen(false);
         setImportProgress(null);
-        refreshBatches();
+        refreshBatches(true);
       } catch (err: any) {
         toast({ variant: 'error', title: 'Upload Failed', message: err.message });
       }
@@ -961,10 +974,12 @@ export function BatchManagement() {
           const ok = await confirm({ title: 'Delete Batch?', message: 'Are you sure you want to delete this batch?' });
           if (ok) {
             await removeBatch(id);
-            refreshBatches();
+            refreshBatches(true);
           }
         } : undefined}
         onToggleCompleteBatch={handleToggleCompleteBatch}
+        onRefresh={handleManualRefresh}
+        isRefreshing={isRefreshing}
       />
 
       {/* ── Sub-Tab Body (When activated via batch actions) ── */}
@@ -1546,7 +1561,7 @@ export function BatchManagement() {
                     .insert({ batch_id: selectedBatchId, student_id: res.value.id });
                   toast({ variant: 'success', title: 'Student Added', message: 'Student registered and enrolled.' });
                   setAddStudentModalOpen(false);
-                  refreshBatches();
+                  refreshBatches(true);
                 }
               } catch (err: any) {
                 toast({ variant: 'error', title: 'Failed', message: err.message });

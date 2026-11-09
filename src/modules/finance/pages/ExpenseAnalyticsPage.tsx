@@ -1615,16 +1615,19 @@ export function ExpenseAnalyticsPage() {
 
         {/* ── Navigation Tab Strip ─────────────────────────────────────────── */}
         <div
+          role="tablist"
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
-            padding: '4px',
-            borderRadius: 12,
+            gap: 4,
+            padding: 4,
+            borderRadius: 'var(--radius-md)',
             background: 'var(--bg-sunken)',
             border: '1px solid var(--border)',
-            marginBottom: 24,
+            marginBottom: 20,
             overflowX: 'auto',
+            scrollbarWidth: 'none',
+            boxShadow: 'var(--e0)',
           }}
         >
           {[
@@ -1641,25 +1644,28 @@ export function ExpenseAnalyticsPage() {
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => setActiveTab(tab.id as TabKey)}
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8,
-                  padding: '9px 16px',
-                  borderRadius: 8,
-                  border: 'none',
+                  gap: 7,
+                  padding: '7px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid',
+                  borderColor: active ? 'var(--border)' : 'transparent',
                   cursor: 'pointer',
                   fontSize: 13,
-                  fontWeight: active ? 700 : 500,
-                  color: active ? '#FFFFFF' : 'var(--text-secondary)',
-                  background: active ? 'var(--brand)' : 'transparent',
-                  boxShadow: active ? '0 2px 8px rgba(59, 130, 246, 0.3)' : 'none',
+                  fontWeight: active ? 600 : 500,
+                  color: active ? 'var(--brand)' : 'var(--text-secondary)',
+                  background: active ? 'var(--bg-surface)' : 'transparent',
+                  boxShadow: active ? 'var(--e1)' : 'none',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.16s ease',
                 }}
               >
-                <Icon size={16} />
+                <Icon size={15} />
                 {tab.label}
               </button>
             );

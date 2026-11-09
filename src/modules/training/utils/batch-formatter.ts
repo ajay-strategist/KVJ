@@ -44,3 +44,23 @@ export function formatBatchTitle(
 
   return parts.length > 0 ? parts.join(' - ') : 'Training Batch';
 }
+
+export function formatBatchWithCourse(
+  batch?: {
+    code?: string;
+    batchNo?: string;
+    trainingName?: string;
+    name?: string;
+    college?: string;
+    program?: string;
+  } | null,
+  courseTitle?: string
+): string {
+  if (!batch) return 'Training Batch';
+  const base = cleanBatchCode(batch.code, batch.batchNo) || batch.name || 'Batch';
+  const course = (batch.trainingName || courseTitle || '').trim();
+  if (course && !base.toLowerCase().includes(course.toLowerCase())) {
+    return `${base} — ${course}`;
+  }
+  return base;
+}

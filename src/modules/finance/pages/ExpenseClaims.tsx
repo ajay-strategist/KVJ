@@ -611,11 +611,12 @@ export function ExpenseClaims() {
       // 5. Save to Supabase DB with safe fallback
       const claimId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : undefined;
 
+      const isCeo = user?.role?.toUpperCase() === 'CEO';
       const insertPayload: Record<string, any> = {
         amount,
         category: values.categoryType || 'Office Expense',
         receipt_url: receiptLink,
-        status: 'submitted',
+        status: isCeo ? 'approved' : 'submitted',
         created_at: safeIsoDate,
         notes: notesJson,
       };
@@ -625,6 +626,10 @@ export function ExpenseClaims() {
       }
       if (validEmployeeId) {
         insertPayload.employee_id = validEmployeeId;
+      }
+      if (isCeo) {
+        insertPayload.approved_by = validEmployeeId || user?.id;
+        insertPayload.approved_at = new Date().toISOString();
       }
 
       try {
@@ -654,7 +659,7 @@ export function ExpenseClaims() {
         notes: (values.notes as string) || (values.route as string) || expType,
         amount,
         receipt: receiptLink,
-        status: 'submitted',
+        status: isCeo ? 'approved' : 'submitted',
       };
 
       try {
@@ -678,8 +683,10 @@ export function ExpenseClaims() {
 
       toast({
         variant: 'success',
-        title: 'Claim Filed & Saved',
-        message: values.receiptFile
+        title: isCeo ? 'Expense Claim Auto-Approved' : 'Claim Filed & Saved',
+        message: isCeo
+          ? `Submitted ₹${amount.toFixed(2)} expense claim has been automatically approved.`
+          : values.receiptFile
           ? `Submitted ₹${amount.toFixed(2)} claim. Receipt saved in Google Drive: Office/Flow Desk/Receipt/${monthFolder}.`
           : `Submitted ₹${amount.toFixed(2)} expense claim for review.`,
       });

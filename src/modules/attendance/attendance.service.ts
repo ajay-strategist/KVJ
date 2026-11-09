@@ -327,7 +327,7 @@ export class AttendanceService implements IAttendanceService {
   async requestCorrection(recordId: UUID, field: string, proposed: string, reason: string, actor: Actor): Promise<Result<void>> {
     try {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const isUuid = UUID_RE.test(recordId);
+      const isUuid = typeof recordId === 'string' && UUID_RE.test(recordId);
 
       const record = isUuid ? await this.repo.findById(recordId) : null;
       const originalVal = record
@@ -336,40 +336,43 @@ export class AttendanceService implements IAttendanceService {
           : record.lastClockOut || 'None'
         : 'None';
 
-      const payload = {
-        attendance_record_id: isUuid ? recordId : null,
+      const correctionId = this.uuid();
+      const isCeo = actor?.role?.toUpperCase() === 'CEO';
+
+      const payload: Record<string, any> = {
+        id: correctionId,
+        attendance_record_id: (isUuid && record) ? recordId : null,
         requested_by: actor.id,
         requested_date: todayStr(),
         field_to_correct: field,
         original_value: originalVal,
         proposed_value: proposed,
         reason,
-        status: 'pending',
+        status: isCeo ? 'approved' : 'pending',
       };
+
+      if (isCeo) {
+        payload.approver_id = actor.id;
+        payload.approved_at = nowIso();
+      }
 
       const { error } = await supabase
         .from('flwdsk_attendance_corrections')
         .insert(payload);
 
       if (error) {
-        console.warn('Supabase attendance_corrections insert warning, using memory fallback:', error.message);
-        const id = this.uuid();
-        this.corrections.set(id, {
-          id,
-          attendanceRecordId: recordId,
-          requestedBy: actor.id,
-          requestedDate: todayStr(),
-          fieldToCorrect: field,
-          originalValue: originalVal,
-          proposedValue: proposed,
-          reason,
-          status: 'pending',
-          createdAt: nowIso(),
-        });
+        console.error('Supabase attendance_corrections insert error:', error.message);
+        return Err(AppError.internal(`Failed to submit attendance request: ${error.message}`));
       }
+
+      if (isCeo) {
+        // Automatically approve and apply the attendance record immediately!
+        await this.approveCorrection(correctionId, actor, 'Auto-approved for CEO');
+      }
+
       return Ok(undefined);
-    } catch (e) {
-      return Err(AppError.internal((e as any)?.message));
+    } catch (e: any) {
+      return Err(AppError.internal(e?.message || 'Failed to submit correction'));
     }
   }
 

@@ -8,6 +8,7 @@ import { container } from '../../../core/registry';
 import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { BATCH_REPOSITORY_TOKEN } from '../../training/training.repository';
 import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
+import { formatBatchWithCourse } from '../../training/utils/batch-formatter';
 
 export type WorkSessionType = 'Office' | 'Remote' | 'Training';
 
@@ -86,7 +87,7 @@ export function AttendanceCorrectionModal({
           setBatches(
             res.data.map((b: any) => ({
               id: b.id,
-              name: b.name || b.batchCode || 'Batch',
+              name: formatBatchWithCourse(b),
               code: b.batchCode || b.code || '',
             }))
           );
@@ -254,7 +255,8 @@ export function AttendanceCorrectionModal({
         proposedString = parts.join(', ');
       }
 
-      const recId = defaultRecordId || `att-${Date.now()}`;
+      const isCeo = user?.role?.toUpperCase() === 'CEO';
+      const recId = defaultRecordId || '';
       const reasonVal = reason.trim() || `Full-day correction claim (${mode === 'single' ? '1 session' : `${sessions.length} sessions`})`;
 
       const res = await attService.requestCorrection(
@@ -268,13 +270,19 @@ export function AttendanceCorrectionModal({
       if (res.ok) {
         toast({
           variant: 'success',
-          title: 'Correction Claim Submitted',
-          message: `Attendance claim for ${attendanceDate} submitted to Approvals Queue for Manager/CEO review.`,
+          title: isCeo ? 'Correction Claim Auto-Approved' : 'Correction Claim Submitted',
+          message: isCeo
+            ? `Attendance claim for ${attendanceDate} has been automatically approved.`
+            : `Attendance claim for ${attendanceDate} submitted to Approvals Queue for Manager/CEO review.`,
         });
         if (onSuccess) onSuccess();
         onClose();
       } else {
-        toast({ variant: 'error', title: 'Submission Failed', message: res.error.message });
+        toast({
+          variant: 'error',
+          title: 'Submission Failed',
+          message: res.error.message || 'Could not submit correction request.',
+        });
       }
     } catch (err: any) {
       console.error('Error submitting attendance correction:', err);
@@ -330,15 +338,17 @@ export function AttendanceCorrectionModal({
               type="button"
               onClick={() => setMode('single')}
               style={{
-                padding: '10px 8px',
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 700,
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 12.5,
+                fontWeight: 600,
                 cursor: 'pointer',
-                border: mode === 'single' ? '2px solid var(--primary-600, #2563eb)' : '1px solid var(--border)',
-                background: mode === 'single' ? 'var(--primary-50, #eff6ff)' : 'var(--bg-surface)',
-                color: mode === 'single' ? 'var(--primary-700, #1d4ed8)' : 'var(--text-secondary)',
+                border: mode === 'single' ? '1px solid var(--brand)' : '1px solid var(--border)',
+                background: mode === 'single' ? 'var(--brand-muted)' : 'var(--bg-surface)',
+                color: mode === 'single' ? 'var(--brand)' : 'var(--text-secondary)',
+                boxShadow: mode === 'single' ? 'var(--e1)' : 'none',
                 textAlign: 'center',
+                transition: 'all 0.15s ease',
               }}
             >
               ☀️ Single Session (Standard Day)
@@ -347,15 +357,17 @@ export function AttendanceCorrectionModal({
               type="button"
               onClick={() => setMode('multiple')}
               style={{
-                padding: '10px 8px',
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 700,
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 12.5,
+                fontWeight: 600,
                 cursor: 'pointer',
-                border: mode === 'multiple' ? '2px solid var(--primary-600, #2563eb)' : '1px solid var(--border)',
-                background: mode === 'multiple' ? 'var(--primary-50, #eff6ff)' : 'var(--bg-surface)',
-                color: mode === 'multiple' ? 'var(--primary-700, #1d4ed8)' : 'var(--text-secondary)',
+                border: mode === 'multiple' ? '1px solid var(--brand)' : '1px solid var(--border)',
+                background: mode === 'multiple' ? 'var(--brand-muted)' : 'var(--bg-surface)',
+                color: mode === 'multiple' ? 'var(--brand)' : 'var(--text-secondary)',
+                boxShadow: mode === 'multiple' ? 'var(--e1)' : 'none',
                 textAlign: 'center',
+                transition: 'all 0.15s ease',
               }}
             >
               🔄 Multiple Sessions (Split Day)

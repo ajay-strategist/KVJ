@@ -28,6 +28,17 @@ let activeCoursesPromise: Promise<Course[]> | null = null;
 let activeBatchesPromise: Promise<Batch[]> | null = null;
 let activeEnrollmentsPromise: Promise<Enrollment[]> | null = null;
 
+export function invalidateTrainingCache(type?: 'students' | 'courses' | 'batches' | 'enrollments') {
+  if (!type || type === 'students') { cachedStudents = null; activeStudentsPromise = null; }
+  if (!type || type === 'courses') { cachedCourses = null; activeCoursesPromise = null; }
+  if (!type || type === 'batches') { cachedBatches = null; activeBatchesPromise = null; }
+  if (!type || type === 'enrollments') { cachedEnrollments = null; activeEnrollmentsPromise = null; }
+}
+
+export function syncCachedBatches(newBatches: Batch[]) {
+  cachedBatches = newBatches;
+}
+
 export function useTraining(options?: {
   fetchStudents?: boolean;
   fetchCourses?: boolean;
@@ -42,15 +53,17 @@ export function useTraining(options?: {
   const fetchBatches = options?.fetchBatches !== false;
   const fetchEnrollments = options?.fetchEnrollments !== false;
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState<Student[]>(() => (fetchStudents && cachedStudents) ? cachedStudents : []);
+  const [courses, setCourses] = useState<Course[]>(() => (fetchCourses && cachedCourses) ? cachedCourses : []);
+  const [batches, setBatches] = useState<Batch[]>(() => (fetchBatches && cachedBatches) ? cachedBatches : []);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>(() => (fetchEnrollments && cachedEnrollments) ? cachedEnrollments : []);
+  const [loading, setLoading] = useState(() => (fetchBatches && !cachedBatches) || (fetchCourses && !cachedCourses));
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async (forceRefresh = false) => {
-    setLoading(true);
+    if (!cachedBatches && !cachedCourses) {
+      setLoading(true);
+    }
     try {
       const studentRepo = container.resolve(STUDENT_REPOSITORY_TOKEN);
       const courseRepo = container.resolve(COURSE_REPOSITORY_TOKEN);
@@ -82,50 +95,61 @@ export function useTraining(options?: {
         sort?: any[]
       ) => {
         if (forceRefresh) {
-          if (type === 'students') {
-            activeStudentsPromise = fetchAllPages(repo, sort).then(r => { cachedStudents = r; activeStudentsPromise = null; return r; });
-            return activeStudentsPromise;
-          }
-          if (type === 'courses') {
-            activeCoursesPromise = fetchAllPages(repo, sort).then(r => { cachedCourses = r; activeCoursesPromise = null; return r; });
-            return activeCoursesPromise;
-          }
-          if (type === 'batches') {
-            activeBatchesPromise = fetchAllPages(repo, sort).then(r => { cachedBatches = r; activeBatchesPromise = null; return r; });
-            return activeBatchesPromise;
-          }
-          if (type === 'enrollments') {
-            activeEnrollmentsPromise = fetchAllPages(repo, sort).then(r => { cachedEnrollments = r; activeEnrollmentsPromise = null; return r; });
-            return activeEnrollmentsPromise;
-          }
+          if (type === 'students') activeStudentsPromise = null;
+          if (type === 'courses') activeCoursesPromise = null;
+          if (type === 'batches') activeBatchesPromise = null;
+          if (type === 'enrollments') activeEnrollmentsPromise = null;
         }
-
-        if (type === 'students' && cachedStudents) return cachedStudents;
-        if (type === 'courses' && cachedCourses) return cachedCourses;
-        if (type === 'batches' && cachedBatches) return cachedBatches;
-        if (type === 'enrollments' && cachedEnrollments) return cachedEnrollments;
 
         if (type === 'students') {
           if (!activeStudentsPromise) {
-            activeStudentsPromise = fetchAllPages(repo, sort).then(r => { cachedStudents = r; activeStudentsPromise = null; return r; });
+            activeStudentsPromise = fetchAllPages(repo, sort).then(r => {
+              cachedStudents = r;
+              activeStudentsPromise = null;
+              return r;
+            }).catch(e => {
+              activeStudentsPromise = null;
+              throw e;
+            });
           }
           return activeStudentsPromise;
         }
         if (type === 'courses') {
           if (!activeCoursesPromise) {
-            activeCoursesPromise = fetchAllPages(repo, sort).then(r => { cachedCourses = r; activeCoursesPromise = null; return r; });
+            activeCoursesPromise = fetchAllPages(repo, sort).then(r => {
+              cachedCourses = r;
+              activeCoursesPromise = null;
+              return r;
+            }).catch(e => {
+              activeCoursesPromise = null;
+              throw e;
+            });
           }
           return activeCoursesPromise;
         }
         if (type === 'batches') {
           if (!activeBatchesPromise) {
-            activeBatchesPromise = fetchAllPages(repo, sort).then(r => { cachedBatches = r; activeBatchesPromise = null; return r; });
+            activeBatchesPromise = fetchAllPages(repo, sort).then(r => {
+              cachedBatches = r;
+              activeBatchesPromise = null;
+              return r;
+            }).catch(e => {
+              activeBatchesPromise = null;
+              throw e;
+            });
           }
           return activeBatchesPromise;
         }
         if (type === 'enrollments') {
           if (!activeEnrollmentsPromise) {
-            activeEnrollmentsPromise = fetchAllPages(repo, sort).then(r => { cachedEnrollments = r; activeEnrollmentsPromise = null; return r; });
+            activeEnrollmentsPromise = fetchAllPages(repo, sort).then(r => {
+              cachedEnrollments = r;
+              activeEnrollmentsPromise = null;
+              return r;
+            }).catch(e => {
+              activeEnrollmentsPromise = null;
+              throw e;
+            });
           }
           return activeEnrollmentsPromise;
         }
@@ -513,6 +537,18 @@ export function useTraining(options?: {
     fetchAll();
   }, [fetchAll]);
 
+  useEffect(() => {
+    let lastFocus = Date.now();
+    const handleFocus = () => {
+      if (Date.now() - lastFocus > 4000) {
+        lastFocus = Date.now();
+        fetchAll(false);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchAll]);
+
   return {
     students,
     courses,
@@ -555,7 +591,7 @@ export function useTraining(options?: {
     saveCalendarSession,
     deleteCalendarSession,
     getBatchTrainingDeliveryLogs,
-    refresh: fetchAll,
+    refresh: (force: boolean = true) => fetchAll(force),
   };
 }
 

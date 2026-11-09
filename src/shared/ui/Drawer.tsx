@@ -91,12 +91,12 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
             style={{
               background: 'var(--bg-sunken)',
               border: '1px solid var(--border)',
-              color: 'var(--text-primary)',
-              fontSize: 18,
-              fontWeight: 'normal',
+              color: 'var(--text-secondary)',
+              fontSize: 16,
+              fontWeight: 500,
               width: 32,
               height: 32,
-              borderRadius: 8,
+              borderRadius: 'var(--radius-sm)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -106,7 +106,7 @@ export function Drawer({ open, onClose, title, children, footer, size = 'md' }: 
               transition: 'all var(--dur-fast)',
             }}
           >
-            ×
+            ✕
           </button>
         </div>
 

@@ -37,16 +37,15 @@ export function Tabs({ items = [], defaultTabId, onChange, className = '' }: Tab
         role="tablist"
         style={{
           display: 'inline-flex',
-          gap: 6,
-          padding: 6,
+          gap: 4,
+          padding: 4,
           background: 'var(--bg-sunken)',
-          border: 'var(--glass-border, 1px solid var(--border))',
-          borderRadius: 'var(--radius-lg)', /* 18px */
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-md)',
           marginBottom: 20,
           overflowX: 'auto',
           scrollbarWidth: 'none',
-          backdropFilter: 'blur(var(--glass-blur, 12px))',
-          boxShadow: 'var(--e1)',
+          boxShadow: 'var(--e0)',
         }}
       >
         {safeItems.map((tab) => {
@@ -58,19 +57,21 @@ export function Tabs({ items = [], defaultTabId, onChange, className = '' }: Tab
               aria-selected={isActive}
               onClick={() => handleTabClick(tab.id)}
               style={{
-                padding: '9px 18px',
-                border: isActive ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
-                borderRadius: 'var(--radius-md)', /* 16px */
-                background: isActive
-                  ? 'linear-gradient(135deg, var(--bg-surface), rgba(59, 130, 246, 0.12))'
-                  : 'transparent',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 14px',
+                border: '1px solid',
+                borderColor: isActive ? 'var(--border)' : 'transparent',
+                borderRadius: 'var(--radius-sm)',
+                background: isActive ? 'var(--bg-surface)' : 'transparent',
                 color: isActive ? 'var(--brand)' : 'var(--text-secondary)',
-                fontWeight: isActive ? 700 : 500,
+                fontWeight: isActive ? 600 : 500,
                 cursor: 'pointer',
-                fontSize: 13.5,
+                fontSize: 13,
                 whiteSpace: 'nowrap',
-                boxShadow: isActive ? '0 4px 14px rgba(59, 130, 246, 0.15)' : 'none',
-                transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: isActive ? 'var(--e1)' : 'none',
+                transition: 'all 0.16s ease',
               }}
             >
               {tab.label}

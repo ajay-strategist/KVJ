@@ -81,8 +81,8 @@ export function Form({ initial = {}, onSubmit, children }: {
     <FormContext.Provider value={ctx}>
       <form onSubmit={handleSubmit} noValidate>
         {errorList.length > 0 && (
-          <div role="alert" style={{ background: 'var(--status-danger-bg)', color: 'var(--status-danger)', borderRadius: 'var(--radius-md)', padding: '10px 12px', marginBottom: 16, fontSize: 13 }}>
-            Please fix {errorList.length} field{errorList.length > 1 ? 's' : ''} before continuing.
+          <div role="alert" style={{ background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger-border)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: 16, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
+            <span>⚠️ Please fix {errorList.length} field{errorList.length > 1 ? 's' : ''} before continuing.</span>
           </div>
         )}
         {children}
@@ -104,7 +104,7 @@ function Field({ name, label, rules, children }: { name: string; label?: string;
         </label>
       )}
       {children({ value: values[name] as never, onChange: (v) => setValue(name, v), onBlur: () => validateField(name), invalid: !!error })}
-      {error && <span className="kvj-field-error">⚠️ {error}</span>}
+      {error && <span className="kvj-field-error" role="alert">{error}</span>}
     </div>
   );
 }

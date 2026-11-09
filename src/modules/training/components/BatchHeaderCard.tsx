@@ -22,6 +22,8 @@ export interface BatchHeaderCardProps {
   onCopyBatch: (batch: Batch) => void;
   onDeleteBatch?: (batchId: string) => void;
   onToggleCompleteBatch?: (batchId: string) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
@@ -41,6 +43,8 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
   onCopyBatch,
   onDeleteBatch,
   onToggleCompleteBatch,
+  onRefresh,
+  isRefreshing,
 }) => {
   return (
     <div style={{ marginBottom: 20 }}>
@@ -75,6 +79,19 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
                 })}
               </select>
             </div>
+          )}
+
+          {onRefresh && (
+            <Button
+              variant="outline"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              title="Refresh batches from database"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', fontSize: 13 }}
+            >
+              <span style={{ display: 'inline-block', animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }}>🔄</span>
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
           )}
 
           {canCreateBatch && (

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTraining } from '../../training/hooks/useTraining';
-import { cleanBatchCode } from '../../training/utils/batch-formatter';
+import { cleanBatchCode, formatBatchWithCourse } from '../../training/utils/batch-formatter';
 import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
 import { supabase } from '../../../shared/integration/supabase';
 import { container } from '../../../core/registry';
@@ -8,14 +8,9 @@ import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 
 function batchDisplayName(b?: {
   college?: string; program?: string; academicYear?: string;
-  batchNo?: string; trainingName?: string; code?: string;
+  batchNo?: string; trainingName?: string; code?: string; name?: string;
 } | null): string {
-  if (!b) return 'Training Batch';
-  const cleaned = cleanBatchCode(b.code, b.batchNo);
-  if (cleaned) return cleaned;
-  const parts = [b.college, b.program, b.academicYear, b.batchNo].filter(Boolean);
-  if (parts.length) return parts.join(' - ');
-  return b.trainingName || 'Training Batch';
+  return formatBatchWithCourse(b);
 }
 
 export interface SplitSessionInput {
@@ -139,19 +134,26 @@ export function SubmitAttendanceDrawerForm({
       const proposedVal = `${date} (${sessionParts.join(', ')})`;
       const reasonVal = `Split Session Claim (${sessions.length} sessions). Date: ${date}`;
 
+      const isCeo = user?.role?.toUpperCase() === 'CEO';
       const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
-      await attService.requestCorrection(
+      const res = await attService.requestCorrection(
         recordId,
         'attendance_claim',
         proposedVal,
         reasonVal,
-        { id: targetEmpId, role: 'Employee' }
+        { id: targetEmpId, role: user?.role || 'Employee' }
       );
+
+      if (!res.ok) {
+        throw new Error(res.error.message);
+      }
 
       toast({
         variant: 'success',
-        title: 'Attendance Claim Submitted',
-        message: `Split-session claim (${sessions.length} session(s)) for ${date} sent to Approvals Queue for review.`,
+        title: isCeo ? 'Attendance Claim Auto-Approved' : 'Attendance Claim Submitted',
+        message: isCeo
+          ? `Split-session claim (${sessions.length} session(s)) for ${date} has been automatically approved.`
+          : `Split-session claim (${sessions.length} session(s)) for ${date} sent to Approvals Queue for review.`,
       });
       onClose();
     } catch (err: any) {

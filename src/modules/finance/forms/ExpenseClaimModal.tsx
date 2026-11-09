@@ -372,16 +372,21 @@ export function ExpenseClaimModal({
     }
     if (!validEmployeeId && isUuid(user?.id)) validEmployeeId = user!.id;
 
+    const isCeo = user?.role?.toUpperCase() === 'CEO';
     const insertPayload: Record<string, any> = {
       amount: item.resolvedAmount,
       category: item.categoryType || 'Office Expense',
       receipt_url: receiptLink,
-      status: 'submitted',
+      status: isCeo ? 'approved' : 'submitted',
       created_at: safeIsoDate,
       notes: notesPayload,
     };
     if (claimId) insertPayload.id = claimId;
     if (validEmployeeId) insertPayload.employee_id = validEmployeeId;
+    if (isCeo) {
+      insertPayload.approved_by = validEmployeeId || user?.id;
+      insertPayload.approved_at = new Date().toISOString();
+    }
 
     try {
       const { error: insertError } = await supabase.from('flwdsk_expense_claims').insert(insertPayload);
@@ -409,7 +414,7 @@ export function ExpenseClaimModal({
       notes: item.notes.trim() || undefined,
       amount: item.resolvedAmount,
       receipt: receiptLink,
-      status: 'submitted',
+      status: isCeo ? 'approved' : 'submitted',
       employeeId: validEmployeeId || user?.id || '',
       createdAt: safeIsoDate,
     };

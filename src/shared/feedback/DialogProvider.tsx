@@ -73,14 +73,14 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             WebkitBackdropFilter: 'blur(var(--overlay-blur, 3px))',
             padding: 16
           }}>
-          <div style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--e4)', width: 'min(440px, 100%)', overflow: 'hidden' }}>
-            <div style={{ height: 4, background: accent[dialog.variant ?? 'confirm'] }} />
-            <div style={{ padding: 24 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{dialog.title}</h3>
-              {dialog.message && <div style={{ marginTop: 8, fontSize: 14, color: 'var(--text-secondary)' }}>{dialog.message}</div>}
+          <div style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--e3)', width: 'min(440px, 100%)', overflow: 'hidden' }}>
+            <div style={{ height: 3, background: accent[dialog.variant ?? 'confirm'] }} />
+            <div style={{ padding: 22 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{dialog.title}</h3>
+              {dialog.message && <div style={{ marginTop: 8, fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{dialog.message}</div>}
               {dialog.requireReason && (
                 <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add a reason (optional)"
-                  style={{ marginTop: 12, width: '100%', minHeight: 72, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-sunken)', color: 'var(--text-primary)', padding: 10, fontFamily: 'inherit', fontSize: 14 }} />
+                  style={{ marginTop: 12, width: '100%', minHeight: 72, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-sunken)', color: 'var(--text-primary)', padding: '8px 12px', fontFamily: 'inherit', fontSize: 13.5, boxSizing: 'border-box' }} />
               )}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
                 {dialog.cancelLabel !== '' && (
@@ -101,8 +101,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
 function btn(kind: 'primary' | 'secondary', color?: string): React.CSSProperties {
   return kind === 'primary'
-    ? { background: color ?? 'var(--brand)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '9px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }
-    : { background: 'var(--bg-sunken)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '9px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' };
+    ? { background: color ?? 'var(--brand)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s ease' }
+    : { background: 'var(--bg-sunken)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s ease' };
 }
 
 export function useDialog(): DialogContextValue {

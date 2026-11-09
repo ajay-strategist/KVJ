@@ -17,7 +17,7 @@ import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
 import { toLocalISODate, todayISO, formatDisplayTime, calculateMergedBreakMinutes } from '../../../shared/utils/date';
 import { useTraining } from '../../training/hooks/useTraining';
-import { cleanBatchCode } from '../../training/utils/batch-formatter';
+import { cleanBatchCode, formatBatchWithCourse } from '../../training/utils/batch-formatter';
 import { supabase } from '../../../shared/integration/supabase';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useBreakpoint } from '../../../shared/hooks/responsive';
@@ -31,14 +31,9 @@ import { EditExpenseModal, type EditableExpense } from '../../finance/forms/Edit
  */
 function batchDisplayName(b?: {
   college?: string; program?: string; academicYear?: string;
-  batchNo?: string; trainingName?: string; code?: string;
+  batchNo?: string; trainingName?: string; code?: string; name?: string;
 } | null): string {
-  if (!b) return 'Training Batch';
-  const cleaned = cleanBatchCode(b.code, b.batchNo);
-  if (cleaned) return cleaned;
-  const parts = [b.college, b.program, b.academicYear, b.batchNo].filter(Boolean);
-  if (parts.length) return parts.join(' - ');
-  return b.trainingName || 'Training Batch';
+  return formatBatchWithCourse(b);
 }
 
 function safeFormatTime(raw?: string): string {
@@ -1828,7 +1823,7 @@ export function AttendanceLogPage() {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: '#0F4C81', color: 'white' }}>
+                  <tr style={{ background: 'var(--brand)', color: 'var(--brand-contrast, #ffffff)' }}>
                     <th style={{ padding: '8px 10px' }}>Date</th>
                     <th style={{ padding: '8px 10px' }}>Name</th>
                     <th style={{ padding: '8px 10px' }}>Holiday</th>

@@ -26,7 +26,7 @@ import {
 import { BATCH_REPOSITORY_TOKEN, COURSE_REPOSITORY_TOKEN, type Batch, type Course } from '../training.repository';
 import { cleanBatchCode } from '../utils/batch-formatter';
 import { supabase } from '../../../shared/integration/supabase';
-import { useTraining } from '../hooks/useTraining';
+import { useTraining, syncCachedBatches } from '../hooks/useTraining';
 
 const EMPTY: ScheduleRangeResult = { sessions: [], leaves: [], holidays: [], daysLoaded: 0 };
 
@@ -707,6 +707,9 @@ export function TrainingCalendar() {
     ]).then(([bRes, cRes]) => {
       setBatches(bRes.data);
       setCourses(cRes.data);
+      if (Array.isArray(bRes?.data)) {
+        syncCachedBatches(bRes.data);
+      }
     });
 
     // Real enrolled-student counts per batch (not capacity). Count the batch's
