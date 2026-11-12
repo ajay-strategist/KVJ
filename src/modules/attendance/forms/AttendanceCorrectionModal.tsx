@@ -9,8 +9,9 @@ import { ATTENDANCE_SERVICE_TOKEN } from '../attendance.service';
 import { BATCH_REPOSITORY_TOKEN } from '../../training/training.repository';
 import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
 import { formatBatchWithCourse } from '../../training/utils/batch-formatter';
+import { supabase } from '../../../shared/integration/supabase';
 
-export type WorkSessionType = 'Office' | 'Remote' | 'Training';
+export type WorkSessionType = 'Office' | 'Remote' | 'Training' | 'Marketing';
 
 export interface CorrectionSessionBlock {
   id: string;
@@ -27,6 +28,7 @@ export interface AttendanceCorrectionModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   defaultRecordId?: string;
+  currentEmployee?: any;
 }
 
 export function AttendanceCorrectionModal({
@@ -34,6 +36,7 @@ export function AttendanceCorrectionModal({
   onClose,
   onSuccess,
   defaultRecordId,
+  currentEmployee,
 }: AttendanceCorrectionModalProps) {
   const { user } = useAuth();
   const { toast } = useNotifications();
@@ -132,8 +135,9 @@ export function AttendanceCorrectionModal({
     }
   }, [open, todayStr]);
 
-  // Payroll month validation check
-  const isDateInCurrentPayrollMonth = attendanceDate.startsWith(currentMonthPrefix);
+  // Payroll month validation check (exempt CEO and Admin)
+  const isPrivileged = user?.role?.toUpperCase() === 'CEO' || user?.role?.toUpperCase() === 'ADMIN' || currentEmployee?.role?.toUpperCase() === 'CEO';
+  const isDateInCurrentPayrollMonth = isPrivileged || attendanceDate.startsWith(currentMonthPrefix);
 
   // Time overlap validation logic
   const overlapError = useMemo(() => {
@@ -239,32 +243,57 @@ export function AttendanceCorrectionModal({
     setSubmitting(true);
     try {
       const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
+      const targetEmpId = currentEmployee?.id || user?.id || '';
 
       // Build parsed representation accepted by attendance.service.ts
       let proposedString = '';
       if (mode === 'single') {
         const batchObj = batches.find((b) => b.id === singleBatchId);
-        const tag = singleType === 'Training' ? `Training: ${batchObj?.name || 'Batch'}` : singleType;
-        proposedString = `${singleStartTime} - ${singleEndTime} [${tag}]`;
+        const tag = singleType === 'Training'
+          ? `Training: ${batchObj?.name || 'Batch'}`
+          : singleType === 'Marketing'
+          ? `Marketing: ${reason || 'Marketing Visit'}`
+          : singleType;
+        proposedString = `${attendanceDate} (${singleStartTime} - ${singleEndTime} [${tag}])`;
       } else {
         const parts = sessions.map((s) => {
           const batchObj = batches.find((b) => b.id === s.batchId);
-          const tag = s.workType === 'Training' ? `Training: ${batchObj?.name || 'Batch'}` : s.workType;
+          const tag = s.workType === 'Training'
+            ? `Training: ${batchObj?.name || 'Batch'}`
+            : s.workType === 'Marketing'
+            ? `Marketing: ${s.notes || 'Marketing Visit'}`
+            : s.workType;
           return `${s.startTime} - ${s.endTime} [${tag}${s.notes ? ` - ${s.notes}` : ''}]`;
         });
-        proposedString = parts.join(', ');
+        proposedString = `${attendanceDate} (${parts.join(', ')})`;
       }
 
-      const isCeo = user?.role?.toUpperCase() === 'CEO';
-      const recId = defaultRecordId || '';
+      const isCeo = user?.role?.toUpperCase() === 'CEO' || currentEmployee?.role?.toUpperCase() === 'CEO';
+      let recId = defaultRecordId || '';
+      if (!recId && targetEmpId) {
+        try {
+          const { data } = await supabase
+            .from('flwdsk_attendance_records')
+            .select('id')
+            .eq('employee_id', targetEmpId)
+            .eq('work_date', attendanceDate)
+            .is('deleted_at', null)
+            .limit(1);
+          if (data && data[0]) {
+            recId = data[0].id;
+          }
+        } catch {}
+      }
+
       const reasonVal = reason.trim() || `Full-day correction claim (${mode === 'single' ? '1 session' : `${sessions.length} sessions`})`;
+      const actorRole = user?.role || 'Employee';
 
       const res = await attService.requestCorrection(
         recId,
         'attendance_claim',
         proposedString,
         reasonVal,
-        { id: user!.id, role: user!.role }
+        { id: targetEmpId, role: actorRole }
       );
 
       if (res.ok) {
@@ -293,7 +322,7 @@ export function AttendanceCorrectionModal({
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Attendance Correction Claim">
+    <Drawer open={open} onClose={onClose} title="Submit Attendance Request">
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Desktop Audit Banner Notice */}
         <div
@@ -307,7 +336,7 @@ export function AttendanceCorrectionModal({
             fontWeight: 600,
           }}
         >
-          💻 Attendance corrections are submitted to the CEO / Manager Approvals Queue for the current payroll month.
+          💻 Attendance requests are submitted to the CEO / Manager Approvals Queue for the current payroll month.
         </div>
 
         {/* Target Attendance Date */}
@@ -396,9 +425,10 @@ export function AttendanceCorrectionModal({
                 onChange={(e) => setSingleType(e.target.value as WorkSessionType)}
                 style={{ width: '100%' }}
               >
-                <option value="Office">🏢 Office</option>
-                <option value="Remote">💻 Remote</option>
-                <option value="Training">🎓 Training (College Batch)</option>
+                <option value="Office">🏢 Office Work</option>
+                <option value="Remote">💻 Work From Home / Remote</option>
+                <option value="Training">🎓 Training Batch Session</option>
+                <option value="Marketing">🤝 Marketing Visit</option>
               </select>
             </div>
 
@@ -491,9 +521,10 @@ export function AttendanceCorrectionModal({
                       onChange={(e) => handleUpdateSession(s.id, { workType: e.target.value as WorkSessionType })}
                       style={{ width: '100%' }}
                     >
-                      <option value="Office">Office</option>
-                      <option value="Remote">Remote</option>
-                      <option value="Training">Training</option>
+                      <option value="Office">Office Work</option>
+                      <option value="Remote">Work From Home / Remote</option>
+                      <option value="Training">Training Batch Session</option>
+                      <option value="Marketing">Marketing Visit</option>
                     </select>
                   </div>
 

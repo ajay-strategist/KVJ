@@ -22,7 +22,7 @@ import { supabase } from '../../../shared/integration/supabase';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useBreakpoint } from '../../../shared/hooks/responsive';
 import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
-import { SubmitAttendanceDrawerForm } from '../components/SubmitAttendanceDrawerForm';
+import { AttendanceCorrectionModal } from '../forms/AttendanceCorrectionModal';
 import { EditExpenseModal, type EditableExpense } from '../../finance/forms/EditExpenseModal';
 
 /**
@@ -2452,14 +2452,12 @@ export function AttendanceLogPage() {
         <Tabs items={tabs} />
       </div>
 
-      <Drawer open={submitDrawerOpen} onClose={() => setSubmitDrawerOpen(false)} title="Submit Attendance Request">
-        <SubmitAttendanceDrawerForm
-          onClose={() => setSubmitDrawerOpen(false)}
-          currentEmployee={currentEmployee}
-          user={user}
-          toast={toast}
-        />
-      </Drawer>
+      <AttendanceCorrectionModal
+        open={submitDrawerOpen}
+        onClose={() => setSubmitDrawerOpen(false)}
+        onSuccess={() => setRefetchTrigger((prev) => prev + 1)}
+        currentEmployee={currentEmployee}
+      />
 
       {/* Admin Edit Expense Claim Drawer / Modal */}
       <EditExpenseModal

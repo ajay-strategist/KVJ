@@ -36,7 +36,7 @@ import { calculateTaskTotalSeconds, formatHoursMinutes } from '../../../shared/u
 import { TimelineWidget, parseTimeToMinutes, getEntryDate, getEntryTimestamp } from './components/TimelineWidget';
 import { AnnouncementWidget } from './components/AnnouncementWidget';
 import { DownloadMobileAppModal } from '../../../modules/mobile/components/DownloadMobileAppModal';
-import { SubmitAttendanceDrawerForm } from '../../../modules/attendance/components/SubmitAttendanceDrawerForm';
+import { AttendanceCorrectionModal } from '../../../modules/attendance/forms/AttendanceCorrectionModal';
 import {
   isTaskAssignedToUser,
   getTaskOrderStorageKey,
@@ -1040,20 +1040,17 @@ export const AttendancePanel = memo(function AttendancePanel({
       </Drawer>
 
       {/* Submit / Claim Attendance Drawer */}
-      <Drawer open={claimOpen} onClose={() => setClaimOpen(false)} title="Submit Attendance Request">
-        <SubmitAttendanceDrawerForm
-          onClose={() => setClaimOpen(false)}
-          currentEmployee={currentEmployee}
-          user={user}
-          toast={toast}
-          onSuccess={() => {
-            onRefreshAttendance?.();
-            if (onActivityLog) {
-              onActivityLog('Submitted attendance claim', 'success');
-            }
-          }}
-        />
-      </Drawer>
+      <AttendanceCorrectionModal
+        open={claimOpen}
+        onClose={() => setClaimOpen(false)}
+        currentEmployee={currentEmployee}
+        onSuccess={() => {
+          onRefreshAttendance?.();
+          if (onActivityLog) {
+            onActivityLog('Submitted attendance claim', 'success');
+          }
+        }}
+      />
 
       {/* Official Break Status Update Drawer */}
       <Drawer open={breakModalOpen} onClose={() => setBreakModalOpen(false)} title="Start Official Break — Update Work Status">
