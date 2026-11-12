@@ -28,6 +28,7 @@ export interface SubmitAttendanceDrawerFormProps {
   currentEmployee: any;
   user: any;
   toast: any;
+  onSuccess?: () => void;
 }
 
 export function SubmitAttendanceDrawerForm({
@@ -35,6 +36,7 @@ export function SubmitAttendanceDrawerForm({
   currentEmployee,
   user,
   toast,
+  onSuccess,
 }: SubmitAttendanceDrawerFormProps) {
   const [date, setDate] = useState(new Date(Date.now() - 86400000).toISOString().slice(0, 10));
   const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
@@ -89,7 +91,7 @@ export function SubmitAttendanceDrawerForm({
 
     try {
       const targetEmpId = currentEmployee?.id || user?.id || '';
-      let recordId = String(Date.now());
+      let recordId = '';
 
       try {
         const { data } = await supabase
@@ -97,6 +99,7 @@ export function SubmitAttendanceDrawerForm({
           .select('id')
           .eq('employee_id', targetEmpId)
           .eq('work_date', date)
+          .is('deleted_at', null)
           .limit(1);
         if (data && data[0]) {
           recordId = data[0].id;
@@ -155,6 +158,7 @@ export function SubmitAttendanceDrawerForm({
           ? `Split-session claim (${sessions.length} session(s)) for ${date} has been automatically approved.`
           : `Split-session claim (${sessions.length} session(s)) for ${date} sent to Approvals Queue for review.`,
       });
+      onSuccess?.();
       onClose();
     } catch (err: any) {
       toast({ variant: 'error', title: 'Submission Failed', message: err.message || 'Could not submit claim.' });

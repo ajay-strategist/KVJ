@@ -36,6 +36,7 @@ import { calculateTaskTotalSeconds, formatHoursMinutes } from '../../../shared/u
 import { TimelineWidget, parseTimeToMinutes, getEntryDate, getEntryTimestamp } from './components/TimelineWidget';
 import { AnnouncementWidget } from './components/AnnouncementWidget';
 import { DownloadMobileAppModal } from '../../../modules/mobile/components/DownloadMobileAppModal';
+import { SubmitAttendanceDrawerForm } from '../../../modules/attendance/components/SubmitAttendanceDrawerForm';
 import {
   isTaskAssignedToUser,
   getTaskOrderStorageKey,
@@ -75,40 +76,6 @@ const statusMap = {
   absent: { label: 'Absent', tone: 'danger' as const },
 };
 
-function ConditionalAttendanceFields() {
-  const { values } = useForm();
-  const { batches } = useTraining({ fetchStudents: false, fetchCourses: false, fetchEnrollments: false });
-  
-  if (values.classification === 'Training') {
-    const batchList = batches || [];
-    const options = batchList.length > 0
-      ? batchList.map((b) => {
-          const label = formatBatchWithCourse(b);
-          return { value: label, label };
-        })
-      : [{ value: 'No Batches Available', label: 'No Batches Available' }];
-    return (
-      <SelectField
-        name="location"
-        label="Select Training Batch"
-        options={options}
-      />
-    );
-  }
-
-  if (values.classification === 'Marketing') {
-    return (
-      <TextField
-        name="organisationsVisited"
-        label="Organisations Visited"
-        placeholder="e.g. Christ College, Rajagiri College"
-      />
-    );
-  }
-
-  return null;
-}
-
 const resolveLocationName = (locStr: string) => {
   if (locStr.includes('9.98') || locStr.includes('Office') || locStr.includes('Detecting')) {
     return 'KVJ Kochi HQ Workspace';
@@ -146,6 +113,7 @@ interface AttendancePanelProps {
   tasks?: TaskItem[];
   onStartBreakWithTask?: (reason: string, updateMsg: string, targetTaskId?: string) => Promise<boolean>;
   onApplyLeave?: () => void;
+  onRefreshAttendance?: () => void;
 }
 
 export const AttendancePanel = memo(function AttendancePanel({
@@ -160,6 +128,7 @@ export const AttendancePanel = memo(function AttendancePanel({
   tasks = [],
   onStartBreakWithTask,
   onApplyLeave,
+  onRefreshAttendance,
 }: AttendancePanelProps) {
   const device = useDevice();
   const isMobile = device === 'mobile';
@@ -1072,89 +1041,18 @@ export const AttendancePanel = memo(function AttendancePanel({
 
       {/* Submit / Claim Attendance Drawer */}
       <Drawer open={claimOpen} onClose={() => setClaimOpen(false)} title="Submit Attendance Request">
-        <Form
-          initial={{
-            date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
-            classification: 'Office',
-            location: '',
-            organisationsVisited: '',
-            startTime: '08:30 AM',
-            endTime: '05:00 PM',
-            notes: '',
-          }}
-          onSubmit={async (values) => {
-            const locText = values.classification === 'Training' 
-              ? values.location 
-              : values.classification === 'Marketing' 
-              ? `Marketing: ${values.organisationsVisited}` 
-              : 'Office Work';
-            
-            const isCeo = user?.role?.toUpperCase() === 'CEO';
-            try {
-              const attService = container.resolve(ATTENDANCE_SERVICE_TOKEN);
-              const targetRecordId = (record && record.workDate === values.date)
-                ? record.id
-                : '';
-              const actorRole = user?.role || 'Employee';
-              const actorId = user?.id || record?.employeeId || 'emp-user';
-              const res = await attService.requestCorrection(
-                targetRecordId,
-                'attendance_claim',
-                `${values.date} (${values.startTime} - ${values.endTime})`,
-                `Classification: ${values.classification}, Location: ${locText}. ${values.notes || ''}`,
-                { id: actorId, role: actorRole }
-              );
-
-              if (!res.ok) {
-                toast({
-                  variant: 'error',
-                  title: 'Submission Failed',
-                  message: res.error.message || 'Could not submit attendance request.',
-                });
-                return;
-              }
-            } catch (e: any) {
-              console.warn('Attendance correction request notice:', e);
-              toast({
-                variant: 'error',
-                title: 'Submission Failed',
-                message: e?.message || 'Could not submit attendance request.',
-              });
-              return;
-            }
-
-            toast({
-              variant: 'success',
-              title: isCeo ? 'Attendance Auto-Approved' : 'Attendance Request Submitted',
-              message: isCeo
-                ? `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) has been automatically approved.`
-                : `Attendance claim for ${values.date} (${values.startTime} - ${values.endTime}) sent to Approvals Queue for review.`,
-            });
+        <SubmitAttendanceDrawerForm
+          onClose={() => setClaimOpen(false)}
+          currentEmployee={currentEmployee}
+          user={user}
+          toast={toast}
+          onSuccess={() => {
+            onRefreshAttendance?.();
             if (onActivityLog) {
-              onActivityLog(`Submitted attendance claim for ${values.date} (${locText})`, 'success');
+              onActivityLog('Submitted attendance claim', 'success');
             }
-            setClaimOpen(false);
           }}
-        >
-          <TextField name="date" label="Attendance Date" placeholder="YYYY-MM-DD" />
-          <SelectField
-            name="classification"
-            label="Attendance Type"
-            options={[
-              { value: 'Office', label: 'Office Work' },
-              { value: 'Training', label: 'Training Batch Session' },
-              { value: 'Marketing', label: 'Marketing Visit' },
-            ]}
-          />
-          <ConditionalAttendanceFields />
-          <TextField name="startTime" label="Start Time" placeholder="08:30 AM" />
-          <TextField name="endTime" label="End Time" placeholder="05:00 PM" />
-          <TextField name="notes" label="Reason / Notes (Optional)" placeholder="Emergency, system delay, or missed clock-in..." />
-          <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" type="button" onClick={() => setClaimOpen(false)}>Cancel</Button>
-            <Button type="submit">Submit for Review</Button>
-          </div>
-        </Form>
+        />
       </Drawer>
 
       {/* Official Break Status Update Drawer */}
@@ -1992,7 +1890,7 @@ function TaskProjectFields({ projectOptions }: { projectOptions: Array<{ value: 
 export function MyDayPage() {
   const { user } = useAuth();
   const { employees } = useEmployee();
-  const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct } = useAttendance();
+  const { record, loading, clockIn, clockOut, startBreak, endBreak, hoursThisMonth, monthAttendancePct, refresh: refreshAttendance } = useAttendance();
   const { toast, addNotification } = useNotifications();
   const { tasks: projectTasks, projects, createTask, createProject, updateTask, submitTask, refresh } = useProject();
   const { startSession, pauseSession, completeSession } = useTaskSessions();
@@ -3026,6 +2924,7 @@ export function MyDayPage() {
         tasks={tasks}
         onStartBreakWithTask={handleStartBreakWithTask}
         onApplyLeave={() => setApplyLeaveOpen(true)}
+        onRefreshAttendance={refreshAttendance}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'calc(68% - 8px) calc(32% - 8px)', gap: 16, marginTop: 16, width: '100%', boxSizing: 'border-box' }}>
