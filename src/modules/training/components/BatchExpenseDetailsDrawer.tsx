@@ -24,6 +24,7 @@
 import { useEffect, useState, useMemo, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../../shared/integration/supabase';
+import { formatBatchWithCourse } from '../utils/batch-formatter';
 
 import type { Batch } from '../training.repository';
 
@@ -82,6 +83,7 @@ export interface BatchExpenseDetailsDrawerProps {
   startDate?: string;
   endDate?: string;
   batch?: Batch | null;
+  allBatches?: Batch[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -151,20 +153,30 @@ export function normalizeBatchKey(str?: string | null): string {
     .trim();
 }
 
+export interface BatchMatchOptions {
+  recordDate?: string;
+  siblingBatches?: any[];
+  scheduledDates?: Set<string>;
+  siblingScheduledDates?: Map<string, string>; // date (YYYY-MM-DD) -> batchId
+}
+
 export function isBatchMatch(
   notes: string | undefined,
   targetBatchName: string,
   targetBatchCode?: string,
-  batchObj?: Batch | null
+  batchObj?: Batch | null,
+  options?: BatchMatchOptions
 ): boolean {
   if (!notes) return false;
 
   let expBatch = '';
   let expBatchId = '';
+  let parsedDate = '';
   try {
     const parsed = typeof notes === 'string' ? JSON.parse(notes) : notes;
     expBatch = parsed?.batchName || parsed?.batch || parsed?.batch_name || '';
     expBatchId = parsed?.batchId || parsed?.batch_id || '';
+    parsedDate = parsed?.expenseDate || '';
     if (!expBatch && typeof notes === 'string' && !notes.trim().startsWith('{')) {
       expBatch = notes;
     }
@@ -173,8 +185,54 @@ export function isBatchMatch(
   }
 
   // 1. Direct Batch ID match if present
-  if (batchObj?.id && expBatchId && batchObj.id === expBatchId) {
-    return true;
+  if (batchObj?.id && expBatchId) {
+    return batchObj.id === expBatchId;
+  }
+
+  const dateToCheck = options?.recordDate || parsedDate;
+
+  // 2. Scheduled calendar dates check if available
+  if (dateToCheck && options?.siblingScheduledDates?.has(dateToCheck) && batchObj?.id) {
+    const scheduledBatchId = options.siblingScheduledDates.get(dateToCheck);
+    if (scheduledBatchId) {
+      return scheduledBatchId === batchObj.id;
+    }
+  }
+
+  // 3. Disambiguate when multiple sibling batches share the same code
+  if (batchObj && options?.siblingBatches && options.siblingBatches.length > 1) {
+    const fullText = (typeof notes === 'string' ? notes : JSON.stringify(notes)).toLowerCase();
+    const currentCourse = (batchObj.trainingName || (batchObj as any).training_name || '').toLowerCase().trim();
+
+    // Check if notes text mentions another sibling batch's course title
+    const otherSiblings = options.siblingBatches.filter((s: any) => s.id !== batchObj.id);
+    for (const other of otherSiblings) {
+      const otherCourse = (other.training_name || other.trainingName || '').toLowerCase().trim();
+      if (otherCourse && otherCourse.length > 2 && fullText.includes(otherCourse)) {
+        return false;
+      }
+    }
+
+    // If text explicitly mentions our course name, match!
+    if (currentCourse && currentCourse.length > 2 && fullText.includes(currentCourse)) {
+      return true;
+    }
+
+    // Check date against batch creation timestamp:
+    // A batch created on 2026-11-08 cannot have historical records from 2026-10-26
+    const batchCreatedAt = (batchObj as any).created_at || (batchObj as any).createdAt;
+    if (batchCreatedAt && dateToCheck) {
+      const createdDate = batchCreatedAt.slice(0, 10);
+      if (dateToCheck < createdDate) {
+        const olderSiblings = otherSiblings.filter((s: any) => {
+          const sCreated = (s.created_at || s.createdAt || '').slice(0, 10);
+          return sCreated && sCreated <= dateToCheck;
+        });
+        if (olderSiblings.length > 0) {
+          return false;
+        }
+      }
+    }
   }
 
   if (!expBatch) return false;
@@ -182,7 +240,7 @@ export function isBatchMatch(
   const kExp = normalizeBatchKey(expBatch);
   if (!kExp) return false;
 
-  // 2. Candidate target keys from batch identifiers
+  // 4. Candidate target keys from batch identifiers
   const candidateKeys = new Set<string>();
   if (targetBatchName) candidateKeys.add(normalizeBatchKey(targetBatchName));
   if (targetBatchCode) candidateKeys.add(normalizeBatchKey(targetBatchCode));
@@ -211,15 +269,20 @@ export function isBatchMatch(
 }
 
 export function isSessionForBatch(
-  ws: { work_type?: string; notes?: string },
+  ws: { work_type?: string; notes?: string; clock_in?: string },
   targetBatchName: string,
   targetBatchCode?: string,
-  batchObj?: Batch | null
+  batchObj?: Batch | null,
+  options?: BatchMatchOptions
 ): boolean {
   if (!ws) return false;
+  const sessionDate = ws.clock_in ? ws.clock_in.slice(0, 10) : undefined;
   const textCandidates = [ws.work_type, ws.notes].filter(Boolean) as string[];
   for (const text of textCandidates) {
-    if (isBatchMatch(text, targetBatchName, targetBatchCode, batchObj)) {
+    if (isBatchMatch(text, targetBatchName, targetBatchCode, batchObj, {
+      ...options,
+      recordDate: sessionDate || options?.recordDate,
+    })) {
       return true;
     }
   }
@@ -638,6 +701,7 @@ export function BatchExpenseDetailsDrawer({
   batchCode,
   studentCount,
   batch,
+  allBatches,
 }: BatchExpenseDetailsDrawerProps) {
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [workSessions, setWorkSessions] = useState<BatchWorkSession[]>([]);
@@ -666,6 +730,40 @@ export function BatchExpenseDetailsDrawer({
     const fetchedExpenses: ExpenseRow[] = [];
 
     (async () => {
+      // 0. Sibling Batches & Scheduled Dates for Disambiguation
+      let siblingBatches: any[] = [];
+      const siblingScheduledDates = new Map<string, string>();
+      try {
+        if (batch?.code) {
+          if (allBatches && allBatches.length > 0) {
+            const currentNorm = normalizeBatchKey(batch.code);
+            siblingBatches = allBatches.filter((b) => normalizeBatchKey(b.code) === currentNorm);
+          } else {
+            const { data: sBatches } = await supabase
+              .from('flwdsk_batches')
+              .select('id, code, training_name, created_at, start_date, end_date')
+              .eq('code', batch.code)
+              .is('deleted_at', null);
+            siblingBatches = sBatches || [];
+          }
+
+          if (siblingBatches.length > 1) {
+            const siblingIds = siblingBatches.map((s) => s.id);
+            const { data: cals } = await supabase
+              .from('flwdsk_calendar_sessions')
+              .select('batch_id, date, session_title')
+              .in('batch_id', siblingIds);
+            cals?.forEach((c: any) => {
+              if (c.date && c.batch_id) {
+                siblingScheduledDates.set(c.date.slice(0, 10), c.batch_id);
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load sibling batches:', err);
+      }
+
       // 1. Fetch expenses from Supabase
       try {
         const { data } = await supabase
@@ -676,7 +774,18 @@ export function BatchExpenseDetailsDrawer({
 
         if (data && data.length > 0) {
           data
-            .filter((r: RawExpenseClaim) => isBatchMatch(r.notes, batchName, batchCode, batch))
+            .filter((r: RawExpenseClaim) => {
+              let rawDate = r.created_at ? r.created_at.slice(0, 10) : '';
+              try {
+                const p = JSON.parse(r.notes || '{}');
+                if (p.expenseDate) rawDate = p.expenseDate;
+              } catch {}
+              return isBatchMatch(r.notes, batchName, batchCode, batch, {
+                recordDate: rawDate,
+                siblingBatches,
+                siblingScheduledDates,
+              });
+            })
             .forEach((r: RawExpenseClaim) => fetchedExpenses.push(parseExpenseRow(r)));
         }
       } catch { /* fall through */ }
@@ -688,7 +797,12 @@ export function BatchExpenseDetailsDrawer({
           local
             .filter((r: any) => {
               const notesField = r.notes || r.batch || '';
-              return isBatchMatch(r.batch || notesField, batchName, batchCode, batch);
+              const rawDate = r.date || (r.createdAt ? r.createdAt.slice(0, 10) : '');
+              return isBatchMatch(r.batch || notesField, batchName, batchCode, batch, {
+                recordDate: rawDate,
+                siblingBatches,
+                siblingScheduledDates,
+              });
             })
             .forEach((r: any) => {
               if (!fetchedExpenses.find((f) => f.id === r.id)) {
@@ -747,7 +861,10 @@ export function BatchExpenseDetailsDrawer({
 
         if (wsData && wsData.length > 0) {
           wsData.forEach((ws: any) => {
-            if (isSessionForBatch(ws, batchName, batchCode, batch)) {
+            if (isSessionForBatch(ws, batchName, batchCode, batch, {
+              siblingBatches,
+              siblingScheduledDates,
+            })) {
               const att = Array.isArray(ws.flwdsk_attendance_records)
                 ? ws.flwdsk_attendance_records[0]
                 : ws.flwdsk_attendance_records;
@@ -839,7 +956,7 @@ export function BatchExpenseDetailsDrawer({
       setWorkSessions(matchedSessions);
       setLoading(false);
     })();
-  }, [open, batchName, batchCode, batch]);
+  }, [open, batchName, batchCode, batch, allBatches]);
 
   // ── Core Calculations & Unit Economics ───────────────────────────────────
 
@@ -1170,7 +1287,16 @@ export function BatchExpenseDetailsDrawer({
             <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>💰 Expense Details</span>
               <span style={{ color: 'var(--text-muted)' }}>—</span>
-              <span style={{ color: 'var(--brand)' }}>{batchCode || batchName}</span>
+              <span style={{ color: 'var(--brand)' }}>
+                {(() => {
+                  const base = batchCode || batchName;
+                  const course = batch?.trainingName || (batch as any)?.training_name;
+                  if (base && course && !base.toLowerCase().includes(course.toLowerCase())) {
+                    return `${base} — ${course}`;
+                  }
+                  return base || (batch ? formatBatchWithCourse(batch) : 'Batch');
+                })()}
+              </span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -107,6 +107,98 @@ describe('BatchExpenseDetailsDrawer Revamp & Calculations', () => {
       expect(isSessionForBatch(ws, 'MIM - UG - 2026 - 2027 - Batch 1')).toBe(true);
       expect(isSessionForBatch(ws, 'Other College - Batch 2')).toBe(false);
     });
+
+    it('disambiguates sibling batches sharing the same code (e.g. SJCET Data Analytics vs Excel Expert 365)', () => {
+      const batchExcel = {
+        id: 'd749ef07-1bb4-4d5e-b4bb-8b513833d785',
+        code: 'SJCET - 2 MBA - Batch 1',
+        batch_no: 'Batch 1',
+        trainingName: 'Excel Expert 365',
+        college: 'SJCET',
+        created_at: '2026-08-28T04:23:17.84+00:00',
+      };
+      const batchData = {
+        id: '2db0b548-5f25-4dde-bf1b-c4e415e5558c',
+        code: 'SJCET - 2 MBA - Batch 1',
+        batch_no: 'Batch 1',
+        trainingName: 'Data Analytics',
+        college: 'SJCET',
+        created_at: '2026-11-08T16:38:13.809+00:00',
+      };
+      const siblings = [batchExcel, batchData];
+      const scheduledMap = new Map<string, string>([
+        ['2026-11-04', batchExcel.id],
+        ['2026-11-09', batchData.id],
+        ['2026-11-10', batchData.id],
+        ['2026-11-11', batchData.id],
+      ]);
+
+      const optionsForData = {
+        siblingBatches: siblings as any,
+        siblingScheduledDates: scheduledMap,
+      };
+      const optionsForExcel = {
+        siblingBatches: siblings as any,
+        siblingScheduledDates: scheduledMap,
+      };
+
+      // 1. Claim from 2026-10-26 (before Data Analytics creation date 2026-11-08)
+      const octClaim = JSON.stringify({
+        personName: 'Linto George',
+        expenseType: 'Metro',
+        batchName: 'SJCET - 2 MBA - 2026-2027 - Batch 1',
+        expenseDate: '2026-10-26',
+      });
+      expect(isBatchMatch(octClaim, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '2026-10-26' })).toBe(false);
+      expect(isBatchMatch(octClaim, batchExcel.code, undefined, batchExcel as any, { ...optionsForExcel, recordDate: '2026-10-26' })).toBe(true);
+
+      // 2. Claim from 2026-11-04 (scheduled for Excel Expert)
+      const nov4Claim = JSON.stringify({
+        personName: 'Ajay Thomas',
+        expenseType: 'Self Travel',
+        batchName: 'SJCET - 2 MBA - Batch 1',
+        expenseDate: '2026-11-04',
+      });
+      expect(isBatchMatch(nov4Claim, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '2026-11-04' })).toBe(false);
+      expect(isBatchMatch(nov4Claim, batchExcel.code, undefined, batchExcel as any, { ...optionsForExcel, recordDate: '2026-11-04' })).toBe(true);
+
+      // 3. Claim from 2026-11-09 (scheduled for Data Analytics)
+      const nov9Claim = JSON.stringify({
+        personName: 'Jomon Joseph',
+        expenseType: 'Self Travel',
+        batchName: 'SJCET - 2 MBA - Batch 1',
+        expenseDate: '2026-11-09',
+      });
+      expect(isBatchMatch(nov9Claim, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '2026-11-09' })).toBe(true);
+      expect(isBatchMatch(nov9Claim, batchExcel.code, undefined, batchExcel as any, { ...optionsForExcel, recordDate: '2026-11-09' })).toBe(false);
+
+      // 4. Work session on 2026-11-09 with explicit course name in notes
+      const wsNov9 = {
+        clock_in: '2026-11-09T03:30:00+00:00',
+        work_type: 'Training',
+        notes: 'Classification: Training, Location: SJCET - 2 MBA - Batch 1 — Data Analytics.',
+      };
+      expect(isSessionForBatch(wsNov9, batchData.code, undefined, batchData as any, optionsForData)).toBe(true);
+      expect(isSessionForBatch(wsNov9, batchExcel.code, undefined, batchExcel as any, optionsForExcel)).toBe(false);
+
+      // 5. Work session on 2026-11-11 with base code only, mapped via scheduled date
+      const wsNov11 = {
+        clock_in: '2026-11-11T03:38:57.561+00:00',
+        work_type: 'Training: SJCET - 2 MBA - Batch 1',
+        notes: '',
+      };
+      expect(isSessionForBatch(wsNov11, batchData.code, undefined, batchData as any, optionsForData)).toBe(true);
+      expect(isSessionForBatch(wsNov11, batchExcel.code, undefined, batchExcel as any, optionsForExcel)).toBe(false);
+
+      // 6. Work session on 2026-10-28 for Excel Expert
+      const wsOct28 = {
+        clock_in: '2026-10-28T03:13:53.326+00:00',
+        work_type: 'Training: SJCET - 2 MBA - Batch 1',
+        notes: '',
+      };
+      expect(isSessionForBatch(wsOct28, batchData.code, undefined, batchData as any, optionsForData)).toBe(false);
+      expect(isSessionForBatch(wsOct28, batchExcel.code, undefined, batchExcel as any, optionsForExcel)).toBe(true);
+    });
   });
 
   describe('KPI Calculations & Zero Division Protection', () => {

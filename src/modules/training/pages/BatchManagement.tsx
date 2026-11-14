@@ -17,7 +17,7 @@ import { todayISO } from '../../../shared/utils/date';
 import { DailyReportBuilderModal } from '../report/DailyReportBuilderModal';
 import { DailyReportPreview } from '../report/DailyReportPreview';
 import type { DailyReportConfig, DailyReportData, TrainingDeliveryLogItem } from '../report/daily-report.types';
-import { cleanBatchCode } from '../utils/batch-formatter';
+import { cleanBatchCode, formatBatchWithCourse } from '../utils/batch-formatter';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 import { BatchHeaderCard } from '../components/BatchHeaderCard';
@@ -1657,11 +1657,26 @@ export function BatchManagement() {
           setExpenseBatchId(null);
         }}
         batch={expenseBatch}
-        batchName={expenseBatch?.code || expenseBatch?.trainingName || ''}
-        batchCode={expenseBatchCardVM?.batchCode || cleanBatchCode(expenseBatch?.code, expenseBatch?.batchNo) || expenseBatch?.trainingName || 'Batch'}
+        batchName={formatBatchWithCourse(
+          {
+            code: expenseBatchCardVM?.batchCode || expenseBatch?.code,
+            batchNo: expenseBatch?.batchNo,
+            trainingName: expenseBatch?.trainingName,
+          },
+          expenseBatchCardVM?.course
+        )}
+        batchCode={formatBatchWithCourse(
+          {
+            code: expenseBatchCardVM?.batchCode || expenseBatch?.code,
+            batchNo: expenseBatch?.batchNo,
+            trainingName: expenseBatch?.trainingName,
+          },
+          expenseBatchCardVM?.course
+        )}
         studentCount={students.length > 0 ? students.length : (expenseBatch?.capacity ?? 0)}
         startDate={expenseBatch?.startDate}
         endDate={expenseBatch?.endDate}
+        allBatches={safeBatches}
       />
     </AppShell>
   );
