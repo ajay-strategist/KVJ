@@ -4,6 +4,8 @@ import { Button } from '../../../shared/ui/components';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { supabase } from '../../../shared/integration/supabase';
 import type { TravelRate } from './TravelRatesModal';
+import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
+import { formatBatchWithCourse, cleanBatchCode } from '../../training/utils/batch-formatter';
 
 export interface EditableExpense {
   id: string;
@@ -114,7 +116,22 @@ export function EditExpenseModal({
         : 'Office Expense'
     );
     setExpenseType(expense.type || 'Self Travel');
-    setBatchName(expense.batch && expense.batch !== '—' ? expense.batch : '');
+
+    let initialBatch = expense.batch && expense.batch !== '—' ? expense.batch : '';
+    if (initialBatch && batches.length > 0 && !initialBatch.includes('—')) {
+      const match = batches.find(
+        (b: any) =>
+          b.id === initialBatch ||
+          b.code === initialBatch ||
+          cleanBatchCode(b.code, b.batchNo) === cleanBatchCode(initialBatch) ||
+          b.trainingName === initialBatch
+      );
+      if (match) {
+        initialBatch = formatBatchWithCourse(match);
+      }
+    }
+    setBatchName(initialBatch);
+
     setVehicle(expense.vehicle || 'Car');
     setKm(expense.km !== undefined && expense.km !== null ? String(expense.km) : '');
     setRoute(expense.route || '');
@@ -328,26 +345,18 @@ export function EditExpenseModal({
 
         {/* Dynamic Batch Selector if Training Expense */}
         {isTraining && (
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4, color: 'var(--text-primary)' }}>
-              Training Batch <span style={{ color: 'var(--status-danger)' }}>*</span>
-            </label>
-            <input
-              type="text"
-              list="training-batches-list"
-              required={isTraining}
-              className="kvj-input"
+          <div style={{ marginBottom: 12 }}>
+            <SearchableBatchSelect
+              label="Training Batch"
+              required
+              batches={batches as any}
               value={batchName}
-              placeholder="Select or enter training batch..."
-              onChange={(e) => setBatchName(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
+              onChange={(id, b) => {
+                const label = b ? formatBatchWithCourse(b) : id;
+                setBatchName(label);
+              }}
+              placeholder="Select Training Batch..."
             />
-            <datalist id="training-batches-list">
-              {batches.map((b: any, idx: number) => {
-                const label = b.batchName || b.code || b.trainingName || b.name;
-                return <option key={b.id || idx} value={label} />;
-              })}
-            </datalist>
           </div>
         )}
 

@@ -290,7 +290,7 @@ export function ExpenseClaims() {
               const parsed = JSON.parse(r.notes);
               person = parsed.personName || person;
               type = parsed.expenseType || type;
-              batch = cleanBatchNameForDisplay(parsed.batchName || batch);
+              batch = cleanBatchNameForDisplay(parsed.batchName || batch, batches);
               route = parsed.route || route;
               vehicle = parsed.vehicle || undefined;
               km = parsed.km !== undefined && parsed.km !== null ? Number(parsed.km) : undefined;
@@ -363,7 +363,7 @@ export function ExpenseClaims() {
             person: lc.person || 'Employee',
             category: lc.category || 'Office Expense',
             type: lc.type || 'Self Travel',
-            batch: cleanBatchNameForDisplay(lc.batch),
+            batch: cleanBatchNameForDisplay(lc.batch, batches),
             notes: lc.notes || '',
             route: lc.route || '',
             vehicle: lc.vehicle,
@@ -383,7 +383,12 @@ export function ExpenseClaims() {
     } finally {
       setIsLoadingClaims(false);
     }
-  }, [user, isManagement]);
+  }, [user, isManagement, batches]);
+
+  const resolveDisplayBatch = useCallback(
+    (rawBatch?: string) => cleanBatchNameForDisplay(rawBatch, batches),
+    [batches]
+  );
 
   useEffect(() => {
     loadClaims();
@@ -444,7 +449,7 @@ export function ExpenseClaims() {
           const q = searchQuery.toLowerCase();
           const matchName = (exp.person || '').toLowerCase().includes(q);
           const matchType = (exp.type || '').toLowerCase().includes(q);
-          const matchBatch = (exp.batch || '').toLowerCase().includes(q);
+          const matchBatch = (resolveDisplayBatch(exp.batch) || '').toLowerCase().includes(q);
           const matchRoute = (exp.route || '').toLowerCase().includes(q);
           if (!matchName && !matchType && !matchBatch && !matchRoute) return false;
         }
@@ -1024,7 +1029,7 @@ export function ExpenseClaims() {
       Employee: exp.person,
       Classification: exp.category,
       'Expense Type': exp.type,
-      'Batch / Route': exp.batch || exp.route || '—',
+      'Batch / Route': resolveDisplayBatch(exp.batch) || exp.route || '—',
       'Vehicle': exp.vehicle || '—',
       'KM': exp.km ?? '—',
       'Rate (₹/km)': exp.rate ?? '—',
@@ -1332,7 +1337,7 @@ export function ExpenseClaims() {
                     )}
                     {(exp.batch || exp.route) && (
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                        {exp.batch && <span>Batch: <strong>{exp.batch}</strong> </span>}
+                        {exp.batch && <span>Batch: <strong>{resolveDisplayBatch(exp.batch)}</strong> </span>}
                         {exp.route && <span>(Route: {exp.route})</span>}
                       </div>
                     )}
@@ -1566,7 +1571,7 @@ export function ExpenseClaims() {
                         )}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 500, color: 'var(--brand)' }}>{exp.batch || '—'}</div>
+                        <div style={{ fontWeight: 500, color: 'var(--brand)' }}>{resolveDisplayBatch(exp.batch) || '—'}</div>
                         {exp.route && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>🗺 {exp.route}</div>}
                       </td>
                       <td style={{ fontWeight: 800, color: 'var(--status-success)', fontVariantNumeric: 'tabular-nums' }}>

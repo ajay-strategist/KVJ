@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
 import type { Batch, ApprovedBatchStatus } from '../../modules/training/training.repository';
 import { normalizeBatchPhase } from '../../modules/training/training.repository';
+import { formatBatchWithCourse, cleanBatchCode } from '../../modules/training/utils/batch-formatter';
 
 export interface SearchableBatchSelectProps {
   value?: string;
@@ -50,13 +51,15 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
   // Find currently selected batch
   const selectedBatch = useMemo(() => {
     if (!value) return undefined;
+    const valLower = value.toLowerCase().trim();
     return batches.find(
       (b) =>
         b.id === value ||
-        b.code === value ||
-        b.trainingName === value ||
-        (b.code && value.startsWith(b.code)) ||
-        (b.trainingName && value.includes(b.trainingName))
+        (b.code && b.code.toLowerCase() === valLower) ||
+        (b.code && cleanBatchCode(b.code, b.batchNo).toLowerCase() === valLower) ||
+        formatBatchWithCourse(b).toLowerCase() === valLower ||
+        (b.code && valLower.startsWith(b.code.toLowerCase())) ||
+        (b.trainingName && valLower.includes(b.trainingName.toLowerCase()))
     );
   }, [batches, value]);
 
@@ -70,12 +73,14 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
       const college = (b.college || '').toLowerCase();
       const program = (b.program || '').toLowerCase();
       const phase = (b.phase || '').toLowerCase();
+      const formatted = formatBatchWithCourse(b).toLowerCase();
       return (
         code.includes(q) ||
         name.includes(q) ||
         college.includes(q) ||
         program.includes(q) ||
-        phase.includes(q)
+        phase.includes(q) ||
+        formatted.includes(q)
       );
     });
   }, [batches, search]);
@@ -168,7 +173,7 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
   };
 
   const displayTitle = selectedBatch
-    ? selectedBatch.code || selectedBatch.trainingName || 'Selected Batch'
+    ? formatBatchWithCourse(selectedBatch)
     : value || '';
 
   const selectedPhase = selectedBatch ? normalizeBatchPhase(selectedBatch.phase) : null;
@@ -526,9 +531,9 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {b.code || b.trainingName || 'Unnamed Batch'}
+                        {formatBatchWithCourse(b)}
                       </div>
-                      {(b.college || b.program) && (
+                      {(b.college || b.program || b.trainingName || b.academicYear) && (
                         <div
                           style={{
                             fontSize: 11,
@@ -539,7 +544,12 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
                             marginTop: 2,
                           }}
                         >
-                          {[b.college, b.program, b.batchNo ? `Batch ${b.batchNo}` : ''].filter(Boolean).join(' · ')}
+                          {[
+                            b.college,
+                            b.trainingName || b.program,
+                            b.academicYear,
+                            b.batchNo ? (b.batchNo.toLowerCase().startsWith('batch') ? b.batchNo : `Batch ${b.batchNo}`) : ''
+                          ].filter(Boolean).filter((val, i, arr) => arr.indexOf(val) === i).join(' · ')}
                         </div>
                       )}
                     </div>

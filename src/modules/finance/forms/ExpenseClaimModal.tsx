@@ -8,8 +8,9 @@ import { supabase } from '../../../shared/integration/supabase';
 import type { TravelRate } from './TravelRatesModal';
 import { parseExpenseDateToYMD, formatDisplayDateGB } from '../pages/ExpenseClaims';
 import { SearchableBatchSelect } from '../../../shared/components/SearchableBatchSelect';
+import { formatBatchWithCourse, cleanBatchCode } from '../../training/utils/batch-formatter';
 
-export function cleanBatchNameForDisplay(val?: string | null): string {
+export function cleanBatchNameForDisplay(val?: string | null, batches?: Array<any>): string {
   if (!val || val === '—') return '—';
   let clean = String(val).trim();
   // Strip leading "Batch (" and trailing ")" if present
@@ -17,7 +18,31 @@ export function cleanBatchNameForDisplay(val?: string | null): string {
   if (clean.toLowerCase().startsWith('batch ') && !clean.toLowerCase().includes('batch 1') && !clean.toLowerCase().includes('batch 2') && !clean.toLowerCase().includes('batch 3')) {
     clean = clean.slice(6).trim();
   }
-  return clean || '—';
+  if (!clean) return '—';
+
+  // If already formatted with course separator, return as is
+  if (clean.includes('—') || clean.includes(' - Course:')) {
+    return clean;
+  }
+
+  // If batches list is available, enrich with course name
+  if (batches && batches.length > 0) {
+    const cleanLower = clean.toLowerCase();
+    const cleanCode = cleanBatchCode(clean).toLowerCase();
+    const match = batches.find((b: any) => {
+      if (!b) return false;
+      if (b.id && b.id.toLowerCase() === cleanLower) return true;
+      if (b.code && b.code.toLowerCase() === cleanLower) return true;
+      if (b.code && cleanBatchCode(b.code, b.batchNo).toLowerCase() === cleanCode) return true;
+      if (b.trainingName && b.trainingName.toLowerCase() === cleanLower) return true;
+      return false;
+    });
+    if (match) {
+      return formatBatchWithCourse(match);
+    }
+  }
+
+  return clean;
 }
 
 export interface ExpenseClaimModalProps {
@@ -560,7 +585,7 @@ export function ExpenseClaimModal({
                 batches={batches}
                 value={batchName}
                 onChange={(id, b) => {
-                  const label = b ? (b.code || b.trainingName || id) : id;
+                  const label = b ? formatBatchWithCourse(b) : id;
                   setBatchName(label);
                 }}
                 placeholder="Select Training Batch..."
