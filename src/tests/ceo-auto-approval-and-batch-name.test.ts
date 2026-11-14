@@ -79,6 +79,38 @@ describe('cleanBatchNameForDisplay with course enrichment', () => {
       'SJCET - 2 MBA - Batch 1 — Excel Expert 365'
     );
   });
+
+  it('accurately distinguishes batches that share the identical training/course name (e.g. MIM UG vs STC UG)', () => {
+    const multiBatchesSameCourse = [
+      {
+        id: 'stc-ug',
+        code: 'STC - UG - Batch 1',
+        batchNo: 'Batch 1',
+        trainingName: 'Business Analytics',
+        college: 'STC',
+      },
+      {
+        id: 'mim-ug',
+        code: 'MIM - UG - Batch 1',
+        batchNo: 'Batch 1',
+        trainingName: 'Business Analytics',
+        college: 'MIM',
+      },
+    ];
+
+    // Selecting or passing MIM - UG - Batch 1 must NEVER falsely match STC - UG - Batch 1
+    expect(
+      cleanBatchNameForDisplay('MIM - UG - Batch 1', multiBatchesSameCourse)
+    ).toBe('MIM - UG - Batch 1 — Business Analytics');
+
+    expect(
+      cleanBatchNameForDisplay('MIM - UG - Batch 1 — Business Analytics', multiBatchesSameCourse)
+    ).toBe('MIM - UG - Batch 1 — Business Analytics');
+
+    expect(
+      cleanBatchNameForDisplay('STC - UG - Batch 1', multiBatchesSameCourse)
+    ).toBe('STC - UG - Batch 1 — Business Analytics');
+  });
 });
 
 describe('CEO Auto-Approval logic verification', () => {

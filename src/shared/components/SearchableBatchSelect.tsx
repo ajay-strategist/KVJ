@@ -48,19 +48,44 @@ export const SearchableBatchSelect: React.FC<SearchableBatchSelectProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
 
-  // Find currently selected batch
+  // Find currently selected batch with strict priority matching
   const selectedBatch = useMemo(() => {
     if (!value) return undefined;
     const valLower = value.toLowerCase().trim();
-    return batches.find(
-      (b) =>
-        b.id === value ||
-        (b.code && b.code.toLowerCase() === valLower) ||
-        (b.code && cleanBatchCode(b.code, b.batchNo).toLowerCase() === valLower) ||
-        formatBatchWithCourse(b).toLowerCase() === valLower ||
-        (b.code && valLower.startsWith(b.code.toLowerCase())) ||
-        (b.trainingName && valLower.includes(b.trainingName.toLowerCase()))
+
+    // 1. Strict ID match
+    const byId = batches.find((b) => b.id === value);
+    if (byId) return byId;
+
+    // 2. Strict Full Formatted Title match (e.g. "MIM - UG - Batch 1 — Business Analytics")
+    const byFormatted = batches.find(
+      (b) => formatBatchWithCourse(b).toLowerCase() === valLower
     );
+    if (byFormatted) return byFormatted;
+
+    // 3. Strict Code match (e.g. "MIM - UG - Batch 1")
+    const byCode = batches.find(
+      (b) => b.code && b.code.toLowerCase() === valLower
+    );
+    if (byCode) return byCode;
+
+    // 4. Strict Cleaned Code match (e.g. stripping duplicate - Copy suffixes)
+    const byCleanCode = batches.find(
+      (b) => b.code && cleanBatchCode(b.code, b.batchNo).toLowerCase() === valLower
+    );
+    if (byCleanCode) return byCleanCode;
+
+    // 5. Code prefix match (only if valLower begins with b.code + separator " — " or " - ")
+    const byCodePrefix = batches.find(
+      (b) =>
+        b.code &&
+        (valLower.startsWith(b.code.toLowerCase() + ' —') ||
+          valLower.startsWith(b.code.toLowerCase() + ' -') ||
+          valLower.startsWith(b.code.toLowerCase() + ' '))
+    );
+    if (byCodePrefix) return byCodePrefix;
+
+    return undefined;
   }, [batches, value]);
 
   // Filter batches based on search query

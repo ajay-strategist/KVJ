@@ -25,21 +25,35 @@ export function cleanBatchNameForDisplay(val?: string | null, batches?: Array<an
     return clean;
   }
 
-  // If batches list is available, enrich with course name
+  // If batches list is available, enrich with course name using strict priority
   if (batches && batches.length > 0) {
     const cleanLower = clean.toLowerCase();
     const cleanCode = cleanBatchCode(clean).toLowerCase();
-    const match = batches.find((b: any) => {
-      if (!b) return false;
-      if (b.id && b.id.toLowerCase() === cleanLower) return true;
-      if (b.code && b.code.toLowerCase() === cleanLower) return true;
-      if (b.code && cleanBatchCode(b.code, b.batchNo).toLowerCase() === cleanCode) return true;
-      if (b.trainingName && b.trainingName.toLowerCase() === cleanLower) return true;
-      return false;
-    });
-    if (match) {
-      return formatBatchWithCourse(match);
-    }
+
+    // 1. Strict ID match
+    const byId = batches.find((b: any) => b && b.id && b.id.toLowerCase() === cleanLower);
+    if (byId) return formatBatchWithCourse(byId);
+
+    // 2. Strict Code match
+    const byCode = batches.find((b: any) => b && b.code && b.code.toLowerCase() === cleanLower);
+    if (byCode) return formatBatchWithCourse(byCode);
+
+    // 3. Strict Cleaned Code match
+    const byClean = batches.find(
+      (b: any) => b && b.code && cleanBatchCode(b.code, b.batchNo).toLowerCase() === cleanCode
+    );
+    if (byClean) return formatBatchWithCourse(byClean);
+
+    // 4. Code prefix match (only if clean begins with b.code + separator)
+    const byPrefix = batches.find(
+      (b: any) =>
+        b &&
+        b.code &&
+        (cleanLower.startsWith(b.code.toLowerCase() + ' —') ||
+          cleanLower.startsWith(b.code.toLowerCase() + ' -') ||
+          cleanLower.startsWith(b.code.toLowerCase() + ' '))
+    );
+    if (byPrefix) return formatBatchWithCourse(byPrefix);
   }
 
   return clean;
