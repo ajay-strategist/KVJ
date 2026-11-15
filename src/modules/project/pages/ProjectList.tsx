@@ -323,23 +323,55 @@ export function ProjectList({
   // Filter based on selected checkboxes, commonFilters and selectedEmployeeId
   const filteredProjects = useMemo(() => {
     let list = projectsList;
-    const effectiveEmpId = (commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all') 
-      ? commonFilters.selectedEmployeeId 
-      : selectedEmployeeId;
+    const supId = commonFilters?.selectedSupervisorId && commonFilters.selectedSupervisorId !== 'all'
+      ? commonFilters.selectedSupervisorId
+      : (selectedSupervisor !== 'all' ? selectedSupervisor : undefined);
 
-    if (effectiveEmpId && effectiveEmpId !== 'all') {
+    const memId = commonFilters?.selectedMemberId && commonFilters.selectedMemberId !== 'all'
+      ? commonFilters.selectedMemberId
+      : undefined;
+
+    const fallbackEmpId = (!supId && !memId && commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all')
+      ? commonFilters.selectedEmployeeId
+      : (!supId && !memId && selectedEmployeeId && selectedEmployeeId !== 'all' ? selectedEmployeeId : undefined);
+
+    if (supId) {
+      const supEmp = employees.find((e) => e.id === supId);
+      const supName = supEmp ? `${supEmp.firstName} ${supEmp.lastName}`.trim() : '';
       list = list.filter((p: any) => {
         const dbProj = projects.find((dp: any) => dp.id === p.id);
         const dbSupId = (dbProj as any)?.supervisorId || (dbProj as any)?.supervisor_id;
-        if (dbProj && dbSupId === effectiveEmpId) {
-          return true;
-        }
+        return (dbProj && dbSupId === supId) || p.supervisorId === supId || (supName && p.supervisor === supName);
+      });
+    }
+
+    if (memId) {
+      list = list.filter((p: any) => {
         const isAllocated = allocations.some(
-          (a: any) => a.projectId === p.id && a.employeeId === effectiveEmpId
+          (a: any) => a.projectId === p.id && a.employeeId === memId
         );
         if (isAllocated) return true;
         const hasTask = tasks.some(
-          (t: any) => t.projectId === p.id && t.assigneeId === effectiveEmpId
+          (t: any) => t.projectId === p.id && t.assigneeId === memId
+        );
+        if (hasTask) return true;
+        return false;
+      });
+    }
+
+    if (fallbackEmpId) {
+      list = list.filter((p: any) => {
+        const dbProj = projects.find((dp: any) => dp.id === p.id);
+        const dbSupId = (dbProj as any)?.supervisorId || (dbProj as any)?.supervisor_id;
+        if (dbProj && dbSupId === fallbackEmpId) {
+          return true;
+        }
+        const isAllocated = allocations.some(
+          (a: any) => a.projectId === p.id && a.employeeId === fallbackEmpId
+        );
+        if (isAllocated) return true;
+        const hasTask = tasks.some(
+          (t: any) => t.projectId === p.id && t.assigneeId === fallbackEmpId
         );
         if (hasTask) return true;
         return false;

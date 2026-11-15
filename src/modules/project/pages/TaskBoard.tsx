@@ -407,15 +407,33 @@ export function TaskBoard({
         if (!proj || proj.client !== commonFilters.selectedClient) return false;
       }
 
-      // User-level filtering: Supervisors and assignees both see tasks
-      const effectiveEmpId = (commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all')
-        ? commonFilters.selectedEmployeeId
-        : selectedEmployeeId;
+      // User-level filtering: Supervisors and assignees
+      const supId = commonFilters?.selectedSupervisorId && commonFilters.selectedSupervisorId !== 'all'
+        ? commonFilters.selectedSupervisorId
+        : undefined;
 
-      if (effectiveEmpId && effectiveEmpId !== 'all') {
-        const isTarget = t.assigneeId === effectiveEmpId || t.supervisorId === effectiveEmpId || t.assignedByEmployeeId === effectiveEmpId;
+      const memId = commonFilters?.selectedMemberId && commonFilters.selectedMemberId !== 'all'
+        ? commonFilters.selectedMemberId
+        : undefined;
+
+      const fallbackEmpId = (!supId && !memId && commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all')
+        ? commonFilters.selectedEmployeeId
+        : (!supId && !memId && selectedEmployeeId && selectedEmployeeId !== 'all' ? selectedEmployeeId : undefined);
+
+      if (supId) {
+        const isSup = t.supervisorId === supId || t.assignedByEmployeeId === supId;
+        if (!isSup) return false;
+      }
+
+      if (memId) {
+        const isMem = t.assigneeId === memId;
+        if (!isMem) return false;
+      }
+
+      if (fallbackEmpId) {
+        const isTarget = t.assigneeId === fallbackEmpId || t.supervisorId === fallbackEmpId || t.assignedByEmployeeId === fallbackEmpId;
         if (!isTarget) return false;
-      } else if (!isManagement) {
+      } else if (!isManagement && !supId && !memId) {
         const isMyTask =
           t.assigneeId === user?.id ||
           t.assigneeId === user?.email ||
@@ -425,7 +443,7 @@ export function TaskBoard({
           (t.supervisor && t.supervisor.toLowerCase().includes(myName)) ||
           t.approvedBy?.toLowerCase() === myName;
         if (!isMyTask) return false;
-      } else if (selectedAssignee !== 'all') {
+      } else if (selectedAssignee !== 'all' && !supId && !memId) {
         const target = selectedAssignee.toLowerCase();
         const matchesTarget =
           t.assignee.toLowerCase() === target ||

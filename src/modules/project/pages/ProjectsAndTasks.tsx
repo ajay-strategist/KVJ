@@ -24,6 +24,8 @@ export function ProjectsAndTasks() {
     searchQuery: '',
     selectedProjectId: 'all',
     selectedEmployeeId: isMgmt ? 'all' : (user?.id || ''),
+    selectedSupervisorId: 'all',
+    selectedMemberId: isMgmt ? 'all' : (user?.id || ''),
     selectedTaskName: 'all',
     selectedStatuses: ['Not Started', 'In Progress'],
     selectedClient: 'all',

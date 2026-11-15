@@ -7,7 +7,9 @@ import { useAuth } from '../../auth/AuthProvider';
 export interface ProjectCommonFiltersState {
   searchQuery: string;
   selectedProjectId: string;
-  selectedEmployeeId: string;
+  selectedEmployeeId?: string;
+  selectedSupervisorId?: string;
+  selectedMemberId?: string;
   selectedTaskName: string;
   selectedStatuses: string[];
   selectedClient: string;
@@ -107,13 +109,29 @@ export function ProjectCommonFilterHeader({
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.selectedProjectId && filters.selectedProjectId !== 'all') count++;
-    if (filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all') count++;
+    if (filters.selectedSupervisorId && filters.selectedSupervisorId !== 'all') count++;
+    if (filters.selectedMemberId && filters.selectedMemberId !== 'all') count++;
+    if (!filters.selectedSupervisorId && !filters.selectedMemberId && filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all') count++;
     if (filters.selectedTaskName && filters.selectedTaskName !== 'all') count++;
     if (currentStatuses.length > 0 && !currentStatuses.includes('all')) count++;
     if (filters.selectedClient && filters.selectedClient !== 'all') count++;
     if (filters.fromDate || filters.toDate) count++;
     return count;
   }, [filters, currentStatuses]);
+
+  const selectedSupName = useMemo(() => {
+    if (!filters.selectedSupervisorId || filters.selectedSupervisorId === 'all') return null;
+    if (user && filters.selectedSupervisorId === user.id) return `Me (${user.fullName || 'User'})`;
+    const emp = employees.find((e) => e && e.id === filters.selectedSupervisorId);
+    return emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : filters.selectedSupervisorId;
+  }, [filters.selectedSupervisorId, employees, user]);
+
+  const selectedMemberName = useMemo(() => {
+    if (!filters.selectedMemberId || filters.selectedMemberId === 'all') return null;
+    if (user && filters.selectedMemberId === user.id) return `Me (${user.fullName || 'User'})`;
+    const emp = employees.find((e) => e && e.id === filters.selectedMemberId);
+    return emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : filters.selectedMemberId;
+  }, [filters.selectedMemberId, employees, user]);
 
   const selectedEmpName = useMemo(() => {
     if (!filters.selectedEmployeeId || filters.selectedEmployeeId === 'all') return null;
@@ -164,18 +182,38 @@ export function ProjectCommonFilterHeader({
 
       {/* Filter Items Flex Layout */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-        {/* 1. Employee (Supervisor / Member) */}
+        {/* 1. Supervisor */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Employee (Supervisor / Member)
+            Supervisor
           </label>
           <select
             className="kvj-select"
-            value={filters.selectedEmployeeId || 'all'}
-            onChange={(e) => onFilterChange({ selectedEmployeeId: e.target.value })}
+            value={filters.selectedSupervisorId || 'all'}
+            onChange={(e) => onFilterChange({ selectedSupervisorId: e.target.value })}
             style={{ fontSize: 12.5 }}
           >
-            <option value="all">👥 All Employees</option>
+            <option value="all">👔 All Supervisors</option>
+            {user && <option value={user.id}>Me ({user.fullName})</option>}
+            {employees.filter((e) => e && e.id && e.id !== user?.id).map((e) => {
+              const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.id;
+              return <option key={e.id} value={e.id}>{name}</option>;
+            })}
+          </select>
+        </div>
+
+        {/* 2. Member */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Member
+          </label>
+          <select
+            className="kvj-select"
+            value={filters.selectedMemberId || 'all'}
+            onChange={(e) => onFilterChange({ selectedMemberId: e.target.value })}
+            style={{ fontSize: 12.5 }}
+          >
+            <option value="all">👥 All Members</option>
             {user && <option value={user.id}>Me ({user.fullName})</option>}
             {employees.filter((e) => e && e.id && e.id !== user?.id).map((e) => {
               const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.id;
@@ -286,7 +324,19 @@ export function ProjectCommonFilterHeader({
       {/* Active Filter Chips */}
       {activeFiltersCount > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border, #e2e8f0)' }}>
-          {filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all' && (
+          {filters.selectedSupervisorId && filters.selectedSupervisorId !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              Supervisor: {selectedSupName}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedSupervisorId: 'all' })}>×</span>
+            </Badge>
+          )}
+          {filters.selectedMemberId && filters.selectedMemberId !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              Member: {selectedMemberName}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedMemberId: 'all' })}>×</span>
+            </Badge>
+          )}
+          {!filters.selectedSupervisorId && !filters.selectedMemberId && filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all' && (
             <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Employee: {selectedEmpName}
               <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedEmployeeId: 'all' })}>×</span>

@@ -289,13 +289,29 @@ export function TaskWorklogView({
     const today = new Date().toISOString().slice(0, 10);
 
     // Timesheet-based entries
+    const supId = commonFilters?.selectedSupervisorId && commonFilters.selectedSupervisorId !== 'all'
+      ? commonFilters.selectedSupervisorId
+      : undefined;
+    const memId = commonFilters?.selectedMemberId && commonFilters.selectedMemberId !== 'all'
+      ? commonFilters.selectedMemberId
+      : undefined;
+
     const fromTimesheets = (timesheets || [])
       .filter((ts: any) => {
-        // Specific employee filter (from parent dropdown)
-        if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+        // Specific member/employee filter
+        if (memId) {
+          if (ts.employeeId !== memId) return false;
+        } else if (selectedEmployeeId && selectedEmployeeId !== 'all') {
           if (ts.employeeId !== selectedEmployeeId) return false;
-        } else if (!isManagement && user) {
+        } else if (!isManagement && user && !supId) {
           if (ts.employeeId !== user.id) return false;
+        }
+
+        if (supId) {
+          const project = (projects || []).find((p: any) => p.id === ts.projectId);
+          const task = (tasks || []).find((t: any) => t.id === ts.taskId);
+          const isSup = task?.supervisorId === supId || (project as any)?.supervisorId === supId;
+          if (!isSup) return false;
         }
         if (selectedProjectId !== 'all') {
           if (selectedProjectId === 'OFFICE_TASK') {
@@ -369,9 +385,15 @@ export function TaskWorklogView({
               (t as any).assignee.toLowerCase() === user.fullName.toLowerCase());
           if (!isMyTask) return false;
         }
-        // Management can further filter by a specific employee
-        if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+        // Member / Employee filtering
+        if (memId) {
+          if (t.assigneeId !== memId) return false;
+        } else if (selectedEmployeeId && selectedEmployeeId !== 'all') {
           if (t.assigneeId !== selectedEmployeeId) return false;
+        }
+        if (supId) {
+          const isSup = t.supervisorId === supId || (proj as any)?.supervisorId === supId;
+          if (!isSup) return false;
         }
         if (selectedProjectId !== 'all') {
           if (selectedProjectId === 'OFFICE_TASK') {
@@ -561,12 +583,20 @@ export function TaskWorklogView({
     st === 'running' ? 'success' : st === 'paused' ? 'warning' : 'neutral';
 
   const filteredSessions = sessions.filter((s) => {
-    const effectiveEmpId = (commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all')
-      ? commonFilters.selectedEmployeeId
-      : selectedEmployeeId;
+    const memId = commonFilters?.selectedMemberId && commonFilters.selectedMemberId !== 'all'
+      ? commonFilters.selectedMemberId
+      : undefined;
 
-    if (effectiveEmpId && effectiveEmpId !== 'all') {
-      if (s.employeeId !== effectiveEmpId) return false;
+    if (memId) {
+      if (s.employeeId !== memId) return false;
+    } else {
+      const effectiveEmpId = (commonFilters?.selectedEmployeeId && commonFilters.selectedEmployeeId !== 'all')
+        ? commonFilters.selectedEmployeeId
+        : selectedEmployeeId;
+
+      if (effectiveEmpId && effectiveEmpId !== 'all') {
+        if (s.employeeId !== effectiveEmpId) return false;
+      }
     }
 
     const effectiveProjId = (commonFilters?.selectedProjectId && commonFilters.selectedProjectId !== 'all')
