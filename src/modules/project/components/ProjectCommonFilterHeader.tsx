@@ -158,23 +158,74 @@ export function ProjectCommonFilterHeader({
       }}
     >
       {/* Top Header Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: '1 1 auto' }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             🔍 Filters
             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>
               ({activeTab === 'projects' ? 'Projects View' : activeTab === 'tasks' ? 'Tasks View' : 'Task Worklog View'})
             </span>
           </span>
+
           {activeFiltersCount > 0 && (
-            <Badge tone="brand" style={{ fontSize: 11 }}>
+            <Badge tone="brand" style={{ fontSize: 11, flexShrink: 0 }}>
               {activeFiltersCount} Active Filter{activeFiltersCount > 1 ? 's' : ''}
+            </Badge>
+          )}
+
+          {/* Active / Applied Filter Chips in the Top Row */}
+          {filters.selectedSupervisorId && filters.selectedSupervisorId !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Supervisor: {selectedSupName}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedSupervisorId: 'all' })}>×</span>
+            </Badge>
+          )}
+          {filters.selectedMemberId && filters.selectedMemberId !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Member: {selectedMemberName}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedMemberId: 'all' })}>×</span>
+            </Badge>
+          )}
+          {!filters.selectedSupervisorId && !filters.selectedMemberId && filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Employee: {selectedEmpName}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedEmployeeId: 'all' })}>×</span>
+            </Badge>
+          )}
+          {filters.selectedProjectId && filters.selectedProjectId !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Project: {selectedProjTitle}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedProjectId: 'all' })}>×</span>
+            </Badge>
+          )}
+          {filters.selectedTaskName && filters.selectedTaskName !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Task: {filters.selectedTaskName}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedTaskName: 'all' })}>×</span>
+            </Badge>
+          )}
+          {filters.selectedClient && filters.selectedClient !== 'all' && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Client: {filters.selectedClient}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedClient: 'all' })}>×</span>
+            </Badge>
+          )}
+          {currentStatuses.length > 0 && !currentStatuses.includes('all') && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Status: {currentStatuses.join(', ')}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedStatuses: [] })}>×</span>
+            </Badge>
+          )}
+          {(filters.fromDate || filters.toDate) && (
+            <Badge tone="neutral" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Date Range: {filters.fromDate || 'Start'} to {filters.toDate || 'End'}
+              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ fromDate: '', toDate: '' })}>×</span>
             </Badge>
           )}
         </div>
 
         {activeFiltersCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={onResetFilters} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          <Button variant="ghost" size="sm" onClick={onResetFilters} style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
             ↺ Reset All Filters
           </Button>
         )}
@@ -320,60 +371,6 @@ export function ProjectCommonFilterHeader({
           </div>
         </div>
       </div>
-
-      {/* Active Filter Chips */}
-      {activeFiltersCount > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border, #e2e8f0)' }}>
-          {filters.selectedSupervisorId && filters.selectedSupervisorId !== 'all' && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Supervisor: {selectedSupName}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedSupervisorId: 'all' })}>×</span>
-            </Badge>
-          )}
-          {filters.selectedMemberId && filters.selectedMemberId !== 'all' && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Member: {selectedMemberName}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedMemberId: 'all' })}>×</span>
-            </Badge>
-          )}
-          {!filters.selectedSupervisorId && !filters.selectedMemberId && filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all' && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Employee: {selectedEmpName}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedEmployeeId: 'all' })}>×</span>
-            </Badge>
-          )}
-          {filters.selectedProjectId && filters.selectedProjectId !== 'all' && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Project: {selectedProjTitle}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedProjectId: 'all' })}>×</span>
-            </Badge>
-          )}
-          {filters.selectedTaskName && filters.selectedTaskName !== 'all' && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Task: {filters.selectedTaskName}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedTaskName: 'all' })}>×</span>
-            </Badge>
-          )}
-          {filters.selectedClient && filters.selectedClient !== 'all' && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Client: {filters.selectedClient}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedClient: 'all' })}>×</span>
-            </Badge>
-          )}
-          {currentStatuses.length > 0 && !currentStatuses.includes('all') && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Status: {currentStatuses.join(', ')}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ selectedStatuses: [] })}>×</span>
-            </Badge>
-          )}
-          {(filters.fromDate || filters.toDate) && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Date Range: {filters.fromDate || 'Start'} to {filters.toDate || 'End'}
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ fromDate: '', toDate: '' })}>×</span>
-            </Badge>
-          )}
-        </div>
-      )}
     </div>
   );
 }
