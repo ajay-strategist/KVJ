@@ -104,14 +104,13 @@ export function ProjectCommonFilterHeader({
     return Array.from(set).sort();
   }, [safeTasks]);
 
-  // Searchable options for Supervisor filter
+  // Searchable options for Supervisor filter (clean name display)
   const supervisorOptions: SearchableOption[] = useMemo(() => {
     const list: SearchableOption[] = [];
     if (user) {
       list.push({
         value: user.id,
         label: `Me (${user.fullName || 'User'})`,
-        subLabel: user.role || user.email,
       });
     }
     employees
@@ -121,20 +120,18 @@ export function ProjectCommonFilterHeader({
         list.push({
           value: e.id,
           label: name,
-          subLabel: e.designation || e.role || e.email,
         });
       });
     return list;
   }, [employees, user]);
 
-  // Searchable options for Member filter
+  // Searchable options for Member filter (clean name display)
   const memberOptions: SearchableOption[] = useMemo(() => {
     const list: SearchableOption[] = [];
     if (user) {
       list.push({
         value: user.id,
         label: `Me (${user.fullName || 'User'})`,
-        subLabel: user.role || user.email,
       });
     }
     employees
@@ -144,7 +141,6 @@ export function ProjectCommonFilterHeader({
         list.push({
           value: e.id,
           label: name,
-          subLabel: e.designation || e.role || e.email,
         });
       });
     return list;
