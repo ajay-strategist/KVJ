@@ -947,67 +947,81 @@ export function ProjectList({
     toast({ variant: 'success', title: 'Export Complete', message: 'Projects and tasks report exported to Excel successfully.' });
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Top Header Actions (Single Line Right Aligned) */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'nowrap', overflowX: 'auto' }}>
-        {/* Prominent View Mode Segmented Control */}
-        <div style={{ display: 'inline-flex', background: 'var(--bg-sunken, #f1f5f9)', border: '1px solid var(--border, #cbd5e1)', borderRadius: 10, padding: 3, gap: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.06)', flexShrink: 0 }}>
-          <button
-            type="button"
-            onClick={() => setViewMode('card')}
-            style={{
-              padding: '7px 16px',
-              fontSize: 12.5,
-              fontWeight: 700,
-              borderRadius: 8,
-              border: 'none',
-              background: viewMode === 'card' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
-              color: viewMode === 'card' ? '#ffffff' : 'var(--text-secondary, #475569)',
-              boxShadow: viewMode === 'card' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            🎴 Card View
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('table')}
-            style={{
-              padding: '7px 16px',
-              fontSize: 12.5,
-              fontWeight: 700,
-              borderRadius: 8,
-              border: 'none',
-              background: viewMode === 'table' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
-              color: viewMode === 'table' ? '#ffffff' : 'var(--text-secondary, #475569)',
-              boxShadow: viewMode === 'table' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            📊 Table View
-          </button>
-        </div>
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
 
-        <Button variant="secondary" onClick={handleExportProjectsToExcel} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-          📥 Export Projects to Excel
-        </Button>
-        <Button onClick={() => setCreateProjectOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-          + Create Master Project
-        </Button>
+  useEffect(() => {
+    const el = document.getElementById('kvj-tabs-extra-portal');
+    if (el) setPortalNode(el);
+  }, []);
+
+  const headerActions = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap' }}>
+      {/* Prominent View Mode Segmented Control */}
+      <div style={{ display: 'inline-flex', background: 'var(--bg-sunken, #f1f5f9)', border: '1px solid var(--border, #cbd5e1)', borderRadius: 10, padding: 3, gap: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.06)', flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => setViewMode('card')}
+          style={{
+            padding: '7px 16px',
+            fontSize: 12.5,
+            fontWeight: 700,
+            borderRadius: 8,
+            border: 'none',
+            background: viewMode === 'card' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
+            color: viewMode === 'card' ? '#ffffff' : 'var(--text-secondary, #475569)',
+            boxShadow: viewMode === 'card' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          🎴 Card View
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('table')}
+          style={{
+            padding: '7px 16px',
+            fontSize: 12.5,
+            fontWeight: 700,
+            borderRadius: 8,
+            border: 'none',
+            background: viewMode === 'table' ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
+            color: viewMode === 'table' ? '#ffffff' : 'var(--text-secondary, #475569)',
+            boxShadow: viewMode === 'table' ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          📊 Table View
+        </button>
       </div>
 
+      <Button variant="secondary" onClick={handleExportProjectsToExcel} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+        📥 Export Projects to Excel
+      </Button>
+      <Button onClick={() => setCreateProjectOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+        + Create Master Project
+      </Button>
+    </div>
+  );
 
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {portalNode ? (
+        createPortal(headerActions, portalNode)
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'nowrap', overflowX: 'auto' }}>
+          {headerActions}
+        </div>
+      )}
 
       {/* Main View Display: Card View OR Table View */}
       {viewMode === 'card' ? (

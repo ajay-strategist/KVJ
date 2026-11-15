@@ -33,51 +33,74 @@ export function Tabs({ items = [], defaultTabId, onChange, className = '' }: Tab
   return (
     <div className={`kvj-tabs-container ${className}`}>
       <div
-        className="kvj-tabs-list"
-        role="tablist"
         style={{
-          display: 'inline-flex',
-          gap: 4,
-          padding: 4,
-          background: 'var(--bg-sunken)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
           marginBottom: 20,
+          flexWrap: 'nowrap',
           overflowX: 'auto',
-          scrollbarWidth: 'none',
-          boxShadow: 'var(--e0)',
         }}
       >
-        {safeItems.map((tab) => {
-          const isActive = effectiveActiveTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => handleTabClick(tab.id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '7px 14px',
-                border: '1px solid',
-                borderColor: isActive ? 'var(--border)' : 'transparent',
-                borderRadius: 'var(--radius-sm)',
-                background: isActive ? 'var(--bg-surface)' : 'transparent',
-                color: isActive ? 'var(--brand)' : 'var(--text-secondary)',
-                fontWeight: isActive ? 600 : 500,
-                cursor: 'pointer',
-                fontSize: 13,
-                whiteSpace: 'nowrap',
-                boxShadow: isActive ? 'var(--e1)' : 'none',
-                transition: 'all 0.16s ease',
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+        <div
+          className="kvj-tabs-list"
+          role="tablist"
+          style={{
+            display: 'inline-flex',
+            gap: 4,
+            padding: 4,
+            background: 'var(--bg-sunken)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            boxShadow: 'var(--e0)',
+            flexShrink: 0,
+          }}
+        >
+          {safeItems.map((tab) => {
+            const isActive = effectiveActiveTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => handleTabClick(tab.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '7px 14px',
+                  border: '1px solid',
+                  borderColor: isActive ? 'var(--border)' : 'transparent',
+                  borderRadius: 'var(--radius-sm)',
+                  background: isActive ? 'var(--bg-surface)' : 'transparent',
+                  color: isActive ? 'var(--brand)' : 'var(--text-secondary)',
+                  fontWeight: isActive ? 600 : 500,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  whiteSpace: 'nowrap',
+                  boxShadow: isActive ? 'var(--e1)' : 'none',
+                  transition: 'all 0.16s ease',
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          id="kvj-tabs-extra-portal"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'nowrap',
+            flexShrink: 0,
+          }}
+        />
       </div>
       <div className="kvj-tab-panel" role="tabpanel">
         {safeItems.find((tab) => tab.id === effectiveActiveTab)?.content}
