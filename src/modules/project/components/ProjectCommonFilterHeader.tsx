@@ -71,7 +71,7 @@ export function ProjectCommonFilterHeader({
     ];
   }, [activeTab]);
 
-  // Extract unique clients
+  // Extract unique clients (including registered clients and project-level client names)
   const clientOptions = useMemo(() => {
     const set = new Set<string>();
     safeClients.forEach((c) => {
@@ -79,7 +79,18 @@ export function ProjectCommonFilterHeader({
       else if (c && c.name) set.add(c.name);
     });
     safeProjects.forEach((p) => {
-      if (p && p.client) set.add(p.client);
+      if (p && p.client) {
+        set.add(p.client);
+      } else if (p && p.clientId) {
+        const found = safeClients.find((c: any) => c.id === p.clientId);
+        if (found && found.name) {
+          set.add(found.name);
+        } else {
+          set.add('Independent');
+        }
+      } else {
+        set.add('Independent');
+      }
     });
     return Array.from(set).sort();
   }, [safeClients, safeProjects]);
@@ -373,6 +384,7 @@ export function ProjectCommonFilterHeader({
             allOptionLabel="🏢 All Clients"
             searchPlaceholder="Search clients..."
             emptyMessage="No matching clients found"
+            align="right"
           />
         </div>
 

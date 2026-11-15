@@ -14,6 +14,7 @@ export interface SearchableSelectProps {
   searchPlaceholder?: string;
   allOptionLabel?: string;
   emptyMessage?: string;
+  align?: 'left' | 'right';
   style?: React.CSSProperties;
 }
 
@@ -25,6 +26,7 @@ export function SearchableSelect({
   searchPlaceholder = 'Search...',
   allOptionLabel = 'All',
   emptyMessage = 'No matching options found',
+  align = 'left',
   style,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
@@ -130,8 +132,9 @@ export function SearchableSelect({
           style={{
             position: 'absolute',
             top: 'calc(100% + 4px)',
-            left: 0,
-            width: 'max(100%, 280px)',
+            ...(align === 'right' ? { right: 0, left: 'auto' } : { left: 0, right: 'auto' }),
+            width: 'max(100%, 240px)',
+            maxWidth: 'min(320px, 90vw)',
             maxHeight: 320,
             background: 'var(--bg-panel, #ffffff)',
             border: '1px solid var(--border)',

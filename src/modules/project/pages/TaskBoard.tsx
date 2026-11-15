@@ -404,7 +404,8 @@ export function TaskBoard({
       if (commonFilters?.selectedClient && commonFilters.selectedClient !== 'all') {
         const rawTask = tasks.find((raw: any) => raw.id === t.id);
         const proj = projects.find((p: any) => p.id === rawTask?.projectId);
-        if (!proj || proj.client !== commonFilters.selectedClient) return false;
+        const pClient = proj?.client || (proj?.clientId ? (actualProjectData?.clients || []).find((c: any) => c.id === proj.clientId)?.name : 'Independent') || 'Independent';
+        if (pClient !== commonFilters.selectedClient) return false;
       }
 
       // User-level filtering: Supervisors and assignees
