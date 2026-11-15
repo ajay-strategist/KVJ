@@ -10,6 +10,7 @@ export interface ChecklistMultiSelectProps {
   selectedValues: string[];
   onChange: (values: string[]) => void;
   placeholder?: string;
+  searchPlaceholder?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -19,10 +20,13 @@ export function ChecklistMultiSelect({
   selectedValues,
   onChange,
   placeholder = 'Select Statuses',
+  searchPlaceholder = 'Search statuses...',
   style,
 }: ChecklistMultiSelectProps) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Close popup when clicking outside
   useEffect(() => {
@@ -34,6 +38,22 @@ export function ChecklistMultiSelect({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    } else {
+      setSearch('');
+    }
+  }, [open]);
+
+  const filteredOptions = options.filter((opt) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return opt.label.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q);
+  });
 
   const isAllSelected = (selectedValues.length === 0 || (selectedValues.length === options.length && !selectedValues.includes('__none__'))) && !selectedValues.includes('__none__');
 
@@ -164,9 +184,49 @@ export function ChecklistMultiSelect({
             </button>
           </div>
 
+          {/* Search Box */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ position: 'absolute', left: 8, fontSize: 11, color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={searchPlaceholder}
+              style={{
+                width: '100%',
+                padding: '5px 8px 5px 24px',
+                fontSize: 12,
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-panel, #ffffff)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: 6,
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 10,
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           {/* Checklist Items */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-            {options.map((opt) => {
+            {filteredOptions.map((opt) => {
               const isChecked = !selectedValues.includes('__none__') && (isAllSelected || selectedValues.includes(opt.value));
               return (
                 <label
@@ -199,6 +259,12 @@ export function ChecklistMultiSelect({
                 </label>
               );
             })}
+
+            {filteredOptions.length === 0 && (
+              <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                No matching options found
+              </div>
+            )}
           </div>
         </div>
       )}

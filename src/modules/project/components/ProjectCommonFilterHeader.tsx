@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Button, Badge } from '../../../shared/ui/components';
 import { ChecklistMultiSelect, type ChecklistOption } from '../../../shared/ui/ChecklistMultiSelect';
+import { SearchableSelect, type SearchableOption } from '../../../shared/ui/SearchableSelect';
 import { useEmployee } from '../../employee/hooks/useEmployee';
 import { useAuth } from '../../auth/AuthProvider';
 
@@ -102,6 +103,77 @@ export function ProjectCommonFilterHeader({
     });
     return Array.from(set).sort();
   }, [safeTasks]);
+
+  // Searchable options for Supervisor filter
+  const supervisorOptions: SearchableOption[] = useMemo(() => {
+    const list: SearchableOption[] = [];
+    if (user) {
+      list.push({
+        value: user.id,
+        label: `Me (${user.fullName || 'User'})`,
+        subLabel: user.role || user.email,
+      });
+    }
+    employees
+      .filter((e) => e && e.id && e.id !== user?.id)
+      .forEach((e) => {
+        const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.id;
+        list.push({
+          value: e.id,
+          label: name,
+          subLabel: e.designation || e.department || e.email,
+        });
+      });
+    return list;
+  }, [employees, user]);
+
+  // Searchable options for Member filter
+  const memberOptions: SearchableOption[] = useMemo(() => {
+    const list: SearchableOption[] = [];
+    if (user) {
+      list.push({
+        value: user.id,
+        label: `Me (${user.fullName || 'User'})`,
+        subLabel: user.role || user.email,
+      });
+    }
+    employees
+      .filter((e) => e && e.id && e.id !== user?.id)
+      .forEach((e) => {
+        const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.id;
+        list.push({
+          value: e.id,
+          label: name,
+          subLabel: e.designation || e.department || e.email,
+        });
+      });
+    return list;
+  }, [employees, user]);
+
+  // Searchable options for Project Name filter
+  const projectSelectOptions: SearchableOption[] = useMemo(() => {
+    return safeProjects.map((p) => ({
+      value: p.id,
+      label: `${p.code ? `${p.code} - ` : ''}${p.title || 'Untitled Project'}`,
+      subLabel: p.client || undefined,
+    }));
+  }, [safeProjects]);
+
+  // Searchable options for Task Name filter
+  const taskSelectOptions: SearchableOption[] = useMemo(() => {
+    return taskOptions.map((name) => ({
+      value: name,
+      label: name,
+    }));
+  }, [taskOptions]);
+
+  // Searchable options for Client filter
+  const clientSelectOptions: SearchableOption[] = useMemo(() => {
+    return clientOptions.map((c) => ({
+      value: c,
+      label: c,
+    }));
+  }, [clientOptions]);
 
   const currentStatuses = Array.isArray(filters.selectedStatuses) ? filters.selectedStatuses : [];
 
@@ -238,19 +310,14 @@ export function ProjectCommonFilterHeader({
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Supervisor
           </label>
-          <select
-            className="kvj-select"
+          <SearchableSelect
+            options={supervisorOptions}
             value={filters.selectedSupervisorId || 'all'}
-            onChange={(e) => onFilterChange({ selectedSupervisorId: e.target.value })}
-            style={{ fontSize: 12.5 }}
-          >
-            <option value="all">👔 All Supervisors</option>
-            {user && <option value={user.id}>Me ({user.fullName})</option>}
-            {employees.filter((e) => e && e.id && e.id !== user?.id).map((e) => {
-              const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.id;
-              return <option key={e.id} value={e.id}>{name}</option>;
-            })}
-          </select>
+            onChange={(val) => onFilterChange({ selectedSupervisorId: val })}
+            allOptionLabel="👔 All Supervisors"
+            searchPlaceholder="Search supervisors..."
+            emptyMessage="No matching supervisors found"
+          />
         </div>
 
         {/* 2. Member */}
@@ -258,19 +325,14 @@ export function ProjectCommonFilterHeader({
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Member
           </label>
-          <select
-            className="kvj-select"
+          <SearchableSelect
+            options={memberOptions}
             value={filters.selectedMemberId || 'all'}
-            onChange={(e) => onFilterChange({ selectedMemberId: e.target.value })}
-            style={{ fontSize: 12.5 }}
-          >
-            <option value="all">👥 All Members</option>
-            {user && <option value={user.id}>Me ({user.fullName})</option>}
-            {employees.filter((e) => e && e.id && e.id !== user?.id).map((e) => {
-              const name = `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.id;
-              return <option key={e.id} value={e.id}>{name}</option>;
-            })}
-          </select>
+            onChange={(val) => onFilterChange({ selectedMemberId: val })}
+            allOptionLabel="👥 All Members"
+            searchPlaceholder="Search members..."
+            emptyMessage="No matching members found"
+          />
         </div>
 
         {/* 3. Project Name */}
@@ -278,19 +340,14 @@ export function ProjectCommonFilterHeader({
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Project Name
           </label>
-          <select
-            className="kvj-select"
+          <SearchableSelect
+            options={projectSelectOptions}
             value={filters.selectedProjectId || 'all'}
-            onChange={(e) => onFilterChange({ selectedProjectId: e.target.value })}
-            style={{ fontSize: 12.5 }}
-          >
-            <option value="all">📁 All Projects</option>
-            {projectOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => onFilterChange({ selectedProjectId: val })}
+            allOptionLabel="📁 All Projects"
+            searchPlaceholder="Search projects..."
+            emptyMessage="No matching projects found"
+          />
         </div>
 
         {/* 4. Task Name */}
@@ -298,19 +355,14 @@ export function ProjectCommonFilterHeader({
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Task Name
           </label>
-          <select
-            className="kvj-select"
+          <SearchableSelect
+            options={taskSelectOptions}
             value={filters.selectedTaskName || 'all'}
-            onChange={(e) => onFilterChange({ selectedTaskName: e.target.value })}
-            style={{ fontSize: 12.5 }}
-          >
-            <option value="all">✅ All Tasks</option>
-            {taskOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => onFilterChange({ selectedTaskName: val })}
+            allOptionLabel="✅ All Tasks"
+            searchPlaceholder="Search tasks..."
+            emptyMessage="No matching tasks found"
+          />
         </div>
 
         {/* 5. Client */}
@@ -318,19 +370,14 @@ export function ProjectCommonFilterHeader({
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Client
           </label>
-          <select
-            className="kvj-select"
+          <SearchableSelect
+            options={clientSelectOptions}
             value={filters.selectedClient || 'all'}
-            onChange={(e) => onFilterChange({ selectedClient: e.target.value })}
-            style={{ fontSize: 12.5 }}
-          >
-            <option value="all">🏢 All Clients</option>
-            {clientOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => onFilterChange({ selectedClient: val })}
+            allOptionLabel="🏢 All Clients"
+            searchPlaceholder="Search clients..."
+            emptyMessage="No matching clients found"
+          />
         </div>
 
         {/* 6. Context-Aware Status Checklist MultiSelect */}
@@ -343,6 +390,7 @@ export function ProjectCommonFilterHeader({
             selectedValues={currentStatuses}
             onChange={(vals) => onFilterChange({ selectedStatuses: vals })}
             placeholder="All Statuses"
+            searchPlaceholder="Search statuses..."
             style={{ width: '100%' }}
           />
         </div>

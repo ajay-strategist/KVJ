@@ -13,6 +13,7 @@ export interface SearchableSelectProps {
   placeholder?: string;
   searchPlaceholder?: string;
   allOptionLabel?: string;
+  emptyMessage?: string;
   style?: React.CSSProperties;
 }
 
@@ -20,9 +21,10 @@ export function SearchableSelect({
   options,
   value,
   onChange,
-  placeholder = 'Select Project',
-  searchPlaceholder = 'Search projects...',
-  allOptionLabel = 'All Projects',
+  placeholder = 'Select option',
+  searchPlaceholder = 'Search...',
+  allOptionLabel = 'All',
+  emptyMessage = 'No matching options found',
   style,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
@@ -77,6 +79,7 @@ export function SearchableSelect({
         onClick={() => setOpen(!open)}
         style={{
           width: '100%',
+          minHeight: 38,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -134,7 +137,7 @@ export function SearchableSelect({
             border: '1px solid var(--border)',
             borderRadius: 8,
             boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-            zIndex: 100,
+            zIndex: 9999,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -255,7 +258,7 @@ export function SearchableSelect({
 
             {filteredOptions.length === 0 && (
               <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                No matching projects found
+                {emptyMessage}
               </div>
             )}
           </div>
