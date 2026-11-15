@@ -49,7 +49,7 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
   return (
     <div style={{ marginBottom: 20 }}>
       {/* Top Bar with Add Batch Action */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12, minHeight: 64 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0, flexWrap: 'wrap', gap: 12, minHeight: 64 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
             🎓 Training Batch Management & Analytics

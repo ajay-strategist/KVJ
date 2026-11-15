@@ -55,7 +55,7 @@ export function ProjectsAndTasks() {
 
   return (
     <AppShell>
-      <div style={{ width: '100%', marginBottom: 16 }}>
+      <div style={{ width: '100%' }}>
         <PageHeader 
           title="Projects & Tasks" 
           subtitle="Manage projects, schedules, worklogs, and tasks"

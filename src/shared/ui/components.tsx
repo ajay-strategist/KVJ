@@ -227,7 +227,7 @@ export function PageHeader({
   };
 
   return (
-    <div style={{ marginBottom: 24, width: '100%' }}>
+    <div style={{ marginBottom: isDesktop ? 0 : 16, width: '100%' }}>
       {breadcrumb}
       <div
         style={{
@@ -237,6 +237,7 @@ export function PageHeader({
           justifyContent: isDesktop ? 'space-between' : 'flex-start',
           gap: isDesktop ? 16 : 12,
           minHeight: isDesktop ? 64 : undefined,
+          height: isDesktop ? 64 : undefined,
         }}
       >
         <div style={{ flex: isDesktop ? '1 1 auto' : undefined, minWidth: 0 }}>
