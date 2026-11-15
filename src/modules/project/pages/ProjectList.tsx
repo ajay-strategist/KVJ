@@ -19,6 +19,7 @@ import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
 import { supabase } from '../../../shared/integration/supabase';
 import { ProjectMembersField } from '../components/ProjectMembersField';
 import { ProjectCardStatusButton } from '../components/ProjectCardStatusButton';
+import { ProjectClientDropdown } from '../components/ProjectClientDropdown';
 
 export type ProjectStatusLabel = 'Not Started' | 'In Progress' | 'Completed';
 
@@ -150,7 +151,7 @@ export function ProjectList({
   const tasks = actualProjectData?.tasks || [];
   const allocations = actualProjectData?.allocations || [];
   const timesheets = actualProjectData?.timesheets || [];
-  const { createProject, updateProject, createTask, updateTask, submitTask, deleteTask, deleteProject } = actualProjectData || {};
+  const { createClient, createProject, updateProject, createTask, updateTask, submitTask, deleteTask, deleteProject } = actualProjectData || {};
   const { employees = [] } = useEmployee() || {};
 
   const [taskSessions, setTaskSessions] = useState<any[]>([]);
@@ -206,7 +207,7 @@ export function ProjectList({
 
   const mappedProjects = useMemo(() => {
     return projects.map((p: any) => {
-      const client = clients.find((c: any) => c.id === p.clientId);
+      const client = clients.find((c: any) => c.id === p.clientId || c.id === p.client_id);
       // Only an EXPLICITLY assigned supervisor is shown. Previously, when a
       // project had none, the first manager/lead allocated to it was displayed
       // as the supervisor — which is why projects with no supervisor still
@@ -521,10 +522,29 @@ export function ProjectList({
   const handleCreateProject = async (values: Record<string, unknown>) => {
     const initialStatus = isMgmt ? ((values.status as any) || 'execution') : 'planning';
 
-    // Resolve client: match typed name to existing client, or pass name for new client creation
+    // Resolve client: match typed name to existing client, or create new client record
     const typedName = (clientNameInput || '').trim();
-    const matchedClient = clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
-    const resolvedClientId = matchedClient ? matchedClient.id : undefined;
+    const isIndependent = !typedName || typedName.toLowerCase() === 'independent';
+    const matchedClient = isIndependent
+      ? undefined
+      : clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
+
+    let resolvedClientId: string | null | undefined = matchedClient ? matchedClient.id : undefined;
+
+    if (!isIndependent && !resolvedClientId && typedName) {
+      if (createClient) {
+        const clientRes = await createClient({
+          name: typedName,
+          contactPerson: 'Primary Contact',
+          email: '',
+        });
+        if (clientRes.ok && clientRes.value) {
+          resolvedClientId = clientRes.value.id;
+        }
+      }
+    } else if (isIndependent) {
+      resolvedClientId = null;
+    }
 
     if (!values.supervisorId) {
       toast({ variant: 'error', title: 'Supervisor Required', message: 'Please select a Project Supervisor.' });
@@ -534,8 +554,8 @@ export function ProjectList({
     const res = await createProject({
       title: values.title as string,
       code: (values.code as string) || `KVJ-PRJ-${Math.floor(100 + Math.random() * 900)}`,
-      clientId: resolvedClientId,
-      clientName: !matchedClient ? typedName : undefined,
+      clientId: resolvedClientId !== undefined ? resolvedClientId : null,
+      clientName: !resolvedClientId && !isIndependent ? typedName : undefined,
       status: initialStatus as any,
       priority: 'medium',
       supervisorId: values.supervisorId as string,
@@ -563,8 +583,27 @@ export function ProjectList({
     if (!selectedProject) return;
 
     const typedName = (clientNameInput || '').trim();
-    const matchedClient = clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
-    const resolvedClientId = matchedClient ? matchedClient.id : undefined;
+    const isIndependent = !typedName || typedName.toLowerCase() === 'independent';
+    const matchedClient = isIndependent
+      ? undefined
+      : clients.find((c: any) => c.name.toLowerCase() === typedName.toLowerCase());
+
+    let resolvedClientId: string | null | undefined = matchedClient ? matchedClient.id : undefined;
+
+    if (!isIndependent && !resolvedClientId && typedName) {
+      if (createClient) {
+        const clientRes = await createClient({
+          name: typedName,
+          contactPerson: 'Primary Contact',
+          email: '',
+        });
+        if (clientRes.ok && clientRes.value) {
+          resolvedClientId = clientRes.value.id;
+        }
+      }
+    } else if (isIndependent) {
+      resolvedClientId = null;
+    }
 
     if (!values.supervisorId) {
       toast({ variant: 'error', title: 'Supervisor Required', message: 'Please select a Project Supervisor.' });
@@ -574,8 +613,8 @@ export function ProjectList({
     const res = await updateProject(selectedProject.id as UUID, {
       title: values.title as string,
       code: values.code as string,
-      clientId: resolvedClientId,
-      clientName: !matchedClient ? typedName : undefined,
+      clientId: resolvedClientId !== undefined ? resolvedClientId : null,
+      clientName: !resolvedClientId && !isIndependent ? typedName : undefined,
       status: values.status as any,
       supervisorId: values.supervisorId as string,
       memberIds: Array.isArray(values.memberIds) ? (values.memberIds as string[]) : [],
@@ -1267,7 +1306,7 @@ export function ProjectList({
                     whiteSpace: 'nowrap',
                   }}
                   onClick={() => {
-                    setClientNameInput(selectedProject.client);
+                    setClientNameInput(selectedProject.client === 'Independent' ? '' : selectedProject.client);
                     setEditProjectOpen(true);
                   }}
                 >
@@ -1718,33 +1757,13 @@ export function ProjectList({
           <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
           <TextField name="title" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
 
-          {/* Client: combobox — type a new name or select from existing */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client Organization *</label>
-            <input
-              list="client-datalist"
-              value={clientNameInput}
-              onChange={(e) => setClientNameInput(e.target.value)}
-              placeholder="Type or select client name…"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: 8,
-                border: '1.5px solid var(--border)',
-                background: 'var(--bg-input, var(--bg-surface))',
-                color: 'var(--text-primary)',
-                fontSize: 14,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-            <datalist id="client-datalist">
-              {clients.map((c: any) => <option key={c.id} value={c.name} />)}
-            </datalist>
-            {clientNameInput && !clients.find((c: any) => c.name.toLowerCase() === clientNameInput.toLowerCase()) && (
-              <div style={{ fontSize: 12, color: 'var(--status-warning)', marginTop: 2 }}>⚡ New client will be registered: "{clientNameInput}"</div>
-            )}
-          </div>
+          {/* Client: Searchable custom dropdown with instant auto-registration */}
+          <ProjectClientDropdown
+            value={clientNameInput}
+            onChange={setClientNameInput}
+            clients={clients}
+            placeholder="Type or select client name…"
+          />
 
           <SelectField
             name="supervisorId"
@@ -1814,30 +1833,13 @@ export function ProjectList({
             <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
             <TextField name="title" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
 
-            {/* Client: combobox */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client Organization *</label>
-              <input
-                list="client-datalist"
-                value={clientNameInput}
-                onChange={(e) => setClientNameInput(e.target.value)}
-                placeholder="Type or select client name…"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1.5px solid var(--border)',
-                  background: 'var(--bg-input, var(--bg-surface))',
-                  color: 'var(--text-primary)',
-                  fontSize: 14,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <datalist id="client-datalist">
-                {clients.map((c: any) => <option key={c.id} value={c.name} />)}
-              </datalist>
-            </div>
+            {/* Client: Searchable custom dropdown with instant auto-registration */}
+            <ProjectClientDropdown
+              value={clientNameInput}
+              onChange={setClientNameInput}
+              clients={clients}
+              placeholder="Type or select client name…"
+            />
 
             <SelectField
               name="supervisorId"

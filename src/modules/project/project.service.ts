@@ -65,7 +65,37 @@ export class ProjectService implements IProjectService {
   async createProject(data: Partial<Project>, actor: Actor): Promise<Result<Project>> {
     try {
       const memberIds = data.memberIds;
-      const { memberIds: _, ...dbData } = data as any;
+      const { memberIds: _, ...rawDbData } = data as any;
+      const dbData = { ...rawDbData };
+
+      const clientName = typeof dbData.clientName === 'string' ? dbData.clientName.trim() : '';
+      delete dbData.clientName;
+
+      let resolvedClientId = dbData.clientId;
+      if (!resolvedClientId && clientName && clientName.toLowerCase() !== 'independent') {
+        // Look up existing client in repository (case-insensitive)
+        const allClientsPage = await this.clientRepo.findMany({ pageSize: 1000 });
+        const existing = (allClientsPage.data || []).find(
+          (c) => c.name.trim().toLowerCase() === clientName.toLowerCase()
+        );
+        if (existing) {
+          resolvedClientId = existing.id;
+        } else {
+          const newClient = await this.clientRepo.create({
+            name: clientName,
+            contactPerson: 'Primary Contact',
+            email: '',
+          }, actor);
+          resolvedClientId = newClient.id;
+        }
+      } else if (clientName && clientName.toLowerCase() === 'independent') {
+        resolvedClientId = null;
+      }
+
+      if (resolvedClientId !== undefined) {
+        dbData.clientId = resolvedClientId;
+      }
+
       const project = await this.projectRepo.create(dbData, actor);
       
       if (Array.isArray(memberIds)) {
@@ -92,7 +122,40 @@ export class ProjectService implements IProjectService {
   async updateProject(projectId: UUID, patch: Partial<Project>, actor: Actor): Promise<Result<Project>> {
     try {
       const memberIds = patch.memberIds;
-      const { memberIds: _, ...dbData } = patch as any;
+      const { memberIds: _, ...rawDbData } = patch as any;
+      const dbData = { ...rawDbData };
+
+      const clientName = typeof dbData.clientName === 'string' ? dbData.clientName.trim() : undefined;
+      delete dbData.clientName;
+
+      let resolvedClientId = dbData.clientId;
+      if (resolvedClientId === undefined && clientName !== undefined) {
+        if (!clientName || clientName.toLowerCase() === 'independent') {
+          resolvedClientId = null;
+        } else {
+          const allClientsPage = await this.clientRepo.findMany({ pageSize: 1000 });
+          const existing = (allClientsPage.data || []).find(
+            (c) => c.name.trim().toLowerCase() === clientName.toLowerCase()
+          );
+          if (existing) {
+            resolvedClientId = existing.id;
+          } else {
+            const newClient = await this.clientRepo.create({
+              name: clientName,
+              contactPerson: 'Primary Contact',
+              email: '',
+            }, actor);
+            resolvedClientId = newClient.id;
+          }
+        }
+      } else if (clientName && clientName.toLowerCase() === 'independent') {
+        resolvedClientId = null;
+      }
+
+      if (resolvedClientId !== undefined) {
+        dbData.clientId = resolvedClientId;
+      }
+
       const project = await this.projectRepo.update(projectId, dbData, actor);
 
       if (Array.isArray(memberIds)) {
