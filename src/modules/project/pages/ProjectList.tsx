@@ -18,6 +18,7 @@ import { ChecklistMultiSelect } from '../../../shared/ui/ChecklistMultiSelect';
 import { SearchableSelect } from '../../../shared/ui/SearchableSelect';
 import { supabase } from '../../../shared/integration/supabase';
 import { ProjectMembersField } from '../components/ProjectMembersField';
+import { ProjectCardStatusButton } from '../components/ProjectCardStatusButton';
 
 export type ProjectStatusLabel = 'Not Started' | 'In Progress' | 'Completed';
 
@@ -94,6 +95,7 @@ export function ProjectList({
   const [clientNameInput, setClientNameInput] = useState('');
 
   const [projectsList, setProjectsList] = useState<ProjectCardData[]>([]);
+  const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
 
   const { listSessions } = useTaskSessions();
   const [allSessions, setAllSessions] = useState<any[]>([]);
@@ -588,6 +590,55 @@ export function ProjectList({
     }
   };
 
+  const handleQuickProjectStatusChange = async (
+    projectId: string,
+    newStatusValue: string,
+    newStatusLabel: ProjectStatusLabel
+  ) => {
+    const prevProj = projectsList.find((p) => p.id === projectId);
+    if (!prevProj || prevProj.status === newStatusLabel) return;
+
+    setUpdatingProjectId(projectId);
+
+    // Optimistic UI update
+    setProjectsList((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, status: newStatusLabel } : p))
+    );
+
+    try {
+      const res = await updateProject(projectId as UUID, { status: newStatusValue as any });
+      if (res.ok) {
+        toast({
+          variant: 'success',
+          title: 'Status Updated',
+          message: `Project "${prevProj.title}" status changed to ${newStatusLabel}.`,
+        });
+      } else {
+        // Revert on failure
+        setProjectsList((prev) =>
+          prev.map((p) => (p.id === projectId ? { ...p, status: prevProj.status } : p))
+        );
+        toast({
+          variant: 'error',
+          title: 'Update Failed',
+          message: res.error || 'Failed to update project status',
+        });
+      }
+    } catch (err: any) {
+      // Revert on error
+      setProjectsList((prev) =>
+        prev.map((p) => (p.id === projectId ? { ...p, status: prevProj.status } : p))
+      );
+      toast({
+        variant: 'error',
+        title: 'Update Failed',
+        message: err.message || 'An unexpected error occurred while updating status',
+      });
+    } finally {
+      setUpdatingProjectId(null);
+    }
+  };
+
   const handleAddTaskSubmit = async (values: Record<string, unknown>) => {
     if (!selectedProject) return;
 
@@ -891,11 +942,13 @@ export function ProjectList({
       );
     }},
     { key: 'status', header: 'Status', render: (p) => {
-      const status = p?.status || 'Unknown';
+      if (!p) return <span>—</span>;
       return (
-        <Badge tone={status === 'Completed' ? 'success' : status === 'In Progress' ? 'progress' : 'neutral'}>
-          {status}
-        </Badge>
+        <ProjectCardStatusButton
+          status={p.status}
+          onChange={(newVal, newLabel) => handleQuickProjectStatusChange(p.id, newVal, newLabel)}
+          loading={updatingProjectId === p.id}
+        />
       );
     }},
     { key: 'actions', header: 'Actions', render: (p) => (
@@ -1068,7 +1121,7 @@ export function ProjectList({
               >
                 <div>
                   {/* Top Bar: Code & Status */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8 }}>
                     <div>
                       <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', letterSpacing: '0.05em' }}>
                         {p.code}
@@ -1078,9 +1131,11 @@ export function ProjectList({
                       </h3>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Client: {p.client}</div>
                     </div>
-                    <Badge tone={p.status === 'Completed' ? 'success' : p.status === 'In Progress' ? 'progress' : 'neutral'}>
-                      {p.status}
-                    </Badge>
+                    <ProjectCardStatusButton
+                      status={p.status}
+                      onChange={(newVal, newLabel) => handleQuickProjectStatusChange(p.id, newVal, newLabel)}
+                      loading={updatingProjectId === p.id}
+                    />
                   </div>
 
                   {/* Supervisor */}

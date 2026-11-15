@@ -227,15 +227,16 @@ export function PageHeader({
   };
 
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div style={{ marginBottom: 24, width: '100%' }}>
       {breadcrumb}
       <div
         style={{
           display: 'flex',
           flexDirection: isDesktop ? 'row' : 'column',
-          alignItems: isDesktop ? 'flex-start' : 'stretch',
+          alignItems: isDesktop ? 'center' : 'stretch',
           justifyContent: isDesktop ? 'space-between' : 'flex-start',
           gap: isDesktop ? 16 : 12,
+          minHeight: isDesktop ? 64 : undefined,
         }}
       >
         <div style={{ flex: isDesktop ? '1 1 auto' : undefined, minWidth: 0 }}>

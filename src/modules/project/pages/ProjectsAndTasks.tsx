@@ -55,7 +55,7 @@ export function ProjectsAndTasks() {
 
   return (
     <AppShell>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ width: '100%', marginBottom: 16 }}>
         <PageHeader 
           title="Projects & Tasks" 
           subtitle="Manage projects, schedules, worklogs, and tasks"

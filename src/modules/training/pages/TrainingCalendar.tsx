@@ -1381,7 +1381,7 @@ export function TrainingCalendar() {
         marginBottom: 14,
         boxShadow: 'var(--e1)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', minHeight: 64 }}>
           
           {/* Title Block */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
