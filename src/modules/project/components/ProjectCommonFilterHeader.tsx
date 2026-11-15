@@ -106,7 +106,6 @@ export function ProjectCommonFilterHeader({
   // Compute active filters count
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (filters.searchQuery) count++;
     if (filters.selectedProjectId && filters.selectedProjectId !== 'all') count++;
     if (filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all') count++;
     if (filters.selectedTaskName && filters.selectedTaskName !== 'all') count++;
@@ -165,22 +164,7 @@ export function ProjectCommonFilterHeader({
 
       {/* Filter Items Flex Layout */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-        {/* 1. Search Bar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Search Bar
-          </label>
-          <input
-            type="text"
-            className="kvj-input"
-            value={filters.searchQuery || ''}
-            onChange={(e) => onFilterChange({ searchQuery: e.target.value })}
-            placeholder="Search title, code, client…"
-            style={{ fontSize: 12.5 }}
-          />
-        </div>
-
-        {/* 2. Employee (Supervisor / Member) */}
+        {/* 1. Employee (Supervisor / Member) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Employee (Supervisor / Member)
@@ -302,12 +286,6 @@ export function ProjectCommonFilterHeader({
       {/* Active Filter Chips */}
       {activeFiltersCount > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border, #e2e8f0)' }}>
-          {filters.searchQuery && (
-            <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              Search: "{filters.searchQuery}"
-              <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => onFilterChange({ searchQuery: '' })}>×</span>
-            </Badge>
-          )}
           {filters.selectedEmployeeId && filters.selectedEmployeeId !== 'all' && (
             <Badge tone="neutral" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               Employee: {selectedEmpName}
