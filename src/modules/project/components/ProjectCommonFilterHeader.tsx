@@ -121,7 +121,7 @@ export function ProjectCommonFilterHeader({
         list.push({
           value: e.id,
           label: name,
-          subLabel: e.designation || e.department || e.email,
+          subLabel: e.designation || e.role || e.email,
         });
       });
     return list;
@@ -144,7 +144,7 @@ export function ProjectCommonFilterHeader({
         list.push({
           value: e.id,
           label: name,
-          subLabel: e.designation || e.department || e.email,
+          subLabel: e.designation || e.role || e.email,
         });
       });
     return list;

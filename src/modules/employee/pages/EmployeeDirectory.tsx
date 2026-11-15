@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
-import { PageHeader, Avatar, SearchInput, Button, Badge, SectionHeader } from '../../../shared/ui/components';
+import { PageHeader, Avatar, SearchInput, Button, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { Tabs } from '../../../shared/ui/Tabs';
 import { useEmployee } from '../hooks/useEmployee';
@@ -1076,7 +1076,6 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
             </div>
           )}
 
-          <SectionHeader title="Today's Employee Status & Current Work" />
           <DataTable
             columns={[
               {
