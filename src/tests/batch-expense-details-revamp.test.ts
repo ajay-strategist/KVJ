@@ -198,6 +198,43 @@ describe('BatchExpenseDetailsDrawer Revamp & Calculations', () => {
       };
       expect(isSessionForBatch(wsOct28, batchData.code, undefined, batchData as any, optionsForData)).toBe(false);
       expect(isSessionForBatch(wsOct28, batchExcel.code, undefined, batchExcel as any, optionsForExcel)).toBe(true);
+
+      // 7. Non-training sessions (Work From Home, Office) must NEVER match even on scheduled dates
+      const wsWFH = {
+        clock_in: '2026-11-09T03:30:00+00:00',
+        work_type: 'Work From Home',
+        notes: '',
+      };
+      const wsOffice = {
+        clock_in: '2026-11-09T03:30:00+00:00',
+        work_type: 'Office',
+        notes: '',
+      };
+      expect(isSessionForBatch(wsWFH, batchData.code, undefined, batchData as any, optionsForData)).toBe(false);
+      expect(isSessionForBatch(wsOffice, batchData.code, undefined, batchData as any, optionsForData)).toBe(false);
+
+      // 8. Cross-college isolation: Christ & MIM sessions and claims must NEVER match SJCET batch
+      const wsChrist = {
+        clock_in: '2026-11-09T03:30:00+00:00',
+        work_type: 'Training: Christ - 2 BCOM Professional - Batch 1',
+        notes: '',
+      };
+      const christClaim = JSON.stringify({
+        personName: 'Anoop Baiju',
+        expenseType: 'Tea break',
+        batchName: 'Christ - 2 BCOM Professional - Batch 1',
+        expenseDate: '2026-11-09',
+      });
+      const mimClaim = JSON.stringify({
+        personName: 'Anoop Baiju',
+        expenseType: 'Bus',
+        batchName: 'MIM - UG - Batch 1',
+        expenseDate: '2026-11-11',
+      });
+
+      expect(isSessionForBatch(wsChrist, batchData.code, undefined, batchData as any, optionsForData)).toBe(false);
+      expect(isBatchMatch(christClaim, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '2026-11-09' })).toBe(false);
+      expect(isBatchMatch(mimClaim, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '2026-11-11' })).toBe(false);
     });
   });
 

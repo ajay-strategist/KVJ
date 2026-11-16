@@ -143,6 +143,8 @@ export function normalizeBatchKey(str?: string | null): string {
     .replace(/^batch\s*\(/i, '')
     .replace(/\)$/, '')
     .replace(/^batch\s*-\s*/i, '')
+    // Strip location prefix if embedded in notes like "Classification: Training, Location: ..."
+    .replace(/^.*?location\s*[:\-]?\s*/gi, '')
     // Remove prefixes like "Training: ", "Class: ", "Location: ", "Batch: "
     .replace(/^(?:training|class|batch|location)\s*[:\-]?\s*/gi, '')
     // Remove academic years like 2026-2027
@@ -189,23 +191,69 @@ export function isBatchMatch(
     return batchObj.id === expBatchId;
   }
 
-  const dateToCheck = options?.recordDate || parsedDate;
+  const fullText = (typeof notes === 'string' ? notes : JSON.stringify(notes)).toLowerCase();
 
-  // 2. Scheduled calendar dates check if available
-  if (dateToCheck && options?.siblingScheduledDates?.has(dateToCheck) && batchObj?.id) {
-    const scheduledBatchId = options.siblingScheduledDates.get(dateToCheck);
-    if (scheduledBatchId) {
-      return scheduledBatchId === batchObj.id;
+  // 2. Cross-college isolation: prevent claims from other colleges from leaking
+  let targetCollege = (batchObj?.college || '').toLowerCase().trim();
+  if (!targetCollege && targetBatchCode) {
+    targetCollege = targetBatchCode.split('-')[0].toLowerCase().trim();
+  }
+  if (!targetCollege && targetBatchName) {
+    targetCollege = targetBatchName.split('-')[0].toLowerCase().trim();
+  }
+
+  const KNOWN_COLLEGES = ['sjcet', 'christ', 'mim', 'sb', 'toch', 'asian school of business', 'asb'];
+  if (targetCollege) {
+    for (const c of KNOWN_COLLEGES) {
+      if (c !== targetCollege && fullText.includes(c)) {
+        return false;
+      }
     }
   }
 
-  // 3. Disambiguate when multiple sibling batches share the same code
+  if (!expBatch) return false;
+
+  const kExp = normalizeBatchKey(expBatch);
+  if (!kExp) return false;
+
+  // 3. Candidate target keys from batch identifiers
+  const candidateKeys = new Set<string>();
+  if (targetBatchName) candidateKeys.add(normalizeBatchKey(targetBatchName));
+  if (targetBatchCode) candidateKeys.add(normalizeBatchKey(targetBatchCode));
+  if (batchObj?.code) candidateKeys.add(normalizeBatchKey(batchObj.code));
+  if (batchObj?.trainingName) candidateKeys.add(normalizeBatchKey(batchObj.trainingName));
+
+  if (batchObj) {
+    const col = batchObj.college || '';
+    const prog = (batchObj.program && batchObj.program !== 'undefined') ? batchObj.program : '';
+    const yr = batchObj.academicYear || (batchObj as any).academic_year || '';
+    const bNo = batchObj.batchNo || (batchObj as any).batch_no || '';
+    const course = batchObj.trainingName || (batchObj as any).training_name || '';
+    if (col && bNo) {
+      candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${bNo}`));
+      candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${yr} ${bNo}`));
+      if (course) {
+        candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${bNo} ${course}`));
+        candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${yr} ${bNo} ${course}`));
+      }
+    }
+  }
+
+  const currentCourse = (batchObj?.trainingName || (batchObj as any)?.training_name || '').toLowerCase().trim();
+  const mentionsOurCourse = Boolean(currentCourse && currentCourse.length > 2 && fullText.includes(currentCourse));
+
+  const baseKeyMatches = candidateKeys.has(kExp) || (mentionsOurCourse && Boolean(targetCollege && fullText.includes(targetCollege)));
+  if (!baseKeyMatches) {
+    return false;
+  }
+
+  const dateToCheck = options?.recordDate || parsedDate;
+
+  // 4. Disambiguate when multiple sibling batches share the same code
   if (batchObj && options?.siblingBatches && options.siblingBatches.length > 1) {
-    const fullText = (typeof notes === 'string' ? notes : JSON.stringify(notes)).toLowerCase();
-    const currentCourse = (batchObj.trainingName || (batchObj as any).training_name || '').toLowerCase().trim();
+    const otherSiblings = options.siblingBatches.filter((s: any) => s.id !== batchObj.id);
 
     // Check if notes text mentions another sibling batch's course title
-    const otherSiblings = options.siblingBatches.filter((s: any) => s.id !== batchObj.id);
     for (const other of otherSiblings) {
       const otherCourse = (other.training_name || other.trainingName || '').toLowerCase().trim();
       if (otherCourse && otherCourse.length > 2 && fullText.includes(otherCourse)) {
@@ -214,7 +262,7 @@ export function isBatchMatch(
     }
 
     // If text explicitly mentions our course name, match!
-    if (currentCourse && currentCourse.length > 2 && fullText.includes(currentCourse)) {
+    if (mentionsOurCourse) {
       return true;
     }
 
@@ -233,39 +281,17 @@ export function isBatchMatch(
         }
       }
     }
-  }
 
-  if (!expBatch) return false;
-
-  const kExp = normalizeBatchKey(expBatch);
-  if (!kExp) return false;
-
-  // 4. Candidate target keys from batch identifiers
-  const candidateKeys = new Set<string>();
-  if (targetBatchName) candidateKeys.add(normalizeBatchKey(targetBatchName));
-  if (targetBatchCode) candidateKeys.add(normalizeBatchKey(targetBatchCode));
-  if (batchObj?.code) candidateKeys.add(normalizeBatchKey(batchObj.code));
-  if (batchObj?.trainingName) candidateKeys.add(normalizeBatchKey(batchObj.trainingName));
-
-  if (batchObj) {
-    const col = batchObj.college || '';
-    const prog = (batchObj.program && batchObj.program !== 'undefined') ? batchObj.program : '';
-    const yr = batchObj.academicYear || (batchObj as any).academic_year || '';
-    const bNo = batchObj.batchNo || (batchObj as any).batch_no || '';
-    if (col && bNo) {
-      candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${bNo}`));
-      candidateKeys.add(normalizeBatchKey(`${col} ${prog} ${yr} ${bNo}`));
+    // Scheduled calendar dates check for sibling disambiguation
+    if (dateToCheck && options?.siblingScheduledDates?.has(dateToCheck)) {
+      const scheduledBatchId = options.siblingScheduledDates.get(dateToCheck);
+      if (scheduledBatchId) {
+        return scheduledBatchId === batchObj.id;
+      }
     }
   }
 
-  // Exact normalized key equality check to prevent cross-batch leakage
-  for (const k of candidateKeys) {
-    if (k && kExp === k) {
-      return true;
-    }
-  }
-
-  return false;
+  return true;
 }
 
 export function isSessionForBatch(
@@ -276,6 +302,19 @@ export function isSessionForBatch(
   options?: BatchMatchOptions
 ): boolean {
   if (!ws) return false;
+
+  // Non-training sessions (Work From Home, Office, etc.) can NEVER match a training batch
+  const workType = (ws.work_type || '').trim().toLowerCase();
+  if (
+    workType === 'work from home' ||
+    workType === 'office' ||
+    workType === 'general' ||
+    workType === 'leave' ||
+    workType === 'holiday'
+  ) {
+    return false;
+  }
+
   const sessionDate = ws.clock_in ? ws.clock_in.slice(0, 10) : undefined;
   const textCandidates = [ws.work_type, ws.notes].filter(Boolean) as string[];
   for (const text of textCandidates) {
