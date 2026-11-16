@@ -18,8 +18,6 @@ describe('Training Batch Checklist Sync & Multi-User Persistence (Issue B)', () 
   const mockCourse: Course = {
     id: 'course-1',
     title: 'Excel Expert 365',
-    category: 'Analytics',
-    level: 'Advanced',
     durationHours: 30,
     checklist: [
       'Create Google Classroom',
@@ -29,7 +27,7 @@ describe('Training Batch Checklist Sync & Multi-User Persistence (Issue B)', () 
     ],
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
-  };
+  } as unknown as Course;
 
   const mockBatch: Batch = {
     id: 'batch-1',
@@ -47,7 +45,7 @@ describe('Training Batch Checklist Sync & Multi-User Persistence (Issue B)', () 
     endDate: '2026-11-15',
     createdAt: '2026-10-01T00:00:00Z',
     updatedAt: '2026-10-01T00:00:00Z',
-  };
+  } as unknown as Batch;
 
   it('toCardVM calculates totalTasks from course checklist if batch totalTasks is 0', () => {
     const vm = toCardVM(mockBatch, [mockCourse], []);
