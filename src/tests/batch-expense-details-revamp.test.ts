@@ -235,6 +235,23 @@ describe('BatchExpenseDetailsDrawer Revamp & Calculations', () => {
       expect(isSessionForBatch(wsChrist, batchData.code, undefined, batchData as any, optionsForData)).toBe(false);
       expect(isBatchMatch(christClaim, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '2026-11-09' })).toBe(false);
       expect(isBatchMatch(mimClaim, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '2026-11-11' })).toBe(false);
+
+      // 9. Ajay Thomas claims for Excel Expert 365 or dated in October must NEVER match Data Analytics
+      const ajayExcelClaim = JSON.stringify({
+        personName: 'Ajay Thomas',
+        expenseType: 'Self Travel',
+        batchName: 'SJCET - 2 MBA - Batch 1 — Excel Expert 365',
+        expenseDate: '2026-11-04',
+      });
+      const ajayOctClaimGB = JSON.stringify({
+        personName: 'Ajay Thomas',
+        expenseType: 'Self Travel',
+        batch: 'SJCET - 2 MBA - Batch 1',
+      });
+      expect(isBatchMatch(ajayExcelClaim, batchData.code, undefined, batchData as any, optionsForData)).toBe(false);
+      expect(isBatchMatch(ajayOctClaimGB, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '21/10/2026' })).toBe(false);
+      expect(isBatchMatch(ajayOctClaimGB, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '23/10/2026' })).toBe(false);
+      expect(isBatchMatch(ajayOctClaimGB, batchData.code, undefined, batchData as any, { ...optionsForData, recordDate: '06/11/2026' })).toBe(false);
     });
   });
 

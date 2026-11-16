@@ -98,6 +98,20 @@ export function parseDateStr(val?: string | null): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+export function toISODate(val?: string | null): string {
+  if (!val || val === '—') return '';
+  const ymd = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (ymd) return `${ymd[1]}-${String(Number(ymd[2])).padStart(2, '0')}-${String(Number(ymd[3])).padStart(2, '0')}`;
+  const dmy = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmy) return `${dmy[3]}-${String(Number(dmy[2])).padStart(2, '0')}-${String(Number(dmy[1])).padStart(2, '0')}`;
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function formatDate(val?: string | null): string {
   if (!val) return '—';
   const d = parseDateStr(val);
@@ -211,12 +225,33 @@ export function isBatchMatch(
     }
   }
 
+  // 3. Course title mismatch: if notes mention another course and do not mention our course, reject
+  const currentCourse = (batchObj?.trainingName || (batchObj as any)?.training_name || '').toLowerCase().trim();
+  const mentionsOurCourse = Boolean(currentCourse && currentCourse.length > 2 && fullText.includes(currentCourse));
+
+  const KNOWN_COURSES = [
+    'excel expert',
+    'excel expert 365',
+    'power bi',
+    'business analytics',
+    'python for beginners',
+    'data analytics',
+    'advanced excel',
+  ];
+  if (currentCourse) {
+    for (const c of KNOWN_COURSES) {
+      if (c !== currentCourse && !currentCourse.includes(c) && fullText.includes(c)) {
+        return false;
+      }
+    }
+  }
+
   if (!expBatch) return false;
 
   const kExp = normalizeBatchKey(expBatch);
   if (!kExp) return false;
 
-  // 3. Candidate target keys from batch identifiers
+  // 4. Candidate target keys from batch identifiers
   const candidateKeys = new Set<string>();
   if (targetBatchName) candidateKeys.add(normalizeBatchKey(targetBatchName));
   if (targetBatchCode) candidateKeys.add(normalizeBatchKey(targetBatchCode));
@@ -239,17 +274,23 @@ export function isBatchMatch(
     }
   }
 
-  const currentCourse = (batchObj?.trainingName || (batchObj as any)?.training_name || '').toLowerCase().trim();
-  const mentionsOurCourse = Boolean(currentCourse && currentCourse.length > 2 && fullText.includes(currentCourse));
-
   const baseKeyMatches = candidateKeys.has(kExp) || (mentionsOurCourse && Boolean(targetCollege && fullText.includes(targetCollege)));
   if (!baseKeyMatches) {
     return false;
   }
 
-  const dateToCheck = options?.recordDate || parsedDate;
+  // 5. Creation Date Boundary Check:
+  // A batch cannot have expenses from before its creation date
+  const dateToCheck = toISODate(options?.recordDate || parsedDate);
+  const batchCreatedAt = (batchObj as any)?.created_at || (batchObj as any)?.createdAt;
+  if (batchCreatedAt && dateToCheck) {
+    const createdDate = batchCreatedAt.slice(0, 10);
+    if (dateToCheck < createdDate) {
+      return false;
+    }
+  }
 
-  // 4. Disambiguate when multiple sibling batches share the same code
+  // 6. Disambiguate when multiple sibling batches share the same code
   if (batchObj && options?.siblingBatches && options.siblingBatches.length > 1) {
     const otherSiblings = options.siblingBatches.filter((s: any) => s.id !== batchObj.id);
 
@@ -264,22 +305,6 @@ export function isBatchMatch(
     // If text explicitly mentions our course name, match!
     if (mentionsOurCourse) {
       return true;
-    }
-
-    // Check date against batch creation timestamp:
-    // A batch created on 2026-11-08 cannot have historical records from 2026-10-26
-    const batchCreatedAt = (batchObj as any).created_at || (batchObj as any).createdAt;
-    if (batchCreatedAt && dateToCheck) {
-      const createdDate = batchCreatedAt.slice(0, 10);
-      if (dateToCheck < createdDate) {
-        const olderSiblings = otherSiblings.filter((s: any) => {
-          const sCreated = (s.created_at || s.createdAt || '').slice(0, 10);
-          return sCreated && sCreated <= dateToCheck;
-        });
-        if (olderSiblings.length > 0) {
-          return false;
-        }
-      }
     }
 
     // Scheduled calendar dates check for sibling disambiguation
@@ -472,7 +497,7 @@ function parseExpenseRow(raw: RawExpenseClaim): ExpenseRow {
     vehicle = parsed.vehicle;
     km = parsed.km;
     if (parsed.expenseDate) {
-      rawDate = parsed.expenseDate;
+      rawDate = toISODate(parsed.expenseDate);
       dateStr = formatDate(parsed.expenseDate);
     }
   } catch { /* noop */ }
@@ -773,18 +798,18 @@ export function BatchExpenseDetailsDrawer({
       let siblingBatches: any[] = [];
       const siblingScheduledDates = new Map<string, string>();
       try {
-        if (batch?.code) {
-          if (allBatches && allBatches.length > 0) {
-            const currentNorm = normalizeBatchKey(batch.code);
-            siblingBatches = allBatches.filter((b) => normalizeBatchKey(b.code) === currentNorm);
-          } else {
-            const { data: sBatches } = await supabase
-              .from('flwdsk_batches')
-              .select('id, code, training_name, created_at, start_date, end_date')
-              .eq('code', batch.code)
-              .is('deleted_at', null);
-            siblingBatches = sBatches || [];
-          }
+        const batchCodeToSearch = batch?.code || batchCode || '';
+        if (batchCodeToSearch) {
+          const { data: sBatches } = await supabase
+            .from('flwdsk_batches')
+            .select('id, code, training_name, created_at, start_date, end_date')
+            .eq('code', batch?.code || batchCodeToSearch)
+            .is('deleted_at', null);
+          siblingBatches = (sBatches || []).map((s: any) => ({
+            ...s,
+            trainingName: s.training_name,
+            createdAt: s.created_at,
+          }));
 
           if (siblingBatches.length > 1) {
             const siblingIds = siblingBatches.map((s) => s.id);
@@ -794,7 +819,7 @@ export function BatchExpenseDetailsDrawer({
               .in('batch_id', siblingIds);
             cals?.forEach((c: any) => {
               if (c.date && c.batch_id) {
-                siblingScheduledDates.set(c.date.slice(0, 10), c.batch_id);
+                siblingScheduledDates.set(toISODate(c.date), c.batch_id);
               }
             });
           }
@@ -814,10 +839,10 @@ export function BatchExpenseDetailsDrawer({
         if (data && data.length > 0) {
           data
             .filter((r: RawExpenseClaim) => {
-              let rawDate = r.created_at ? r.created_at.slice(0, 10) : '';
+              let rawDate = r.created_at ? toISODate(r.created_at) : '';
               try {
                 const p = JSON.parse(r.notes || '{}');
-                if (p.expenseDate) rawDate = p.expenseDate;
+                if (p.expenseDate) rawDate = toISODate(p.expenseDate);
               } catch {}
               return isBatchMatch(r.notes, batchName, batchCode, batch, {
                 recordDate: rawDate,
@@ -836,7 +861,7 @@ export function BatchExpenseDetailsDrawer({
           local
             .filter((r: any) => {
               const notesField = r.notes || r.batch || '';
-              const rawDate = r.date || (r.createdAt ? r.createdAt.slice(0, 10) : '');
+              const rawDate = toISODate(r.date || (r.createdAt ? r.createdAt.slice(0, 10) : ''));
               return isBatchMatch(r.batch || notesField, batchName, batchCode, batch, {
                 recordDate: rawDate,
                 siblingBatches,
@@ -845,10 +870,11 @@ export function BatchExpenseDetailsDrawer({
             })
             .forEach((r: any) => {
               if (!fetchedExpenses.find((f) => f.id === r.id)) {
+                const isoDate = toISODate(r.date || (r.createdAt ? r.createdAt.slice(0, 10) : ''));
                 fetchedExpenses.push({
                   id: r.id,
                   date: r.date || formatDate(r.createdAt),
-                  rawDate: r.date || (r.createdAt ? r.createdAt.slice(0, 10) : ''),
+                  rawDate: isoDate,
                   expenseType: r.type || 'Expense',
                   category: r.category || 'Training Expense',
                   amount: Number(r.amount) || 0,
