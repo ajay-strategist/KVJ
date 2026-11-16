@@ -152,6 +152,779 @@
   color-scheme: dark;
 }
 
+/* =============================================================================
+   SEASONAL FESTIVAL THEMES (FlowDesk Festival Theme System)
+   ============================================================================= */
+
+/* ── 1. Christmas Theme: Festive Red & Snow (Winter Wonderland & Frosted Glass) ── */
+[data-theme='christmas'] {
+  color-scheme: light;
+
+  /* Brand */
+  --brand: #DC2626;
+  --brand-hover: #B91C1C;
+  --brand-contrast: #FFFFFF;
+  --brand-muted: #FEE2E2;
+
+  /* Accent */
+  --accent: #166534;
+  --accent-hover: #14532D;
+  --accent-muted: #DCFCE7;
+
+  --accent-gold: #D4A84F;
+  --accent-gold-muted: #FEF3C7;
+
+  /* Backgrounds */
+  --bg-app: #F4F8FC;
+  --bg-surface: rgb(255 255 255 / 78%);
+  --bg-panel: rgb(255 255 255 / 96%);
+  --bg-sunken: #EAF1F8;
+  --bg-hover: #F1F5F9;
+  --bg-active: #FEE2E2;
+  --bg-form: rgb(255 255 255 / 94%);
+  --bg-table: rgb(255 255 255 / 85%);
+  --bg-card: rgb(255 255 255 / 78%);
+  --bg-overlay: rgb(15 23 42 / 40%);
+  --overlay-blur: 4px;
+
+  /* Winter Wonderland Snow Landscape Canvas */
+  --app-canvas:
+    radial-gradient(circle at 75% 6%, rgb(255 255 255 / 95%) 0%, rgb(254 243 199 / 35%) 18%, transparent 45%),
+    radial-gradient(ellipse at 15% 100%, rgb(255 255 255 / 98%) 0%, transparent 60%),
+    radial-gradient(ellipse at 85% 100%, rgb(255 255 255 / 95%) 0%, transparent 55%),
+    linear-gradient(180deg, #D4E5F5 0%, #E2EFF9 25%, #EDF5FD 55%, #F7FAFD 85%, #FFFFFF 100%);
+
+  /* Borders */
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-focus: #DC2626;
+  --border-color: #E2E8F0;
+
+  /* Glass */
+  --glass-blur: 18px;
+  --glass-border: rgb(255 255 255 / 85%);
+
+  --glow-ambient:
+    0 0 48px rgb(220 38 38 / 6%),
+    0 0 80px rgb(147 197 253 / 8%);
+
+  /* Typography */
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+  --text-disabled: #94A3B8;
+  --text-inverse: #FFFFFF;
+  --text-brand: #DC2626;
+
+  /* Status Colors */
+  --status-success: #166534; --status-success-bg: #DCFCE7; --status-success-border: #86EFAC;
+  --status-warning: #B45309; --status-warning-bg: #FEF3C7; --status-warning-border: #FDE68A;
+  --status-danger:  #DC2626; --status-danger-bg:  #FEE2E2; --status-danger-border:  #FECACA;
+  --status-info:    #2563EB; --status-info-bg:    #DBEAFE; --status-info-border:    #BFDBFE;
+  --status-progress:#DC2626; --status-progress-bg:#FEE2E2; --status-progress-border:#FECACA;
+  --status-neutral: #64748B; --status-neutral-bg: #F1F5F9; --status-neutral-border: #E2E8F0;
+  --status-purple:  #7C3AED; --status-purple-bg:  #EDE9FE; --status-purple-border:  #DDD6FE;
+
+  --bg-holiday-solid: #FEE2E2;
+  --bg-today-solid: #EFF6FF;
+  --text-holiday: #DC2626;
+  --text-today: #1E40AF;
+
+  --focus-ring: rgb(220 38 38 / 35%);
+
+  /* Elevation */
+  --e0: 0 1px 2px rgb(15 23 42 / 3%);
+  --e1:
+    0 1px 2px rgb(15 23 42 / 4%),
+    0 1px 3px rgb(148 163 184 / 8%);
+
+  --e2:
+    0 4px 12px rgb(15 23 42 / 4%),
+    0 2px 6px rgb(148 163 184 / 8%);
+
+  --e3:
+    0 12px 32px rgb(15 23 42 / 8%),
+    0 4px 12px rgb(148 163 184 / 10%);
+
+  --e4:
+    0 24px 64px rgb(15 23 42 / 12%),
+    0 8px 24px rgb(148 163 184 / 12%);
+
+  /* Chart colors */
+  --chart-1: #DC2626;
+  --chart-2: #166534;
+  --chart-3: #2563EB;
+  --chart-4: #D4A84F;
+  --chart-5: #7C3AED;
+  --chart-6: #64748B;
+}
+
+/* ── 1b. Christmas Dark Theme: Festive Midnight Obsidian & Velvet Crimson ── */
+[data-theme='christmas-dark'] {
+  color-scheme: dark;
+
+  /* Brand */
+  --brand: #DC2626;
+  --brand-hover: #EF4444;
+  --brand-contrast: #FFFFFF;
+  --brand-muted: #450A0A;
+
+  /* Accent */
+  --accent: #16A34A;
+  --accent-hover: #22C55E;
+  --accent-muted: #052E16;
+
+  --accent-gold: #F59E0B;
+  --accent-gold-muted: #451A03;
+
+  /* Backgrounds */
+  --bg-app: #080D1A;
+  --bg-surface: rgb(15 23 42 / 85%);
+  --bg-panel: rgb(15 23 42 / 92%);
+  --bg-sunken: #060913;
+  --bg-hover: #1E293B;
+  --bg-active: #450A0A;
+  --bg-form: rgb(15 23 42 / 92%);
+  --bg-table: rgb(15 23 42 / 88%);
+  --bg-card: rgb(15 23 42 / 85%);
+  --bg-overlay: rgb(3 7 18 / 75%);
+  --overlay-blur: 4px;
+
+  /* Snow & Midnight Starry Canvas */
+  --app-canvas:
+    radial-gradient(
+      ellipse at 50% 0%,
+      rgb(30 41 59 / 60%) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 88% 8%,
+      rgb(220 38 38 / 14%) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 12% 85%,
+      rgb(22 101 52 / 12%) 0%,
+      transparent 45%
+    ),
+    linear-gradient(
+      180deg,
+      #070B16 0%,
+      #0B1124 50%,
+      #050811 100%
+    );
+
+  /* Borders & Dual Glow */
+  --border: #1E293B;
+  --border-strong: #334155;
+  --border-focus: #DC2626;
+  --border-color: rgba(220, 38, 38, 0.25);
+
+  --glass-blur: 20px;
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glow-ambient:
+    0 0 32px rgb(220 38 38 / 14%),
+    0 0 60px rgb(56 189 248 / 8%);
+
+  /* Typography */
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --text-inverse: #0B0F19;
+  --text-brand: #EF4444;
+
+  /* Status Colors */
+  --status-success: #16A34A; --status-success-bg: rgba(22, 163, 74, 0.18); --status-success-border: rgba(22, 163, 74, 0.35);
+  --status-warning: #F59E0B; --status-warning-bg: rgba(245, 158, 11, 0.18); --status-warning-border: rgba(245, 158, 11, 0.35);
+  --status-danger:  #EF4444; --status-danger-bg:  rgba(239, 68, 68, 0.18);  --status-danger-border:  rgba(239, 68, 68, 0.35);
+  --status-info:    #38BDF8; --status-info-bg:    rgba(56, 189, 248, 0.18); --status-info-border:    rgba(56, 189, 248, 0.35);
+  --status-progress:#DC2626; --status-progress-bg:rgba(220, 38, 38, 0.18); --status-progress-border:rgba(220, 38, 38, 0.35);
+  --status-neutral: #94A3B8; --status-neutral-bg: rgba(148, 163, 184, 0.12); --status-neutral-border: rgba(148, 163, 184, 0.25);
+  --status-purple:  #A855F7; --status-purple-bg:  rgba(168, 85, 247, 0.18); --status-purple-border: rgba(168, 85, 247, 0.35);
+
+  --bg-holiday-solid: #450A0A;
+  --bg-today-solid: #172554;
+  --text-holiday: #F87171;
+  --text-today: #93C5FD;
+
+  --focus-ring: rgb(220 38 38 / 40%);
+
+  /* Elevation */
+  --e0: 0 1px 2px rgb(0 0 0 / 25%);
+  --e1: 0 1px 3px rgb(0 0 0 / 20%);
+  --e2: 0 4px 16px rgb(0 0 0 / 30%);
+  --e3: 0 12px 32px rgb(0 0 0 / 40%);
+  --e4: 0 24px 64px rgb(0 0 0 / 50%);
+
+  /* Charts */
+  --chart-1: #DC2626;
+  --chart-2: #16A34A;
+  --chart-3: #38BDF8;
+  --chart-4: #F59E0B;
+  --chart-5: #A855F7;
+  --chart-6: #94A3B8;
+}
+
+/* ── 2. New Year Theme: Champagne Gold & Midnight Obsidian with Starlight Sparkle ── */
+[data-theme='new-year'],
+[data-theme='newyear'] {
+  color-scheme: dark;
+
+  --brand: #D6B56D;
+  --brand-hover: #E7CA8A;
+  --brand-contrast: #111827;
+  --brand-muted: #3A3020;
+
+  --accent: #A78BFA;
+  --accent-hover: #C4B5FD;
+  --accent-muted: #29213F;
+
+  --accent-gold: #F5E7C8;
+
+  --bg-app: #0B1020;
+  --bg-surface: rgb(24 32 51 / 82%);
+  --bg-panel: #182033;
+  --bg-sunken: #0F172A;
+  --bg-hover: #202B42;
+  --bg-active: #3A3020;
+  --bg-form: rgb(24 32 51 / 92%);
+  --bg-table: rgb(24 32 51 / 85%);
+  --bg-card: rgb(24 32 51 / 82%);
+  --bg-overlay: rgb(3 7 18 / 65%);
+  --overlay-blur: 4px;
+
+  --app-canvas:
+    radial-gradient(
+      ellipse at 15% 0%,
+      rgb(214 181 109 / 12%),
+      transparent 42%
+    ),
+    radial-gradient(
+      ellipse at 90% 15%,
+      rgb(167 139 250 / 10%),
+      transparent 35%
+    ),
+    linear-gradient(145deg, #0B1020, #111827 55%, #090D18);
+
+  --border: #293449;
+  --border-strong: #3B4961;
+  --border-focus: #D6B56D;
+  --border-color: rgba(214, 181, 109, 0.28);
+
+  --glass-blur: 20px;
+  --glass-border: rgba(214, 181, 109, 0.20);
+  --glow-ambient: 0 0 48px rgb(214 181 109 / 12%);
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --text-inverse: #111827;
+  --text-brand: #D6B56D;
+
+  --status-success: #10B981; --status-success-bg: rgba(16, 185, 129, 0.16); --status-success-border: rgba(16, 185, 129, 0.32);
+  --status-warning: #EAB308; --status-warning-bg: rgba(234, 179, 8, 0.16);  --status-warning-border: rgba(234, 179, 8, 0.32);
+  --status-danger:  #EF4444; --status-danger-bg:  rgba(239, 68, 68, 0.16);   --status-danger-border:  rgba(239, 68, 68, 0.32);
+  --status-info:    #38BDF8; --status-info-bg:    rgba(56, 189, 248, 0.16); --status-info-border:    rgba(56, 189, 248, 0.32);
+  --status-progress:#D6B56D; --status-progress-bg:rgba(214, 181, 109, 0.18);--status-progress-border:rgba(214, 181, 109, 0.35);
+  --status-neutral: #94A3B8; --status-neutral-bg: rgba(148, 163, 184, 0.12); --status-neutral-border: rgba(148, 163, 184, 0.25);
+  --status-purple:  #C084FC; --status-purple-bg:  rgba(192, 132, 252, 0.16);  --status-purple-border: rgba(192, 132, 252, 0.32);
+
+  --bg-holiday-solid: #2B1800;
+  --bg-today-solid: #171E36;
+  --text-holiday: #FDE047;
+  --text-today: #93C5FD;
+
+  --focus-ring: rgb(214 181 109 / 40%);
+
+  --e0: 0 1px 2px rgb(0 0 0 / 25%);
+  --e1: 0 1px 3px rgb(0 0 0 / 20%);
+  --e2: 0 4px 16px rgb(0 0 0 / 25%);
+  --e3: 0 12px 32px rgb(0 0 0 / 35%);
+  --e4: 0 24px 64px rgb(0 0 0 / 45%);
+
+  --chart-1: #D6B56D;
+  --chart-2: #A78BFA;
+  --chart-3: #38BDF8;
+  --chart-4: #F5E7C8;
+  --chart-5: #10B981;
+  --chart-6: #94A3B8;
+}
+
+/* ── 3. Easter Theme: Spring Lilac & Meadow Mint ── */
+[data-theme='easter'] {
+  color-scheme: light;
+
+  --brand: #7C3AED;
+  --brand-hover: #6D28D9;
+  --brand-contrast: #FFFFFF;
+  --brand-muted: #EDE9FE;
+
+  --accent: #047857;
+  --accent-hover: #065F46;
+  --accent-muted: #D1FAE5;
+
+  --accent-gold: #D97706;
+
+  --bg-app: #F8F7FC;
+  --bg-surface: rgb(255 255 255 / 82%);
+  --bg-panel: #FFFFFF;
+  --bg-sunken: #F0FDF4;
+  --bg-hover: #F5F3FF;
+  --bg-active: #EDE9FE;
+  --bg-form: rgb(255 255 255 / 96%);
+  --bg-table: rgb(255 255 255 / 90%);
+  --bg-card: rgb(255 255 255 / 82%);
+  --bg-overlay: rgb(30 27 75 / 35%);
+  --overlay-blur: 4px;
+
+  --app-canvas:
+    radial-gradient(ellipse at 50% 0%, rgb(196 181 253 / 32%) 0%, transparent 45%),
+    radial-gradient(ellipse at 92% 12%, rgb(253 230 138 / 25%) 0%, transparent 35%),
+    radial-gradient(ellipse at 50% 100%, rgb(187 247 208 / 45%) 0%, transparent 55%),
+    linear-gradient(180deg, #FDFBFF 0%, #F5F3FF 45%, #F0FDF4 85%, #DCFCE7 100%);
+
+  --border: #E5E7EB;
+  --border-strong: #C4B5FD;
+  --border-focus: #7C3AED;
+  --border-color: #E5E7EB;
+
+  --glass-blur: 16px;
+  --glass-border: rgb(255 255 255 / 90%);
+  --glow-ambient: 0 0 48px rgb(139 92 246 / 7%);
+
+  --text-primary: #1E1B4B;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+  --text-disabled: #9CA3AF;
+  --text-inverse: #FFFFFF;
+  --text-brand: #7C3AED;
+
+  --status-success: #047857; --status-success-bg: #D1FAE5; --status-success-border: #6EE7B7;
+  --status-warning: #D97706; --status-warning-bg: #FEF3C7; --status-warning-border: #FDE68A;
+  --status-danger:  #EF4444; --status-danger-bg:  #FEE2E2; --status-danger-border:  #FECACA;
+  --status-info:    #0284C7; --status-info-bg:    #E0F2FE; --status-info-border:    #BAE6FD;
+  --status-progress:#7C3AED; --status-progress-bg:#EDE9FE; --status-progress-border:#DDD6FE;
+  --status-neutral: #6B7280; --status-neutral-bg: #F3F4F6; --status-neutral-border: #E5E7EB;
+  --status-purple:  #7C3AED; --status-purple-bg:  #EDE9FE; --status-purple-border:  #DDD6FE;
+
+  --bg-holiday-solid: #FFF1F2;
+  --bg-today-solid: #F3E8FF;
+  --text-holiday: #E11D48;
+  --text-today: #7E22CE;
+
+  --focus-ring: rgb(124 58 237 / 35%);
+
+  --e0: 0 1px 2px rgb(31 41 55 / 3%);
+  --e1: 0 1px 3px rgb(31 41 55 / 4%);
+  --e2: 0 4px 12px rgb(31 41 55 / 5%);
+  --e3: 0 12px 32px rgb(31 41 55 / 8%);
+  --e4: 0 24px 64px rgb(31 41 55 / 12%);
+
+  --chart-1: #7C3AED;
+  --chart-2: #047857;
+  --chart-3: #D97706;
+  --chart-4: #0284C7;
+  --chart-5: #EC4899;
+  --chart-6: #6B7280;
+}
+
+/* ── 4. Onam Theme: Kerala Kasavu Gold & Marigold Saffron ── */
+[data-theme='onam'] {
+  color-scheme: light;
+
+  --brand: #B8860B;
+  --brand-hover: #926B08;
+  --brand-contrast: #FFFFFF;
+  --brand-muted: #FEF3C7;
+
+  --accent: #166534;
+  --accent-hover: #14532D;
+  --accent-muted: #DCFCE7;
+
+  --accent-gold: #D97706;
+
+  --bg-app: #FFFBF2;
+  --bg-surface: rgb(255 255 255 / 84%);
+  --bg-panel: #FFFFFF;
+  --bg-sunken: #F7F1E4;
+  --bg-hover: #FFF7E6;
+  --bg-active: #FEF3C7;
+  --bg-form: rgb(255 255 255 / 96%);
+  --bg-table: rgb(255 255 255 / 90%);
+  --bg-card: rgb(255 255 255 / 84%);
+  --bg-overlay: rgb(41 37 36 / 35%);
+  --overlay-blur: 4px;
+
+  --app-canvas:
+    radial-gradient(
+      ellipse at 12% 0%,
+      rgb(255 255 255 / 95%),
+      transparent 42%
+    ),
+    radial-gradient(
+      ellipse at 90% 10%,
+      rgb(234 179 8 / 12%),
+      transparent 36%
+    ),
+    radial-gradient(
+      ellipse at 50% 100%,
+      rgb(249 115 22 / 8%),
+      transparent 42%
+    ),
+    linear-gradient(145deg, #FFFBF2, #FFF7E6 55%, #FAF3E3);
+
+  --border: #E8DFCC;
+  --border-strong: #D6BD82;
+  --border-focus: #B8860B;
+  --border-color: #E8DFCC;
+
+  --glass-blur: 16px;
+  --glass-border: rgb(255 255 255 / 90%);
+  --glow-ambient: 0 0 48px rgb(184 134 11 / 7%);
+
+  --text-primary: #292524;
+  --text-secondary: #44403C;
+  --text-muted: #78716C;
+  --text-disabled: #A8A29E;
+  --text-inverse: #FFFFFF;
+  --text-brand: #B8860B;
+
+  --status-success: #166534; --status-success-bg: #DCFCE7; --status-success-border: #86EFAC;
+  --status-warning: #D97706; --status-warning-bg: #FEF3C7; --status-warning-border: #FDE68A;
+  --status-danger:  #DC2626; --status-danger-bg:  #FEE2E2; --status-danger-border:  #FECACA;
+  --status-info:    #0284C7; --status-info-bg:    #E0F2FE; --status-info-border:    #BAE6FD;
+  --status-progress:#B8860B; --status-progress-bg:#FEF3C7; --status-progress-border:#FDE68A;
+  --status-neutral: #78716C; --status-neutral-bg: #F5F5F4; --status-neutral-border: #E7E5E4;
+  --status-purple:  #9333EA; --status-purple-bg:  #EDE9FE; --status-purple-border:  #DDD6FE;
+
+  --bg-holiday-solid: #FEF3C7;
+  --bg-today-solid: #FFFBEB;
+  --text-holiday: #B8860B;
+  --text-today: #92400E;
+
+  --focus-ring: rgb(184 134 11 / 35%);
+
+  --e0: 0 1px 2px rgb(41 37 36 / 3%);
+  --e1: 0 1px 3px rgb(41 37 36 / 4%);
+  --e2: 0 4px 12px rgb(41 37 36 / 5%);
+  --e3: 0 12px 32px rgb(41 37 36 / 8%);
+  --e4: 0 24px 64px rgb(41 37 36 / 12%);
+
+  --chart-1: #B8860B;
+  --chart-2: #166534;
+  --chart-3: #D97706;
+  --chart-4: #DC2626;
+  --chart-5: #0284C7;
+  --chart-6: #78716C;
+}
+
+/* ── 4b. Onam Dark Theme: Kerala Kasavu Gold & Midnight Backwaters ── */
+[data-theme='onam-dark'] {
+  color-scheme: dark;
+
+  --brand: #D48806;
+  --brand-hover: #E5A823;
+  --brand-contrast: #FFFFFF;
+  --brand-muted: #3D2600;
+
+  --accent: #15803D;
+  --accent-hover: #16A34A;
+  --accent-muted: #052E16;
+
+  --accent-gold: #F59E0B;
+
+  --bg-app: #08100A;
+  --bg-surface: rgb(15 26 18 / 85%);
+  --bg-panel: rgb(15 26 18 / 92%);
+  --bg-sunken: #050B07;
+  --bg-hover: #16241A;
+  --bg-active: #3D2600;
+  --bg-form: rgb(15 26 18 / 92%);
+  --bg-table: rgb(15 26 18 / 88%);
+  --bg-card: rgb(15 26 18 / 85%);
+  --bg-overlay: rgb(3 10 5 / 75%);
+  --overlay-blur: 4px;
+
+  --app-canvas:
+    radial-gradient(
+      ellipse at 50% 0%,
+      rgb(212 136 6 / 15%) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 90% 12%,
+      rgb(249 115 22 / 12%) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 12% 85%,
+      rgb(21 128 61 / 14%) 0%,
+      transparent 45%
+    ),
+    linear-gradient(
+      180deg,
+      #08100A 0%,
+      #0D1A10 50%,
+      #050B07 100%
+    );
+
+  --border: #1E3324;
+  --border-strong: #2F4D37;
+  --border-focus: #D48806;
+  --border-color: rgba(212, 136, 6, 0.28);
+
+  --glass-blur: 20px;
+  --glass-border: rgba(212, 168, 35, 0.22);
+  --glow-ambient: 0 0 36px rgba(212, 136, 6, 0.15), 0 0 60px rgba(34, 197, 94, 0.08);
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --text-inverse: #0B0F19;
+  --text-brand: #E5A823;
+
+  --status-success: #16A34A; --status-success-bg: rgba(22, 163, 74, 0.18); --status-success-border: rgba(22, 163, 74, 0.35);
+  --status-warning: #F59E0B; --status-warning-bg: rgba(245, 158, 11, 0.18); --status-warning-border: rgba(245, 158, 11, 0.35);
+  --status-danger:  #EF4444; --status-danger-bg:  rgba(239, 68, 68, 0.18);  --status-danger-border:  rgba(239, 68, 68, 0.35);
+  --status-info:    #38BDF8; --status-info-bg:    rgba(56, 189, 248, 0.18); --status-info-border:    rgba(56, 189, 248, 0.35);
+  --status-progress:#D48806; --status-progress-bg:rgba(212, 136, 6, 0.18); --status-progress-border:rgba(212, 136, 6, 0.35);
+  --status-neutral: #94A3B8; --status-neutral-bg: rgba(148, 163, 184, 0.12); --status-neutral-border: rgba(148, 163, 184, 0.25);
+  --status-purple:  #A855F7; --status-purple-bg:  rgba(168, 85, 247, 0.18); --status-purple-border: rgba(168, 85, 247, 0.35);
+
+  --bg-holiday-solid: #3D2600;
+  --bg-today-solid: #16241A;
+  --text-holiday: #FDE047;
+  --text-today: #86EFAC;
+
+  --focus-ring: rgb(212 136 6 / 40%);
+
+  --e0: 0 1px 2px rgb(0 0 0 / 25%);
+  --e1: 0 1px 3px rgb(0 0 0 / 20%);
+  --e2: 0 4px 16px rgb(0 0 0 / 30%);
+  --e3: 0 12px 32px rgb(0 0 0 / 40%);
+  --e4: 0 24px 64px rgb(0 0 0 / 50%);
+
+  --chart-1: #D48806;
+  --chart-2: #16A34A;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #38BDF8;
+  --chart-6: #94A3B8;
+}
+
+/* ── Festival Theme Surface Utility Classes ── */
+.app-canvas {
+  background: var(--app-canvas);
+  min-height: 100vh;
+}
+
+.glass-card {
+  background: var(--bg-surface);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--e2), var(--glow-ambient);
+  border-radius: 16px;
+}
+
+.solid-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--e1);
+  border-radius: 12px;
+}
+
+/* ── Christmas Snowdrift Caps on Cards & Sidebar ── */
+[data-theme='christmas'] .kvj-card,
+[data-theme='christmas'] aside,
+[data-theme='christmas'] .festive-snow-card {
+  position: relative;
+}
+
+[data-theme='christmas'] .kvj-card::before,
+[data-theme='christmas'] aside::before,
+[data-theme='christmas'] .festive-snow-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 16px;
+  pointer-events: none;
+  z-index: 10;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 16' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L120,0 L120,6 Q108,13 96,7 Q84,1 70,8 Q58,15 45,9 Q32,3 20,8 Q8,13 0,6 Z' fill='%23ffffff'/%3E%3Cpath d='M0,0 L120,0 L120,3 Q100,9 80,4 Q60,10 40,5 Q20,10 0,4 Z' fill='%23e2e8f0' opacity='0.35'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 140px 16px;
+  filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.06));
+}
+
+/* Attendance Control Panel card resilient height & visibility */
+.festive-attendance-card {
+  min-height: fit-content !important;
+  height: auto !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+}
+
+/* Attendance Control Panel top-right holly */
+[data-theme='christmas'] .festive-attendance-card::after {
+  content: '🌿🍒';
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  font-size: 24px;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+}
+
+/* Announcements card top-right gifts */
+[data-theme='christmas'] .festive-announcements-card::after {
+  content: '🎁🌲';
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: 24px;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+}
+
+/* New Year Announcements top-right champagne flutes */
+[data-theme='new-year'] .festive-announcements-card::after,
+[data-theme='newyear'] .festive-announcements-card::after {
+  content: '🥂✨';
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: 24px;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 2px 6px rgba(214, 181, 109, 0.4));
+}
+
+/* New Year card golden rim illumination */
+[data-theme='new-year'] .kvj-card,
+[data-theme='newyear'] .kvj-card,
+[data-theme='new-year'] aside,
+[data-theme='newyear'] aside {
+  border: 1px solid rgba(214, 181, 109, 0.22);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 1px rgba(214, 181, 109, 0.35);
+}
+
+/* Christmas Dark card glowing frosted glass & ambient neon rim */
+[data-theme='christmas-dark'] .kvj-card,
+[data-theme='christmas-dark'] aside {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 24px rgba(220, 38, 38, 0.12);
+}
+
+[data-theme='christmas-dark'] .festive-announcements-card::after {
+  content: '🎁🌲';
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: 24px;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+/* Easter Announcements top-right pastel eggs in nest */
+[data-theme='easter'] .festive-announcements-card::after {
+  content: '🪺🥚🌸';
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: 22px;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 2px 4px rgba(124, 58, 237, 0.2));
+}
+
+/* Easter card soft lilac glow */
+[data-theme='easter'] .kvj-card,
+[data-theme='easter'] aside {
+  border: 1px solid rgba(196, 181, 253, 0.6);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.06), 0 1px 3px rgba(31, 41, 55, 0.04);
+}
+
+/* Onam Announcements top-right marigold & hibiscus */
+[data-theme='onam'] .festive-announcements-card::after,
+[data-theme='onam-dark'] .festive-announcements-card::after {
+  content: '🌺🌼🍃';
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: 24px;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* Onam card Kasavu Gold & Dark rim illumination */
+[data-theme='onam'] .kvj-card,
+[data-theme='onam'] aside {
+  border: 1px solid rgba(214, 189, 130, 0.6);
+  box-shadow: 0 4px 14px rgba(184, 134, 11, 0.08), 0 1px 3px rgba(41, 37, 36, 0.04);
+}
+
+[data-theme='onam-dark'] .kvj-card,
+[data-theme='onam-dark'] aside {
+  border: 1px solid rgba(212, 168, 35, 0.28);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 20px rgba(212, 136, 6, 0.12);
+}
+
+/* ── Christmas Snowfall Background Overlay (Pure CSS, GPU-Accelerated, Non-Blocking) ── */
+[data-theme='christmas']::after,
+[data-theme='christmas-dark']::after {
+  content: '';
+  position: fixed;
+  top: -100vh;
+  left: 0;
+  right: 0;
+  height: 200vh;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.40;
+  background-image:
+    radial-gradient(3px 3px at 25px 40px, rgb(255 255 255 / 90%), transparent),
+    radial-gradient(2px 2px at 90px 140px, rgb(255 255 255 / 85%), transparent),
+    radial-gradient(3.5px 3.5px at 160px 80px, rgb(255 255 255 / 95%), transparent),
+    radial-gradient(2px 2px at 250px 210px, rgb(255 255 255 / 80%), transparent),
+    radial-gradient(3px 3px at 340px 110px, rgb(255 255 255 / 90%), transparent),
+    radial-gradient(2.5px 2.5px at 430px 260px, rgb(255 255 255 / 85%), transparent),
+    radial-gradient(3px 3px at 520px 160px, rgb(255 255 255 / 90%), transparent),
+    radial-gradient(2px 2px at 610px 50px, rgb(255 255 255 / 80%), transparent);
+  background-size: 650px 650px;
+  animation: flowdeskSnowfall 35s linear infinite;
+  will-change: transform;
+}
+
+[data-theme='christmas-dark']::after {
+  opacity: 0.65;
+}
+
+@keyframes flowdeskSnowfall {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='christmas']::after,
+  [data-theme='christmas-dark']::after {
+    animation: none;
+    display: none;
+  }
+}
+
 /* ── Theme-Independent Specs ── */
 :root {
   /* Spacing Grid (4pt base, 8pt major) */

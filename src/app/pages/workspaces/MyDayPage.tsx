@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { useDevice, useBreakpoint } from '../../../shared/hooks/responsive';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { getCelebrationYear } from '../../../shared/theme/seasonal-themes';
 import { WorkspaceShell, type WorkspaceRole } from '../../../shared/workspace/WorkspaceShell';
 import { DashboardGrid } from '../../../shared/dashboard/dashboard';
 import { PageHeader, Card, SectionHeader, SearchInput, StatCard, QuickActionCard, Badge, Timeline, ActivityCard, Button } from '../../../shared/ui/components';
@@ -135,6 +137,16 @@ export const AttendancePanel = memo(function AttendancePanel({
   const { confirm } = useDialog();
   const { toast } = useNotifications();
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const isChristmas = theme === 'christmas' || theme === 'christmas-dark';
+  const isChristmasLight = theme === 'christmas';
+  const isChristmasDark = theme === 'christmas-dark';
+  const isNewYear = theme === 'new-year' || theme === 'newyear';
+  const isEaster = theme === 'easter';
+  const isOnam = theme === 'onam' || theme === 'onam-dark';
+  const isOnamLight = theme === 'onam';
+  const isOnamDark = theme === 'onam-dark';
+  const isDarkTheme = theme === 'dark' || isChristmasDark || isOnamDark || isNewYear;
   const { batches, courses } = useTraining({ fetchStudents: false, fetchEnrollments: false });
   const { employees } = useEmployee();
   const [clockInOpen, setClockInOpen] = useState(false);
@@ -293,16 +305,20 @@ export const AttendancePanel = memo(function AttendancePanel({
   const [placeName, setPlaceName] = useState<string>('Detecting location...');
 
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocationStr(`${pos.coords.latitude.toFixed(4)}°, ${pos.coords.longitude.toFixed(4)}°`);
-        },
-        () => { setLocationStr('Office / GPS Active'); },
-        { timeout: 5000 }
-      );
-    } else {
-      setLocationStr('Office / GPS N/A');
+    try {
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setLocationStr(`${pos.coords.latitude.toFixed(4)}°, ${pos.coords.longitude.toFixed(4)}°`);
+          },
+          () => { setLocationStr('Office / GPS Active'); },
+          { timeout: 5000 }
+        );
+      } else {
+        setLocationStr('Office / GPS N/A');
+      }
+    } catch {
+      setLocationStr('Office / GPS Active');
     }
   }, []);
 
@@ -593,94 +609,122 @@ export const AttendancePanel = memo(function AttendancePanel({
   return (
     <>
       <div
+        className="kvj-card festive-snow-card festive-attendance-card"
         style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
+          background: isDarkTheme
+            ? (isChristmasDark ? 'rgba(15, 23, 42, 0.78)' : isOnamDark ? 'rgba(15, 26, 18, 0.85)' : isNewYear ? 'rgba(17, 24, 39, 0.88)' : 'var(--bg-surface)')
+            : (isOnamLight ? 'rgba(255, 253, 245, 0.95)' : isChristmasLight ? '#ffffff' : '#ffffff'),
+          border: isDarkTheme
+            ? (isChristmasDark ? '1px solid rgba(220, 38, 38, 0.35)' : isOnamDark ? '1px solid rgba(212, 168, 35, 0.35)' : isNewYear ? '1px solid rgba(214, 181, 109, 0.4)' : '1px solid var(--border)')
+            : (isOnamLight ? '1px solid rgba(214, 189, 130, 0.6)' : isChristmasLight ? '1px solid rgba(220, 38, 38, 0.2)' : '1px solid #e2e8f0'),
           borderRadius: 24,
           padding: '24px 28px 28px 28px',
-          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03)',
+          boxShadow: isDarkTheme
+            ? (isChristmasDark ? '0 4px 20px rgba(220, 38, 38, 0.25), 0 0 15px rgba(220, 38, 38, 0.15)' : isOnamDark ? '0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(212, 136, 6, 0.2)' : isNewYear ? '0 4px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(214, 181, 109, 0.2)' : 'var(--e2)')
+            : '0 4px 20px -2px rgba(0, 0, 0, 0.03)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           marginBottom: 24,
           position: 'relative',
+          flexShrink: 0,
+          flexGrow: 0,
+          minHeight: 'fit-content',
+          height: 'auto',
+          overflow: 'visible',
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
-        {/* Header bar matching Sample Image */}
+        {/* Header bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>
+          <h3 style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: isDarkTheme ? '#F8FAFC' : isOnamLight ? '#166534' : '#1e293b',
+            margin: 0,
+            letterSpacing: '-0.01em',
+          }}>
             Attendance Control Panel — Office / Training
           </h3>
         </div>
 
-        {/* 5 Stat Columns inside single soft ice-blue container box */}
+        {/* 6 Stat Columns inside container box */}
         <div
           style={{
             display: 'grid',
-            // Wraps to fewer columns on narrow/mobile screens instead of squashing 5 across.
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(140px, 1fr))',
             gap: 16,
             padding: '16px 24px',
             borderRadius: 16,
-            background: '#f1f5fe',
-            border: '1px solid #dbe6fe',
+            background: isDarkTheme
+              ? (isChristmasDark ? 'rgba(0, 0, 0, 0.45)' : isOnamDark ? 'rgba(0, 0, 0, 0.5)' : isNewYear ? 'rgba(0, 0, 0, 0.5)' : 'var(--bg-sunken)')
+              : (isOnamLight ? '#fefce8' : '#f1f5fe'),
+            border: isDarkTheme
+              ? (isChristmasDark ? '1px solid rgba(255, 255, 255, 0.12)' : isOnamDark ? '1px solid rgba(212, 168, 35, 0.25)' : isNewYear ? '1px solid rgba(214, 181, 109, 0.25)' : '1px solid var(--border)')
+              : (isOnamLight ? '1px solid #fef08a' : '1px solid #dbe6fe'),
             marginBottom: 18,
             alignItems: 'center',
+            width: '100%',
+            boxSizing: 'border-box',
+            minHeight: 68,
           }}
         >
           {/* CURRENT STATUS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: isDarkTheme ? 'rgba(255, 255, 255, 0.65)' : '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CURRENT STATUS
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: isDarkTheme ? '#F8FAFC' : '#1e293b', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
               {(currentStatus === 'present' || Boolean(activeRunningTask)) ? '🟢 Working' : currentStatus === 'on_break' ? '🟡 On Break' : '⚫ Not Working'}
             </span>
           </div>
 
           {/* GPS LOCATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: isDarkTheme ? 'rgba(255, 255, 255, 0.65)' : '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               GPS LOCATION
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: '#6366f1', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={placeName}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: isDarkTheme ? (isOnamDark ? '#E5A823' : isNewYear ? '#E5C378' : isChristmasDark ? '#FCA5A5' : '#818cf8') : '#6366f1', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={placeName}>
               📍 {placeName}
             </span>
           </div>
 
           {/* CLOCK IN TIME */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: isDarkTheme ? 'rgba(255, 255, 255, 0.65)' : '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               CLOCK IN TIME
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: isDarkTheme ? '#F8FAFC' : '#1e293b' }}>
               {clockInTimeStr}
             </span>
           </div>
 
           {/* TOTAL DURATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: isDarkTheme ? 'rgba(255, 255, 255, 0.65)' : '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               Duration (Today)
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: isDarkTheme ? '#F8FAFC' : '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(grossDurationMs)}
             </span>
           </div>
 
           {/* BREAK DURATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: isDarkTheme ? 'rgba(255, 255, 255, 0.65)' : '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               BREAK DURATION
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: currentStatus === 'on_break' ? '#d97706' : isDarkTheme ? '#F8FAFC' : '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(totalBreakMs)}
             </span>
           </div>
 
           {/* HOURS WORKED */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <span style={{ fontSize: 12, textTransform: 'uppercase', color: '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 12, textTransform: 'uppercase', color: isDarkTheme ? 'rgba(255, 255, 255, 0.65)' : '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
               Hours Worked
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: isDarkTheme ? (isOnamDark ? '#E5A823' : isNewYear ? '#E5C378' : isChristmasDark ? '#FCA5A5' : 'var(--brand)') : 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(totalWorkMs)}
             </span>
           </div>
@@ -708,7 +752,7 @@ export const AttendancePanel = memo(function AttendancePanel({
         )}
 
         {/* Action Controls Bar matching Sample Image */}
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginTop: 4, minHeight: 48, width: '100%', boxSizing: 'border-box' }}>
           {((currentStatus === 'clocked_out' || (currentStatus !== 'present' && currentStatus !== 'on_break')) && !activeRunningTask) && (
             <button
               type="button"
@@ -716,21 +760,41 @@ export const AttendancePanel = memo(function AttendancePanel({
               disabled={loading}
               onClick={() => setClockInOpen(true)}
               style={{
-                background: '#00c875',
-                color: '#ffffff',
+                background: isChristmasDark
+                  ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)'
+                  : isChristmasLight
+                  ? '#16a34a'
+                  : isNewYear
+                  ? 'linear-gradient(135deg, #E5C378 0%, #C99E4B 100%)'
+                  : isEaster
+                  ? 'linear-gradient(135deg, #A855F7 0%, #7C3AED 100%)'
+                  : isOnam
+                  ? 'linear-gradient(135deg, #D48806 0%, #B87333 100%)'
+                  : '#00c875',
+                color: isNewYear ? '#111827' : '#ffffff',
                 border: 'none',
                 padding: '12px 28px',
-                fontWeight: 700,
+                fontWeight: isNewYear || isChristmasDark || isOnam ? 800 : 700,
                 fontSize: 13.5,
                 borderRadius: 999,
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,200,117,0.25)',
+                boxShadow: isChristmasDark
+                  ? '0 4px 16px rgba(220, 38, 38, 0.45)'
+                  : isNewYear
+                  ? '0 4px 14px rgba(214, 181, 109, 0.4)'
+                  : isEaster
+                  ? '0 4px 14px rgba(124, 58, 237, 0.35)'
+                  : isOnam
+                  ? '0 4px 14px rgba(212, 136, 6, 0.4)'
+                  : isChristmasLight
+                  ? '0 2px 10px rgba(22,163,74,0.35)'
+                  : '0 2px 8px rgba(0,200,117,0.25)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
               }}
             >
-              Clock In (Office / Training)
+              {isChristmasDark ? '⏱️ Clock In (Office / Training)' : isOnam ? '⏱️ Clock In (Office / Training)' : 'Clock In (Office / Training)'}
             </button>
           )}
 
@@ -742,7 +806,11 @@ export const AttendancePanel = memo(function AttendancePanel({
                 disabled={loading || submittingBreak}
                 onClick={handleBreakClick}
                 style={{
-                  background: 'var(--status-warning)',
+                  background: isChristmasDark
+                    ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
+                    : isOnamDark
+                    ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
+                    : 'var(--status-warning)',
                   color: 'white',
                   border: 'none',
                   padding: '10px 22px',
@@ -751,7 +819,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                   borderRadius: 999,
                   cursor: loading || submittingBreak ? 'not-allowed' : 'pointer',
                   opacity: loading || submittingBreak ? 0.6 : 1,
-                  boxShadow: '0 4px 12px rgba(245,158,11,0.25)',
+                  boxShadow: isChristmasDark || isOnamDark ? '0 4px 14px rgba(217,119,6,0.35)' : '0 4px 12px rgba(245,158,11,0.25)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 8,
@@ -765,7 +833,11 @@ export const AttendancePanel = memo(function AttendancePanel({
                 disabled={loading}
                 onClick={handleClockOutClick}
                 style={{
-                  background: 'var(--status-danger)',
+                  background: isChristmasDark
+                    ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)'
+                    : isOnamDark
+                    ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)'
+                    : 'var(--status-danger)',
                   color: 'white',
                   border: 'none',
                   padding: '10px 22px',
@@ -773,7 +845,7 @@ export const AttendancePanel = memo(function AttendancePanel({
                   fontSize: 13.5,
                   borderRadius: 999,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
+                  boxShadow: isChristmasDark || isOnamDark ? '0 4px 14px rgba(220,38,38,0.4)' : '0 4px 12px rgba(239,68,68,0.25)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 8,
@@ -791,16 +863,20 @@ export const AttendancePanel = memo(function AttendancePanel({
               disabled={loading || endingBreak}
               onClick={handleEndBreak}
               style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                color: 'white',
+                background: isChristmasDark
+                  ? 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)'
+                  : isOnamDark
+                  ? 'linear-gradient(135deg, #E5A823 0%, #D48806 100%)'
+                  : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                color: isOnamDark ? '#111827' : 'white',
                 border: 'none',
                 padding: '11px 22px',
                 fontWeight: 700,
                 fontSize: 13.5,
-                borderRadius: 10,
+                borderRadius: 999,
                 cursor: loading || endingBreak ? 'not-allowed' : 'pointer',
                 opacity: loading || endingBreak ? 0.6 : 1,
-                boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+                boxShadow: isChristmasDark ? '0 4px 14px rgba(22,163,74,0.35)' : isOnamDark ? '0 4px 14px rgba(229,168,35,0.4)' : '0 4px 12px rgba(99,102,241,0.3)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
@@ -817,9 +893,39 @@ export const AttendancePanel = memo(function AttendancePanel({
               className="kvj-btn"
               onClick={onApplyLeave}
               style={{
-                background: '#ffffff',
-                color: 'var(--primary-700, #1d4ed8)',
-                border: '2px solid var(--primary-300, #93c5fd)',
+                background: isDarkTheme
+                  ? (isChristmasDark || isOnamDark ? 'rgba(255, 255, 255, 0.06)' : isNewYear ? 'rgba(214, 181, 109, 0.1)' : 'rgba(255, 255, 255, 0.08)')
+                  : '#ffffff',
+                color: isChristmasDark
+                  ? '#F8FAFC'
+                  : isOnamDark
+                  ? '#F8FAFC'
+                  : isChristmasLight
+                  ? '#DC2626'
+                  : isNewYear
+                  ? '#E5C378'
+                  : isEaster
+                  ? '#7C3AED'
+                  : isOnamLight
+                  ? '#166534'
+                  : isDarkTheme
+                  ? '#F8FAFC'
+                  : 'var(--primary-700, #1d4ed8)',
+                border: isChristmasDark
+                  ? '1.5px solid rgba(255, 255, 255, 0.25)'
+                  : isOnamDark
+                  ? '1.5px solid rgba(212, 168, 35, 0.4)'
+                  : isChristmasLight
+                  ? '2px solid #DC2626'
+                  : isNewYear
+                  ? '2px solid #D6B56D'
+                  : isEaster
+                  ? '2px solid #7C3AED'
+                  : isOnamLight
+                  ? '1.5px solid #166534'
+                  : isDarkTheme
+                  ? '1.5px solid rgba(255, 255, 255, 0.25)'
+                  : '2px solid var(--primary-300, #93c5fd)',
                 padding: '10px 22px',
                 fontWeight: 700,
                 fontSize: 13.5,
@@ -828,11 +934,21 @@ export const AttendancePanel = memo(function AttendancePanel({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                boxShadow: '0 2px 6px rgba(37,99,235,0.08)',
+                boxShadow: isDarkTheme
+                  ? '0 2px 8px rgba(0,0,0,0.35)'
+                  : isChristmasLight
+                  ? '0 2px 8px rgba(220,38,38,0.12)'
+                  : isNewYear
+                  ? '0 2px 8px rgba(214,181,109,0.2)'
+                  : isEaster
+                  ? '0 2px 8px rgba(124,58,237,0.15)'
+                  : isOnamLight
+                  ? '0 2px 8px rgba(22,101,52,0.15)'
+                  : '0 2px 6px rgba(37,99,235,0.08)',
                 marginLeft: 'auto',
               }}
             >
-              🌴 Apply Leave
+              {isChristmas ? '🌲' : isNewYear ? '🎉' : isEaster ? '🥚' : isOnam ? '🍃' : '🌴'} Apply Leave
             </button>
           )}
 
@@ -842,9 +958,39 @@ export const AttendancePanel = memo(function AttendancePanel({
             className="kvj-btn"
             onClick={() => setClaimOpen(true)}
             style={{
-              background: '#ffffff',
-              color: '#6366f1',
-              border: '2px solid #a5b4fc',
+              background: isDarkTheme
+                ? (isChristmasDark || isOnamDark ? 'rgba(255, 255, 255, 0.06)' : isNewYear ? 'rgba(214, 181, 109, 0.1)' : 'rgba(255, 255, 255, 0.08)')
+                : '#ffffff',
+              color: isChristmasDark
+                ? '#F8FAFC'
+                : isOnamDark
+                ? '#F8FAFC'
+                : isChristmasLight
+                ? '#DC2626'
+                : isNewYear
+                ? '#E5C378'
+                : isEaster
+                ? '#7C3AED'
+                : isOnamLight
+                ? '#D48806'
+                : isDarkTheme
+                ? '#F8FAFC'
+                : '#6366f1',
+              border: isChristmasDark
+                ? '1.5px solid rgba(255, 255, 255, 0.25)'
+                : isOnamDark
+                ? '1.5px solid rgba(212, 168, 35, 0.4)'
+                : isChristmasLight
+                ? '2px solid #DC2626'
+                : isNewYear
+                ? '2px solid #D6B56D'
+                : isEaster
+                ? '2px solid #7C3AED'
+                : isOnamLight
+                ? '1.5px solid #D48806'
+                : isDarkTheme
+                ? '1.5px solid rgba(255, 255, 255, 0.25)'
+                : '2px solid #a5b4fc',
               padding: '10px 22px',
               fontWeight: 700,
               fontSize: 13.5,
@@ -853,11 +999,21 @@ export const AttendancePanel = memo(function AttendancePanel({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              boxShadow: '0 2px 6px rgba(99,102,241,0.08)',
+              boxShadow: isDarkTheme
+                ? '0 2px 8px rgba(0,0,0,0.35)'
+                : isChristmasLight
+                ? '0 2px 8px rgba(220,38,38,0.12)'
+                : isNewYear
+                ? '0 2px 8px rgba(214,181,109,0.2)'
+                : isEaster
+                ? '0 2px 8px rgba(124,58,237,0.15)'
+                : isOnamLight
+                ? '0 2px 8px rgba(212,136,6,0.15)'
+                : '0 2px 6px rgba(99,102,241,0.08)',
               marginLeft: !onApplyLeave ? 'auto' : undefined,
             }}
           >
-            📋 Submit Attendance
+            {isChristmasDark ? '📅' : isChristmas ? '🎁' : isNewYear ? '📅' : isEaster ? '🧺' : isOnam ? '📅' : '📋'} Submit Attendance
           </button>
         </div>
       </div>
@@ -1299,8 +1455,118 @@ export const TaskWidget = memo(function TaskWidget({
   onSyncTask?: (id: string, secondsToday: number, active: boolean, underReview?: boolean) => void;
 }) {
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const isChristmas = theme === 'christmas' || theme === 'christmas-dark';
+  const isChristmasLight = theme === 'christmas';
+  const isChristmasDark = theme === 'christmas-dark';
+  const isNewYear = theme === 'new-year' || theme === 'newyear';
+  const isEaster = theme === 'easter';
+  const isOnam = theme === 'onam' || theme === 'onam-dark';
+  const isOnamLight = theme === 'onam';
+  const isOnamDark = theme === 'onam-dark';
+  const isDarkTheme = theme === 'dark' || isChristmasDark || isOnamDark || isNewYear;
+  const isFestive = isChristmas || isNewYear || isEaster || isOnam;
   const { toast } = useNotifications();
   const isDesktop = useBreakpoint('md');
+
+  const getStartButtonStyle = (tActive: boolean) => {
+    if (isOnam) {
+      return {
+        padding: '4px 16px',
+        fontSize: 12,
+        minWidth: 80,
+        borderRadius: 999,
+        background: tActive ? '#334155' : 'linear-gradient(135deg, #166534 0%, #14532D 100%)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: tActive ? 'none' : '0 2px 8px rgba(22, 101, 52, 0.4)',
+      };
+    }
+    if (isChristmasDark) {
+      return {
+        padding: '4px 16px',
+        fontSize: 12,
+        minWidth: 80,
+        borderRadius: 999,
+        background: tActive ? '#334155' : 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: tActive ? 'none' : '0 2px 8px rgba(220, 38, 38, 0.4)',
+      };
+    }
+    if (isFestive) {
+      return {
+        padding: '4px 16px',
+        fontSize: 12,
+        minWidth: 80,
+        borderRadius: 999,
+        background: tActive ? '#334155' : 'linear-gradient(135deg, #4F46E5 0%, #4338CA 100%)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: tActive ? 'none' : '0 2px 8px rgba(79, 70, 229, 0.35)',
+      };
+    }
+    return { padding: '4px 14px', fontSize: 12, minWidth: 80 };
+  };
+
+  const getSubmitButtonStyle = () => {
+    if (isOnamLight) {
+      return {
+        padding: '4px 16px',
+        fontSize: 12,
+        borderRadius: 999,
+        background: '#ffffff',
+        color: '#166534',
+        border: '1.5px solid #166534',
+        boxShadow: '0 2px 6px rgba(22, 101, 52, 0.12)',
+        fontWeight: 600,
+      };
+    }
+    if (isOnamDark) {
+      return {
+        padding: '4px 16px',
+        fontSize: 12,
+        borderRadius: 999,
+        background: 'rgba(21, 128, 61, 0.25)',
+        color: '#86EFAC',
+        border: '1.5px solid rgba(22, 163, 74, 0.6)',
+        boxShadow: '0 2px 8px rgba(21, 128, 61, 0.25)',
+        fontWeight: 600,
+      };
+    }
+    if (isFestive) {
+      return {
+        padding: '4px 16px',
+        fontSize: 12,
+        borderRadius: 999,
+        background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
+        color: 'white',
+        border: 'none',
+        boxShadow: '0 2px 8px rgba(22, 163, 74, 0.35)',
+      };
+    }
+    return { padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' };
+  };
+
+  const renderSubmitContent = () => {
+    if (isOnam) {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span>📋</span>
+          <span>Submit</span>
+        </span>
+      );
+    }
+    if (isFestive) {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span>📋</span>
+          <span>Submit</span>
+        </span>
+      );
+    }
+    return '📩 Submit';
+  };
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const [showSubmitted, setShowSubmitted] = useState(false);
@@ -1646,16 +1912,16 @@ export const TaskWidget = memo(function TaskWidget({
                                  <Button
                                    variant={t.active ? 'secondary' : 'primary'}
                                    onClick={() => onToggleTask(t.id, t.title, t.active)}
-                                   style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                                   style={getStartButtonStyle(t.active)}
                                  >
                                    {t.active ? '⏸ Pause' : '▶ Start'}
                                  </Button>
 
                                  <Button
                                    onClick={() => onSubmitReview(t.id, t.title)}
-                                   style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                                   style={getSubmitButtonStyle()}
                                  >
-                                   📩 Submit
+                                   {renderSubmitContent()}
                                  </Button>
                                </>
                              );
@@ -1746,16 +2012,16 @@ export const TaskWidget = memo(function TaskWidget({
                                    <Button
                                      variant={t.active ? 'secondary' : 'primary'}
                                      onClick={() => onToggleTask(t.id, t.title, t.active)}
-                                     style={{ padding: '4px 14px', fontSize: 12, minWidth: 80 }}
+                                     style={getStartButtonStyle(t.active)}
                                    >
                                      {t.active ? '⏸ Pause' : '▶ Start'}
                                    </Button>
 
                                    <Button
                                      onClick={() => onSubmitReview(t.id, t.title)}
-                                     style={{ padding: '4px 14px', fontSize: 12, background: 'var(--status-success)', color: 'white' }}
+                                     style={getSubmitButtonStyle()}
                                    >
-                                     📩 Submit
+                                     {renderSubmitContent()}
                                    </Button>
                                  </>
                                );
@@ -2881,10 +3147,22 @@ export function MyDayPage() {
     }));
   }, [employees]);
 
+  const { theme } = useTheme();
+  const isChristmas = theme === 'christmas' || theme === 'christmas-dark';
+  const isChristmasLight = theme === 'christmas';
+  const isChristmasDark = theme === 'christmas-dark';
+  const isNewYear = theme === 'new-year' || theme === 'newyear';
+  const isEaster = theme === 'easter';
+  const isOnam = theme === 'onam' || theme === 'onam-dark';
+  const isOnamLight = theme === 'onam';
+  const isOnamDark = theme === 'onam-dark';
+  const isDarkTheme = theme === 'dark' || isChristmasDark || isOnamDark || isNewYear;
+  const celebrationYear = getCelebrationYear();
+
   return (
     <AppShell>
       <PageHeader
-        title="My Day"
+        title={isChristmas ? "My Day 🔴" : isNewYear ? "My Day ✨" : isEaster ? "My Day 🌸" : isOnam ? "My Day 🌼" : "My Day"}
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Button
@@ -2893,15 +3171,96 @@ export function MyDayPage() {
               style={{
                 gap: 8,
                 fontWeight: 700,
-                border: '1.5px solid var(--brand)',
-                color: 'var(--brand)',
-                backgroundColor: 'var(--bg-sunken)',
-                boxShadow: 'var(--shadow-sm)',
+                border: isChristmasDark
+                  ? '1.5px solid rgba(255, 255, 255, 0.25)'
+                  : isChristmasLight
+                  ? '1.5px solid #DC2626'
+                  : isNewYear
+                  ? '1.5px solid #D6B56D'
+                  : isEaster
+                  ? '1.5px solid #7C3AED'
+                  : isOnamDark
+                  ? '1.5px solid rgba(255, 255, 255, 0.25)'
+                  : isOnamLight
+                  ? '1.5px solid #166534'
+                  : '1.5px solid var(--brand)',
+                color: isChristmasDark
+                  ? '#F8FAFC'
+                  : isChristmasLight
+                  ? '#DC2626'
+                  : isNewYear
+                  ? '#D6B56D'
+                  : isEaster
+                  ? '#7C3AED'
+                  : isOnamDark
+                  ? '#F8FAFC'
+                  : isOnamLight
+                  ? '#166534'
+                  : 'var(--brand)',
+                backgroundColor: isChristmasDark
+                  ? 'rgba(15, 23, 42, 0.6)'
+                  : isNewYear
+                  ? 'rgba(214, 181, 109, 0.1)'
+                  : isOnamDark
+                  ? 'rgba(15, 26, 18, 0.6)'
+                  : '#ffffff',
+                borderRadius: 999,
+                padding: '9px 20px',
+                boxShadow: isChristmasDark
+                  ? '0 2px 8px rgba(0, 0, 0, 0.3)'
+                  : isChristmasLight
+                  ? '0 2px 6px rgba(220,38,38,0.1)'
+                  : isNewYear
+                  ? '0 2px 8px rgba(214, 181, 109, 0.2)'
+                  : isEaster
+                  ? '0 2px 8px rgba(124, 58, 237, 0.15)'
+                  : isOnamDark
+                  ? '0 2px 8px rgba(0, 0, 0, 0.3)'
+                  : isOnamLight
+                  ? '0 2px 6px rgba(22, 101, 52, 0.12)'
+                  : 'var(--shadow-sm)',
               }}
             >
               📱 Download Mobile App
             </Button>
-            <Button onClick={() => setCreateTaskOpen(true)} style={{ gap: 6 }}>
+            <Button
+              onClick={() => setCreateTaskOpen(true)}
+              style={{
+                gap: 6,
+                borderRadius: 999,
+                padding: '9px 20px',
+                backgroundColor: isChristmas ? '#DC2626' : isNewYear ? '#D6B56D' : isEaster ? '#7C3AED' : isOnamLight ? '#166534' : isOnamDark ? '#E5A823' : undefined,
+                background: isChristmasDark
+                  ? 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)'
+                  : isNewYear
+                  ? 'linear-gradient(135deg, #E5C378 0%, #C99E4B 100%)'
+                  : isEaster
+                  ? 'linear-gradient(135deg, #A855F7 0%, #7C3AED 100%)'
+                  : isOnamDark
+                  ? 'linear-gradient(135deg, #E5A823 0%, #D48806 100%)'
+                  : isOnamLight
+                  ? 'linear-gradient(135deg, #166534 0%, #14532D 100%)'
+                  : isChristmasLight
+                  ? '#DC2626'
+                  : undefined,
+                borderColor: isChristmasDark ? 'transparent' : isChristmasLight ? '#DC2626' : isNewYear ? '#D6B56D' : isEaster ? '#7C3AED' : isOnamDark ? 'transparent' : isOnamLight ? '#166534' : undefined,
+                color: isNewYear ? '#111827' : isOnamDark ? '#111827' : '#ffffff',
+                fontWeight: 700,
+                boxShadow: isChristmasDark
+                  ? '0 4px 14px rgba(220, 38, 38, 0.45)'
+                  : isChristmasLight
+                  ? '0 4px 12px rgba(220,38,38,0.25)'
+                  : isNewYear
+                  ? '0 4px 14px rgba(214, 181, 109, 0.4)'
+                  : isEaster
+                  ? '0 4px 14px rgba(124, 58, 237, 0.35)'
+                  : isOnamDark
+                  ? '0 4px 14px rgba(212, 136, 6, 0.45)'
+                  : isOnamLight
+                  ? '0 4px 12px rgba(22, 101, 52, 0.3)'
+                  : undefined,
+              }}
+            >
               ＋ Add Task
             </Button>
           </div>

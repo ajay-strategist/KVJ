@@ -154,7 +154,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Sync state values with global CSS custom properties in real-time
   useEffect(() => {
     const root = document.documentElement;
-    const isLight = root.getAttribute('data-theme') === 'light';
+    const currentTheme = root.getAttribute('data-theme') || '';
+    const isSeasonal = ['christmas', 'new-year', 'newyear', 'easter', 'onam'].includes(currentTheme);
+
+    // When a seasonal festival theme is active, let its design tokens in tokens.css
+    // drive the background canvas, surfaces, and brand colors without inline overrides.
+    if (isSeasonal) {
+      root.style.removeProperty('--app-canvas');
+      root.style.removeProperty('--brand');
+      root.style.removeProperty('--bg-surface');
+      root.style.removeProperty('--bg-panel');
+      root.style.removeProperty('--bg-sunken');
+      root.style.removeProperty('--bg-hover');
+      root.style.removeProperty('--bg-card');
+      root.style.removeProperty('--bg-form');
+      root.style.removeProperty('--bg-table');
+      root.style.removeProperty('--bg-dialog');
+      root.style.removeProperty('--bg-kpi');
+      root.style.removeProperty('--glass-border');
+      return;
+    }
+
+    const isLight = currentTheme === 'light';
 
     // 1. Enforce strict minimum glass opacity safeguards for readability priority
     let baseOpacity = glassOpacity;

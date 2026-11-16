@@ -18,6 +18,7 @@ type View = 'login' | 'forgot' | 'first_time_reset';
 export function LoginPage() {
   const { login, requestPasswordReset, updateUserPassword, hasUsers, status } = useAuth();
   const { theme, toggle } = useTheme();
+  const isDark = theme === 'dark' || theme === 'christmas' || theme === 'newyear';
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -163,7 +164,7 @@ export function LoginPage() {
       display: 'flex',
       flexDirection: 'row',
       color: 'var(--text-primary)',
-      background: theme === 'dark'
+      background: isDark
         ? 'linear-gradient(135deg, #090e18 0%, #0d1527 50%, #152037 100%)'
         : 'linear-gradient(135deg, #eff6ff 0%, #ffffff 45%, #ecf4fd 100%)',
       overflowX: 'hidden',
@@ -174,7 +175,7 @@ export function LoginPage() {
         style={{
           position: 'fixed',
           inset: 0,
-          backgroundImage: theme === 'dark'
+          backgroundImage: isDark
             ? 'radial-gradient(circle at 18% 22%, rgba(37, 99, 235, 0.12) 0%, transparent 45%), radial-gradient(circle at 82% 78%, rgba(59, 130, 246, 0.08) 0%, transparent 50%)'
             : 'radial-gradient(circle at 18% 22%, rgba(59, 130, 246, 0.08) 0%, transparent 45%), radial-gradient(circle at 82% 78%, rgba(37, 99, 235, 0.06) 0%, transparent 50%)',
           pointerEvents: 'none',
@@ -205,7 +206,7 @@ export function LoginPage() {
           transition: 'all 0.15s ease',
         }}
       >
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        {isDark ? <Sun size={18} /> : <Moon size={18} />}
       </button>
 
       {/* Main Responsive Layout */}
@@ -251,7 +252,7 @@ export function LoginPage() {
               fontSize: 'clamp(32px, 3.6vw, 46px)',
               fontWeight: 900,
               lineHeight: 1.15,
-              color: theme === 'dark' ? '#ffffff' : '#0e2b5c',
+              color: isDark ? '#ffffff' : '#0e2b5c',
               margin: '0 0 16px',
               letterSpacing: '-0.03em',
             }}>
@@ -261,7 +262,7 @@ export function LoginPage() {
             {/* Subtitle */}
             <p style={{
               fontSize: 'clamp(15px, 1.15vw, 17px)',
-              color: theme === 'dark' ? '#94a3b8' : '#475569',
+              color: isDark ? '#94a3b8' : '#475569',
               lineHeight: 1.6,
               margin: '0 0 32px',
               maxWidth: 480,
@@ -290,7 +291,7 @@ export function LoginPage() {
                 }}>
                   <Users size={22} />
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#1e293b' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#cbd5e1' : '#1e293b' }}>
                   People
                 </span>
               </div>
@@ -309,7 +310,7 @@ export function LoginPage() {
                 }}>
                   <Settings size={22} />
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#1e293b' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#cbd5e1' : '#1e293b' }}>
                   Process
                 </span>
               </div>
@@ -328,7 +329,7 @@ export function LoginPage() {
                 }}>
                   <TrendingUp size={22} />
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#1e293b' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#cbd5e1' : '#1e293b' }}>
                   Progress
                 </span>
               </div>
@@ -347,7 +348,7 @@ export function LoginPage() {
                 }}>
                   <Layers size={22} />
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#1e293b' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#cbd5e1' : '#1e293b' }}>
                   Together
                 </span>
               </div>
@@ -375,7 +376,7 @@ export function LoginPage() {
                 display: 'block',
                 position: 'relative',
                 zIndex: 2,
-                filter: theme === 'dark'
+                filter: isDark
                   ? 'drop-shadow(0 12px 28px rgba(0, 0, 0, 0.5))'
                   : 'drop-shadow(0 12px 24px rgba(15, 23, 42, 0.1))',
               }}
@@ -387,7 +388,7 @@ export function LoginPage() {
                 width: '85%',
                 height: 16,
                 marginTop: -8,
-                background: theme === 'dark'
+                background: isDark
                   ? 'radial-gradient(ellipse at center, rgba(0, 0, 0, 0.65) 0%, transparent 75%)'
                   : 'radial-gradient(ellipse at center, rgba(15, 23, 42, 0.15) 0%, transparent 75%)',
                 borderRadius: '50%',
@@ -411,9 +412,9 @@ export function LoginPage() {
           <div style={{
             width: '100%',
             maxWidth: 440,
-            background: theme === 'dark' ? '#141c2e' : '#ffffff',
+            background: isDark ? '#141c2e' : '#ffffff',
             borderRadius: 22,
-            boxShadow: theme === 'dark'
+            boxShadow: isDark
               ? '0 20px 50px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08)'
               : '0 20px 45px -12px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.06)',
             padding: 'clamp(28px, 4vw, 38px)',
@@ -424,7 +425,7 @@ export function LoginPage() {
             {/* Teamz Logo Lockup: theme-aware (white text in dark mode, dark text in light mode) */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
               <img
-                src={theme === 'dark' ? '/teamz-logo-dark.png' : '/teamz-logo.png'}
+                src={isDark ? '/teamz-logo-dark.png' : '/teamz-logo.png'}
                 alt="Teamz - People Work Together"
                 style={{
                   height: 46,
@@ -528,7 +529,7 @@ export function LoginPage() {
                         paddingRight: 14,
                         borderRadius: 12,
                         border: '1px solid var(--border, #e2e8f0)',
-                        background: theme === 'dark' ? '#0f172a' : '#f1f5f9',
+                        background: isDark ? '#0f172a' : '#f1f5f9',
                         color: 'var(--text-primary)',
                         fontSize: 14,
                         outline: 'none',
@@ -570,7 +571,7 @@ export function LoginPage() {
                         paddingRight: 42,
                         borderRadius: 12,
                         border: '1px solid var(--border, #e2e8f0)',
-                        background: theme === 'dark' ? '#0f172a' : '#f1f5f9',
+                        background: isDark ? '#0f172a' : '#f1f5f9',
                         color: 'var(--text-primary)',
                         fontSize: 14,
                         outline: 'none',
@@ -697,7 +698,7 @@ export function LoginPage() {
                         paddingRight: 42,
                         borderRadius: 12,
                         border: '1px solid var(--border)',
-                        background: theme === 'dark' ? '#0f172a' : '#f1f5f9',
+                        background: isDark ? '#0f172a' : '#f1f5f9',
                         color: 'var(--text-primary)',
                         fontSize: 14,
                         outline: 'none',
@@ -732,7 +733,7 @@ export function LoginPage() {
                         paddingRight: 42,
                         borderRadius: 12,
                         border: '1px solid var(--border)',
-                        background: theme === 'dark' ? '#0f172a' : '#f1f5f9',
+                        background: isDark ? '#0f172a' : '#f1f5f9',
                         color: 'var(--text-primary)',
                         fontSize: 14,
                         outline: 'none',
@@ -794,7 +795,7 @@ export function LoginPage() {
                         paddingRight: 14,
                         borderRadius: 12,
                         border: '1px solid var(--border)',
-                        background: theme === 'dark' ? '#0f172a' : '#f1f5f9',
+                        background: isDark ? '#0f172a' : '#f1f5f9',
                         color: 'var(--text-primary)',
                         fontSize: 14,
                         outline: 'none',

@@ -60,7 +60,7 @@ export const AnnouncementWidget = memo(function AnnouncementWidget() {
   };
 
   return (
-    <Card>
+    <Card className="festive-announcements-card">
       <SectionHeader title="Announcements & Notices" />
       {visibleAnnouncements.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 2px' }}>

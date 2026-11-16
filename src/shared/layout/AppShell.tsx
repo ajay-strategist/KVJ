@@ -9,12 +9,13 @@
  *  - Mobile overlay improved
  */
 
-import { createContext, useContext, useState, useRef, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { Link, NavLink as RRNavLink, useLocation, useNavigate } from 'react-router-dom';
 import { visibleNav, useNavPrefs } from '../navigation/navigation';
 import { usePermissions } from '../permissions/react';
 import { useAuth } from '../../modules/auth/AuthProvider';
 import { useTheme, THEME_LABELS } from '../theme/ThemeProvider';
+import { getCelebrationYear } from '../theme/seasonal-themes';
 import { useNotifications } from '../notifications/NotificationProvider';
 import { useCommandPalette } from '../search/CommandPaletteProvider';
 import { useDevice } from '../hooks/responsive';
@@ -149,8 +150,9 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const { setOpen: setCmdOpen } = useCommandPalette();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const celebrationYear = useMemo(() => getCelebrationYear(), []);
 
-  let openTutorial = (_tabKey?: string) => {};
+  let openTutorial = (_tabKey?: string) => { };
   try {
     const tut = useTutorial();
     openTutorial = tut.openTutorial;
@@ -177,7 +179,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
       if (userRef.current && !userRef.current.contains(e.target as Node)) {
         setUserOpen(false);
       }
-      const clickedInsideNotif = 
+      const clickedInsideNotif =
         (notifRef.current && notifRef.current.contains(e.target as Node)) ||
         (popoverRef.current && popoverRef.current.contains(e.target as Node));
       if (!clickedInsideNotif) {
@@ -214,7 +216,614 @@ function AppShellFrame({ children }: { children: ReactNode }) {
 
   return (
     <InsideShellContext.Provider value={true}>
-      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--app-canvas, var(--bg-app))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', position: 'relative', overflowX: 'hidden' }}>
+
+        {/* ── Christmas Theme Festive Overlays ── */}
+        {theme === 'christmas' && (
+          <>
+            {/* Top Hanging Pine Garland with Glowing Lights & Baubles */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 32,
+                pointerEvents: 'none',
+                zIndex: 1190,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 32' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L240,0 L240,8 Q210,22 180,8 Q150,22 120,8 Q90,22 60,8 Q30,22 0,8 Z' fill='%2314532D'/%3E%3Cpath d='M0,0 L240,0 L240,5 Q210,16 180,6 Q150,16 120,6 Q90,16 60,6 Q30,16 0,5 Z' fill='%23166534'/%3E%3Ccircle cx='30' cy='15' r='3.5' fill='%23DC2626'/%3E%3Ccircle cx='60' cy='9' r='3' fill='%23FBBF24'/%3E%3Ccircle cx='90' cy='15' r='3.5' fill='%23DC2626'/%3E%3Ccircle cx='120' cy='9' r='3' fill='%23FBBF24'/%3E%3Ccircle cx='150' cy='15' r='3.5' fill='%23DC2626'/%3E%3Ccircle cx='180' cy='9' r='3' fill='%23FBBF24'/%3E%3Ccircle cx='210' cy='15' r='3.5' fill='%23DC2626'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: '240px 32px',
+                filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.18))',
+              }}
+            />
+
+            {/* Winter Sky Flying Santa with Reindeer & Glowing Moon */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 10,
+                left: isMobile ? '38%' : 'calc(48% - 50px)',
+                pointerEvents: 'none',
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                opacity: 0.88,
+                filter: 'drop-shadow(0 2px 8px rgba(254, 240, 138, 0.45))',
+              }}
+            >
+              <span style={{ fontSize: 26, lineHeight: 1, filter: 'drop-shadow(0 0 14px rgba(254, 240, 138, 0.8))' }}>🌕</span>
+              <span style={{ fontSize: 18, letterSpacing: '2px', whiteSpace: 'nowrap', lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.22))' }}>🦌🦌🦌 🛷🎅</span>
+            </div>
+
+            {/* Bottom-Right Snowman & Gifts Landscape */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 62 : 12,
+                right: isMobile ? 8 : 24,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 6,
+                filter: 'drop-shadow(0 6px 16px rgba(15,23,42,0.18))',
+                transform: isMobile ? 'scale(0.8)' : 'scale(1)',
+                transformOrigin: 'bottom right',
+              }}
+            >
+              <span style={{ fontSize: 26, transform: 'translateY(-2px)' }}>🌲</span>
+              <span style={{ fontSize: 32, transform: 'rotate(-6deg)' }}>🎁</span>
+              <span style={{ fontSize: 28, transform: 'translateY(-2px)' }}>🎁</span>
+              <span style={{ fontSize: 48, lineHeight: 1 }}>⛄</span>
+            </div>
+
+            {/* Bottom-Left Pine Greenery & Berries */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 62 : 8,
+                left: isMobile ? 6 : 14,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                filter: 'drop-shadow(0 4px 10px rgba(15,23,42,0.14))',
+                transform: isMobile ? 'scale(0.8)' : 'scale(1)',
+                transformOrigin: 'bottom left',
+              }}
+            >
+              <span style={{ fontSize: 28 }}>🌲</span>
+              <span style={{ fontSize: 22 }}>🍒</span>
+            </div>
+          </>
+        )}
+
+        {/* ── Christmas Dark Theme Festive Overlays ── */}
+        {theme === 'christmas-dark' && (
+          <>
+            {/* Top Hanging Pine Garland with Glowing Lights & Red Baubles */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 32,
+                pointerEvents: 'none',
+                zIndex: 1190,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 32' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L240,0 L240,8 Q210,22 180,8 Q150,22 120,8 Q90,22 60,8 Q30,22 0,8 Z' fill='%2314532D'/%3E%3Cpath d='M0,0 L240,0 L240,5 Q210,16 180,6 Q150,16 120,6 Q90,16 60,6 Q30,16 0,5 Z' fill='%23166534'/%3E%3Ccircle cx='30' cy='15' r='3.5' fill='%23DC2626'/%3E%3Ccircle cx='60' cy='9' r='3' fill='%23FBBF24'/%3E%3Ccircle cx='90' cy='15' r='3.5' fill='%23DC2626'/%3E%3Ccircle cx='120' cy='9' r='3' fill='%23FBBF24'/%3E%3Ccircle cx='150' cy='15' r='3.5' fill='%23DC2626'/%3E%3Ccircle cx='180' cy='9' r='3' fill='%23FBBF24'/%3E%3Ccircle cx='210' cy='15' r='3.5' fill='%23DC2626'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: '240px 32px',
+                filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.45))',
+              }}
+            />
+
+            {/* Header Winter Sky Script Calligraphy "Merry Christmas" + Santa Hat on C + Cozy Glowing Cabin in Snowy Pines */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 8,
+                left: isMobile ? '24%' : 'calc(45% - 90px)',
+                right: 0,
+                height: 48,
+                pointerEvents: 'none',
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                opacity: 0.95,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Script Calligraphy with Santa hat */}
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      top: -11,
+                      left: 62,
+                      fontSize: 18,
+                      transform: 'rotate(12deg)',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
+                    }}
+                  >
+                    🎅
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: '"Brush Script MT", "Caveat", "Dancing Script", cursive, serif',
+                      fontStyle: 'italic',
+                      fontSize: 26,
+                      fontWeight: 800,
+                      letterSpacing: '0.04em',
+                      background: 'linear-gradient(135deg, #FFFBEB 0%, #FEE2E2 40%, #EF4444 80%, #B91C1C 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      filter: 'drop-shadow(0 2px 10px rgba(220,38,38,0.7)) drop-shadow(0 0 16px rgba(254,226,226,0.35))',
+                      whiteSpace: 'nowrap',
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    Merry Christmas
+                  </span>
+                </div>
+
+                {/* Cozy Snow-Covered Cabin with warm glowing windows */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, filter: 'drop-shadow(0 2px 8px rgba(245, 158, 11, 0.45))' }}>
+                  <span style={{ fontSize: 16 }}>🌲</span>
+                  <span style={{ fontSize: 24, filter: 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.8))' }}>🏡</span>
+                  <span style={{ fontSize: 16 }}>🌲</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Winter Snowbank Contour */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 24,
+                pointerEvents: 'none',
+                zIndex: 20,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 24' preserveAspectRatio='none'%3E%3Cpath d='M0,14 Q75,6 150,13 T300,10 L300,24 L0,24 Z' fill='%230F172A' opacity='0.8'/%3E%3Cpath d='M0,18 Q90,10 180,16 T300,14 L300,24 L0,24 Z' fill='%231E293B' opacity='0.5'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: '300px 24px',
+              }}
+            />
+
+            {/* Bottom-Right Lit Christmas Tree, Vintage Lantern & Gifts */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 62 : 10,
+                right: isMobile ? 8 : 26,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 8,
+                filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))',
+                transform: isMobile ? 'scale(0.8)' : 'scale(1)',
+                transformOrigin: 'bottom right',
+              }}
+            >
+              {/* Glowing Vintage Lantern */}
+              <div style={{ display: 'flex', alignItems: 'center', filter: 'drop-shadow(0 0 16px rgba(245, 158, 11, 0.8))' }}>
+                <span style={{ fontSize: 26 }}>🏮</span>
+              </div>
+
+              {/* Wrapped Red Ribbon Gift Box */}
+              <span style={{ fontSize: 32, transform: 'rotate(-4deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }}>🎁</span>
+
+              {/* Decorated Christmas Tree with Fairy Lights */}
+              <span style={{ fontSize: 44, lineHeight: 1, filter: 'drop-shadow(0 0 14px rgba(34, 197, 94, 0.6)) drop-shadow(0 0 10px rgba(234, 179, 8, 0.7))' }}>🎄</span>
+            </div>
+
+            {/* Bottom-Left Pine Greenery & Berries */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 62 : 8,
+                left: isMobile ? 6 : 14,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))',
+                transform: isMobile ? 'scale(0.8)' : 'scale(1)',
+                transformOrigin: 'bottom left',
+              }}
+            >
+              <span style={{ fontSize: 28 }}>🌲</span>
+              <span style={{ fontSize: 22 }}>🍒</span>
+            </div>
+          </>
+        )}
+
+        {/* ── New Year Theme Festive Overlays ── */}
+        {(theme === 'new-year' || theme === 'newyear') && (
+          <>
+            {/* Top Skyline Silhouette with Bursting Golden Fireworks */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: isMobile ? '20%' : 'calc(45% - 80px)',
+                right: 0,
+                height: 52,
+                pointerEvents: 'none',
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                opacity: 0.95,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 22, filter: 'drop-shadow(0 0 12px rgba(234, 179, 8, 0.7))' }}>🎆</span>
+                <span style={{ fontSize: 18, filter: 'drop-shadow(0 0 8px rgba(245, 231, 200, 0.6))' }}>✨</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span style={{
+                    fontFamily: 'serif',
+                    fontStyle: 'italic',
+                    fontSize: 20,
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    background: 'linear-gradient(135deg, #FDE68A 0%, #D6B56D 60%, #B8860B 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    filter: 'drop-shadow(0 2px 8px rgba(214, 181, 109, 0.45))',
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.1,
+                  }}>
+                    Happy New Year {celebrationYear}
+                  </span>
+                </div>
+                <span style={{ fontSize: 18, filter: 'drop-shadow(0 0 8px rgba(245, 231, 200, 0.6))' }}>✨</span>
+                <span style={{ fontSize: 22, filter: 'drop-shadow(0 0 12px rgba(234, 179, 8, 0.7))' }}>🎆</span>
+              </div>
+            </div>
+
+            {/* Bottom Flowing Golden Ribbon Overlay */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 28,
+                pointerEvents: 'none',
+                zIndex: 20,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 28' preserveAspectRatio='none'%3E%3Cpath d='M0,18 Q100,2 200,16 T400,10 L400,28 L0,28 Z' fill='%23B88E3E' opacity='0.55'/%3E%3Cpath d='M0,22 Q120,6 240,20 T400,14 L400,28 L0,28 Z' fill='%23E5C378' opacity='0.75'/%3E%3Ccircle cx='80' cy='12' r='2' fill='%23FFFFFF' opacity='0.8'/%3E%3Ccircle cx='220' cy='8' r='2' fill='%23FFFFFF' opacity='0.8'/%3E%3Ccircle cx='340' cy='14' r='1.5' fill='%23FFFFFF' opacity='0.8'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: '400px 28px',
+                filter: 'drop-shadow(0 -3px 8px rgba(214, 181, 109, 0.25))',
+              }}
+            />
+
+            {/* Bottom-Right Golden Year & Luxury Gift Box Scene */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 62 : 12,
+                right: isMobile ? 8 : 28,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 12,
+                filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.5))',
+                transform: isMobile ? 'scale(0.8)' : 'scale(1)',
+                transformOrigin: 'bottom right',
+              }}
+            >
+              {/* Dynamic 3D Metallic Gold Year Number */}
+              <div style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 48,
+                fontWeight: 900,
+                letterSpacing: '-0.02em',
+                lineHeight: 0.9,
+                background: 'linear-gradient(135deg, #FFFBEB 0%, #FDE047 30%, #D4AF37 70%, #996515 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                filter: 'drop-shadow(0 4px 12px rgba(214, 181, 109, 0.55)) drop-shadow(0 2px 3px rgba(0,0,0,0.85))',
+              }}>
+                {celebrationYear}
+              </div>
+
+              {/* Luxury Black & Gold Gift Box and Champagne Ornaments */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+                <span style={{ fontSize: 26, filter: 'drop-shadow(0 2px 6px rgba(214, 181, 109, 0.4))' }}>🟡</span>
+                <span style={{ fontSize: 40, transform: 'rotate(-4deg)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))' }}>🎁</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Easter Theme Festive Overlays ── */}
+        {theme === 'easter' && (
+          <>
+            {/* Top Cherry Blossom & Spring Flower Garland */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 32,
+                pointerEvents: 'none',
+                zIndex: 1190,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 32' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L240,0 L240,6 Q210,18 180,6 Q150,18 120,6 Q90,18 60,6 Q30,18 0,6 Z' fill='%2386EFAC' opacity='0.7'/%3E%3Cpath d='M0,0 L240,0 L240,4 Q210,12 180,4 Q150,12 120,4 Q90,12 60,4 Q30,12 0,4 Z' fill='%2310B981' opacity='0.6'/%3E%3Ccircle cx='30' cy='12' r='4' fill='%23F472B6'/%3E%3Ccircle cx='30' cy='12' r='2' fill='%23FEF08A'/%3E%3Ccircle cx='90' cy='12' r='4' fill='%23C084FC'/%3E%3Ccircle cx='90' cy='12' r='2' fill='%23FEF08A'/%3E%3Ccircle cx='150' cy='12' r='4' fill='%23F472B6'/%3E%3Ccircle cx='150' cy='12' r='2' fill='%23FEF08A'/%3E%3Ccircle cx='210' cy='12' r='4' fill='%23C084FC'/%3E%3Ccircle cx='210' cy='12' r='2' fill='%23FEF08A'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: '240px 32px',
+                filter: 'drop-shadow(0 2px 4px rgba(124, 58, 237, 0.12))',
+              }}
+            />
+
+            {/* Header Sky Spring Lilies & Calligraphy "Happy Easter" */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 6,
+                left: isMobile ? '25%' : 'calc(45% - 70px)',
+                right: 0,
+                height: 48,
+                pointerEvents: 'none',
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                opacity: 0.95,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 22, filter: 'drop-shadow(0 2px 4px rgba(124, 58, 237, 0.2))' }}>🌸</span>
+                <span style={{
+                  fontFamily: 'serif',
+                  fontStyle: 'italic',
+                  fontSize: 23,
+                  fontWeight: 800,
+                  letterSpacing: '0.03em',
+                  background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 60%, #C084FC 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  filter: 'drop-shadow(0 2px 6px rgba(124, 58, 237, 0.25))',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.1,
+                }}>
+                  Happy Easter
+                </span>
+                <span style={{ fontSize: 20, filter: 'drop-shadow(0 2px 4px rgba(124, 58, 237, 0.2))' }}>🪻</span>
+                <span style={{ fontSize: 16, transform: 'translateY(-6px)' }}>🦋</span>
+              </div>
+            </div>
+
+            {/* Bottom Spring Meadow Rolling Hill with Wildflowers */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 24,
+                pointerEvents: 'none',
+                zIndex: 20,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 24' preserveAspectRatio='none'%3E%3Cpath d='M0,14 Q75,4 150,12 T300,8 L300,24 L0,24 Z' fill='%2386EFAC' opacity='0.7'/%3E%3Cpath d='M0,18 Q90,8 180,16 T300,12 L300,24 L0,24 Z' fill='%234ADE80' opacity='0.8'/%3E%3Ccircle cx='40' cy='14' r='2' fill='%23FFFFFF'/%3E%3Ccircle cx='110' cy='12' r='2' fill='%23FEF08A'/%3E%3Ccircle cx='190' cy='15' r='2' fill='%23FFFFFF'/%3E%3Ccircle cx='260' cy='13' r='2' fill='%23FEF08A'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: '300px 24px',
+                filter: 'drop-shadow(0 -2px 6px rgba(34, 197, 94, 0.15))',
+              }}
+            />
+
+            {/* Bottom-Right Cute Easter Bunny & Pastel Decorated Eggs Scene */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 60 : 8,
+                right: isMobile ? 8 : 28,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 8,
+                filter: 'drop-shadow(0 6px 14px rgba(124, 58, 237, 0.2))',
+                transform: isMobile ? 'scale(0.85)' : 'scale(1)',
+                transformOrigin: 'bottom right',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, transform: 'translateY(-2px)' }}>
+                <span style={{ fontSize: 30, transform: 'rotate(-8deg)' }}>🥚</span>
+                <span style={{ fontSize: 26, transform: 'translateY(-2px)' }}>🪺</span>
+              </div>
+              <span style={{ fontSize: 50, lineHeight: 1 }}>🐰</span>
+            </div>
+
+            {/* Bottom-Left Spring Daisies */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 60 : 8,
+                left: isMobile ? 6 : 14,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                filter: 'drop-shadow(0 2px 6px rgba(34, 197, 94, 0.2))',
+                transform: isMobile ? 'scale(0.85)' : 'scale(1)',
+                transformOrigin: 'bottom left',
+              }}
+            >
+              <span style={{ fontSize: 24 }}>🌼</span>
+              <span style={{ fontSize: 22 }}>🌸</span>
+            </div>
+          </>
+        )}
+
+        {/* ── Onam & Onam Dark Theme Festive Overlays ── */}
+        {(theme === 'onam' || theme === 'onam-dark') && (
+          <>
+            {/* Top Palm & Banana Leaves Tropical Border */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 32,
+                pointerEvents: 'none',
+                zIndex: 1190,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 32' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L240,0 L240,6 Q210,18 180,6 Q150,18 120,6 Q90,18 60,6 Q30,18 0,6 Z' fill='%2315803D' opacity='0.7'/%3E%3Cpath d='M0,0 L240,0 L240,4 Q210,12 180,4 Q150,12 120,4 Q90,12 60,4 Q30,12 0,4 Z' fill='%23166534' opacity='0.85'/%3E%3Ccircle cx='30' cy='12' r='4' fill='%23F59E0B'/%3E%3Ccircle cx='30' cy='12' r='2' fill='%23EF4444'/%3E%3Ccircle cx='90' cy='12' r='4' fill='%23F59E0B'/%3E%3Ccircle cx='90' cy='12' r='2' fill='%23EF4444'/%3E%3Ccircle cx='150' cy='12' r='4' fill='%23F59E0B'/%3E%3Ccircle cx='150' cy='12' r='2' fill='%23EF4444'/%3E%3Ccircle cx='210' cy='12' r='4' fill='%23F59E0B'/%3E%3Ccircle cx='210' cy='12' r='2' fill='%23EF4444'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: '240px 32px',
+                filter: 'drop-shadow(0 2px 4px rgba(22, 101, 52, 0.2))',
+              }}
+            />
+
+            {/* Header Sky: Vallamkali Snake Boat, Calligraphy "Happy Onam" & Royal Kasavu Muthukuda */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 6,
+                left: isMobile ? '22%' : 'calc(45% - 100px)',
+                right: 0,
+                height: 48,
+                pointerEvents: 'none',
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                opacity: 0.95,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Vallamkali Snake Boat */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}>
+                  <span style={{ fontSize: 24, transform: 'scaleX(-1)' }}>🛶</span>
+                  <span style={{ fontSize: 16 }}>🌴</span>
+                </div>
+
+                {/* Script Calligraphy "Happy Onam" */}
+                <span
+                  style={{
+                    fontFamily: '"Brush Script MT", "Caveat", "Dancing Script", cursive, serif',
+                    fontStyle: 'italic',
+                    fontSize: 27,
+                    fontWeight: 800,
+                    letterSpacing: '0.03em',
+                    background: theme === 'onam-dark'
+                      ? 'linear-gradient(135deg, #FFFBEB 0%, #FDE047 30%, #D48806 70%, #B87333 100%)'
+                      : 'linear-gradient(135deg, #14532D 0%, #166534 40%, #B8860B 80%, #926B08 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    filter: theme === 'onam-dark'
+                      ? 'drop-shadow(0 2px 10px rgba(212, 136, 6, 0.7)) drop-shadow(0 0 16px rgba(254, 240, 138, 0.35))'
+                      : 'drop-shadow(0 2px 6px rgba(184, 134, 11, 0.4))',
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  Happy Onam
+                </span>
+
+                {/* Royal Kasavu Muthukuda & Marigold */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, filter: 'drop-shadow(0 2px 6px rgba(217, 119, 6, 0.4))' }}>
+                  <span style={{ fontSize: 24 }}>⛱️</span>
+                  <span style={{ fontSize: 18 }}>🌼</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom-Right Athapookalam & Glowing Nilavilakku (Traditional Brass Lamp) */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 60 : 4,
+                right: isMobile ? 8 : 20,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 8,
+                filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.35))',
+                transform: isMobile ? 'scale(0.8)' : 'scale(1)',
+                transformOrigin: 'bottom right',
+              }}
+            >
+              {/* Concentric Floral Pookalam */}
+              <div
+                style={{
+                  width: 90,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, #EF4444 0% 18%, #F59E0B 19% 36%, #FEF08A 37% 55%, #15803D 56% 75%, #D97706 76% 100%)',
+                  boxShadow: '0 4px 12px rgba(217, 119, 6, 0.45)',
+                  transform: 'rotateX(55deg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid rgba(255,255,255,0.7)',
+                }}
+              />
+
+              {/* Glowing Nilavilakku (Brass Oil Lamp) */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', filter: 'drop-shadow(0 0 12px rgba(245, 158, 11, 0.75))' }}>
+                <span style={{ fontSize: 40, lineHeight: 1 }}>🪔</span>
+              </div>
+            </div>
+
+            {/* Bottom-Left Fresh Marigold Garlands */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                bottom: isMobile ? 60 : 6,
+                left: isMobile ? 6 : 14,
+                pointerEvents: 'none',
+                zIndex: 25,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                filter: 'drop-shadow(0 2px 8px rgba(184, 134, 11, 0.3))',
+                transform: isMobile ? 'scale(0.85)' : 'scale(1)',
+                transformOrigin: 'bottom left',
+              }}
+            >
+              <span style={{ fontSize: 24 }}>🌼</span>
+              <span style={{ fontSize: 20 }}>🌺</span>
+              <span style={{ fontSize: 24 }}>🌼</span>
+              <span style={{ fontSize: 18 }}>🍃</span>
+            </div>
+          </>
+        )}
 
         {/* ── Sidebar ── */}
         {(!isMobile || mobileOpen) && (
@@ -251,7 +860,25 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                   background: '#FFFFFF', borderRadius: 10,
                   padding: '4px 6px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.12)', flexShrink: 0,
+                  position: 'relative',
                 }}>
+                  {(theme === 'christmas' || theme === 'christmas-dark') && (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        top: -10,
+                        left: -8,
+                        fontSize: 18,
+                        transform: 'rotate(-20deg)',
+                        pointerEvents: 'none',
+                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))',
+                        zIndex: 2,
+                      }}
+                    >
+                      🎅
+                    </span>
+                  )}
                   <img
                     src="/teamz-icon.png"
                     alt={`${appConfig.app.productTitle} Icon`}
@@ -270,7 +897,25 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                     background: '#FFFFFF', borderRadius: 10,
                     padding: '4px 8px',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.12)', flexShrink: 0,
+                    position: 'relative',
                   }}>
+                    {(theme === 'christmas' || theme === 'christmas-dark') && (
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          top: -11,
+                          left: -8,
+                          fontSize: 20,
+                          transform: 'rotate(-20deg)',
+                          pointerEvents: 'none',
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))',
+                          zIndex: 2,
+                        }}
+                      >
+                        🎅
+                      </span>
+                    )}
                     <img
                       src="/teamz-icon.png"
                       alt={`${appConfig.app.productTitle} Icon`}
@@ -341,7 +986,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
 
             {/* ── Left Sidebar Bottom Toolbar & User Profile ── */}
             <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              
+
               {/* Toolbar Actions Row */}
               <div style={{
                 display: 'grid',
@@ -353,11 +998,15 @@ function AppShellFrame({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   onClick={toggle}
-                  aria-label={`Theme: ${THEME_LABELS[theme]}`}
-                  title={`Theme: ${THEME_LABELS[theme]}`}
+                  aria-label={`Theme: ${THEME_LABELS[theme] || theme}`}
+                  title={`Theme: ${THEME_LABELS[theme] || theme}`}
                   style={sidebarIconBtnStyle}
                 >
-                  <Icon name={theme === 'dark' ? 'Moon' : 'Sun'} size={15} />
+                  {(theme === 'christmas' || theme === 'christmas-dark') ? <span style={{ fontSize: 14 }}>🎄</span>
+                    : (theme === 'newyear' || theme === 'new-year') ? <span style={{ fontSize: 14 }}>🎆</span>
+                      : theme === 'easter' ? <span style={{ fontSize: 14 }}>🐣</span>
+                        : theme === 'onam' ? <span style={{ fontSize: 14 }}>🌼</span>
+                          : <Icon name={theme === 'dark' ? 'Moon' : 'Sun'} size={15} />}
                 </button>
 
                 {/* Notifications Bell */}
@@ -780,7 +1429,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
 
         {/* ── Main content ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, height: '100vh' }}>
-          
+
           {/* Mobile Top App Bar */}
           {isMobile && (
             <header
@@ -1001,7 +1650,13 @@ function SideNavLink({
   to: string; icon: string; label: string; collapsed: boolean; onNavigate: () => void;
 }) {
   const { pathname } = useLocation();
+  const { theme } = useTheme();
   const active = pathname === to || (to !== '/app' && pathname.startsWith(to) && !(to === '/app/employees' && pathname.startsWith('/app/employees/status')));
+  const isChristmas = theme === 'christmas' || theme === 'christmas-dark';
+  const isNewYear = theme === 'new-year' || theme === 'newyear';
+  const isEaster = theme === 'easter';
+  const isOnam = theme === 'onam' || theme === 'onam-dark';
+
   return (
     <Link
       to={to}
@@ -1014,22 +1669,52 @@ function SideNavLink({
         padding: collapsed ? '10px 0' : '9px 12px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderRadius: 'var(--radius-md)',
-        color: active ? 'var(--brand)' : 'var(--text-secondary)',
+        color: active
+          ? (isChristmas || isEaster || isOnam ? '#FFFFFF' : isNewYear ? '#111827' : 'var(--brand)')
+          : 'var(--text-secondary)',
         background: active
-          ? 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.10))'
+          ? (isChristmas
+            ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)'
+            : isNewYear
+              ? 'linear-gradient(135deg, #E5C378 0%, #B88E3E 100%)'
+              : isEaster
+                ? 'linear-gradient(135deg, #A855F7 0%, #7C3AED 100%)'
+                : isOnam
+                  ? 'linear-gradient(135deg, #E5A823 0%, #D48806 100%)'
+                  : 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.10))')
           : 'transparent',
-        border: active ? '1px solid rgba(59,130,246,0.22)' : '1px solid transparent',
-        boxShadow: active ? '0 2px 10px rgba(59,130,246,0.10)' : 'none',
+        border: active
+          ? (isChristmas
+            ? '1px solid rgba(255,255,255,0.25)'
+            : isNewYear
+              ? '1px solid rgba(245, 231, 200, 0.4)'
+              : isEaster
+                ? '1px solid rgba(255, 255, 255, 0.35)'
+                : isOnam
+                  ? '1px solid rgba(255, 255, 255, 0.35)'
+                  : '1px solid rgba(59,130,246,0.22)')
+          : '1px solid transparent',
+        boxShadow: active
+          ? (isChristmas
+            ? '0 4px 14px rgba(220, 38, 38, 0.35)'
+            : isNewYear
+              ? '0 4px 16px rgba(214, 181, 109, 0.35)'
+              : isEaster
+                ? '0 4px 14px rgba(124, 58, 237, 0.35)'
+                : isOnam
+                  ? '0 4px 14px rgba(212, 136, 6, 0.35)'
+                  : '0 2px 10px rgba(59,130,246,0.10)')
+          : 'none',
         textDecoration: 'none',
         fontSize: 13,
-        fontWeight: active ? 600 : 500,
+        fontWeight: active ? (isChristmas || isNewYear || isEaster || isOnam ? 800 : 600) : 500,
         marginBottom: 2,
         transition: 'all 160ms cubic-bezier(0.16, 1, 0.3, 1)',
         overflow: 'hidden',
         whiteSpace: 'nowrap',
       }}
     >
-      <span style={{ flexShrink: 0, display: 'inline-flex' }}>
+      <span style={{ flexShrink: 0, display: 'inline-flex', color: active ? (isChristmas || isEaster || isOnam ? '#FFFFFF' : isNewYear ? '#111827' : undefined) : undefined }}>
         <Icon name={icon} size={17} />
       </span>
       {!collapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}

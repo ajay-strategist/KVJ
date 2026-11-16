@@ -15,6 +15,7 @@ import { TRAINING_PHASES, APPROVED_BATCH_STATUSES, normalizeBatchPhase } from '.
 import type { Employee } from '../../employee/employee.repository';
 import { Button, Badge, FilterChip, ProgressBar, SearchInput } from '../../../shared/ui/components';
 import { cleanBatchCode } from '../utils/batch-formatter';
+import { supabase } from '../../../shared/integration/supabase';
 
 export interface BatchAction {
   id: 'daily' | 'student' | 'final' | 'attendance' | 'assessments' | 'documents' | 'expense-details';
@@ -84,7 +85,7 @@ function compareDates(dateA: number, dateB: number, dir: 'asc' | 'desc'): number
 export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): BatchCardVM {
   const course = courses.find((c) => c.id === b.courseId);
   const trainer = trainers.find((t) => t.id === b.trainerId);
-  const total = b.totalTasks ?? 0;
+  const total = b.totalTasks && b.totalTasks > 0 ? b.totalTasks : (course?.checklist?.length ?? 0);
   const done  = b.completedTasks ?? 0;
 
   const college = b.college || (b.code?.includes('-') ? b.code.split('-')[0] : undefined) || '—';
@@ -141,24 +142,147 @@ function getBatchChecklist(batchId: string, courseChecklist?: string[]): Checkli
 }
 
 const CHECKLIST_DONE_KEY = 'kvj.batchCards.checklistDone.v1';
-function loadChecklistDoneState(batchId: string): Record<string, boolean> {
+const SYSTEM_CHECKLIST_KEY = 'batch_checklist_state';
+
+export function loadAllLocalChecklistDoneStates(): Record<string, Record<string, boolean>> {
   try {
-    const all = JSON.parse(localStorage.getItem(CHECKLIST_DONE_KEY) ?? '{}');
-    return all[batchId] ?? {};
-  } catch { return {}; }
+    return JSON.parse(localStorage.getItem(CHECKLIST_DONE_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
 }
-function saveChecklistDoneState(batchId: string, state: Record<string, boolean>) {
+
+export function saveAllLocalChecklistDoneStates(all: Record<string, Record<string, boolean>>) {
   try {
-    const all = JSON.parse(localStorage.getItem(CHECKLIST_DONE_KEY) ?? '{}');
-    all[batchId] = state;
     localStorage.setItem(CHECKLIST_DONE_KEY, JSON.stringify(all));
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
+}
+
+function loadChecklistDoneState(batchId: string): Record<string, boolean> {
+  const all = loadAllLocalChecklistDoneStates();
+  return all[batchId] ?? {};
+}
+
+function saveChecklistDoneState(batchId: string, state: Record<string, boolean>) {
+  const all = loadAllLocalChecklistDoneStates();
+  all[batchId] = state;
+  saveAllLocalChecklistDoneStates(all);
+}
+
+/**
+ * Loads shared batch checklist state from Supabase system settings.
+ * Merges with local cache so all devices/users stay in sync.
+ */
+export async function fetchRemoteBatchChecklists(): Promise<Record<string, Record<string, boolean>>> {
+  try {
+    const { data, error } = await supabase
+      .from('flwdsk_system_settings')
+      .select('value')
+      .eq('key', SYSTEM_CHECKLIST_KEY)
+      .maybeSingle();
+
+    if (!error && data?.value) {
+      const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+      if (parsed && typeof parsed === 'object') {
+        const local = loadAllLocalChecklistDoneStates();
+        const merged = { ...local, ...parsed };
+        saveAllLocalChecklistDoneStates(merged);
+        return merged;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load batch checklist state from Supabase:', err);
+  }
+  return loadAllLocalChecklistDoneStates();
+}
+
+/**
+ * Persists checklist state across devices and users:
+ * 1) localStorage (instant local response & offline cache)
+ * 2) Supabase flwdsk_batches table (completed_tasks and total_tasks)
+ * 3) Supabase flwdsk_system_settings table (exact task dictionary across all users/devices)
+ */
+export async function syncBatchChecklistToSupabase(
+  batchId: string,
+  batchDoneState: Record<string, boolean>,
+  completedCount: number,
+  totalCount: number
+): Promise<void> {
+  // 1. Immediately cache locally
+  saveChecklistDoneState(batchId, batchDoneState);
+
+  // 2. Persist completed_tasks & total_tasks directly to flwdsk_batches
+  try {
+    const { error: batchErr } = await supabase
+      .from('flwdsk_batches')
+      .update({
+        completed_tasks: completedCount,
+        total_tasks: totalCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', batchId);
+
+    if (batchErr) {
+      console.warn(`Supabase flwdsk_batches update error for batch ${batchId}:`, batchErr.message);
+    }
+  } catch (err) {
+    console.warn(`Supabase flwdsk_batches update failed for batch ${batchId}:`, err);
+  }
+
+  // 3. Persist the detailed task done state dictionary to flwdsk_system_settings for multi-user sync
+  try {
+    const all = loadAllLocalChecklistDoneStates();
+    all[batchId] = batchDoneState;
+
+    const { error: settingsErr } = await supabase
+      .from('flwdsk_system_settings')
+      .upsert(
+        {
+          key: SYSTEM_CHECKLIST_KEY,
+          value: all,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      );
+
+    if (settingsErr) {
+      console.warn('Supabase flwdsk_system_settings upsert error for checklist:', settingsErr.message);
+    }
+  } catch (err) {
+    console.warn('Supabase flwdsk_system_settings upsert failed for checklist:', err);
+  }
+}
+
+function initializeChecklist(
+  batchId: string,
+  courseChecklist?: string[],
+  savedState?: Record<string, boolean>,
+  completedTasksDb?: number
+): ChecklistTask[] {
+  const base = getBatchChecklist(batchId, courseChecklist);
+  if (base.length === 0) return [];
+
+  const hasSaved = savedState && Object.keys(savedState).length > 0;
+  return base.map((t, idx) => {
+    let done = false;
+    if (hasSaved) {
+      done = !!savedState[t.label];
+    } else if (typeof completedTasksDb === 'number' && completedTasksDb > 0) {
+      // If no granular map is cached yet but database says N tasks are completed,
+      // preserve that completion count
+      done = idx < completedTasksDb;
+    }
+    return { ...t, done };
+  });
 }
 
 // ── Individual Batch Card Component (Side-by-Side with Right Checklist Panel) ──
 const BatchCard = memo(function BatchCard({
   vm, active, pinned, favourite,
   onSelect, onTogglePin, onToggleFav, onAction, onEdit, onCopy, onDelete, onToggleComplete,
+  sharedDoneState, onChecklistChange,
 }: {
   vm: BatchCardVM;
   active: boolean;
@@ -172,19 +296,19 @@ const BatchCard = memo(function BatchCard({
   onCopy?: (id: string) => void;
   onDelete?: (id: string) => void;
   onToggleComplete?: (id: string) => void;
+  sharedDoneState?: Record<string, boolean>;
+  onChecklistChange?: (batchId: string, completedCount: number, totalCount: number, taskState: Record<string, boolean>) => void;
 }) {
   const [showAllChecklist, setShowAllChecklist] = useState(false);
   const [checklist, setChecklist] = useState(() => {
-    const base = getBatchChecklist(vm.id, vm.courseChecklist);
-    const saved = loadChecklistDoneState(vm.id);
-    return base.map((t) => ({ ...t, done: saved[t.label] ?? false }));
+    const saved = sharedDoneState ?? loadChecklistDoneState(vm.id);
+    return initializeChecklist(vm.id, vm.courseChecklist, saved, vm.completedTasks);
   });
 
   useEffect(() => {
-    const base = getBatchChecklist(vm.id, vm.courseChecklist);
-    const saved = loadChecklistDoneState(vm.id);
-    setChecklist(base.map((t) => ({ ...t, done: saved[t.label] ?? false })));
-  }, [vm.id, vm.courseChecklist]);
+    const saved = sharedDoneState ?? loadChecklistDoneState(vm.id);
+    setChecklist(initializeChecklist(vm.id, vm.courseChecklist, saved, vm.completedTasks));
+  }, [vm.id, vm.courseChecklist, vm.completedTasks, sharedDoneState]);
 
   const tone = PHASE_TONE[vm.phase];
 
@@ -196,10 +320,18 @@ const BatchCard = memo(function BatchCard({
 
   const toggleTask = (id: string) => {
     setChecklist((prev) => {
-      const next = prev.map((t) => t.id === id ? { ...t, done: !t.done } : t);
+      const next = prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
       const stateObj: Record<string, boolean> = {};
-      next.forEach((t) => { stateObj[t.label] = t.done; });
-      saveChecklistDoneState(vm.id, stateObj);
+      next.forEach((t) => {
+        stateObj[t.label] = t.done;
+      });
+      const nextDoneCount = next.filter((t) => t.done).length;
+      const nextTotalCount = next.length;
+
+      // Update shared state map in local memory & sync to Supabase (flwdsk_batches + flwdsk_system_settings)
+      syncBatchChecklistToSupabase(vm.id, stateObj, nextDoneCount, nextTotalCount);
+      onChecklistChange?.(vm.id, nextDoneCount, nextTotalCount, stateObj);
+
       return next;
     });
   };
@@ -587,7 +719,7 @@ function InfoField({ label, value, mono }: { label: string; value: string; mono?
 const PREFS_KEY_STORE = 'kvj.batchCards.prefs.v3';
 
 export function TrainingBatchCarousel({
-  batches, courses, trainers, activeId, onSelect, onAction, onEdit, onCopy, onDelete, onToggleComplete,
+  batches, courses, trainers, activeId, onSelect, onAction, onEdit, onCopy, onDelete, onToggleComplete, onChecklistChange,
 }: {
   batches: Batch[];
   courses: Course[];
@@ -599,6 +731,7 @@ export function TrainingBatchCarousel({
   onCopy?: (batchId: string) => void;
   onDelete?: (batchId: string) => void;
   onToggleComplete?: (batchId: string) => void;
+  onChecklistChange?: (batchId: string, completedCount: number, totalCount: number, taskState: Record<string, boolean>) => void;
 }) {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [query, setQuery] = useState('');
@@ -606,6 +739,45 @@ export function TrainingBatchCarousel({
   const [fPhase, setFPhase] = useState('active');
   const [fCourse, setFCourse] = useState('all');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'progress' | 'name'>('newest');
+  const [sharedChecklists, setSharedChecklists] = useState<Record<string, Record<string, boolean>>>(loadAllLocalChecklistDoneStates);
+
+  // Sync shared checklist state across devices and users via Supabase
+  useEffect(() => {
+    let active = true;
+    fetchRemoteBatchChecklists().then((remoteData) => {
+      if (active && remoteData) {
+        setSharedChecklists(remoteData);
+      }
+    });
+
+    // Realtime listener for cross-device / multi-user live updates
+    const channel = supabase
+      .channel('batch-checklist-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'flwdsk_system_settings', filter: `key=eq.${SYSTEM_CHECKLIST_KEY}` },
+        (payload: any) => {
+          if (payload.new && payload.new.value) {
+            const val = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+            if (val && typeof val === 'object') {
+              saveAllLocalChecklistDoneStates(val);
+              setSharedChecklists(val);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const handleBatchChecklistChange = useCallback((batchId: string, completedCount: number, totalCount: number, taskState: Record<string, boolean>) => {
+    setSharedChecklists((prev) => ({ ...prev, [batchId]: taskState }));
+    onChecklistChange?.(batchId, completedCount, totalCount, taskState);
+  }, [onChecklistChange]);
 
   const vms = useMemo(() => batches.map((b) => toCardVM(b, courses, trainers)), [batches, courses, trainers]);
 
@@ -770,6 +942,8 @@ export function TrainingBatchCarousel({
               onCopy={onCopy}
               onDelete={onDelete}
               onToggleComplete={onToggleComplete}
+              sharedDoneState={sharedChecklists[vm.id]}
+              onChecklistChange={handleBatchChecklistChange}
             />
           ))}
         </div>
