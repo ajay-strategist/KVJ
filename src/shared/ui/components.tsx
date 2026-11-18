@@ -227,7 +227,7 @@ export function PageHeader({
   };
 
   return (
-    <div style={{ marginBottom: isDesktop ? 0 : 16, width: '100%' }}>
+    <div style={{ marginBottom: isDesktop ? (tabs ? 24 : 0) : 16, width: '100%', flexShrink: 0 }}>
       {breadcrumb}
       <div
         style={{

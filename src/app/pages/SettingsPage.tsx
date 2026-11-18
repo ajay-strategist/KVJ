@@ -213,6 +213,7 @@ export function SettingsPage() {
             boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
             border: '1px solid rgba(255,255,255,0.3)',
             animation: 'kvjBounceIn 0.3s ease-out',
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -257,7 +258,9 @@ export function SettingsPage() {
       <div
         style={{
           display: 'flex',
+          alignItems: 'center',
           gap: 8,
+          marginTop: 16,
           marginBottom: 24,
           padding: '6px',
           background: 'var(--bg-sunken)',
@@ -266,73 +269,85 @@ export function SettingsPage() {
           width: 'fit-content',
           maxWidth: '100%',
           overflowX: 'auto',
+          overflowY: 'hidden',
           boxSizing: 'border-box',
+          flexShrink: 0,
+          minHeight: 52,
         }}
       >
         <button
           type="button"
           onClick={() => setActiveTab('appearance')}
           style={{
-            padding: '9px 20px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '9px 18px',
             borderRadius: 10,
-            border: 'none',
+            border: activeTab === 'appearance' ? '1px solid var(--border)' : '1px solid transparent',
             background: activeTab === 'appearance' ? 'var(--bg-surface)' : 'transparent',
             color: activeTab === 'appearance' ? 'var(--brand, #4f46e5)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'appearance' ? 800 : 600,
+            fontWeight: activeTab === 'appearance' ? 700 : 500,
             fontSize: 13.5,
             cursor: 'pointer',
             boxShadow: activeTab === 'appearance' ? 'var(--e1)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            lineHeight: 'normal',
             transition: 'all 0.15s ease',
           }}
         >
-          <span>🎨</span> Appearance
+          <span style={{ fontSize: 16 }}>🎨</span> Appearance
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('comfort')}
           style={{
-            padding: '9px 20px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '9px 18px',
             borderRadius: 10,
-            border: 'none',
+            border: activeTab === 'comfort' ? '1px solid var(--border)' : '1px solid transparent',
             background: activeTab === 'comfort' ? 'var(--bg-surface)' : 'transparent',
             color: activeTab === 'comfort' ? 'var(--brand, #4f46e5)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'comfort' ? 800 : 600,
+            fontWeight: activeTab === 'comfort' ? 700 : 500,
             fontSize: 13.5,
             cursor: 'pointer',
             boxShadow: activeTab === 'comfort' ? 'var(--e1)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            lineHeight: 'normal',
             transition: 'all 0.15s ease',
           }}
         >
-          <span>🛋️</span> Workspace Comfort
+          <span style={{ fontSize: 16 }}>🛋️</span> Workspace Comfort
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('advanced')}
           style={{
-            padding: '9px 20px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '9px 18px',
             borderRadius: 10,
-            border: 'none',
+            border: activeTab === 'advanced' ? '1px solid var(--border)' : '1px solid transparent',
             background: activeTab === 'advanced' ? 'var(--bg-surface)' : 'transparent',
             color: activeTab === 'advanced' ? 'var(--brand, #4f46e5)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'advanced' ? 800 : 600,
+            fontWeight: activeTab === 'advanced' ? 700 : 500,
             fontSize: 13.5,
             cursor: 'pointer',
             boxShadow: activeTab === 'advanced' ? 'var(--e1)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            lineHeight: 'normal',
             transition: 'all 0.15s ease',
           }}
         >
-          <span>⚙️</span> Advanced Customization
+          <span style={{ fontSize: 16 }}>⚙️</span> Advanced Customization
         </button>
 
         {isAdmin && (
@@ -340,22 +355,25 @@ export function SettingsPage() {
             type="button"
             onClick={() => setActiveTab('admin-festivals')}
             style={{
-              padding: '9px 20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 18px',
               borderRadius: 10,
-              border: 'none',
+              border: activeTab === 'admin-festivals' ? '1px solid rgba(220, 38, 38, 0.3)' : '1px solid transparent',
               background: activeTab === 'admin-festivals' ? 'var(--bg-surface)' : 'transparent',
               color: activeTab === 'admin-festivals' ? '#DC2626' : 'var(--text-secondary)',
-              fontWeight: activeTab === 'admin-festivals' ? 800 : 600,
+              fontWeight: activeTab === 'admin-festivals' ? 700 : 500,
               fontSize: 13.5,
               cursor: 'pointer',
               boxShadow: activeTab === 'admin-festivals' ? 'var(--e1)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 'normal',
               transition: 'all 0.15s ease',
             }}
           >
-            <span>👑</span> Admin Festivals & Access
+            <span style={{ fontSize: 16 }}>👑</span> Admin Festivals & Access
           </button>
         )}
       </div>
@@ -435,23 +453,49 @@ export function SettingsPage() {
               <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
                 Profile Photo (Google Drive Link or Image URL)
               </label>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   type="text"
                   className="kvj-input"
                   placeholder="Paste Google Drive share link (Anyone can view)..."
                   value={photoUrlInput}
                   onChange={(e) => setPhotoUrlInput(e.target.value)}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, minWidth: 0 }}
                 />
                 <Button
                   size="sm"
                   onClick={handleUpdatePhoto}
                   loading={updatingPhoto}
                   disabled={updatingPhoto || photoUrlInput === (user?.avatarUrl || '')}
+                  style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
                   Save Photo
                 </Button>
+                {user?.avatarUrl && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={async () => {
+                      if (!user) return;
+                      setUpdatingPhoto(true);
+                      try {
+                        await updateUser(user.id, { avatarUrl: '' });
+                        setPhotoUrlInput('');
+                        toast({
+                          variant: 'info',
+                          title: 'Photo Removed',
+                          message: 'Your profile photo has been reset.',
+                        });
+                      } finally {
+                        setUpdatingPhoto(false);
+                      }
+                    }}
+                    disabled={updatingPhoto}
+                    style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                  >
+                    Reset
+                  </Button>
+                )}
               </div>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: '1.4' }}>
                 Supports any public Google Drive view link. Automatically converted to a permanent direct viewable image.
