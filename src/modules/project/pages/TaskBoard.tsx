@@ -14,6 +14,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { PageHeader, Card, Button, Badge, WorkflowStrip } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { Form, TextField, SelectField, TextAreaField, DatePickerField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
@@ -1122,91 +1123,8 @@ export function TaskBoard({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Consolidated Single-Row Command Ribbon */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as any)}
-            style={{
-              padding: '7px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-surface)',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="all">📂 All Categories</option>
-            <option value="Office Task">🏢 Office Task</option>
-            <option value="Project Task">🚀 Project Task</option>
-          </select>
-
-          <select
-            value={dateWindowFilter}
-            onChange={(e) => setDateWindowFilter(e.target.value as any)}
-            style={{
-              padding: '7px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-surface)',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="all">📅 All Window</option>
-            <option value="next_3_days">⏳ Next 3 Days Window</option>
-            <option value="today">📌 Due Today</option>
-          </select>
-
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as any)}
-            style={{
-              padding: '7px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-surface)',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="asc">DueDate: Ascending ⬆</option>
-            <option value="desc">DueDate: Descending ⬇</option>
-          </select>
-
-          {/* UIUX-REQ-016: Reveal Toggle for Completed & Under Review tasks */}
-          <label
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              padding: '6px 10px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
-              background: showCompleted ? 'var(--primary-50, #eff6ff)' : 'var(--bg-surface)',
-              color: showCompleted ? 'var(--primary-700, #1d4ed8)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              userSelect: 'none',
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showCompleted}
-              onChange={(e) => setShowCompleted(e.target.checked)}
-              style={{ cursor: 'pointer' }}
-            />
-            <span>Show Completed / Under Review</span>
-          </label>
-        </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {/* Prominent View Mode Segmented Control */}
           <div style={{ display: 'inline-flex', background: 'var(--bg-sunken, #f1f5f9)', border: '1px solid var(--border, #cbd5e1)', borderRadius: 10, padding: 3, gap: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
@@ -1229,7 +1147,8 @@ export function TaskBoard({
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
-              🎴 Card View
+              <span>🎴</span>
+              <span>Card View</span>
             </button>
             <button
               type="button"
@@ -1250,14 +1169,49 @@ export function TaskBoard({
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
-              📊 Table View
+              <span>📊</span>
+              <span>Table View</span>
             </button>
           </div>
 
-          <Button variant="secondary" onClick={handleExportTasksToExcel} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>
-            📥 Export Tasks to Excel
+          <Button
+            variant="outline"
+            onClick={handleExportTasksToExcel}
+            style={{
+              padding: '7px 14px',
+              fontSize: 12,
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            📗 Export to Excel
           </Button>
-          <Button onClick={() => setCreateTaskOpen(true)} style={{ flex: isMobile ? '1 1 calc(50% - 6px)' : undefined, justifyContent: 'center' }}>➕ Create Task</Button>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as any)}
+            style={{
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="asc">DueDate: Ascending ⬆</option>
+            <option value="desc">DueDate: Descending ⬇</option>
+          </select>
+        </div>
+
+        <div>
+          <Button onClick={() => setCreateTaskOpen(true)} style={{ justifyContent: 'center' }}>➕ Create Task</Button>
         </div>
       </div>
 
@@ -1327,7 +1281,7 @@ export function TaskBoard({
           }
 
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
               {sortedTasks.map((t) => {
                 const isAssignee =
                   t.assigneeId === user?.id ||
@@ -1770,8 +1724,8 @@ export function TaskBoard({
       {/* Create Task Modal */}
       <TaskFormModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} onSuccess={() => refresh?.()} />
 
-      {/* Log Time Drawer */}
-      <Drawer open={timeEntryOpen} onClose={() => setTimeEntryOpen(false)} title={`Log Time: ${selectedTask?.name ?? ''}`}>
+      {/* Log Time Modal */}
+      <Modal open={timeEntryOpen} onClose={() => setTimeEntryOpen(false)} title={`Log Time: ${selectedTask?.name ?? ''}`} size="sm">
         <Form initial={{ date: todayStr, durationHrs: '1.0' }} onSubmit={handleLogDailyTime}>
           <DatePickerField name="date" label="Entry Date" />
           <TextField name="durationHrs" label="Duration (Hours)" placeholder="e.g. 2.5" />
@@ -1781,10 +1735,10 @@ export function TaskBoard({
             <Button type="submit">Log Time Entry</Button>
           </div>
         </Form>
-      </Drawer>
+      </Modal>
 
-      {/* Edit Task Drawer */}
-      <Drawer open={editTaskOpen} onClose={() => { setEditTaskOpen(false); setEditingTask(null); }} title={`Edit Task: ${editingTask?.name ?? ''}`}>
+      {/* Edit Task Modal */}
+      <Modal open={editTaskOpen} onClose={() => { setEditTaskOpen(false); setEditingTask(null); }} title={`Edit Task: ${editingTask?.name ?? ''}`} size="lg">
         {editingTask && (() => {
           const rawTask = tasks.find((t: any) => t.id === editingTask.id);
           return (
@@ -1843,16 +1797,17 @@ export function TaskBoard({
             </Form>
           );
         })()}
-      </Drawer>
+      </Modal>
 
-      {/* Pause / Switch Task Work Progress Drawer */}
-      <Drawer
+      {/* Pause / Switch Task Work Progress Modal */}
+      <Modal
         open={pauseModalOpen}
         onClose={() => {
           setPauseModalOpen(false);
           setPendingSwitchTask(null);
         }}
         title={pendingSwitchTask ? 'Switch Task — Save Progress (Mandatory)' : 'Update Work Progress (Mandatory)'}
+        size="md"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ background: 'var(--bg-sunken)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-secondary)' }}>
@@ -1903,7 +1858,7 @@ export function TaskBoard({
             </Button>
           </div>
         </div>
-      </Drawer>
+      </Modal>
 
       {/* Task Worklog Updates Drawer */}
       {selectedTaskForUpdates && (

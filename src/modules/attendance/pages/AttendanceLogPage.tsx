@@ -2057,7 +2057,7 @@ export function AttendanceLogPage() {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))', borderBottom: '1px solid var(--border)' }}>
                     {isManagement && (
                       <th style={{ padding: 10, width: 36 }}>
                         <input
@@ -2292,8 +2292,8 @@ export function AttendanceLogPage() {
   return (
     <AppShell>
       <PageHeader
-        title={isManagement ? 'Attendance Log & Office Timeline' : 'My Attendance Log & Reports'}
-        subtitle={isManagement ? 'Overview of all employee activity, attendance logs, and expense audits' : 'Comprehensive attendance calendar, detailed tabular logs, and expense audits'}
+        title="Attendance Log"
+        subtitle="Comprehensive attendance calendar, detailed tabular logs, and office timelines"
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

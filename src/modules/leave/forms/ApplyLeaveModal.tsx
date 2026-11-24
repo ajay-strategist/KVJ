@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/components';
 import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -165,7 +165,7 @@ export function ApplyLeaveModal({ open, onClose, onSuccess }: ApplyLeaveModalPro
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Apply for Leave">
+    <Modal open={open} onClose={onClose} title="Apply for Leave" size="md">
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Leave Type */}
         <div>
@@ -342,14 +342,14 @@ export function ApplyLeaveModal({ open, onClose, onSuccess }: ApplyLeaveModalPro
         {/* Action Buttons */}
         <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
-            Cancel
+            ✕ Cancel
           </Button>
           <Button type="submit" disabled={submitting || !startDate || (!isHalfDay && effectiveEndDate < startDate)}>
-            {submitting ? 'Submitting...' : 'Submit Application'}
+            {submitting ? 'Submitting...' : '✓ Submit Application'}
           </Button>
         </div>
       </form>
-    </Drawer>
+    </Modal>
   );
 }
 export default ApplyLeaveModal;

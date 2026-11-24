@@ -404,7 +404,7 @@ export function ExpenseClaims() {
     const defaultTypes = [
       'Self Travel',
       'Morning Tea',
-      'Lunch & Refreshments',
+      'Lunch',
       'Evening Tea',
       'Stationery & Printing',
       'Lab / System Supplies',
@@ -422,6 +422,30 @@ export function ExpenseClaims() {
       await supabase.from('flwdsk_expense_types').insert({ name: trimmed });
     } catch (e) {
       console.warn('Supabase expense_types insert warning:', e);
+    }
+    return true;
+  };
+
+  const handleModifyExpenseType = async (oldName: string, newName: string) => {
+    if (!newName.trim() || oldName === newName) return false;
+    const trimmed = newName.trim();
+    setCustomExpenseTypes((prev) => prev.map((t) => (t === oldName ? trimmed : t)));
+    toast({ variant: 'success', title: 'Expense Type Renamed', message: `Renamed "${oldName}" to "${trimmed}".` });
+    try {
+      await supabase.from('flwdsk_expense_types').update({ name: trimmed }).eq('name', oldName);
+    } catch (e) {
+      console.warn('Supabase expense_types update warning:', e);
+    }
+    return true;
+  };
+
+  const handleDeleteExpenseType = async (name: string) => {
+    setCustomExpenseTypes((prev) => prev.filter((t) => t !== name));
+    toast({ variant: 'success', title: 'Expense Type Removed', message: `Removed "${name}".` });
+    try {
+      await supabase.from('flwdsk_expense_types').delete().eq('name', name);
+    } catch (e) {
+      console.warn('Supabase expense_types delete warning:', e);
     }
     return true;
   };
@@ -1105,18 +1129,6 @@ export function ExpenseClaims() {
         }
       />
 
-      {/* Central Rate Info Banner */}
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 16, fontSize: 13, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>📍 Central Reimbursement Rates:</span>
-          {travelRates.map((r) => (
-            <Badge key={r.id || r.name} tone={r.name.toLowerCase().includes('bike') ? 'info' : r.name.toLowerCase().includes('car') ? 'purple' : 'neutral'}>
-              {r.icon || '🚗'} {r.name}: ₹{r.ratePerKm} / KM
-            </Badge>
-          ))}
-        </div>
-      </Card>
-
       {/* Filters Row */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1319,11 +1331,11 @@ export function ExpenseClaims() {
                       )}
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{exp.person || 'Employee'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{exp.date || '—'} · {exp.category || 'Office Expense'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{exp.date || '—'}</div>
                       </div>
                     </div>
                     <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
-                      {isLocked ? '🔒 Approved' : (exp.status || 'submitted')}
+                      {exp.status === 'approved' ? 'Approved' : exp.status === 'rejected' ? 'Rejected' : 'Submitted'}
                     </Badge>
                   </div>
 
@@ -1392,31 +1404,34 @@ export function ExpenseClaims() {
 
                   {/* Actions Row */}
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                    {!isLocked && exp.status === 'submitted' && isManagement && (
+                      <>
+                        <Button size="sm" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>
+                          Approve
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>
+                          Reject
+                        </Button>
+                      </>
+                    )}
                     {isManagement && (
                       <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => setEditingExpense(exp)}
                         title="Admin: Edit Expense Claim"
+                        style={{ padding: '6px 12px' }}
                       >
-                        ✏️ Edit
+                        ✏️
                       </Button>
-                    )}
-                    {!isLocked && exp.status === 'submitted' && isManagement && (
-                      <>
-                        <Button size="sm" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>
-                          ✓ Approve
-                        </Button>
-                        <Button size="sm" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>
-                          ✕ Reject
-                        </Button>
-                      </>
                     )}
                     {(!isLocked || isManagement) && (
                       <Button
                         size="sm"
                         variant="danger"
                         loading={processingAction}
+                        title="Delete Claim"
+                        style={{ padding: '6px 12px' }}
                         onClick={async () => {
                           const ok = await confirm({
                             title: 'Delete Expense Claim?',
@@ -1427,7 +1442,7 @@ export function ExpenseClaims() {
                           }
                         }}
                       >
-                        Delete
+                        🗑️
                       </Button>
                     )}
                     {isLocked && isManagement && exp.status !== 'Cancelled' && (
@@ -1458,10 +1473,10 @@ export function ExpenseClaims() {
           // always reachable. A nested vertical scroll previously clipped it.
           <div style={{ overflowX: 'auto', minHeight: 200, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
             <table className="kvj-table" style={{ marginBottom: 0 }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-surface)' }}>
-                <tr>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>
+                <tr style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>
                   {isManagement && (
-                    <th style={{ width: 36 }}>
+                    <th style={{ width: 36, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>
                       <input
                         type="checkbox"
                         onChange={(e) => handleSelectAllExpenses(e.target.checked)}
@@ -1472,15 +1487,14 @@ export function ExpenseClaims() {
                       />
                     </th>
                   )}
-                  <th>Date</th>
-                  <th>Employee</th>
-                  <th>Classification</th>
-                  <th>Expense Type</th>
-                  <th>Batch / Route</th>
-                  <th>Amount (₹)</th>
-                  <th>Receipt</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Date</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Employee</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Expense Type</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Batch / Route</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Amount (₹)</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Receipt</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Status</th>
+                  <th style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -1512,11 +1526,6 @@ export function ExpenseClaims() {
                         )}
                       </td>
                       <td>{exp.person || 'Employee'}</td>
-                      <td>
-                        <Badge tone={(exp.category || '').includes('Training') ? 'info' : 'neutral'}>
-                          {exp.category || 'Office Expense'}
-                        </Badge>
-                      </td>
                       <td>
                         <div style={{ fontWeight: 600 }}>{exp.type || 'Expense'}</div>
                         {exp.vehicle && (
@@ -1617,7 +1626,7 @@ export function ExpenseClaims() {
                       </td>
                       <td>
                         <Badge tone={exp.status === 'approved' ? 'success' : exp.status === 'rejected' ? 'danger' : 'warning'}>
-                          {isLocked ? '🔒 Approved' : exp.status === 'submitted' ? '⏳ Submitted (Pending)' : exp.status}
+                          {exp.status === 'approved' ? 'Approved' : exp.status === 'rejected' ? 'Rejected' : 'Submitted'}
                         </Badge>
                         {exp.approvedBy && (
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -1627,27 +1636,34 @@ export function ExpenseClaims() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {!isLocked && exp.status === 'submitted' && isManagement && (
+                            <>
+                              <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>
+                                Approve
+                              </Button>
+                              <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>
+                                Reject
+                              </Button>
+                            </>
+                          )}
                           {isManagement && (
                             <Button
                               size="xs"
                               variant="secondary"
                               onClick={() => setEditingExpense(exp)}
-                              title="Admin: Edit Expense Claim"
+                              title="Edit Expense Claim"
+                              style={{ padding: '4px 8px', minWidth: 28 }}
                             >
-                              ✏️ Edit
+                              ✏️
                             </Button>
-                          )}
-                          {!isLocked && exp.status === 'submitted' && isManagement && (
-                            <>
-                              <Button size="xs" variant="success" onClick={() => handleApprove(exp.id)} loading={processingAction}>Approve</Button>
-                              <Button size="xs" variant="danger" onClick={() => handleReject(exp.id)} loading={processingAction}>Reject</Button>
-                            </>
                           )}
                           {(!isLocked || isManagement) && (
                             <Button
                               size="xs"
                               variant="danger"
                               loading={processingAction}
+                              title="Delete Expense Claim"
+                              style={{ padding: '4px 8px', minWidth: 28 }}
                               onClick={async () => {
                                 const ok = await confirm({
                                   title: 'Delete Expense Claim?',
@@ -1658,7 +1674,7 @@ export function ExpenseClaims() {
                                 }
                               }}
                             >
-                              Delete
+                              🗑️
                             </Button>
                           )}
                           {isLocked && !isManagement && (
@@ -1703,6 +1719,8 @@ export function ExpenseClaims() {
         batches={batches}
         customExpenseTypes={customExpenseTypes}
         onRegisterNewType={handleRegisterNewType}
+        onModifyType={handleModifyExpenseType}
+        onDeleteType={handleDeleteExpenseType}
         defaultBatchMode={batchEntryMode}
       />
 

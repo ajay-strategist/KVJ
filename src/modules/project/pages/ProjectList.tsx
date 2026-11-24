@@ -448,7 +448,13 @@ export function ProjectList({
       });
     }
 
-    return list;
+    return [...list].sort((a: any, b: any) => {
+      const aProj = projects.find((dp: any) => dp.id === a.id);
+      const bProj = projects.find((dp: any) => dp.id === b.id);
+      const aTime = aProj?.createdAt ? new Date(aProj.createdAt).getTime() : 0;
+      const bTime = bProj?.createdAt ? new Date(bProj.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
   }, [projectsList, selectedEmployeeId, commonFilters, projects, allocations, tasks, selectedStatuses, selectedProjectFilter, searchQuery, selectedSupervisor, selectedClient, employees]);
 
   const totalTasksCount = useMemo(() => filteredProjects.reduce((acc, p) => acc + p.tasksTotal, 0), [filteredProjects]);
@@ -802,7 +808,8 @@ export function ProjectList({
               </div>
             </div>
             <div style="text-align:right;">
-              <div class="logo">KVJ <span>Analytics</span></div>
+              <img src="/kvj-analytics-logo.png" style="height:36px;object-fit:contain;" alt="KVJ Analytics" onError="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='block';" />
+              <div class="logo" style="display:none;">KVJ <span>Analytics</span></div>
               <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Generated: ${generatedAt}</div>
             </div>
           </div>
@@ -935,11 +942,6 @@ export function ProjectList({
             </tbody>
           </table>
 
-          <!-- Footer -->
-          <div class="footer">
-            <span>KVJ Analytics — Enterprise Operations Platform</span>
-            <span>Confidential · ${p.code} · ${generatedAt}</span>
-          </div>
         </body>
       </html>
     `;
@@ -1149,7 +1151,7 @@ export function ProjectList({
 
       {/* Main View Display: Card View OR Table View */}
       {viewMode === 'card' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 20 }}>
           {filteredProjects.map((p) => {
             const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0;
             return (
@@ -1159,12 +1161,9 @@ export function ProjectList({
                 bodyStyle={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', flex: 1 }}
               >
                 <div>
-                  {/* Top Bar: Code & Status */}
+                  {/* Top Bar: Title & Status */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8 }}>
                     <div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', letterSpacing: '0.05em' }}>
-                        {p.code}
-                      </span>
                       <h3 style={{ fontSize: 15, fontWeight: 700, margin: '2px 0 0 0', color: 'var(--text-primary)' }}>
                         {p.title}
                       </h3>
@@ -1286,12 +1285,9 @@ export function ProjectList({
               flexShrink: 0,
             }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', opacity: 0.7, letterSpacing: 2, marginBottom: 4 }}>📊 Detailed Project Report</div>
                 <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{selectedProject.title}</div>
-                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <span style={{ background: 'rgba(255,255,255,0.15)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>{selectedProject.code}</span>
-                  <span>Client: <strong>{selectedProject.client}</strong></span>
-                  {selectedProject.supervisor && <span>Supervisor: <strong>{selectedProject.supervisor}</strong></span>}
+                <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>
+                  Client: <strong>{selectedProject.client}</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -1310,7 +1306,7 @@ export function ProjectList({
                     setEditProjectOpen(true);
                   }}
                 >
-                  ✏️ Edit Details
+                  ✏️ Edit
                 </Button>
                 <Button
                   size="sm"
@@ -1686,12 +1682,13 @@ export function ProjectList({
                         <th style={{ padding: '10px 12px', fontWeight: 700 }}>Start Time</th>
                         <th style={{ padding: '10px 12px', fontWeight: 700 }}>End Time</th>
                         <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right' }}>Duration</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 700 }}>Work Update</th>
                       </tr>
                     </thead>
                     <tbody>
                       {projectSessions.length === 0 ? (
                         <tr>
-                          <td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          <td colSpan={7} style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                             No work sessions logged for this project's tasks yet.
                           </td>
                         </tr>
@@ -1702,6 +1699,7 @@ export function ProjectList({
                           const emp = empId ? employees.find((e) => e.id === empId || e.firstName === empId || `${e.firstName} ${e.lastName}` === empId) : null;
                           const assigneeName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : (empId || 'Unassigned');
                           const avatarUrl = emp?.avatarUrl;
+                          const workUpdate = s.notes || (s as any).note || (s as any).description || '—';
                           return (
                             <tr key={idx} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-sunken)' }}>
                               <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatSessionDate(s.startTime || s.start_time)}</td>
@@ -1722,6 +1720,9 @@ export function ProjectList({
                               <td style={{ padding: '10px 12px' }}>{s.endTime || s.end_time ? formatSessionTime(s.endTime || s.end_time) : 'Running…'}</td>
                               <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
                                 {s.status === 'running' ? 'Running…' : formatSessionDuration(s.durationMinutes || s.duration_minutes)}
+                              </td>
+                              <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>
+                                {workUpdate}
                               </td>
                             </tr>
                           );

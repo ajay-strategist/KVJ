@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { Button, Card, SectionHeader, Badge, ProgressBar } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
@@ -1137,8 +1138,16 @@ export function BatchManagement() {
 
       {/* ── Drawers & Modals (UIUX-REQ-010: Add/Edit Batch Fieldset Grouping) ── */}
       {createBatchModalOpen && (
-        <Drawer open={true} onClose={() => setCreateBatchModalOpen(false)} title="➕ Create New Training Batch">
+        <Modal open={true} onClose={() => setCreateBatchModalOpen(false)} title="➕ Create New Training Batch" size="lg">
           <form onSubmit={handleCreateBatch} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Live Batch Code Preview Banner */}
+            <div style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>Universal 5-Part Batch Code:</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontFamily: 'monospace' }}>
+                {[newBatchForm.college || 'College', newBatchForm.collegeCourse || 'Stream', newBatchForm.academicYear || 'Year', newBatchForm.batchName || 'Batch', courses.find((c) => c.id === newBatchForm.selectedCourseId)?.code || 'Course'].join(' - ')}
+              </span>
+            </div>
+
             {/* Fieldset 1: College & Course */}
             <fieldset style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px', margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <legend style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand)', padding: '0 6px' }}>
@@ -1283,13 +1292,21 @@ export function BatchManagement() {
               <Button type="submit">➕ Create Batch</Button>
             </div>
           </form>
-        </Drawer>
+        </Modal>
       )}
 
-      {/* Edit Batch Drawer */}
+      {/* Edit Batch Modal */}
       {editingBatch && (
-        <Drawer open={true} onClose={() => setEditingBatch(null)} title="✏️ Edit Training Batch">
+        <Modal open={true} onClose={() => setEditingBatch(null)} title="✏️ Edit Training Batch" size="lg">
           <form onSubmit={handleUpdateBatch} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Live Batch Code Preview Banner */}
+            <div style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>Universal 5-Part Batch Code:</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontFamily: 'monospace' }}>
+                {[editBatchForm.college || 'College', editBatchForm.collegeCourse || 'Stream', editBatchForm.academicYear || 'Year', editBatchForm.batchName || 'Batch', courses.find((c) => c.id === editBatchForm.selectedCourseId)?.code || 'Course'].join(' - ')}
+              </span>
+            </div>
+
             {/* Fieldset 1: College & Course */}
             <fieldset style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px', margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <legend style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand)', padding: '0 6px' }}>
@@ -1484,7 +1501,7 @@ export function BatchManagement() {
               <Button type="submit">💾 Save Changes</Button>
             </div>
           </form>
-        </Drawer>
+        </Modal>
       )}
 
       {/* Upload Student Roster Drawer */}

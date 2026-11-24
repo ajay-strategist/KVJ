@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/components';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { supabase } from '../../../shared/integration/supabase';
@@ -133,6 +133,21 @@ export function TravelRatesModal({
         await supabase
           .from('flwdsk_system_settings')
           .upsert({ key: 'car_rate_per_km', value: String(carVal) });
+
+        // 3. Save to flwdsk_travel_rates table for Category 1 live persistence
+        try {
+          await supabase.from('flwdsk_travel_rates').upsert(
+            rates.map((r) => ({
+              id: r.id,
+              name: r.name,
+              rate_per_km: r.ratePerKm,
+              icon: r.icon,
+              updated_at: new Date().toISOString(),
+            }))
+          );
+        } catch (tableErr) {
+          console.warn('Supabase flwdsk_travel_rates upsert warning:', tableErr);
+        }
       } catch (dbErr) {
         console.warn('Supabase travel rates upsert warning:', dbErr);
       }
@@ -154,7 +169,7 @@ export function TravelRatesModal({
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Travel KM Reimbursement Rates">
+    <Modal open={open} onClose={onClose} title="Travel KM Reimbursement Rates" size="md">
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div
           style={{
@@ -278,7 +293,7 @@ export function TravelRatesModal({
           </Button>
         </div>
       </form>
-    </Drawer>
+    </Modal>
   );
 }
 export default TravelRatesModal;

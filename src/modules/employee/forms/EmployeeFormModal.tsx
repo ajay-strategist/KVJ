@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/components';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import type { Employee } from '../employee.repository';
@@ -41,6 +41,7 @@ export function EmployeeFormModal({
   const [dateOfJoining, setDateOfJoining] = useState(new Date().toISOString().slice(0, 10));
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER' | 'CEO' | 'ADMIN'>('EMPLOYEE');
+  const [professionalRole, setProfessionalRole] = useState<string>('Employee');
   const [supervisorId, setSupervisorId] = useState<string>('');
   const [status, setStatus] = useState<'active' | 'on_notice' | 'suspended' | 'relieved' | 'terminated'>('active');
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +57,16 @@ export function EmployeeFormModal({
         setDesignation(employee.designation || 'Senior Technical Trainer');
         setDateOfJoining(employee.dateOfJoining || new Date().toISOString().slice(0, 10));
         setPhone(employee.phone || '');
-        setRole((employee.role as any) || 'EMPLOYEE');
+        const baseRole = ((employee.role as any) || 'EMPLOYEE').toUpperCase();
+        setRole(baseRole as any);
+        const desig = (employee.designation || '').toLowerCase();
+        const isTrainer = desig.includes('trainer') || desig.includes('training') || desig.includes('instructor');
+        let pRole = 'Employee';
+        if (baseRole === 'CEO') pRole = isTrainer ? 'CEO + Trainer' : 'CEO + Trainer';
+        else if (baseRole === 'MANAGER') pRole = isTrainer ? 'Manager + Trainer' : 'Manager + Trainer';
+        else if (baseRole === 'ADMIN') pRole = isTrainer ? 'Admin + Trainer' : 'Admin';
+        else pRole = isTrainer ? 'Employee + Trainer' : 'Employee';
+        setProfessionalRole(pRole);
         setSupervisorId((employee as any).supervisorId || (employee as any).reportingManagerId || '');
         const rawStatus = String(employee.status || 'active').toLowerCase();
         if (rawStatus === 'terminated' || rawStatus === 'relieved' || rawStatus === 'resigned') {
@@ -79,6 +89,7 @@ export function EmployeeFormModal({
         setDateOfJoining(new Date().toISOString().slice(0, 10));
         setPhone('');
         setRole('EMPLOYEE');
+        setProfessionalRole('Employee');
         setSupervisorId('');
         setStatus('active');
       }
@@ -127,10 +138,11 @@ export function EmployeeFormModal({
   };
 
   return (
-    <Drawer
+    <Modal
       open={open}
       onClose={onClose}
       title={isEdit ? `✏️ Edit Employee: ${employee?.firstName || ''} ${employee?.lastName || ''}` : '➕ Add New Employee'}
+      size="lg"
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* Name Grid */}
@@ -243,21 +255,30 @@ export function EmployeeFormModal({
         {/* System Role */}
         <div>
           <label className="kvj-label">
-            System Role <span style={{ color: 'var(--status-danger)' }}>*</span>
+            System & Professional Role <span style={{ color: 'var(--status-danger)' }}>*</span>
           </label>
           <select
             className="kvj-select"
-            value={role}
-            onChange={(e) => setRole(e.target.value as any)}
+            value={professionalRole}
+            onChange={(e) => {
+              const val = e.target.value;
+              setProfessionalRole(val);
+              if (val.startsWith('CEO')) setRole('CEO');
+              else if (val.startsWith('Manager')) setRole('MANAGER');
+              else if (val.startsWith('Admin')) setRole('ADMIN');
+              else setRole('EMPLOYEE');
+            }}
             style={{ width: '100%' }}
           >
-            <option value="EMPLOYEE">Employee (Can also conduct Training)</option>
-            <option value="MANAGER">Manager (Can also conduct Training)</option>
-            <option value="CEO">CEO (Can also conduct Training)</option>
-            <option value="ADMIN">Admin (System Administrator)</option>
+            <option value="CEO + Trainer">CEO + Trainer</option>
+            <option value="Manager + Trainer">Manager + Trainer</option>
+            <option value="Admin + Trainer">Admin + Trainer</option>
+            <option value="Admin">Admin</option>
+            <option value="Employee">Employee</option>
+            <option value="Employee + Trainer">Employee + Trainer</option>
           </select>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-            ℹ️ All roles can take training batches and clock training sessions.
+            ℹ️ Standardized 6 professional roles. Roles with (+ Trainer) are prioritized in the Training Calendar.
           </div>
         </div>
 
@@ -319,7 +340,7 @@ export function EmployeeFormModal({
           </Button>
         </div>
       </form>
-    </Drawer>
+    </Modal>
   );
 }
 export default EmployeeFormModal;

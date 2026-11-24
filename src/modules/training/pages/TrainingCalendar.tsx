@@ -11,6 +11,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { AppShell } from '../../../shared/layout/AppShell';
 import { Button, Avatar } from '../../../shared/ui/components';
 import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { container } from '../../../core/registry';
 import { EMPLOYEE_SERVICE_TOKEN } from '../../employee/employee.service';
 import type { Employee } from '../../employee/employee.repository';
@@ -1753,14 +1754,15 @@ export function TrainingCalendar() {
         </div>
       </div>
 
-      {/* ASSIGN / EDIT SCHEDULE DRAWER */}
-      <Drawer
+      {/* ASSIGN / EDIT SCHEDULE CENTERED MODAL */}
+      <Modal
         open={isAssignDrawerOpen}
         onClose={() => {
           setIsAssignDrawerOpen(false);
           setIsCopyMode(false);
           setEditingSessionId(null);
         }}
+        size="lg"
         title={
           isCopyMode
             ? `📋 Copy Schedule to Another Day (${assignForm.batchCode || 'Batch'})`
@@ -1768,7 +1770,6 @@ export function TrainingCalendar() {
               ? '✏️ Edit Assigned Training Schedule'
               : '➕ Assign Training Schedule Session'
         }
-        size="md"
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -2261,7 +2262,7 @@ export function TrainingCalendar() {
             </div>
           </div>
         </div>
-      </Drawer>
+      </Modal>
 
       {/* Conflict detail Drawer */}
       <Drawer open={!!detailConflict} onClose={() => setDetailConflict(null)} title="Conflict Details">

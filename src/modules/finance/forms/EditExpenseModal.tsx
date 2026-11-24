@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/components';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { supabase } from '../../../shared/integration/supabase';
@@ -146,7 +146,7 @@ export function EditExpenseModal({
     setKm(val);
     const parsedKm = parseFloat(val);
     if (!isNaN(parsedKm) && parsedKm > 0) {
-      const computed = Math.round(parsedKm * selectedRate);
+      const computed = Number((parsedKm * selectedRate).toFixed(2));
       setAmount(String(computed));
     }
   };
@@ -157,7 +157,7 @@ export function EditExpenseModal({
     const rate = rateMatch ? rateMatch.ratePerKm : newVeh.toLowerCase() === 'bike' ? bikeRate : carRate;
     const parsedKm = parseFloat(km);
     if (!isNaN(parsedKm) && parsedKm > 0) {
-      const computed = Math.round(parsedKm * rate);
+      const computed = Number((parsedKm * rate).toFixed(2));
       setAmount(String(computed));
     }
   };
@@ -261,25 +261,11 @@ export function EditExpenseModal({
   if (!open || !expense) return null;
 
   return (
-    <Drawer
+    <Modal
       open={open}
       onClose={onClose}
       title={`✏️ Edit Expense Claim — ${expense.employee || expense.person || 'Claim'}`}
       size="md"
-      footer={
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', width: '100%' }}>
-          <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            loading={submitting}
-            style={{ background: 'var(--brand)', color: 'white' }}
-          >
-            💾 Save Changes
-          </Button>
-        </div>
-      }
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Employee Readonly Header */}
@@ -373,7 +359,7 @@ export function EditExpenseModal({
           >
             <option value="Self Travel">🚗 Self Travel (KM Reimbursement)</option>
             <option value="Breakfast">🍳 Breakfast</option>
-            <option value="Lunch & Refreshments">🍱 Lunch & Refreshments</option>
+            <option value="Lunch">🍱 Lunch</option>
             <option value="Evening Tea">☕ Evening Tea</option>
             <option value="Dinner">🍽️ Dinner</option>
             <option value="Water">💧 Water / Beverage</option>
@@ -414,8 +400,11 @@ export function EditExpenseModal({
                   onChange={(e) => handleVehicleChange(e.target.value)}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
                 >
-                  <option value="Car">🚗 Car (₹{carRate}/km)</option>
-                  <option value="Bike">🏍️ Bike (₹{bikeRate}/km)</option>
+                  {availableRates.map((r) => (
+                    <option key={r.id || r.name} value={r.name}>
+                      {r.icon || '🚗'} {r.name} (₹{r.ratePerKm}/km)
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -504,10 +493,9 @@ export function EditExpenseModal({
             onChange={(e) => setStatus(e.target.value)}
             style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
           >
-            <option value="approved">✅ Approved</option>
-            <option value="submitted">⏳ Submitted (Pending Review)</option>
-            <option value="rejected">❌ Rejected</option>
-            <option value="reimbursed">💸 Reimbursed / Paid</option>
+            <option value="submitted">Submitted</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
           </select>
         </div>
 
@@ -540,7 +528,20 @@ export function EditExpenseModal({
             style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-surface)', resize: 'vertical' }}
           />
         </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            loading={submitting}
+            style={{ background: 'var(--brand)', color: 'white' }}
+          >
+            💾 Save Changes
+          </Button>
+        </div>
       </form>
-    </Drawer>
+    </Modal>
   );
 }

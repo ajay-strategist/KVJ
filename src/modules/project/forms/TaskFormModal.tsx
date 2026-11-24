@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import Modal from '../../../shared/ui/Modal';
 import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useDevice } from '../../../shared/hooks/responsive';
@@ -221,312 +221,219 @@ export function TaskFormModal({
     }
   };
 
-  return createPortal(
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9000,
-        backgroundColor: 'var(--bg-overlay, rgba(15, 23, 42, 0.6))',
-        backdropFilter: 'blur(3px)',
-        WebkitBackdropFilter: 'blur(3px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        boxSizing: 'border-box',
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
+  return (
+    <Modal open={open} onClose={onClose} title="➕ Create New Task" size="md">
+      <form
+        onSubmit={handleSubmit}
         style={{
-          width: '100%',
-          maxWidth: '560px',
-          maxHeight: '90vh',
-          backgroundColor: 'var(--bg-surface, #ffffff)',
-          borderRadius: '12px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          border: '1px solid var(--border, #e2e8f0)',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          gap: '16px',
         }}
       >
-        {/* Header */}
+        {/* Task Title */}
+        <div>
+          <label className="kvj-label">
+            Task Title <span style={{ color: 'var(--status-danger)' }}>*</span>
+          </label>
+          <input
+            type="text"
+            required
+            className="kvj-input"
+            placeholder="e.g. Q3 Power BI Syllabus Audit"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        {/* Category (Office Task vs Project with Search) */}
+        <div>
+          <label className="kvj-label">Category / Project</label>
+          <SearchableSelect
+            options={[
+              { value: 'Office Task', label: '🏢 Office Task (General Company Task)' },
+              ...projects.map((p) => ({
+                value: p.id,
+                label: `📁 [${p.code || 'PRJ'}] ${p.title}`,
+                subLabel: p.category ? `Category: ${p.category}` : undefined,
+              })),
+            ]}
+            value={form.category}
+            onChange={(val) => setForm({ ...form, category: val || 'Office Task' })}
+            placeholder="Select Category or Project"
+            searchPlaceholder="Search projects by title or code..."
+            allOptionLabel="🏢 Office Task (General Company Task)"
+          />
+        </div>
+
+        {/* Assignee & Supervisor */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+          <div>
+            <label className="kvj-label">Assignee</label>
+            <select
+              className="kvj-select"
+              value={form.assigneeId}
+              onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
+              style={{ width: '100%' }}
+            >
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
+                  {emp.id === user?.id ? ' (You)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="kvj-label">Supervisor</label>
+            <select
+              className="kvj-select"
+              disabled={!isOfficeTask || isAssigningToOther}
+              value={resolvedSupervisorId}
+              onChange={(e) => setForm({ ...form, supervisorId: e.target.value })}
+              style={{
+                width: '100%',
+                backgroundColor: (!isOfficeTask || isAssigningToOther) ? 'var(--bg-sunken)' : undefined,
+              }}
+            >
+              <option value="">Select Supervisor...</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
+                </option>
+              ))}
+            </select>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
+              {!isOfficeTask && 'Auto-linked to Project Lead.'}
+              {isOfficeTask && isAssigningToOther && 'Auto-linked to you (Task Assignor).'}
+              {isOfficeTask && !isAssigningToOther && 'Select your reporting supervisor.'}
+            </div>
+          </div>
+        </div>
+
+        {/* Peer Assignment Notice */}
+        {isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: 6,
+              background: 'var(--status-warning-bg, #fffbeb)',
+              border: '1px solid var(--status-warning, #f59e0b)',
+              fontSize: 11,
+              color: 'var(--status-warning-text, #92400e)',
+            }}
+          >
+            ℹ️ Peer Assignment: Assigning a task to a colleague requires Admin, CEO, or Manager approval before work can begin.
+          </div>
+        )}
+
+        {/* Project Task Self-Creation Notice */}
+        {!isOfficeTask && !isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: 6,
+              background: 'var(--status-info-bg, #eff6ff)',
+              border: '1px solid var(--status-info, #3b82f6)',
+              fontSize: 11,
+              color: 'var(--status-info-text, #1e40af)',
+            }}
+          >
+            ℹ️ Project Task: Tasks created in a project require Project Supervisor / Admin / CEO / Manager approval before work can begin.
+          </div>
+        )}
+
+        {/* Start Date & Due Date */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+          <div>
+            <label className="kvj-label">Start Date</label>
+            <input
+              type="date"
+              className="kvj-input"
+              value={form.startDate}
+              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <label className="kvj-label">
+              Due Date <span style={{ color: 'var(--status-danger)' }}>*</span>
+            </label>
+            <input
+              type="date"
+              required
+              min={todayStr}
+              className="kvj-input"
+              value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+
+        {/* Estimated Hours */}
+        <div>
+          <label className="kvj-label">
+            Estimated Hours <span style={{ color: 'var(--status-danger)' }}>*</span>
+          </label>
+          <input
+            type="number"
+            required
+            min="0.5"
+            step="0.5"
+            placeholder="e.g. 4.0"
+            className="kvj-input"
+            value={form.estimatedHours}
+            onChange={(e) => setForm({ ...form, estimatedHours: e.target.value })}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="kvj-label">Description & Deliverables</label>
+          <textarea
+            rows={3}
+            className="kvj-input"
+            placeholder="Detailed instructions, milestones, or attachments context for this task..."
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            style={{ width: '100%', resize: 'vertical' }}
+          />
+        </div>
+
+        {/* Footer Buttons */}
         <div
           style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--border, #e2e8f0)',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'var(--bg-panel, #f8fafc)',
+            justifyContent: 'flex-end',
+            gap: '10px',
+            paddingTop: '10px',
+            borderTop: '1px solid var(--border, #e2e8f0)',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)' }}>
-            ➕ Create New Task
-          </h2>
           <button
             type="button"
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '18px',
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-            }}
+            disabled={loading}
+            className="kvj-button kvj-button-secondary"
+            style={{ padding: '8px 16px', borderRadius: '6px', cursor: 'pointer' }}
           >
-            ✕
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="kvj-button kvj-button-primary"
+            style={{ padding: '8px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+          >
+            {loading ? 'Creating...' : 'Create Task'}
           </button>
         </div>
-
-        {/* Form Body */}
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            overflowY: 'auto',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px',
-          }}
-        >
-          {/* Section 1: Core Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
-              1. Core Task Details
-            </div>
-
-            {/* Task Title */}
-            <div>
-              <label className="kvj-label">
-                Task Title <span style={{ color: 'var(--status-danger)' }}>*</span>
-              </label>
-              <input
-                type="text"
-                required
-                className="kvj-input"
-                placeholder="e.g. Q3 Power BI Syllabus Audit"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                style={{ width: '100%' }}
-              />
-            </div>
-
-            {/* Category (Office Task vs Project with Search) */}
-            <div>
-              <label className="kvj-label">Category / Project</label>
-              <SearchableSelect
-                options={[
-                  { value: 'Office Task', label: '🏢 Office Task (General Company Task)' },
-                  ...projects.map((p) => ({
-                    value: p.id,
-                    label: `📁 [${p.code || 'PRJ'}] ${p.title}`,
-                    subLabel: p.category ? `Category: ${p.category}` : undefined,
-                  })),
-                ]}
-                value={form.category}
-                onChange={(val) => setForm({ ...form, category: val || 'Office Task' })}
-                placeholder="Select Category or Project"
-                searchPlaceholder="Search projects by title or code..."
-                allOptionLabel="🏢 Office Task (General Company Task)"
-              />
-            </div>
-          </div>
-
-          {/* Section 2: Ownership & Supervision */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
-              2. Ownership & Supervision
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label className="kvj-label">Assignee</label>
-                <select
-                  className="kvj-select"
-                  value={form.assigneeId}
-                  onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
-                  style={{ width: '100%' }}
-                >
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
-                      {emp.id === user?.id ? ' (You)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="kvj-label">Supervisor</label>
-                <select
-                  className="kvj-select"
-                  disabled={!isOfficeTask || isAssigningToOther}
-                  value={resolvedSupervisorId}
-                  onChange={(e) => setForm({ ...form, supervisorId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    backgroundColor: (!isOfficeTask || isAssigningToOther) ? 'var(--bg-sunken)' : undefined,
-                  }}
-                >
-                  <option value="">Select Supervisor...</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.firstName || emp.lastName ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : emp.email}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
-                  {!isOfficeTask && 'Auto-linked to Project Lead.'}
-                  {isOfficeTask && isAssigningToOther && 'Auto-linked to you (Task Assignor).'}
-                  {isOfficeTask && !isAssigningToOther && 'Select your reporting supervisor.'}
-                </div>
-              </div>
-            </div>
-
-            {/* Peer Assignment Notice */}
-            {isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
-              <div
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  background: 'var(--status-warning-bg, #fffbeb)',
-                  border: '1px solid var(--status-warning, #f59e0b)',
-                  fontSize: 11,
-                  color: 'var(--status-warning-text, #92400e)',
-                }}
-              >
-                ℹ️ Peer Assignment: Assigning a task to a colleague requires Admin, CEO, or Manager approval before work can begin.
-              </div>
-            )}
-
-            {/* Project Task Self-Creation Notice */}
-            {!isOfficeTask && !isAssigningToOther && user?.role?.toUpperCase() !== 'CEO' && (
-              <div
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  background: 'var(--status-info-bg, #eff6ff)',
-                  border: '1px solid var(--status-info, #3b82f6)',
-                  fontSize: 11,
-                  color: 'var(--status-info-text, #1e40af)',
-                }}
-              >
-                ℹ️ Project Task: Tasks created in a project require Project Supervisor / Admin / CEO / Manager approval before work can begin.
-              </div>
-            )}
-          </div>
-
-          {/* Section 3: Timeline & Effort Estimation */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
-              3. Timeline & Effort
-            </div>
-
-            {/* Start Date & Due Date (No Backdating min={todayStr}) */}
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label className="kvj-label">Start Date</label>
-                <input
-                  type="date"
-                  className="kvj-input"
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <div>
-                <label className="kvj-label">
-                  Due Date <span style={{ color: 'var(--status-danger)' }}>*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  min={todayStr}
-                  className="kvj-input"
-                  value={form.dueDate}
-                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                  style={{ width: '100%' }}
-                />
-              </div>
-            </div>
-
-            {/* Estimated Hours (Mandatory) */}
-            <div>
-              <label className="kvj-label">
-                Estimated Hours <span style={{ color: 'var(--status-danger)' }}>*</span>
-              </label>
-              <input
-                type="number"
-                required
-                min="0.5"
-                step="0.5"
-                placeholder="e.g. 4.0"
-                className="kvj-input"
-                value={form.estimatedHours}
-                onChange={(e) => setForm({ ...form, estimatedHours: e.target.value })}
-                style={{ width: '100%' }}
-              />
-            </div>
-          </div>
-
-          {/* Section 4: Context & Instructions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand, #3b82f6)' }}>
-              4. Context & Instructions
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="kvj-label">Description & Deliverables</label>
-              <textarea
-                rows={3}
-                className="kvj-input"
-                placeholder="Detailed instructions, milestones, or attachments context for this task..."
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                style={{ width: '100%', resize: 'vertical' }}
-              />
-            </div>
-          </div>
-
-          {/* Footer Buttons */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '10px',
-              paddingTop: '10px',
-              borderTop: '1px solid var(--border, #e2e8f0)',
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="kvj-button kvj-button-secondary"
-              style={{ padding: '8px 16px', borderRadius: '6px', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="kvj-button kvj-button-primary"
-              style={{ padding: '8px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
-            >
-              {loading ? 'Creating...' : 'Create Task'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
+      </form>
+    </Modal>
   );
 }
 export default TaskFormModal;

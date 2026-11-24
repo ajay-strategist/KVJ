@@ -23,6 +23,7 @@
   --bg-active: rgba(59, 130, 246, 0.14);
   --bg-form: rgba(248, 250, 255, 0.98);
   --bg-table: rgba(255, 255, 255, 0.94);
+  --bg-table-header: #F1F5FF;
   --bg-card: rgba(255, 255, 255, 0.92);
   --bg-overlay: rgba(15, 23, 42, 0.45);
   --overlay-blur: 3px;
@@ -99,6 +100,7 @@
   --bg-active: rgba(59, 130, 246, 0.22);
   --bg-form: rgba(10, 16, 28, 0.94);
   --bg-table: rgba(15, 23, 40, 0.90);
+  --bg-table-header: #0D1422;
   --bg-card: rgba(15, 23, 40, 0.90);
   --bg-overlay: rgba(2, 6, 23, 0.60);
   --overlay-blur: 3px;
@@ -183,6 +185,7 @@
   --bg-active: #FEE2E2;
   --bg-form: rgb(255 255 255 / 94%);
   --bg-table: rgb(255 255 255 / 85%);
+  --bg-table-header: #EAF1F8;
   --bg-card: rgb(255 255 255 / 78%);
   --bg-overlay: rgb(15 23 42 / 40%);
   --overlay-blur: 4px;
@@ -286,6 +289,7 @@
   --bg-active: #450A0A;
   --bg-form: rgb(15 23 42 / 92%);
   --bg-table: rgb(15 23 42 / 88%);
+  --bg-table-header: #0D1422;
   --bg-card: rgb(15 23 42 / 85%);
   --bg-overlay: rgb(3 7 18 / 75%);
   --overlay-blur: 4px;
@@ -390,6 +394,7 @@
   --bg-active: #3A3020;
   --bg-form: rgb(24 32 51 / 92%);
   --bg-table: rgb(24 32 51 / 85%);
+  --bg-table-header: #141B2D;
   --bg-card: rgb(24 32 51 / 82%);
   --bg-overlay: rgb(3 7 18 / 65%);
   --overlay-blur: 4px;
@@ -475,6 +480,7 @@
   --bg-active: #EDE9FE;
   --bg-form: rgb(255 255 255 / 96%);
   --bg-table: rgb(255 255 255 / 90%);
+  --bg-table-header: #F0FDF4;
   --bg-card: rgb(255 255 255 / 82%);
   --bg-overlay: rgb(30 27 75 / 35%);
   --overlay-blur: 4px;
@@ -553,6 +559,7 @@
   --bg-active: #FEF3C7;
   --bg-form: rgb(255 255 255 / 96%);
   --bg-table: rgb(255 255 255 / 90%);
+  --bg-table-header: #F7F1E4;
   --bg-card: rgb(255 255 255 / 84%);
   --bg-overlay: rgb(41 37 36 / 35%);
   --overlay-blur: 4px;
@@ -643,6 +650,7 @@
   --bg-active: #3D2600;
   --bg-form: rgb(15 26 18 / 92%);
   --bg-table: rgb(15 26 18 / 88%);
+  --bg-table-header: #0D1610;
   --bg-card: rgb(15 26 18 / 85%);
   --bg-overlay: rgb(3 10 5 / 75%);
   --overlay-blur: 4px;
@@ -919,9 +927,44 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-theme='christmas']::after,
-  [data-theme='christmas-dark']::after {
+  [data-theme='christmas-dark']::after,
+  [data-theme='new-year']::after,
+  [data-theme='newyear']::after {
     animation: none;
     display: none;
+  }
+}
+
+/* ── New Year Golden Sparkle & Celebration Overlay (Pure CSS, GPU-Accelerated) ── */
+[data-theme='new-year']::after,
+[data-theme='newyear']::after {
+  content: '';
+  position: fixed;
+  top: -100vh;
+  left: 0;
+  right: 0;
+  height: 200vh;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.38;
+  background-image:
+    radial-gradient(2.5px 2.5px at 40px 60px, rgba(245, 231, 200, 0.95), transparent),
+    radial-gradient(2px 2px at 120px 180px, rgba(214, 181, 109, 0.90), transparent),
+    radial-gradient(3px 3px at 220px 90px, rgba(253, 230, 138, 0.92), transparent),
+    radial-gradient(2px 2px at 350px 240px, rgba(214, 181, 109, 0.85), transparent),
+    radial-gradient(2.5px 2.5px at 480px 140px, rgba(167, 139, 250, 0.85), transparent),
+    radial-gradient(3px 3px at 600px 290px, rgba(245, 231, 200, 0.95), transparent);
+  background-size: 650px 650px;
+  animation: flowdeskConfetti 38s linear infinite;
+  will-change: transform;
+}
+
+@keyframes flowdeskConfetti {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100vh);
   }
 }
 

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import Drawer from '../../../shared/ui/Drawer';
+import React, { useState, useMemo, useEffect } from 'react';
+import Modal from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/components';
 import { useAuth } from '../../auth/AuthProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -69,9 +69,23 @@ export interface ExpenseClaimModalProps {
   batches: Array<any>;
   customExpenseTypes: string[];
   onRegisterNewType: (name: string) => Promise<boolean>;
-  /** If true the drawer opens directly in batch (multi-entry) mode */
+  onModifyType?: (oldName: string, newName: string) => Promise<boolean>;
+  onDeleteType?: (name: string) => Promise<boolean>;
+  /** If true the modal opens directly in batch (multi-entry) mode */
   defaultBatchMode?: boolean;
 }
+
+export const DEFAULT_EXPENSE_TYPES = [
+  'Self Travel',
+  'Bus Travelling / Fare',
+  'Public Transport',
+  'Morning Tea',
+  'Lunch',
+  'Evening Tea',
+  'Stationery & Printing',
+  'Lab / System Supplies',
+  'Miscellaneous',
+];
 
 // ── Batch item type ────────────────────────────────────────────────────────
 interface BatchExpenseItem {
@@ -154,10 +168,15 @@ export function ExpenseClaimModal({
   batches,
   customExpenseTypes,
   onRegisterNewType,
+  onModifyType,
+  onDeleteType,
   defaultBatchMode = false,
 }: ExpenseClaimModalProps) {
   const { user } = useAuth();
   const { toast } = useNotifications();
+
+  const userRole = (user?.role || '').toUpperCase();
+  const isManagement = ['ADMIN', 'CEO', 'MANAGER'].includes(userRole) || userRole.includes('ADMIN');
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -177,6 +196,9 @@ export function ExpenseClaimModal({
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [notes, setNotes] = useState<string>('');
   const [newTypeInput, setNewTypeInput] = useState<string>('');
+  const [manageTypesOpen, setManageTypesOpen] = useState<boolean>(false);
+  const [editingTypeName, setEditingTypeName] = useState<string | null>(null);
+  const [editTypeVal, setEditTypeVal] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const isSelfTravel = expenseType === 'Self Travel';
@@ -240,18 +262,7 @@ export function ExpenseClaimModal({
   }, [batches]);
 
   const expenseTypeOptions = useMemo(() => {
-    const defaults = [
-      'Self Travel',
-      'Bus Travelling / Fare',
-      'Public Transport',
-      'Morning Tea',
-      'Lunch & Refreshments',
-      'Evening Tea',
-      'Stationery & Printing',
-      'Lab / System Supplies',
-      'Miscellaneous',
-    ];
-    const combined = Array.from(new Set([...defaults, ...customExpenseTypes]));
+    const combined = Array.from(new Set([...DEFAULT_EXPENSE_TYPES, ...customExpenseTypes]));
     const opts = combined.map((t) => ({
       value: t,
       label: t === 'Self Travel' ? '🚗 Self Travel (Bike / Car KM Reimbursement)' : (t === 'Bus Travelling / Fare' ? '🚌 Bus Travelling / Fare' : t),
@@ -267,6 +278,42 @@ export function ExpenseClaimModal({
     if (ok) {
       setExpenseType(val);
       setNewTypeInput('');
+    }
+  };
+
+  const handleSaveModifiedType = async (oldName: string) => {
+    const val = editTypeVal.trim();
+    if (!val || val === oldName) {
+      setEditingTypeName(null);
+      return;
+    }
+    if (onModifyType) {
+      const ok = await onModifyType(oldName, val);
+      if (ok) {
+        if (expenseType === oldName) setExpenseType(val);
+        setEditingTypeName(null);
+        setEditTypeVal('');
+      }
+    } else {
+      toast({ variant: 'info', title: 'Modified', message: `Renamed ${oldName} to ${val}` });
+      if (expenseType === oldName) setExpenseType(val);
+      setEditingTypeName(null);
+    }
+  };
+
+  const handleDeleteType = async (name: string) => {
+    if (name === 'Self Travel') {
+      toast({ variant: 'warning', title: 'Protected Type', message: 'Self Travel cannot be removed.' });
+      return;
+    }
+    if (onDeleteType) {
+      const ok = await onDeleteType(name);
+      if (ok) {
+        if (expenseType === name) setExpenseType('Self Travel');
+      }
+    } else {
+      toast({ variant: 'info', title: 'Removed', message: `Removed expense type: ${name}` });
+      if (expenseType === name) setExpenseType('Self Travel');
     }
   };
 
@@ -557,7 +604,7 @@ export function ExpenseClaimModal({
   };
 
   return (
-    <Drawer open={open} onClose={handleClose} title="Submit Expense Claim">
+    <Modal open={open} onClose={handleClose} title="Submit Expense Claim" size="lg">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -609,7 +656,26 @@ export function ExpenseClaimModal({
 
           {/* Expense Type */}
           <div className="kvj-field">
-            <label className="kvj-label">Expense Type</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <label className="kvj-label" style={{ margin: 0 }}>Expense Type</label>
+              {isManagement && (
+                <button
+                  type="button"
+                  onClick={() => setManageTypesOpen(!manageTypesOpen)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--brand)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  {manageTypesOpen ? '✕ Done Managing' : '⚙️ Manage Types (Admin)'}
+                </button>
+              )}
+            </div>
             <select
               className="kvj-select"
               value={expenseType}
@@ -623,6 +689,95 @@ export function ExpenseClaimModal({
               ))}
             </select>
           </div>
+
+          {/* Admin Expense Type Manager Panel */}
+          {isManagement && manageTypesOpen && (
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                background: 'var(--bg-sunken)',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
+                ⚙️ Admin Expense Types Control:
+              </div>
+              <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {Array.from(new Set([...DEFAULT_EXPENSE_TYPES, ...customExpenseTypes])).map((typeName) => (
+                  <div
+                    key={typeName}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
+                      fontSize: 12,
+                    }}
+                  >
+                    {editingTypeName === typeName ? (
+                      <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={editTypeVal}
+                          onChange={(e) => setEditTypeVal(e.target.value)}
+                          className="kvj-input"
+                          style={{ padding: '2px 6px', fontSize: 12, flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveModifiedType(typeName)}
+                          style={{ background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTypeName(null)}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{typeName}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            title="Modify/Rename Type"
+                            onClick={() => {
+                              setEditingTypeName(typeName);
+                              setEditTypeVal(typeName);
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
+                          >
+                            ✏️
+                          </button>
+                          {typeName !== 'Self Travel' && (
+                            <button
+                              type="button"
+                              title="Remove Type"
+                              onClick={() => handleDeleteType(typeName)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Register New Type Inline */}
           {expenseType === '__NEW_TYPE__' && (
@@ -769,7 +924,7 @@ export function ExpenseClaimModal({
           {/* Receipt Upload (only in single mode — batch skips file upload) */}
           {!batchMode && (
             <div className="kvj-field">
-              <label className="kvj-label">Receipt / Bill Upload (Optional)</label>
+              <label className="kvj-label">Receipt / Bill Upload</label>
               <input
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg,.webp"
@@ -889,7 +1044,7 @@ export function ExpenseClaimModal({
           </div>
         )}
       </div>
-    </Drawer>
+    </Modal>
   );
 }
 export default ExpenseClaimModal;

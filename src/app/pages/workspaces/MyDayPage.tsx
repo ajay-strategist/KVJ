@@ -15,6 +15,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { useLeave } from '../../../modules/leave/hooks/useLeave';
 import { Form, SelectField, TextField, DatePickerField, CheckboxField, FileUploadField, TextAreaField, useForm } from '../../../shared/forms/form';
 import { ApplyLeaveModal } from '../../../modules/leave/forms/ApplyLeaveModal';
@@ -1018,8 +1019,8 @@ export const AttendancePanel = memo(function AttendancePanel({
         </div>
       </div>
 
-      {/* Clock In Drawer */}
-      <Drawer
+      {/* Clock In Centered Modal */}
+      <Modal
         open={clockInOpen}
         onClose={() => setClockInOpen(false)}
         title="Attendance Clock In"
@@ -1032,13 +1033,13 @@ export const AttendancePanel = memo(function AttendancePanel({
 
           {/* Group 1: Attendance Mode selectable cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Attendance Location Mode</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Attendance Work Mode</span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {[
-                { value: 'Office', label: 'Office', icon: '🏢' },
-                { value: 'Training', label: 'Training', icon: '👨‍🏫' },
-                { value: 'Remote', label: 'Remote', icon: '🏠' },
-                { value: 'Travel', label: 'Travel', icon: '🚗' },
+                { value: 'Office', label: 'In Office', icon: '🏢' },
+                { value: 'Remote', label: 'Remote / WFH', icon: '🏠' },
+                { value: 'Travel', label: 'Client Visit', icon: '🚗' },
+                { value: 'Training', label: 'College Training', icon: '🎓' },
               ].map((m) => {
                 const active = selectedMode === m.value;
                 return (
@@ -1193,7 +1194,7 @@ export const AttendancePanel = memo(function AttendancePanel({
             </Button>
           </div>
         </div>
-      </Drawer>
+      </Modal>
 
       {/* Submit / Claim Attendance Drawer */}
       <AttendanceCorrectionModal
@@ -2803,6 +2804,9 @@ export function MyDayPage() {
         const updated = prev.map((t) => {
           if (t.id === id) {
             return { ...t, active: true, secondsToday };
+          }
+          if (t.active) {
+            return { ...t, active: false };
           }
           return t;
         });

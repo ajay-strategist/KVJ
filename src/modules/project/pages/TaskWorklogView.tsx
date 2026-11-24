@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PageHeader, Card, SectionHeader, Badge, Button } from '../../../shared/ui/components';
+import Modal from '../../../shared/ui/Modal';
 import { useAuth } from '../../auth/AuthProvider';
 import { usePermissions } from '../../../shared/permissions/react';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -757,11 +758,11 @@ export function TaskWorklogView({
           />
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table className="kvj-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
                 {['Employee', 'Supervisor', 'Project / Task', 'Date', 'Start Time', 'End Time', 'Duration', 'Update', 'Status'].map((h) => (
-                  <th key={h} style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap', background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))', position: 'sticky', top: 0, zIndex: 10 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -990,60 +991,34 @@ export function TaskWorklogView({
       </Card>
 
       {/* Edit Worklog Update Modal */}
-      {updateModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            backgroundColor: 'var(--bg-overlay)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-          }}
-          onClick={() => setUpdateModalOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: 480,
-              backgroundColor: 'var(--bg-surface)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--border)',
-              boxShadow: 'var(--shadow-xl)',
-              padding: 24,
-            }}
-          >
-            <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-              ✏️ Edit Worklog Update Note
-            </h3>
-            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
-              Add or update the work progress details for this work session. This update will be stored in the worklog.
-            </p>
-            <form onSubmit={handleSaveUpdateNote}>
-              <textarea
-                rows={4}
-                className="kvj-input"
-                placeholder="Describe work completed, progress made, or updates..."
-                value={noteInput}
-                onChange={(e) => setNoteInput(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 16 }}
-              />
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <Button type="button" variant="secondary" onClick={() => setUpdateModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={savingNote}>
-                  {savingNote ? 'Saving...' : '💾 Save Update'}
-                </Button>
-              </div>
-            </form>
+      <Modal
+        open={updateModalOpen}
+        onClose={() => setUpdateModalOpen(false)}
+        title="✏️ Edit Worklog Update Note"
+        size="md"
+      >
+        <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
+          Add or update the work progress details for this work session. This update will be stored in the worklog.
+        </p>
+        <form onSubmit={handleSaveUpdateNote}>
+          <textarea
+            rows={4}
+            className="kvj-input"
+            placeholder="Describe work completed, progress made, or updates..."
+            value={noteInput}
+            onChange={(e) => setNoteInput(e.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 16 }}
+          />
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <Button type="button" variant="secondary" onClick={() => setUpdateModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={savingNote}>
+              {savingNote ? 'Saving...' : '💾 Save Update'}
+            </Button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 }

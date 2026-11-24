@@ -3,7 +3,7 @@ import { AppShell } from '../../../shared/layout/AppShell';
 import { PageHeader, Button, Badge } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
 import { useTraining } from '../hooks/useTraining';
-import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import Tabs from '../../../shared/ui/Tabs';
 import { Form, TextField } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
@@ -472,15 +472,11 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
         onChange={(id) => setActiveTab(id as 'courses' | 'colleges')}
       />
 
-      {/* Create New Course Drawer */}
-      <Drawer open={openCourseModal} onClose={() => setOpenCourseModal(false)} title="Create New Course">
+      {/* Create New Course Centered Modal */}
+      <Modal open={openCourseModal} onClose={() => setOpenCourseModal(false)} title="Create New Course" size="lg">
         <Form initial={{ maxMarks: 100, passPercentage: 70 }} onSubmit={handleCreateCourseSubmit}>
           <TextField name="title" label="Course Title" />
           <TextField name="code" label="Course Code" placeholder="e.g. KVJ-PY-101" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <TextField name="maxMarks" label="Maximum Marks" type="number" placeholder="100" />
-            <TextField name="passPercentage" label="Pass % Criteria" type="number" placeholder="70" />
-          </div>
 
           {/* Checklist Builder */}
           <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
@@ -531,18 +527,14 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
             <Button type="submit">Create Course</Button>
           </div>
         </Form>
-      </Drawer>
+      </Modal>
 
-      {/* Edit Existing Course Drawer */}
-      <Drawer open={editingCourse !== null} onClose={() => setEditingCourse(null)} title="Edit Course Details">
+      {/* Edit Existing Course Centered Modal */}
+      <Modal open={editingCourse !== null} onClose={() => setEditingCourse(null)} title="Edit Course Details" size="lg">
         {editingCourse && (
           <Form initial={{ title: editingCourse.title, code: editingCourse.code, maxMarks: editingCourse.maxMarks ?? 100, passPercentage: editingCourse.passPercentage ?? 70 }} onSubmit={handleEditCourseSubmit}>
             <TextField name="title" label="Course Title" />
             <TextField name="code" label="Course Code" placeholder="e.g. KVJ-PY-101" />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <TextField name="maxMarks" label="Maximum Marks" type="number" placeholder="100" />
-              <TextField name="passPercentage" label="Pass % Criteria" type="number" placeholder="70" />
-            </div>
 
             {/* Checklist Builder */}
             <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
@@ -594,13 +586,14 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
             </div>
           </Form>
         )}
-      </Drawer>
+      </Modal>
 
-      {/* Create / Edit College Drawer */}
-      <Drawer
+      {/* Create / Edit College Centered Modal */}
+      <Modal
         open={openCollegeModal}
         onClose={() => setOpenCollegeModal(false)}
         title={editingCollege ? '🏛️ Edit College Details' : '🏛️ Add New College'}
+        size="lg"
       >
         <form onSubmit={handleSaveCollege} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
@@ -628,7 +621,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
                 required
                 placeholder="e.g. CHRIST-IRK"
                 value={collegeForm.code}
-                onChange={(e) => setCollegeForm({ ...collegeForm, code: e.target.value })}
+                onChange={(e) => setCollegeForm({ ...collegeForm, code: e.target.value.toUpperCase() })}
               />
             </div>
             <div>
@@ -721,7 +714,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
             </Button>
           </div>
         </form>
-      </Drawer>
+      </Modal>
     </AppShell>
   );
 }
