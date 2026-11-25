@@ -2264,8 +2264,8 @@ export function TrainingCalendar() {
         </div>
       </Modal>
 
-      {/* Conflict detail Drawer */}
-      <Drawer open={!!detailConflict} onClose={() => setDetailConflict(null)} title="Conflict Details">
+      {/* Conflict detail Modal */}
+      <Modal open={!!detailConflict} onClose={() => setDetailConflict(null)} title="Conflict Details" size="md">
         {detailConflict && (
           <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Row k="Type" v={`${CONFLICT_META[detailConflict.type].icon} ${detailConflict.type}`} />
@@ -2278,10 +2278,10 @@ export function TrainingCalendar() {
             <p style={{ color: 'var(--text-secondary)' }}>{detailConflict.detail}</p>
           </div>
         )}
-      </Drawer>
+      </Modal>
 
-      {/* Session detail Drawer */}
-      <Drawer open={!!detailSession} onClose={() => setDetailSession(null)} title="Session Details">
+      {/* Session detail Modal */}
+      <Modal open={!!detailSession} onClose={() => setDetailSession(null)} title="Session Details" size="md">
         {detailSession && (
           <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Row k="Session" v={detailSession.name} />
@@ -2296,7 +2296,7 @@ export function TrainingCalendar() {
             <Row k="Students" v={String(detailSession.studentCount)} />
           </div>
         )}
-      </Drawer>
+      </Modal>
     </AppShell>
   );
 }

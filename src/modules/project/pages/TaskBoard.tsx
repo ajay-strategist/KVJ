@@ -1518,25 +1518,24 @@ export function TaskBoard({
         return (
           <Card style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table className="kvj-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
-                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Project</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Task Title</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Supervisor</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Assignee</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Start Date</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Due Date</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'right' }}>Proposed</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'right' }}>Worked</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700 }}>Status</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'center' }}>Actions</th>
+                  <tr style={{ background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Project</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Task Title</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Supervisor</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Assignee</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Start Date</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Due Date</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'right', background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Logged vs Est (Hrs)</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Status</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'center', background: 'var(--bg-table-header, var(--bg-panel, #FFFFFF))' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedTasks.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
                         No tasks found in the selected filter window.
                       </td>
                     </tr>
@@ -1597,21 +1596,44 @@ export function TaskBoard({
                           <td style={{ padding: '12px 16px' }}>{t.assignee || 'Unassigned'}</td>
                           <td style={{ padding: '12px 16px' }}>{formatTableDate((t as any).startDate || t.startDate)}</td>
                           <td style={{ padding: '12px 16px' }}>{formatTableDate(t.dueDate)}</td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--brand)' }}>
-                            {t.proposedHours ? `${t.proposedHours}` : '—'}
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                            ⏱ {Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)}
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            ⏱ {Math.max(getTaskDurationHours(t.id), t.totalHoursWorked).toFixed(1)} / {t.proposedHours ? Number(t.proposedHours).toFixed(1) : '—'}
                           </td>
                           <td style={{ padding: '12px 16px' }}>
-                            <Badge tone={
-                              t.status === 'Completed' ? 'success' :
-                              t.status === 'Under Review' ? 'info' :
-                              t.status === 'In Progress' ? 'progress' :
-                              'neutral'
-                            }>
-                              {t.status}
-                            </Badge>
+                            {canUserApproveTask(t) ? (
+                              <select
+                                className="kvj-select"
+                                value={t.status}
+                                onChange={(e) => {
+                                  const nextStatus = e.target.value as TaskItem['status'];
+                                  const statusMap: Record<string, string> = {
+                                    'To Do': 'todo',
+                                    'In Progress': 'in_progress',
+                                    'Under Review': 'review',
+                                    Completed: 'done',
+                                  };
+                                  updateTask?.(t.id as UUID, {
+                                    status: (statusMap[nextStatus] || 'todo') as any,
+                                    ...(nextStatus === 'Completed' ? { approvalStatus: 'approved' } : {}),
+                                  });
+                                }}
+                                style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600, borderRadius: 6 }}
+                              >
+                                <option value="To Do">To Do</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Under Review">Under Review</option>
+                                <option value="Completed">Completed</option>
+                              </select>
+                            ) : (
+                              <Badge tone={
+                                t.status === 'Completed' ? 'success' :
+                                t.status === 'Under Review' ? 'info' :
+                                t.status === 'In Progress' ? 'progress' :
+                                'neutral'
+                              }>
+                                {t.status}
+                              </Badge>
+                            )}
                           </td>
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>

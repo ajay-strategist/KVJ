@@ -703,7 +703,7 @@ export const AttendancePanel = memo(function AttendancePanel({
           {/* TOTAL DURATION */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ fontSize: 12, textTransform: 'uppercase', color: isDarkTheme ? 'rgba(255, 255, 255, 0.65)' : '#8b96a5', fontWeight: 700, letterSpacing: '0.04em' }}>
-              Duration (Today)
+              Duration
             </span>
             <span style={{ fontSize: 14, fontWeight: 700, color: isDarkTheme ? '#F8FAFC' : '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
               {formatDuration(grossDurationMs)}

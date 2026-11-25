@@ -62,27 +62,6 @@ export const BatchHeaderCard: React.FC<BatchHeaderCardProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {safeTrainers.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>👤 Trainer:</span>
-              <select
-                className="kvj-select"
-                value={selectedTrainerId}
-                onChange={(e) => {
-                  onSelectTrainerId(e.target.value);
-                  onSelectBatchId('');
-                }}
-                style={{ padding: '4px 8px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 160 }}
-              >
-                <option value="all">👥 All Trainers</option>
-                {safeTrainers.map((emp) => {
-                  const name = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.email;
-                  return <option key={emp.id} value={emp.id}>{name}</option>;
-                })}
-              </select>
-            </div>
-          )}
-
           {onRefresh && (
             <Button
               variant="outline"

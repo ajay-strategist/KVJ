@@ -1830,11 +1830,9 @@ export function AttendanceLogPage() {
                     <th style={{ padding: '8px 10px' }}>Organization</th>
                     <th style={{ padding: '8px 10px' }}>Location</th>
                     <th style={{ padding: '8px 10px' }}>Class / Work</th>
-                    <th style={{ padding: '8px 10px' }}>Mode</th>
                     <th style={{ padding: '8px 10px' }}>Start Time</th>
                     <th style={{ padding: '8px 10px' }}>End Time</th>
                     <th style={{ padding: '8px 10px' }}>Duration</th>
-                    <th style={{ padding: '8px 10px' }}>Note</th>
                     <th style={{ padding: '8px 10px' }}>Break</th>
                   </tr>
                 </thead>
@@ -1968,27 +1966,9 @@ export function AttendanceLogPage() {
                             <span style={{ color: 'var(--text-muted)' }}>—</span>
                           )}
                         </td>
-                        <td style={{ padding: '8px 10px' }}>
-                          {isHoliday ? (
-                            <Badge tone="danger">Holiday</Badge>
-                          ) : isLeave ? (
-                            <Badge tone="warning">On Leave</Badge>
-                          ) : r.mode === 'Re-Approved' || r.mode.includes('Re-Approved') ? (
-                            <Badge tone="success">Re-Approved</Badge>
-                          ) : (
-                            r.mode
-                          )}
-                        </td>
                         <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.start}</td>
                         <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.end}</td>
                         <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.duration}</td>
-                        <td style={{
-                          padding: '8px 10px',
-                          color: isHoliday ? 'var(--status-danger)' : isLeave ? '#d97706' : 'var(--text-secondary)',
-                          fontWeight: isHoliday || isLeave ? 700 : 500
-                        }}>
-                          {r.note}
-                        </td>
                         <td style={{ padding: '8px 10px' }}>{r.break}</td>
                       </tr>
                     );
@@ -2185,108 +2165,6 @@ export function AttendanceLogPage() {
         </div>
       ),
     },
-    {
-      id: 'office_timeline',
-      label: '🏢 Office Timeline',
-      content: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>📅 Today — {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--brand)', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'present').length} Present</span>
-            <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--status-warning)', color: 'white', borderRadius: 999, padding: '2px 10px' }}>{timelineRows.filter(r => r.status === 'leave').length} On Leave</span>
-            <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--bg-sunken)', color: 'var(--text-muted)', borderRadius: 999, padding: '2px 10px', border: '1px solid var(--border)' }}>{timelineRows.filter(r => r.status === 'absent').length} Absent</span>
-          </div>
-
-          {timelineRows.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>No employee data available.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {timelineRows.map((row) => (
-                <div
-                  key={row.empId}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '48px 1fr auto',
-                    alignItems: 'center',
-                    gap: 16,
-                    padding: '14px 18px',
-                    background: 'var(--bg-surface)',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border)',
-                    borderLeft: `4px solid ${STATUS_COLORS[row.status]}`,
-                    transition: 'box-shadow 150ms',
-                  }}
-                >
-                  {/* Avatar */}
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%',
-                    background: `${STATUS_COLORS[row.status]}22`,
-                    border: `2px solid ${STATUS_COLORS[row.status]}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 15, fontWeight: 800, color: STATUS_COLORS[row.status],
-                    flexShrink: 0,
-                  }}>
-                    {row.initials}
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{row.name}</span>
-                      <span style={{
-                        fontSize: 12, fontWeight: 600, padding: '2px 9px', borderRadius: 999,
-                        background: `${STATUS_COLORS[row.status]}22`,
-                        color: STATUS_COLORS[row.status],
-                        border: `1px solid ${STATUS_COLORS[row.status]}55`,
-                      }}>
-                        {row.status === 'leave' && row.leaveType ? `🏖 On ${row.leaveType} Leave` : STATUS_LABELS[row.status]}
-                      </span>
-                      {row.status === 'present' && row.workType !== 'Office' && (
-                        <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>📍 {row.workType}</span>
-                      )}
-                    </div>
-                    {row.status === 'present' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          🕐 {row.clockIn || '—'} → {row.clockOut || 'Still Working'}
-                        </span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-success)' }}>
-                          ⏱ {Math.floor(row.workMins / 60)}h {row.workMins % 60}m worked
-                        </span>
-                      </div>
-                    )}
-                    {/* Work progress bar */}
-                    {row.status === 'present' && (
-                      <div style={{ height: 5, background: 'var(--bg-sunken)', borderRadius: 99, overflow: 'hidden', maxWidth: 320 }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${row.barPct}%`,
-                          background: row.barPct >= 80 ? 'var(--status-success)' : row.barPct >= 50 ? 'var(--brand)' : 'var(--status-warning)',
-                          borderRadius: 99,
-                          transition: 'width 600ms ease',
-                        }} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Hours badge */}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {row.status === 'present' ? (
-                      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--status-success)' }}>
-                        {Math.floor(row.workMins / 60)}<span style={{ fontSize: 12, fontWeight: 600 }}>h</span>
-                        {row.workMins % 60}<span style={{ fontSize: 12, fontWeight: 600 }}>m</span>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 13, color: STATUS_COLORS[row.status], fontWeight: 600 }}>—</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ),
-    },
   ];
 
   return (
@@ -2349,7 +2227,7 @@ export function AttendanceLogPage() {
                         style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
                       >
                         <option value={user?.fullName || 'System Admin'}>Me ({user?.fullName || 'Personal'})</option>
-                        <option value="All Employees">All Employees (Manager Access)</option>
+                        <option value="All Employees">All Employees</option>
                         {employeeNames.filter((name) => name !== user?.fullName).map((name) => (
                           <option key={name} value={name}>{name}</option>
                         ))}
@@ -2423,7 +2301,7 @@ export function AttendanceLogPage() {
                           style={{ padding: '6px 12px', fontSize: 12, borderRadius: 'var(--radius-xs)', minWidth: 180 }}
                         >
                           <option value={user?.fullName || 'System Admin'}>Me ({user?.fullName || 'Personal'})</option>
-                          <option value="All Employees">All Employees (Manager Access)</option>
+                          <option value="All Employees">All Employees</option>
                           {employeeNames.filter((name) => name !== user?.fullName).map((name) => (
                             <option key={name} value={name}>{name}</option>
                           ))}

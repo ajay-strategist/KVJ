@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { PageHeader, Button, Card, SectionHeader, Badge, Avatar, SearchInput } from '../../../shared/ui/components';
 import { DataTable, type Column } from '../../../shared/ui/DataTable';
-import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import { Form, TextField, SelectField, DatePickerField, TextAreaField, useForm } from '../../../shared/forms/form';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
@@ -799,12 +799,9 @@ export function ProjectList({
           <!-- Header -->
           <div class="header">
             <div>
-              <div class="report-label">📊 Detailed Project Report</div>
               <h1>${p.title}</h1>
               <div class="meta">
-                Code: <strong>${p.code}</strong> &nbsp;·&nbsp;
-                Client: <strong>${p.client}</strong> &nbsp;·&nbsp;
-                Supervisor: <strong>${p.supervisor}</strong>
+                Client: <strong>${p.client}</strong>
               </div>
             </div>
             <div style="text-align:right;">
@@ -1161,49 +1158,71 @@ export function ProjectList({
                 bodyStyle={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', flex: 1 }}
               >
                 <div>
-                  {/* Top Bar: Title & Status */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8 }}>
+                  {/* Top Bar: Title, Status & Edit Icon */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 8 }}>
                     <div>
                       <h3 style={{ fontSize: 15, fontWeight: 700, margin: '2px 0 0 0', color: 'var(--text-primary)' }}>
                         {p.title}
                       </h3>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Client: {p.client}</div>
                     </div>
-                    <ProjectCardStatusButton
-                      status={p.status}
-                      onChange={(newVal, newLabel) => handleQuickProjectStatusChange(p.id, newVal, newLabel)}
-                      loading={updatingProjectId === p.id}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <ProjectCardStatusButton
+                        status={p.status}
+                        onChange={(newVal, newLabel) => handleQuickProjectStatusChange(p.id, newVal, newLabel)}
+                        loading={updatingProjectId === p.id}
+                      />
+                      <button
+                        type="button"
+                        title="Edit Project"
+                        onClick={() => {
+                          setSelectedProject(p);
+                          setClientNameInput(p.client || '');
+                          setEditProjectOpen(true);
+                        }}
+                        style={{
+                          background: 'var(--bg-sunken)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          padding: '4px 7px',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        ✏️
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Supervisor */}
-                  {p.supervisor ? (
-                    <div style={{ fontSize: 12, marginBottom: 12, padding: '4px 10px', background: 'var(--bg-sunken)', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Supervisor:</span>
-                      <Avatar name={p.supervisor} src={p.supervisorAvatarUrl} size={20} />
-                      <strong>{p.supervisor}</strong>
-                    </div>
-                  ) : null}
-
-                  {/* Member-specific Hours Breakdown */}
+                  {/* Integrated Team Members Strip (Supervisor Highlighted First) */}
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase' }}>
-                      Assigned Members & Hours Worked:
-                    </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {p.members.map((m, idx) => (
-                        <div key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          <Avatar name={m.name} src={m.avatarUrl} size={20} />
-                          <span>{m.name}: <strong style={{ color: 'var(--brand)' }}>{m.hours}</strong></span>
-                        </div>
-                      ))}
+                      {p.supervisor && (() => {
+                        const supMember = p.members.find((m) => m.name === p.supervisor);
+                        return (
+                          <div style={{ fontSize: 12, background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.35)', padding: '4px 10px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span>🛡️</span>
+                            <strong>{p.supervisor}:</strong>
+                            <strong style={{ color: 'var(--brand)' }}>{supMember?.hours || '0.0h'}</strong>
+                          </div>
+                        );
+                      })()}
+                      {p.members
+                        .filter((m) => m.name !== p.supervisor)
+                        .map((m, idx) => (
+                          <div key={idx} style={{ fontSize: 12, background: 'var(--bg-sunken)', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <Avatar name={m.name} src={m.avatarUrl} size={20} />
+                            <span>{m.name}: <strong style={{ color: 'var(--brand)' }}>{m.hours}</strong></span>
+                          </div>
+                        ))}
                     </div>
                   </div>
 
-                  {/* Total Hours Worked & Task Completion Ratio (Clearly Presented) */}
+                  {/* Total Hours Worked & Task Completion Ratio */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 12 }}>
                     <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase', fontWeight: 700 }}>Total Hours Worked:</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', fontWeight: 700 }}>Hours (Logged / Est):</span>
                       <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--brand)', marginTop: 4 }}>⏱ {p.totalHours}</div>
                     </div>
                     <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--e1)' }}>
@@ -1322,36 +1341,6 @@ export function ProjectList({
                 >
                   ➕ Add Task
                 </Button>
-                {canDeleteProject && (
-                  <Button
-                    size="sm"
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.12)',
-                      border: '1px solid rgba(239, 68, 68, 0.35)',
-                      color: '#fee2e2',
-                      fontWeight: 600,
-                      fontSize: 12,
-                      whiteSpace: 'nowrap',
-                    }}
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: 'Delete Project?',
-                        message: `Delete project "${selectedProject.title}"? The project and its tasks will be hidden from the app. Nothing is permanently erased — this can be recovered.`
-                      });
-                      if (ok) {
-                        const res = await deleteProject(selectedProject.id as UUID);
-                        if (res.ok) {
-                          toast({ variant: 'warning', title: 'Project Deleted', message: `"${selectedProject.title}" and its tasks have been hidden (recoverable).` });
-                          setReportOpen(false);
-                        } else {
-                          toast({ variant: 'error', title: 'Delete Failed', message: res.error });
-                        }
-                      }
-                    }}
-                  >
-                    🗑️ Delete Project
-                  </Button>
-                )}
                 <button
                   type="button"
                   onClick={() => setReportOpen(false)}
@@ -1753,7 +1742,7 @@ export function ProjectList({
 
 
       {/* Create Project Modal */}
-      <Drawer open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create New Project">
+      <Modal open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create New Project" size="lg">
         <Form key={nextProjectCode} initial={{ code: nextProjectCode, status: 'not_started' }} onSubmit={handleCreateProject}>
           <TextField name="code" label="Project Code *" placeholder="e.g. KVJ-PRJ-05" />
           <TextField name="title" label="Project Name *" placeholder="e.g. Q3 ERP Migration & Analytics" />
@@ -1777,11 +1766,10 @@ export function ProjectList({
           <ProjectMembersField employees={employees} />
           <SelectField
             name="status"
-            label="Initial Phase *"
+            label="Project Status *"
             options={[
               { value: 'not_started', label: 'Not Started' },
-              { value: 'planning', label: 'Kick Off' },
-              { value: 'execution', label: 'In Execution' },
+              { value: 'execution', label: 'In Progress' },
               { value: 'closure', label: 'Completed' },
             ]}
           />
@@ -1791,11 +1779,11 @@ export function ProjectList({
             <Button type="submit">Create Project</Button>
           </div>
         </Form>
-      </Drawer>
+      </Modal>
 
       {/* Add New Task inside Card Modal */}
       {selectedProject && (
-        <Drawer open={addTaskOpen} onClose={() => setAddTaskOpen(false)} title={`Add New Task — ${selectedProject.code}`}>
+        <Modal open={addTaskOpen} onClose={() => setAddTaskOpen(false)} title={`Add New Task — ${selectedProject.title}`} size="lg">
           <Form initial={{ priority: 'Medium', status: 'To Do', proposedHours: '' }} onSubmit={handleAddTaskSubmit}>
             <TextField name="title" label="Task Title" placeholder="e.g. Implement API Endpoint" />
             <TextAreaField name="description" label="Task Description" placeholder="Detailed requirements..." />
@@ -1812,12 +1800,12 @@ export function ProjectList({
               <Button type="submit">Add Task to Project</Button>
             </div>
           </Form>
-        </Drawer>
+        </Modal>
       )}
 
       {/* Edit Project Modal */}
       {selectedProject && (
-        <Drawer open={editProjectOpen} onClose={() => setEditProjectOpen(false)} title={`Edit Project: ${selectedProject.title}`}>
+        <Modal open={editProjectOpen} onClose={() => setEditProjectOpen(false)} title={`Edit Project: ${selectedProject.title}`} size="lg">
           <Form
             initial={{
               code: selectedProject.code,
@@ -1853,11 +1841,10 @@ export function ProjectList({
             <ProjectMembersField employees={employees} />
             <SelectField
               name="status"
-              label="Phase *"
+              label="Project Status *"
               options={[
                 { value: 'not_started', label: 'Not Started' },
-                { value: 'planning', label: 'Kick Off' },
-                { value: 'execution', label: 'In Execution' },
+                { value: 'execution', label: 'In Progress' },
                 { value: 'closure', label: 'Completed' },
               ]}
             />
@@ -1866,7 +1853,7 @@ export function ProjectList({
               <Button type="submit">Save Changes</Button>
             </div>
           </Form>
-        </Drawer>
+        </Modal>
       )}
     </div>
   );

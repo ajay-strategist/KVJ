@@ -95,7 +95,7 @@ export function toCardVM(b: Batch, courses: Course[], trainers: Employee[]): Bat
   const rawBatchNo = b.batchNo && b.batchNo !== b.code ? b.batchNo : undefined;
   const batchNo = rawBatchNo || (b.code?.match(/Batch\s*\d+/i)?.[0]) || (b.code && !b.code.includes('-') ? b.code : '—');
 
-  const parts = [college, program, academicYear, batchNo].filter((p) => p && p !== '—');
+  const parts = [college, program, academicYear, batchNo, courseTitle].filter((p) => p && p !== '—');
   const dynamicCode = parts.length >= 2 ? parts.join(' - ') : undefined;
   const batchCode = dynamicCode || cleanBatchCode(b.code, b.batchNo) || (b.trainingName || 'Batch');
 
@@ -392,7 +392,7 @@ const BatchCard = memo(function BatchCard({
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
             {/* Title Block */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <h3 style={{
                   margin: 0, fontSize: 16, fontWeight: 700,
                   color: 'var(--text-primary)', letterSpacing: '-0.01em',
@@ -409,41 +409,38 @@ const BatchCard = memo(function BatchCard({
                 </span>
                 {pinned && <span title="Pinned" style={{ fontSize: 13 }}>📌</span>}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {vm.college} · {vm.batchNo} · {vm.academicYear}
-              </div>
             </div>
 
-            {/* Edit + Copy + Fav + Pin controls */}
+            {/* Edit + Copy + Fav + Pin controls (Icons Only) */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
               {onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit(vm.id)}
-                  title="Edit Training Details"
+                  title="Edit Batch"
                   style={{
                     background: 'var(--bg-sunken)', border: '1px solid var(--border)',
-                    cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                    padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
-                    display: 'flex', alignItems: 'center', gap: 4,
+                    cursor: 'pointer', fontSize: 13,
+                    padding: '4px 8px', borderRadius: 8, color: 'var(--text-primary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
-                  ✏️ Edit
+                  ✏️
                 </button>
               )}
               {onCopy && (
                 <button
                   type="button"
                   onClick={() => onCopy(vm.id)}
-                  title="Make a Copy of Training Details Card"
+                  title="Copy Batch"
                   style={{
                     background: 'var(--bg-sunken)', border: '1px solid var(--border)',
-                    cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                    padding: '4px 10px', borderRadius: 8, color: 'var(--text-primary)',
-                    display: 'flex', alignItems: 'center', gap: 4,
+                    cursor: 'pointer', fontSize: 13,
+                    padding: '4px 8px', borderRadius: 8, color: 'var(--text-primary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
-                  📋 Copy
+                  📋
                 </button>
               )}
               <button
@@ -473,24 +470,17 @@ const BatchCard = memo(function BatchCard({
             </div>
           </div>
 
-          {/* ── Details Grid (Row 1: COLLEGE, COURSE, PROGRAM, ACADEMIC YEAR, COORDINATOR | Row 2: TRAINER, START DATE, END DATE) ── */}
+          {/* ── Streamlined Single-Row Metadata Grid (4 Columns) ── */}
           <div style={{
             display: 'grid',
-            // Wraps on narrow/mobile screens instead of squeezing 5 fields across.
-            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
             gap: '12px 16px',
             marginBottom: 18,
           }}>
-            <InfoField label="COLLEGE"       value={vm.college} />
-            <InfoField label="COURSE"        value={vm.course} />
-            <InfoField label="PROGRAM"       value={vm.program} />
-            <InfoField label="ACADEMIC YEAR" value={vm.academicYear} />
+            <InfoField label="START DATE"    value={vm.startDate && vm.startDate !== '—' && /^\d{4}-\d{2}-\d{2}/.test(vm.startDate) ? vm.startDate.slice(0, 10).split('-').reverse().join('-') : vm.startDate} mono />
+            <InfoField label="END DATE"      value={vm.endDate && vm.endDate !== '—' && /^\d{4}-\d{2}-\d{2}/.test(vm.endDate) ? vm.endDate.slice(0, 10).split('-').reverse().join('-') : vm.endDate} mono />
             <InfoField label="NO. OF STUDENTS" value={vm.capacity ? `${vm.capacity} Students` : '—'} />
             <InfoField label="COORDINATOR"   value={vm.coordinator} />
-
-            <InfoField label="TRAINER"       value={vm.trainer} />
-            <InfoField label="START DATE"    value={vm.startDate} mono />
-            <InfoField label="END DATE"      value={vm.endDate} mono />
           </div>
 
           {/* ── Workflow Completion Row ── */}
@@ -583,7 +573,7 @@ const BatchCard = memo(function BatchCard({
                   (e.currentTarget as HTMLButtonElement).style.color = 'var(--status-danger, var(--status-danger))';
                 }}
               >
-                🗑️ Delete Batch
+                🗑️
               </button>
             )}
           </div>

@@ -531,10 +531,10 @@ export function AttendanceCalendarView({
           </div>
         </Card>
 
-        {/* Accumulated Expenses & Metrics (Financial Year) */}
+        {/* Financial Year (FY) Summary */}
         <Card>
           <SectionHeader
-            title="Accumulated Expenses"
+            title="Financial Year (FY) Summary"
             action={
               <select
                 className="kvj-select"

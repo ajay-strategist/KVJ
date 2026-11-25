@@ -10,7 +10,7 @@ import { useDialog } from '../../../shared/feedback/DialogProvider';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
 import { useAuth } from '../../auth/AuthProvider';
 import { businessRules } from '../../../config/business-rules';
-import Drawer from '../../../shared/ui/Drawer';
+import Modal from '../../../shared/ui/Modal';
 import type { LeaveRecord } from '../leave.repository';
 import { googleIntegration, getMonthlyFolderName } from '../../../shared/integration/google';
 import { ApplyLeaveModal } from '../forms/ApplyLeaveModal';
@@ -393,6 +393,8 @@ export function LeaveBoard() {
                   <Button
                     size="xs"
                     variant="primary"
+                    title="Approve Leave Request"
+                    style={{ padding: '4px 8px', minWidth: 28, background: 'var(--status-success)', borderColor: 'var(--status-success)' }}
                     onClick={async (e) => {
                       e.stopPropagation();
                       const res = await approveLeave(r.id, 'Approved via Leave Board');
@@ -404,11 +406,13 @@ export function LeaveBoard() {
                       }
                     }}
                   >
-                    ✓ Approve
+                    ✓
                   </Button>
                   <Button
                     size="xs"
                     variant="danger"
+                    title="Reject Leave Request"
+                    style={{ padding: '4px 8px', minWidth: 28 }}
                     onClick={async (e) => {
                       e.stopPropagation();
                       const res = await rejectLeave(r.id, 'Rejected via Leave Board');
@@ -420,7 +424,7 @@ export function LeaveBoard() {
                       }
                     }}
                   >
-                    ✕ Reject
+                    ✕
                   </Button>
                 </>
               )}
@@ -449,10 +453,10 @@ export function LeaveBoard() {
                   size="xs"
                   variant="secondary"
                   onClick={handleCancel}
-                  style={{ color: cancelCheck.canCancel ? '#dc2626' : '#9ca3af', opacity: cancelCheck.canCancel ? 1 : 0.6 }}
-                  title={cancelCheck.errorReason}
+                  style={{ padding: '4px 8px', minWidth: 28, color: cancelCheck.canCancel ? '#dc2626' : '#9ca3af', opacity: cancelCheck.canCancel ? 1 : 0.6 }}
+                  title={cancelCheck.errorReason || 'Cancel Leave'}
                 >
-                  🚫 Cancel
+                  🚫
                 </Button>
               )}
             </div>
@@ -787,6 +791,8 @@ export function LeaveBoard() {
                           <Button
                             size="sm"
                             variant="success"
+                            title="Approve Leave Request"
+                            style={{ padding: '6px 12px' }}
                             onClick={async () => {
                               const ok = await confirm({
                                 title: 'Approve Leave?',
@@ -798,11 +804,13 @@ export function LeaveBoard() {
                               }
                             }}
                           >
-                            ✓ Approve
+                            ✓
                           </Button>
                           <Button
                             size="sm"
                             variant="danger"
+                            title="Reject Leave Request"
+                            style={{ padding: '6px 12px' }}
                             onClick={async () => {
                               const ok = await confirm({
                                 title: 'Reject Leave?',
@@ -814,7 +822,7 @@ export function LeaveBoard() {
                               }
                             }}
                           >
-                            ✕ Reject
+                            ✕
                           </Button>
                         </>
                       )}
@@ -823,6 +831,8 @@ export function LeaveBoard() {
                         <Button
                           size="sm"
                           variant="danger"
+                          title={cancelCheck.errorReason || 'Cancel Leave'}
+                          style={{ padding: '6px 12px' }}
                           onClick={async () => {
                             if (!cancelCheck.canCancel) {
                               toast({
@@ -844,7 +854,7 @@ export function LeaveBoard() {
                             }
                           }}
                         >
-                          Cancel Leave
+                          🚫
                         </Button>
                       )}
                     </div>
@@ -869,12 +879,13 @@ export function LeaveBoard() {
       {/* Apply Leave Modal */}
       <ApplyLeaveModal open={applyOpen} onClose={() => setApplyOpen(false)} onSuccess={() => refreshMyLeaves()} />
 
-      {/* Upload Post-Leave Medical Certificate Drawer */}
+      {/* Upload Post-Leave Medical Certificate Modal */}
       {uploadCertOpen && uploadTargetLeave && (
-        <Drawer
+        <Modal
           open={true}
           onClose={() => { setUploadCertOpen(false); setUploadTargetLeave(null); }}
           title="Upload Medical Certificate"
+          size="md"
         >
           <Form
             initial={{}}
@@ -945,7 +956,7 @@ export function LeaveBoard() {
               <Button type="submit">Upload Certificate</Button>
             </div>
           </Form>
-        </Drawer>
+        </Modal>
       )}
     </AppShell>
   );

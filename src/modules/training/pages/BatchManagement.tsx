@@ -983,160 +983,7 @@ export function BatchManagement() {
         isRefreshing={isRefreshing}
       />
 
-      {/* ── Sub-Tab Body (When activated via batch actions) ── */}
-      {activeTab && (
-        <div style={{ marginBottom: 16 }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setActiveTab(null)}
-          >
-            ← Back to Batches
-          </Button>
-        </div>
-      )}
-
-      {/* ── Sub-Tab Body ── */}
-      {activeTab === 'matrix' && (
-        <StudentsTab
-          students={students}
-          selectedBatchId={selectedBatchId}
-          batchStudentIds={batchStudentIds}
-          activeBatch={activeBatch}
-          considerAttendance={considerAttendance}
-          attendanceThreshold={attendanceThreshold}
-          eligibilityCriteria={eligibilityCriteria}
-          courseMaxMarks={courseMaxMarks}
-          coursePassPct={coursePassPct}
-          isExecutive={isExecutive}
-          onAssignVoucher={handleAssignVoucher}
-          onNotifyVoucher={handleNotifyVoucher}
-          onRemoveStudent={handleRemoveStudent}
-          onBatchRemoveStudents={handleBatchRemoveStudents}
-          onDedupeStudents={handleDedupeStudents}
-          onSaveEligibilityConfig={async (cond, thr, crit) => {
-            setConsiderAttendance(cond);
-            setAttendanceThreshold(thr);
-            setEligibilityCriteria(crit);
-            if (selectedBatchId) {
-              await saveBatchEligibilityRules(selectedBatchId, cond, thr, coursePassPct, crit);
-            }
-          }}
-          onSetConsiderAttendance={setConsiderAttendance}
-          onSetAttendanceThreshold={setAttendanceThreshold}
-          onSetCourseMaxMarks={setCourseMaxMarks}
-          onSetCoursePassPct={setCoursePassPct}
-          onAddEligCriterion={handleAddEligCriterion}
-          onUpdateEligCriterion={handleUpdateEligCriterion}
-          onRemoveEligCriterion={handleRemoveEligCriterion}
-          assessmentLabelMap={assessmentLabelMap}
-          onOpenUploadModal={() => setUploadModalOpen(true)}
-          onOpenAddStudentModal={() => setAddStudentModalOpen(true)}
-          onOpenUploadVoucherModal={() => setUploadModalOpen(true)}
-          onDownloadVoucherTemplate={downloadVoucherTemplate}
-          onDownloadPDF={downloadPDF}
-          onOpenDailyReport={() => setDailyReportBuilderOpen(true)}
-          onOpenBulkEmail={() => setEmailComposerOpen(true)}
-          canViewDailyReport={canViewDailyReport}
-        />
-      )}
-
-      {activeTab === 'attendance' && (
-        <AttendanceMatrixTab
-          students={students}
-          selectedBatchId={selectedBatchId}
-          batchStudentIds={batchStudentIds}
-          considerAttendance={considerAttendance}
-          attendanceThreshold={attendanceThreshold}
-          attendanceSessions={attendanceSessions}
-          attendanceMatrix={attendanceMatrix}
-          onAddHourSession={handleAddHourSessionColumn}
-          onDeleteSession={handleDeleteSessionColumn}
-          onUpdateSessionDate={(colId, date) => {
-            setAttendanceSessions((prev) =>
-              prev.map((c) => (c.id === colId ? { ...c, date } : c))
-            );
-          }}
-          onUpdateSessionHour={(colId, hour) => {
-            setAttendanceSessions((prev) =>
-              prev.map((c) => (c.id === colId ? { ...c, hour } : c))
-            );
-          }}
-          onToggleStatus={handleToggleSessionStatus}
-        />
-      )}
-
-      {activeTab === 'final-exam' && (
-        <ExamScoresTab
-          mode="final-exam"
-          students={students}
-          selectedBatchId={selectedBatchId}
-          batchStudentIds={batchStudentIds}
-          activeCourse={activeCourse}
-          activeBatch={activeBatch}
-          selectedAttemptTypes={selectedAttemptTypes}
-          onSetSelectedAttemptTypes={setSelectedAttemptTypes}
-          onUpdateStudent={handleUpdateStudent}
-          onSaveStudentToDb={saveStudentToDb}
-          onRemoveStudent={handleRemoveStudent}
-          onAddStudent={() => setAddStudentModalOpen(true)}
-          onOpenReconciliation={() => setReconciliationDrawerOpen(true)}
-          onUploadMarks={handleUploadExamMarks}
-          onSaveRetestPaymentLedger={async (sid, st) => {
-            await verifyRetestPayment(sid, selectedBatchId, st === 'Paid' ? 'Verified' : 'Pending');
-          }}
-          toast={toast}
-          isExecutive={isExecutive}
-        />
-      )}
-
-      {activeTab === 'retest' && (
-        <ExamScoresTab
-          mode="retest"
-          students={students}
-          selectedBatchId={selectedBatchId}
-          batchStudentIds={batchStudentIds}
-          activeCourse={activeCourse}
-          activeBatch={activeBatch}
-          selectedAttemptTypes={selectedAttemptTypes}
-          onSetSelectedAttemptTypes={setSelectedAttemptTypes}
-          onUpdateStudent={handleUpdateStudent}
-          onSaveStudentToDb={saveStudentToDb}
-          onRemoveStudent={handleRemoveStudent}
-          onAddStudent={() => setAddStudentModalOpen(true)}
-          onOpenReconciliation={() => setReconciliationDrawerOpen(true)}
-          onUploadMarks={handleUploadExamMarks}
-          onSaveRetestPaymentLedger={async (sid, st) => {
-            await verifyRetestPayment(sid, selectedBatchId, st === 'Paid' ? 'Verified' : 'Pending');
-          }}
-          toast={toast}
-          isExecutive={isExecutive}
-        />
-      )}
-
-      {activeTab === 'registration' && (
-        <RegistrationTab
-          students={students}
-          registrationRecords={registrationRecords}
-          registrationSearchQuery={registrationSearchQuery}
-          onSearchChange={setRegistrationSearchQuery}
-        />
-      )}
-
-      {activeTab === 'certificates' && (
-        <CertificateDeliveryTab
-          filteredStudents={students}
-          selectedBatchId={selectedBatchId}
-          enrollments={enrollments || []}
-          getCertificateDelivery={getCertificateDelivery}
-          getCertificateReceiptUrl={getCertificateReceiptUrl}
-          saveCertificateDelivery={saveCertificateDelivery}
-          uploadCertificateReceipt={uploadCertificateReceipt}
-          toast={toast}
-        />
-      )}
-
-      {/* ── Drawers & Modals (UIUX-REQ-010: Add/Edit Batch Fieldset Grouping) ── */}
+      {/* ── Drawers & Modals (Add/Edit Batch Centered Modals) ── */}
       {createBatchModalOpen && (
         <Modal open={true} onClose={() => setCreateBatchModalOpen(false)} title="➕ Create New Training Batch" size="lg">
           <form onSubmit={handleCreateBatch} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1266,24 +1113,61 @@ export function BatchManagement() {
               </div>
             </fieldset>
 
-            {/* Fieldset 3: Scheduling & Trainers */}
+            {/* Fieldset 3: Timeline & College Coordinator */}
             <fieldset style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px', margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <legend style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand)', padding: '0 6px' }}>
-                3. Trainers & Operations
+                3. Timeline &amp; College Coordinator
               </legend>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Lead Trainer (Optional)</label>
-                <select
-                  className="kvj-select"
-                  value={newBatchForm.trainerId}
-                  onChange={(e) => setNewBatchForm({ ...newBatchForm, trainerId: e.target.value })}
-                  style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
-                >
-                  <option value="">-- Choose Lead Trainer (Optional) --</option>
-                  {trainers.map((t) => (
-                    <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.designation})</option>
-                  ))}
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Start Date *</label>
+                  <input
+                    type="date"
+                    required
+                    className="kvj-input"
+                    value={newBatchForm.startDate}
+                    onChange={(e) => setNewBatchForm({ ...newBatchForm, startDate: e.target.value })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>End Date *</label>
+                  <input
+                    type="date"
+                    required
+                    className="kvj-input"
+                    value={newBatchForm.endDate}
+                    onChange={(e) => setNewBatchForm({ ...newBatchForm, endDate: e.target.value })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Coordinator Name</label>
+                  <input
+                    type="text"
+                    className="kvj-input"
+                    value={newBatchForm.coordinator}
+                    onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinator: e.target.value })}
+                    placeholder="e.g. Prof. John Doe"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Coordinator Email</label>
+                  <input
+                    type="email"
+                    className="kvj-input"
+                    value={newBatchForm.coordinatorEmail}
+                    onChange={(e) => setNewBatchForm({ ...newBatchForm, coordinatorEmail: e.target.value })}
+                    placeholder="e.g. coordinator@college.edu"
+                    style={{ width: '100%' }}
+                  />
+                </div>
               </div>
             </fieldset>
 
@@ -1425,25 +1309,11 @@ export function BatchManagement() {
               </div>
             </fieldset>
 
-            {/* Fieldset 3: Scheduling & Trainers */}
+            {/* Fieldset 3: Timeline & College Coordinator */}
             <fieldset style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px 16px', margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <legend style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand)', padding: '0 6px' }}>
-                3. Trainers & Timeline
+                3. Timeline &amp; College Coordinator
               </legend>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Lead Trainer (Optional)</label>
-                <select
-                  className="kvj-select"
-                  value={editBatchForm.trainerId}
-                  onChange={(e) => setEditBatchForm({ ...editBatchForm, trainerId: e.target.value })}
-                  style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
-                >
-                  <option value="">-- Choose Lead Trainer (Optional) --</option>
-                  {trainers.map((t) => (
-                    <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.designation})</option>
-                  ))}
-                </select>
-              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -1503,168 +1373,6 @@ export function BatchManagement() {
           </form>
         </Modal>
       )}
-
-      {/* Upload Student Roster Drawer */}
-      {uploadModalOpen && (
-        <Drawer open={true} onClose={() => setUploadModalOpen(false)} title="📤 Upload Student Roster (Excel / CSV)">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 10, padding: '12px 14px' }}>
-              <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 4px', color: 'var(--text-primary)' }}>
-                📋 Required columns: <code>Name</code>, <code>Phone Number</code>, and <code>Email Address</code>
-              </p>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-                Existing records are automatically updated with the latest details. New students are enrolled in this batch.
-              </p>
-            </div>
-
-            {!importProgress ? (
-              <>
-                <div style={{ border: '2px dashed var(--brand)', borderRadius: 12, padding: 30, textAlign: 'center', background: 'var(--bg-sunken)' }}>
-                  <span style={{ fontSize: 32 }}>📄</span>
-                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>Choose Excel / CSV File</div>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={(e) => setSelectedUploadFile(e.target.files?.[0] || null)}
-                    style={{ marginTop: 12 }}
-                  />
-                  {selectedUploadFile && (
-                    <div style={{ marginTop: 12, fontSize: 12, fontWeight: 600, color: 'var(--brand)', background: 'rgba(99, 102, 241, 0.1)', padding: '6px 12px', borderRadius: 6, display: 'inline-block' }}>
-                      📁 Selected: {selectedUploadFile.name} ({(selectedUploadFile.size / 1024).toFixed(1)} KB)
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
-                  <Button variant="secondary" onClick={() => setUploadModalOpen(false)}>Cancel</Button>
-                  <Button disabled={!selectedUploadFile} onClick={() => selectedUploadFile && handleFileUpload(selectedUploadFile)}>
-                    📤 Start Upload
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 24, background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>{importProgress.message}</p>
-                <ProgressBar value={importProgress.current} max={importProgress.total} tone="brand" size="md" showLabel />
-              </div>
-            )}
-          </div>
-        </Drawer>
-      )}
-
-      {/* Add Single Student Drawer */}
-      {addStudentModalOpen && (
-        <Drawer open={true} onClose={() => setAddStudentModalOpen(false)} title="➕ Add Student Record">
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!newStudentForm.name.trim() || !newStudentForm.email.trim()) return;
-              try {
-                const names = newStudentForm.name.split(' ');
-                const res = await registerStudent({
-                  firstName: names[0] || 'Student',
-                  lastName: names.slice(1).join(' ') || '',
-                  phone: newStudentForm.phone,
-                  email: newStudentForm.email,
-                  customFields: {
-                    college: newStudentForm.college || activeBatch?.college || '',
-                    attendancePct: 100,
-                    attendanceStatus: 'Regular',
-                  },
-                });
-                if (res.ok && selectedBatchId) {
-                  await supabase
-                    .from('flwdsk_enrollments')
-                    .insert({ batch_id: selectedBatchId, student_id: res.value.id });
-                  toast({ variant: 'success', title: 'Student Added', message: 'Student registered and enrolled.' });
-                  setAddStudentModalOpen(false);
-                  refreshBatches(true);
-                }
-              } catch (err: any) {
-                toast({ variant: 'error', title: 'Failed', message: err.message });
-              }
-            }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-          >
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Full Name *</label>
-              <input
-                type="text"
-                className="kvj-input"
-                required
-                value={newStudentForm.name}
-                onChange={(e) => setNewStudentForm({ ...newStudentForm, name: e.target.value })}
-                placeholder="e.g. Rahul Sharma"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Email Address *</label>
-              <input
-                type="email"
-                className="kvj-input"
-                required
-                value={newStudentForm.email}
-                onChange={(e) => setNewStudentForm({ ...newStudentForm, email: e.target.value })}
-                placeholder="rahul@example.com"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Phone Number</label>
-              <input
-                type="text"
-                className="kvj-input"
-                value={newStudentForm.phone}
-                onChange={(e) => setNewStudentForm({ ...newStudentForm, phone: e.target.value })}
-                placeholder="+91 98765 00000"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <Button variant="secondary" onClick={() => setAddStudentModalOpen(false)}>Cancel</Button>
-              <Button type="submit">➕ Register Student</Button>
-            </div>
-          </form>
-        </Drawer>
-      )}
-
-      {/* Daily Report Builder & Preview Modals */}
-      {dailyReportBuilderOpen && (
-        <DailyReportBuilderModal
-          isOpen={dailyReportBuilderOpen}
-          onClose={() => setDailyReportBuilderOpen(false)}
-          data={dailyReportFixture}
-          onGenerate={(generatedConfig) => {
-            setDailyReportConfig(generatedConfig);
-            setDailyReportBuilderOpen(false);
-            setDailyReportPreviewOpen(true);
-          }}
-        />
-      )}
-
-      {dailyReportPreviewOpen && (
-        <DailyReportPreview
-          isOpen={dailyReportPreviewOpen}
-          onClose={() => setDailyReportPreviewOpen(false)}
-          data={dailyReportFixture}
-          initialConfig={dailyReportConfig}
-        />
-      )}
-
-      {/* Attempts Reconciliation Drawers */}
-      <ExamReconciliationDrawers
-        isOpen={reconciliationDrawerOpen}
-        onClose={() => setReconciliationDrawerOpen(false)}
-        reconciliationReport={reconciliationReport}
-        students={students}
-        batchStudentIds={batchStudentIds}
-        activeBatch={activeBatch}
-        onResolveDiscrepancy={async (res) => {
-          await resolveExamAttemptDiscrepancy(res);
-        }}
-        toast={toast}
-      />
 
       {/* Batch Expense Details Drawer */}
       <BatchExpenseDetailsDrawer

@@ -394,21 +394,6 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       },
     },
     { key: 'location', header: 'Location', sortable: true, accessor: (c) => c?.location || '—' },
-    { key: 'principalName', header: 'Principal / Head', accessor: (c) => c?.principalName || '—' },
-    {
-      key: 'contact',
-      header: 'Contact Info',
-      render: (c) => {
-        if (!c) return '—';
-        return (
-          <div style={{ fontSize: 12 }}>
-            {c.contactEmail && <div>📧 {c.contactEmail}</div>}
-            {c.contactPhone && <div style={{ color: 'var(--text-muted)' }}>📞 {c.contactPhone}</div>}
-            {!c.contactEmail && !c.contactPhone && '—'}
-          </div>
-        );
-      },
-    },
     {
       key: 'actions',
       header: 'Actions',
@@ -474,7 +459,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
 
       {/* Create New Course Centered Modal */}
       <Modal open={openCourseModal} onClose={() => setOpenCourseModal(false)} title="Create New Course" size="lg">
-        <Form initial={{ maxMarks: 100, passPercentage: 70 }} onSubmit={handleCreateCourseSubmit}>
+        <Form initial={{}} onSubmit={handleCreateCourseSubmit}>
           <TextField name="title" label="Course Title" />
           <TextField name="code" label="Course Code" placeholder="e.g. KVJ-PY-101" />
 
@@ -532,7 +517,7 @@ export function CourseList({ defaultTab = 'courses' }: { defaultTab?: 'courses' 
       {/* Edit Existing Course Centered Modal */}
       <Modal open={editingCourse !== null} onClose={() => setEditingCourse(null)} title="Edit Course Details" size="lg">
         {editingCourse && (
-          <Form initial={{ title: editingCourse.title, code: editingCourse.code, maxMarks: editingCourse.maxMarks ?? 100, passPercentage: editingCourse.passPercentage ?? 70 }} onSubmit={handleEditCourseSubmit}>
+          <Form initial={{ title: editingCourse.title, code: editingCourse.code }} onSubmit={handleEditCourseSubmit}>
             <TextField name="title" label="Course Title" />
             <TextField name="code" label="Course Code" placeholder="e.g. KVJ-PY-101" />
 
