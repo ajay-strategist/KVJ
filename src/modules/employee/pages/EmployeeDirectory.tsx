@@ -422,10 +422,10 @@ export function EmployeeDirectory({ defaultTabId = 'directory' }: { defaultTabId
   };
 
   const getEmployeeIdleInfo = (emp: Employee) => {
-    // Admin and CEO conduct organizational administration, approvals, and meetings — exempt from task-idle tracking
+    // Only CEO is exempt from task-idle tracking; Admins and all other staff are tracked
     const roleUpper = (emp.role || '').toUpperCase();
     const desigUpper = (emp.designation || '').toUpperCase();
-    if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || desigUpper.includes('ADMIN') || desigUpper.includes('CEO')) {
+    if (roleUpper === 'CEO' || desigUpper.includes('CEO')) {
       return { isIdle: false, idleMinutes: 0 };
     }
 

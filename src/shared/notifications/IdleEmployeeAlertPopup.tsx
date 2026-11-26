@@ -63,18 +63,17 @@ export function IdleEmployeeAlertPopup() {
   const alertedIdsRef = useRef<Set<string>>(new Set());
   const soundPlayedMapRef = useRef<Map<string, number>>(new Map());
 
-  // Only run for Admin, CEO, and Manager roles
   const isAdminOrManager = Boolean(
     user && (user.role === 'ADMIN' || user.role === 'CEO' || user.role === 'MANAGER')
   );
 
   const checkIdleEmployees = useCallback(async () => {
-    if (!isAdminOrManager) return;
+    if (!user) return;
 
     try {
       const todayStr = todayISO();
 
-      // 1. Fetch active employees
+      // 1. Fetch active employees (or self only for non-management employees)
       const { data: empsData } = await supabase
         .from('flwdsk_employees')
         .select('id, employee_id, first_name, last_name, designation, status, email, role')
@@ -82,7 +81,15 @@ export function IdleEmployeeAlertPopup() {
 
       if (!empsData || empsData.length === 0) return;
 
-      const activeEmps = empsData.filter((e) => !isRelievedEmployee(e.status));
+      const userEmailLower = user.email?.toLowerCase();
+      const activeEmps = empsData.filter((e) => {
+        if (isRelievedEmployee(e.status)) return false;
+        if (isAdminOrManager) return true;
+        return (
+          e.id === user.id ||
+          (e.email && userEmailLower && e.email.toLowerCase() === userEmailLower)
+        );
+      });
 
       // 2. Fetch today's attendance records
       const { data: attData } = await supabase
@@ -202,10 +209,10 @@ export function IdleEmployeeAlertPopup() {
       for (const emp of activeEmps) {
         if (onLeaveEmpIds.has(emp.id)) continue;
 
-        // Admin and CEO conduct organizational administration, approvals, and meetings — exempt from task-idle tracking
+        // Only CEO is exempt from idle tracking; Admins and all other staff are tracked
         const roleUpper = (emp.role || '').toUpperCase();
         const desigUpper = (emp.designation || '').toUpperCase();
-        if (roleUpper === 'ADMIN' || roleUpper === 'CEO' || desigUpper.includes('ADMIN') || desigUpper.includes('CEO')) {
+        if (roleUpper === 'CEO' || desigUpper.includes('CEO')) {
           continue;
         }
 
@@ -241,19 +248,22 @@ export function IdleEmployeeAlertPopup() {
             .map((r: any) => r.id)
         );
         const activeWs = openWorkSessions.find((ws: any) => matchingAttIds.has(ws.attendance_record_id));
-        if (activeWs?.work_type && String(activeWs.work_type).toLowerCase().includes('training')) {
-          continue; // Conducting training, NOT idle!
+        const activeWsType = activeWs?.work_type ? String(activeWs.work_type).toLowerCase() : '';
+        if (activeWsType.includes('training') || activeWsType.includes('travel') || activeWsType.includes('client')) {
+          continue; // Conducting training or client travel, NOT idle!
         }
 
         // B. Embedded sessions
         if (Array.isArray(att.sessions)) {
           const activeSess = att.sessions.find((s: any) => !s.clockOut && !s.clock_out);
           const sessToCheck = activeSess || att.sessions[att.sessions.length - 1];
-          if (sessToCheck?.workType && String(sessToCheck.workType).toLowerCase().includes('training')) {
-            continue; // Conducting training, NOT idle!
+          const sessType = sessToCheck?.workType ? String(sessToCheck.workType).toLowerCase() : '';
+          if (sessType.includes('training') || sessType.includes('travel') || sessType.includes('client')) {
+            continue; // Conducting training or client travel, NOT idle!
           }
         }
-        if (att.work_type && String(att.work_type).toLowerCase().includes('training')) {
+        const attType = att.work_type ? String(att.work_type).toLowerCase() : '';
+        if (attType.includes('training') || attType.includes('travel') || attType.includes('client')) {
           continue;
         }
 
@@ -335,8 +345,9 @@ export function IdleEmployeeAlertPopup() {
 
         // Must be idle >= 15 mins
         if (idleMinutes >= 15) {
-          // Check if admin recently dismissed this employee's alert
-          const dismissKey = `flwdsk_admin_dismissed_idle_${empId}`;
+          // Check if user/admin recently dismissed this alert
+          const dismissPrefix = isAdminOrManager ? 'flwdsk_admin_dismissed_idle_' : 'flwdsk_emp_dismissed_idle_';
+          const dismissKey = `${dismissPrefix}${empId}`;
           const lastDismissed = localStorage.getItem(dismissKey);
           if (lastDismissed) {
             const dismissMs = Number(lastDismissed);
@@ -377,35 +388,37 @@ export function IdleEmployeeAlertPopup() {
     } catch (err) {
       console.warn('Error checking idle employees:', err);
     }
-  }, [isAdminOrManager]);
+  }, [user, isAdminOrManager]);
 
   useEffect(() => {
-    if (!isAdminOrManager) return;
+    if (!user) return;
     checkIdleEmployees();
     const interval = setInterval(checkIdleEmployees, 15000); // Check every 15s
     return () => clearInterval(interval);
-  }, [isAdminOrManager, checkIdleEmployees]);
+  }, [user, checkIdleEmployees]);
 
   const handleDismiss = (empId: string) => {
     const now = Date.now();
-    localStorage.setItem(`flwdsk_admin_dismissed_idle_${empId}`, String(now));
+    const dismissPrefix = isAdminOrManager ? 'flwdsk_admin_dismissed_idle_' : 'flwdsk_emp_dismissed_idle_';
+    localStorage.setItem(`${dismissPrefix}${empId}`, String(now));
     setActiveAlerts((prev) => prev.filter((a) => a.id !== empId));
   };
 
   const handleDismissAll = () => {
     const now = Date.now();
+    const dismissPrefix = isAdminOrManager ? 'flwdsk_admin_dismissed_idle_' : 'flwdsk_emp_dismissed_idle_';
     activeAlerts.forEach((a) => {
-      localStorage.setItem(`flwdsk_admin_dismissed_idle_${a.id}`, String(now));
+      localStorage.setItem(`${dismissPrefix}${a.id}`, String(now));
     });
     setActiveAlerts([]);
   };
 
-  const handleViewStatus = (empId: string) => {
+  const handleViewStatus = (empId: string, isSelfAlert: boolean) => {
     handleDismiss(empId);
-    navigate('/app/employees/status');
+    navigate(isSelfAlert || !isAdminOrManager ? '/app/my-day' : '/app/employees/status');
   };
 
-  if (!isAdminOrManager || activeAlerts.length === 0) {
+  if (!user || activeAlerts.length === 0) {
     return null;
   }
 
@@ -620,7 +633,7 @@ export function IdleEmployeeAlertPopup() {
                     flexWrap: 'wrap',
                   }}
                 >
-                  <span>No active task in progress</span>
+                  <span>{notice.id === user.id || !isAdminOrManager ? 'You have no active task in progress' : 'No active task in progress'}</span>
                   <span
                     style={{
                       display: 'inline-flex',
@@ -640,7 +653,7 @@ export function IdleEmployeeAlertPopup() {
               </div>
             </div>
 
-            {/* Bottom Actions: View Status & Dismiss */}
+            {/* Bottom Actions: View Status / Go to My Day & Dismiss */}
             <div
               style={{
                 display: 'flex',
@@ -678,7 +691,7 @@ export function IdleEmployeeAlertPopup() {
 
               <button
                 type="button"
-                onClick={() => handleViewStatus(notice.id)}
+                onClick={() => handleViewStatus(notice.id, notice.id === user.id)}
                 style={{
                   background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
                   border: 'none',
@@ -694,7 +707,7 @@ export function IdleEmployeeAlertPopup() {
                   gap: 4,
                 }}
               >
-                View Status →
+                {notice.id === user.id || !isAdminOrManager ? 'Go to My Day →' : 'View Status →'}
               </button>
             </div>
           </div>

@@ -2636,14 +2636,19 @@ export function MyDayPage() {
   // UIUX-REQ-008: 15-Minute Continuous Employee Idle Notification
   useEffect(() => {
     const checkIdleInterval = setInterval(() => {
-      if (!user || user.role === 'ADMIN') return;
+      if (!user || (user.role || '').toUpperCase() === 'CEO') return;
 
       const isClockedIn = record?.status === 'present';
       const isOnBreak = record?.status === 'on_break' || Boolean(record?.breaks?.some((b: any) => !b.endTime && !b.end_time));
       const isAnyTaskRunning = tasks.some((t) => t.active);
+      const activeSession = Array.isArray(record?.sessions)
+        ? (record.sessions.find((s: any) => !s.clockOut && !s.clock_out) || record.sessions[record.sessions.length - 1])
+        : null;
+      const activeWorkType = String(activeSession?.workType || (record as any)?.workType || '').toLowerCase();
+      const isExemptMode = activeWorkType.includes('training') || activeWorkType.includes('travel') || activeWorkType.includes('client');
 
-      // Condition: Clocked In AND No Task Running AND Not On Break
-      const isIdleNow = isClockedIn && !isAnyTaskRunning && !isOnBreak;
+      // Condition: Clocked In (Office/Remote) AND No Task Running AND Not On Break
+      const isIdleNow = isClockedIn && !isAnyTaskRunning && !isOnBreak && !isExemptMode;
 
       const idleKey = `flwdsk_idle_start_${user.id}`;
       const notifiedKey = `flwdsk_idle_notified_${user.id}`;
@@ -2658,12 +2663,17 @@ export function MyDayPage() {
           const alreadyNotified = localStorage.getItem(notifiedKey);
 
           if (elapsedMins >= 15 && !alreadyNotified) {
-            // Trigger Admin notification
+            // Trigger Employee & Admin in-app notification + warning toast
             addNotification({
               title: `⚠️ Idle-Time Alert: ${user.fullName || user.email}`,
               message: `${user.fullName || 'Employee'} has been clocked in without a running task or break for 15 consecutive minutes.`,
               category: 'system',
               priority: 'high',
+            });
+            toast({
+              variant: 'warning',
+              title: '⚠️ Idle-Time Alert (15m+)',
+              message: 'You have been clocked in for 15+ minutes without an active task. Please start a task or log a break.',
             });
             localStorage.setItem(notifiedKey, 'true');
           }
@@ -2676,7 +2686,7 @@ export function MyDayPage() {
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(checkIdleInterval);
-  }, [record, tasks, user, addNotification]);
+  }, [record, tasks, user, addNotification, toast]);
 
   const handleActivityLog = (title: string, tone: 'success' | 'progress' | 'info' | 'neutral' = 'info') => {
     const timeStr = formatDisplayTime(new Date());
