@@ -102,18 +102,13 @@ export function BatchManagement() {
 
   const availableColleges = useMemo(() => {
     const set = new Set<string>();
-    (dbColleges || []).forEach((c) => {
+    (dbColleges || []).forEach((c: any) => {
+      if (c?.deletedAt || c?.deleted_at) return;
       const name = c?.name || c?.title;
       if (name && typeof name === 'string' && name.trim()) set.add(name.trim());
     });
-    (batches || []).forEach((b) => {
-      if (b.college && typeof b.college === 'string' && b.college.trim() && b.college !== '—') {
-        set.add(b.college.trim());
-      }
-    });
-    ['Christ Irinjalakkuda', 'MIM', 'MIM Kuttikkanam', 'SJCET', 'St. Thomas College'].forEach((c) => set.add(c));
     return Array.from(set).sort();
-  }, [dbColleges, batches]);
+  }, [dbColleges]);
 
   // Load Trainers
   useEffect(() => {
