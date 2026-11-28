@@ -1,10 +1,13 @@
 import { SupabaseRepository, toCamelCaseObject } from '../../shared/integration/supabase-repository';
 import type { UUID } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
+import { normalizeBatchCode } from './utils/batch-formatter';
 import type {
   Student, IStudentRepository,
   Course, ICourseRepository,
   Batch, IBatchRepository,
+  BatchChecklistItem,
+  BatchIntegrationRecord,
   College, ICollegeRepository,
   Enrollment, IEnrollmentRepository,
   SessionAttendanceRecord, ISessionAttendanceRepository,
@@ -80,6 +83,151 @@ export class SupabaseCourseRepository extends SupabaseRepository<Course> impleme
 
 export class SupabaseBatchRepository extends SupabaseRepository<Batch> implements IBatchRepository {
   constructor() { super('flwdsk_batches'); }
+
+  async findByCode(code: string): Promise<Batch | null> {
+    const normalized = normalizeBatchCode(code);
+    if (!normalized) return null;
+    const { data, error } = await supabase
+      .from(this.tableName)
+      .select('*')
+      .ilike('code', normalized)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.warn('Supabase findByCode warning on flwdsk_batches:', error.message);
+      return null;
+    }
+    return data ? (toCamelCaseObject(data) as Batch) : null;
+  }
+
+  async listIntegrationRecords(options?: {
+    collegeId?: UUID;
+    courseId?: UUID;
+    includeDeleted?: boolean;
+  }): Promise<BatchIntegrationRecord[]> {
+    let query = supabase.from('flwdsk_batches_integration_v1').select('*');
+    if (!options?.includeDeleted) {
+      query = query.is('deleted_at', null);
+    }
+    if (options?.collegeId) {
+      query = query.eq('college_id', options.collegeId);
+    }
+    if (options?.courseId) {
+      query = query.eq('course_id', options.courseId);
+    }
+    const { data, error } = await query.order('updated_at', { ascending: false });
+    if (!error && data) {
+      return data.map((row) => toCamelCaseObject(row) as BatchIntegrationRecord);
+    }
+
+    // Fallback to direct table join if view is not yet deployed in target DB
+    let fallback = supabase
+      .from('flwdsk_batches')
+      .select('*, flwdsk_colleges(id, code, name, location), flwdsk_courses(id, code, title, checklist)');
+    if (!options?.includeDeleted) fallback = fallback.is('deleted_at', null);
+    if (options?.collegeId) fallback = fallback.eq('college_id', options.collegeId);
+    if (options?.courseId) fallback = fallback.eq('course_id', options.courseId);
+    const fbRes = await fallback.order('updated_at', { ascending: false });
+    if (fbRes.error || !fbRes.data) return [];
+
+    return fbRes.data.map((row: any) => {
+      const col = row.flwdsk_colleges;
+      const crs = row.flwdsk_courses;
+      return {
+        id: row.id,
+        batchCode: row.code,
+        batchNo: row.batch_no,
+        program: row.program,
+        academicYear: row.academic_year,
+        trainingName: row.training_name,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        capacity: row.capacity,
+        phase: row.phase,
+        coordinator: row.coordinator,
+        coordinatorEmail: row.coordinator_email,
+        coordinator2: row.coordinator2,
+        coordinatorEmail2: row.coordinator_email2,
+        completedTasks: row.completed_tasks,
+        totalTasks: row.total_tasks,
+        collegeId: row.college_id ?? col?.id,
+        collegeNameLegacy: row.college,
+        collegeCode: col?.code,
+        collegeName: col?.name ?? row.college,
+        collegeLocation: col?.location,
+        courseId: row.course_id ?? crs?.id,
+        courseCode: crs?.code,
+        courseTitle: crs?.title ?? row.training_name,
+        courseChecklistTemplate: Array.isArray(crs?.checklist) ? crs.checklist : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        deletedAt: row.deleted_at ?? null,
+      } as BatchIntegrationRecord;
+    });
+  }
+
+  async findUpdatedSince(sinceIso: string, options?: { includeDeleted?: boolean }): Promise<BatchIntegrationRecord[]> {
+    let query = supabase
+      .from('flwdsk_batches_integration_v1')
+      .select('*')
+      .gt('updated_at', sinceIso)
+      .order('updated_at', { ascending: true });
+    if (options?.includeDeleted === false) {
+      query = query.is('deleted_at', null);
+    }
+    const { data, error } = await query;
+    if (!error && data) {
+      return data.map((row) => toCamelCaseObject(row) as BatchIntegrationRecord);
+    }
+    // Fallback to listIntegrationRecords filtered by updatedAt
+    const all = await this.listIntegrationRecords({ includeDeleted: options?.includeDeleted !== false });
+    return all
+      .filter((r) => r.updatedAt > sinceIso)
+      .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+  }
+}
+
+export async function fetchBatchChecklistItems(batchId: UUID): Promise<BatchChecklistItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('flwdsk_batch_checklist_items')
+      .select('*')
+      .eq('batch_id', batchId);
+    if (error || !data) return [];
+    return data.map((row) => toCamelCaseObject(row) as BatchChecklistItem);
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleBatchChecklistItemAtomic(params: {
+  batchId: UUID;
+  taskLabel: string;
+  isDone: boolean;
+  actorId?: UUID;
+  actorName?: string;
+  sourceApp?: string;
+  totalTasks?: number;
+}): Promise<BatchChecklistItem | null> {
+  try {
+    const { data, error } = await supabase.rpc('toggle_batch_checklist_item', {
+      p_batch_id: params.batchId,
+      p_task_label: params.taskLabel,
+      p_is_done: params.isDone,
+      p_actor_id: params.actorId ?? null,
+      p_actor_name: params.actorName ?? null,
+      p_source_app: params.sourceApp ?? 'flowdesk',
+      p_total_tasks: params.totalTasks ?? null,
+    });
+    if (error) {
+      console.warn('toggle_batch_checklist_item RPC fallback:', error.message);
+      return null;
+    }
+    return data ? (toCamelCaseObject(data) as BatchChecklistItem) : null;
+  } catch {
+    return null;
+  }
 }
 
 export class SupabaseCollegeRepository extends SupabaseRepository<College> implements ICollegeRepository {

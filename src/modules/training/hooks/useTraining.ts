@@ -15,6 +15,7 @@ import {
 } from '../training.repository';
 import type { UUID } from '../../../core/types';
 import { useAuth } from '../../auth/AuthProvider';
+import { supabase } from '../../../shared/integration/supabase';
 
 type CallbackResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -537,6 +538,40 @@ export function useTraining(options?: {
     fetchAll();
   }, [fetchAll]);
 
+  // Real-time sync for batches & courses so external or multi-user updates reflect immediately
+  useEffect(() => {
+    if (!fetchBatches && !fetchCourses) return;
+    if (typeof (supabase as any)?.channel !== 'function') return;
+
+    const channelName = `training-master-sync-${Math.random().toString(36).slice(2, 10)}`;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'flwdsk_batches' }, () => {
+          invalidateTrainingCache('batches');
+          fetchAll(true);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'flwdsk_courses' }, () => {
+          invalidateTrainingCache('courses');
+          fetchAll(true);
+        })
+        .subscribe();
+    } catch {
+      channel = null;
+    }
+
+    return () => {
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {
+          /* noop */
+        }
+      }
+    };
+  }, [fetchBatches, fetchCourses, fetchAll]);
+
   useEffect(() => {
     let lastFocus = Date.now();
     const handleFocus = () => {
@@ -548,6 +583,40 @@ export function useTraining(options?: {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [fetchAll]);
+
+  // Real-time sync for batches & courses so external or multi-user updates reflect immediately
+  useEffect(() => {
+    if (!fetchBatches && !fetchCourses) return;
+    if (typeof (supabase as any)?.channel !== 'function') return;
+
+    const channelName = `training-master-sync-${Math.random().toString(36).slice(2, 10)}`;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'flwdsk_batches' }, () => {
+          invalidateTrainingCache('batches');
+          fetchAll(true);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'flwdsk_courses' }, () => {
+          invalidateTrainingCache('courses');
+          fetchAll(true);
+        })
+        .subscribe();
+    } catch {
+      channel = null;
+    }
+
+    return () => {
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {
+          /* noop */
+        }
+      }
+    };
+  }, [fetchBatches, fetchCourses, fetchAll]);
 
   return {
     students,

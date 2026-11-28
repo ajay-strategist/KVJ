@@ -101,6 +101,7 @@ export function normalizeBatchPhase(dbPhase?: string | null): ApprovedBatchStatu
 
 export interface Batch extends Entity {
   courseId: UUID;
+  collegeId?: UUID;
   code: string;
   trainerId?: UUID;
   coTrainerIds?: UUID[];
@@ -203,11 +204,59 @@ export interface College extends Entity {
   isActive?: boolean;
 }
 
+export interface BatchChecklistItem {
+  id: UUID;
+  batchId: UUID;
+  taskLabel: string;
+  isDone: boolean;
+  completedBy?: UUID;
+  completedByName?: string;
+  completedAt?: string;
+  sourceApp: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BatchIntegrationRecord {
+  id: UUID;
+  batchCode: string;
+  batchNo?: string;
+  program?: string;
+  academicYear?: string;
+  trainingName?: string;
+  startDate?: string;
+  endDate?: string;
+  capacity?: number;
+  phase?: TrainingPhase;
+  coordinator?: string;
+  coordinatorEmail?: string;
+  coordinator2?: string;
+  coordinatorEmail2?: string;
+  completedTasks?: number;
+  totalTasks?: number;
+  collegeId?: UUID;
+  collegeNameLegacy?: string;
+  collegeCode?: string;
+  collegeName?: string;
+  collegeLocation?: string;
+  courseId?: UUID;
+  courseCode?: string;
+  courseTitle?: string;
+  courseChecklistTemplate?: string[];
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
 export interface IStudentRepository extends IRepository<Student> {
   findByRegisterNo(phone: string): Promise<Student | null>;
 }
 export interface ICourseRepository extends IRepository<Course> {}
-export interface IBatchRepository extends IRepository<Batch> {}
+export interface IBatchRepository extends IRepository<Batch> {
+  findByCode(code: string): Promise<Batch | null>;
+  findUpdatedSince(sinceIso: string, options?: { includeDeleted?: boolean }): Promise<BatchIntegrationRecord[]>;
+  listIntegrationRecords(options?: { collegeId?: UUID; courseId?: UUID; includeDeleted?: boolean }): Promise<BatchIntegrationRecord[]>;
+}
 export interface ICollegeRepository extends IRepository<College> {}
 export interface IEnrollmentRepository extends IRepository<Enrollment> {}
 export interface ISessionAttendanceRepository extends IRepository<SessionAttendanceRecord> {

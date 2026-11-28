@@ -18,7 +18,12 @@ import { todayISO } from '../../../shared/utils/date';
 import { DailyReportBuilderModal } from '../report/DailyReportBuilderModal';
 import { DailyReportPreview } from '../report/DailyReportPreview';
 import type { DailyReportConfig, DailyReportData, TrainingDeliveryLogItem } from '../report/daily-report.types';
-import { cleanBatchCode, formatBatchWithCourse } from '../utils/batch-formatter';
+import {
+  cleanBatchCode,
+  formatBatchWithCourse,
+  generateStandardBatchCode,
+  isDuplicateBatchCode,
+} from '../utils/batch-formatter';
 import { useDialog } from '../../../shared/feedback/DialogProvider';
 
 import { BatchHeaderCard } from '../components/BatchHeaderCard';
@@ -512,6 +517,7 @@ export function BatchManagement() {
   const [editBatchForm, setEditBatchForm] = useState({
     selectedCourseId: '',
     trainingName: '',
+    collegeId: '',
     college: '',
     collegeCourse: '',
     academicYear: '2026-2027',
@@ -633,6 +639,7 @@ export function BatchManagement() {
     code: '',
     selectedCourseId: '',
     trainingName: '',
+    collegeId: '',
     college: '',
     collegeCourse: '',
     academicYear: '2026-2027',
@@ -647,11 +654,25 @@ export function BatchManagement() {
     phase: 'Not Started' as TrainingPhase,
   });
 
+  const resolveCollegeByValue = (val?: string | null) => {
+    if (!val) return undefined;
+    const v = val.trim().toLowerCase();
+    return (dbColleges || []).find(
+      (c: any) =>
+        !c?.deletedAt &&
+        !c?.deleted_at &&
+        (c.id === val ||
+          String(c.name || '').trim().toLowerCase() === v ||
+          String(c.code || '').trim().toLowerCase() === v)
+    );
+  };
+
   const handleOpenCreateBatch = () => {
     setNewBatchForm({
       code: '',
       selectedCourseId: courses[0]?.id || '',
       trainingName: '',
+      collegeId: '',
       college: '',
       collegeCourse: '',
       academicYear: '2026-2027',
@@ -672,11 +693,15 @@ export function BatchManagement() {
     e.preventDefault();
     const courseId = newBatchForm.selectedCourseId || courses[0]?.id;
     const trainerId = newBatchForm.trainerId ? newBatchForm.trainerId : undefined;
-    const college = newBatchForm.college.trim();
+    const collegeRec = resolveCollegeByValue(newBatchForm.collegeId || newBatchForm.college);
+    const college = (collegeRec?.name || newBatchForm.college).trim();
+    const collegeId = collegeRec?.id || (newBatchForm.collegeId || undefined);
     const program = newBatchForm.collegeCourse.trim();
+    const academicYear = newBatchForm.academicYear.trim() || '2026-2027';
     const batchNo = newBatchForm.batchName.trim() || 'Batch 1';
+    const selectedCourse = courses.find((c) => c.id === courseId);
 
-    if (!courseId) {
+    if (!courseId || !selectedCourse) {
       toast({ variant: 'error', title: 'Missing Info', message: 'Course is required.' });
       return;
     }
@@ -685,9 +710,36 @@ export function BatchManagement() {
       return;
     }
 
+    const standardizedCode = generateStandardBatchCode({
+      collegeCode: collegeRec?.code || college,
+      program,
+      academicYear,
+      batchNo,
+      courseCode: selectedCourse.code || selectedCourse.title,
+    });
+
+    if (!standardizedCode) {
+      toast({
+        variant: 'error',
+        title: 'Incomplete Batch Code',
+        message: 'College, Program/Stream, Academic Year, Batch No, and Course Code are all required.',
+      });
+      return;
+    }
+
+    if (isDuplicateBatchCode(standardizedCode, batches)) {
+      toast({
+        variant: 'error',
+        title: 'Duplicate Batch Code',
+        message: `Batch code "${standardizedCode}" already exists. Please use a unique batch number or stream.`,
+      });
+      return;
+    }
+
     const res = await createBatch({
-      code: `${college} - ${program} - ${batchNo}`,
-      trainingName: newBatchForm.trainingName || courses.find((c) => c.id === courseId)?.title || 'Course',
+      code: standardizedCode,
+      trainingName: newBatchForm.trainingName || selectedCourse.title || 'Course',
+      collegeId,
       college,
       program,
       courseId,
@@ -697,13 +749,13 @@ export function BatchManagement() {
       endDate: newBatchForm.endDate || undefined,
       coordinator: newBatchForm.coordinator.trim(),
       coordinatorEmail: newBatchForm.coordinatorEmail.trim(),
-      academicYear: newBatchForm.academicYear.trim() || '2026-2027',
+      academicYear,
       batchNo,
       capacity: newBatchForm.capacity ? Number(newBatchForm.capacity) : 0,
       phase: newBatchForm.phase || 'Not Started',
     });
     if (res.ok) {
-      toast({ variant: 'success', title: 'Batch Created', message: 'New batch created successfully.' });
+      toast({ variant: 'success', title: 'Batch Created', message: `Created batch ${standardizedCode}.` });
       setCreateBatchModalOpen(false);
       refreshBatches(true);
     } else {
@@ -712,7 +764,8 @@ export function BatchManagement() {
   };
 
   const handleOpenEditBatch = (b: Batch) => {
-    const college = b.college || (b.code?.includes('-') ? b.code.split('-')[0].trim() : '') || '';
+    const collegeRec = resolveCollegeByValue(b.collegeId || b.college);
+    const college = collegeRec?.name || b.college || (b.code?.includes('-') ? b.code.split('-')[0].trim() : '') || '';
     const program = b.program || (b as any).collegeCourse || (b.code?.includes('-') ? b.code.split('-')[1]?.trim() : '') || '';
     const batchNo = b.batchNo || (b.code?.match(/Batch\s*\d+/i)?.[0]) || (b.code?.includes('-') ? b.code.split('-').pop()?.trim() : '') || 'Batch 1';
     const academicYear = b.academicYear || (b.code?.match(/20\d\d-20\d\d/)?.[0]) || '2026-2027';
@@ -721,6 +774,7 @@ export function BatchManagement() {
     setEditBatchForm({
       selectedCourseId: b.courseId || '',
       trainingName: b.trainingName || '',
+      collegeId: b.collegeId || collegeRec?.id || '',
       college,
       collegeCourse: program,
       academicYear,
@@ -740,11 +794,15 @@ export function BatchManagement() {
     e.preventDefault();
     if (!editingBatch) return;
     const courseId = editBatchForm.selectedCourseId || editingBatch.courseId;
-    const college = editBatchForm.college.trim();
+    const collegeRec = resolveCollegeByValue((editBatchForm as any).collegeId || editBatchForm.college);
+    const college = (collegeRec?.name || editBatchForm.college).trim();
+    const collegeId = collegeRec?.id || (editBatchForm as any).collegeId || editingBatch.collegeId;
     const program = editBatchForm.collegeCourse.trim();
+    const academicYear = editBatchForm.academicYear.trim() || '2026-2027';
     const batchNo = editBatchForm.batchName.trim() || 'Batch 1';
+    const course = courses.find((c) => c.id === courseId);
 
-    if (!courseId) {
+    if (!courseId || !course) {
       toast({ variant: 'error', title: 'Missing Info', message: 'Course is required.' });
       return;
     }
@@ -753,12 +811,36 @@ export function BatchManagement() {
       return;
     }
 
-    const updatedCode = `${college} - ${program} - ${batchNo}`;
-    const course = courses.find((c) => c.id === courseId);
+    const updatedCode = generateStandardBatchCode({
+      collegeCode: collegeRec?.code || college,
+      program,
+      academicYear,
+      batchNo,
+      courseCode: course.code || course.title,
+    });
+
+    if (!updatedCode) {
+      toast({
+        variant: 'error',
+        title: 'Incomplete Batch Code',
+        message: 'College, Program/Stream, Academic Year, Batch No, and Course Code are all required.',
+      });
+      return;
+    }
+
+    if (isDuplicateBatchCode(updatedCode, batches, editingBatch.id)) {
+      toast({
+        variant: 'error',
+        title: 'Duplicate Batch Code',
+        message: `Another batch already uses code "${updatedCode}".`,
+      });
+      return;
+    }
 
     const res = await updateBatch(editingBatch.id, {
       code: updatedCode,
-      trainingName: editBatchForm.trainingName || course?.title || editingBatch.trainingName || 'Course',
+      trainingName: editBatchForm.trainingName || course.title || editingBatch.trainingName || 'Course',
+      collegeId,
       college,
       program,
       courseId,
@@ -768,14 +850,14 @@ export function BatchManagement() {
       endDate: editBatchForm.endDate || undefined,
       coordinator: editBatchForm.coordinator.trim(),
       coordinatorEmail: editBatchForm.coordinatorEmail.trim(),
-      academicYear: editBatchForm.academicYear.trim() || '2026-2027',
+      academicYear,
       batchNo,
       capacity: editBatchForm.capacity ? Number(editBatchForm.capacity) : 0,
       phase: editBatchForm.phase,
     });
 
     if (res.ok) {
-      toast({ variant: 'success', title: 'Batch Updated', message: 'Training batch updated successfully.' });
+      toast({ variant: 'success', title: 'Batch Updated', message: `Updated batch ${updatedCode}.` });
       setEditingBatch(null);
       refreshBatches(true);
     } else {
@@ -986,7 +1068,16 @@ export function BatchManagement() {
             <div style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>Universal 5-Part Batch Code:</span>
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontFamily: 'monospace' }}>
-                {[newBatchForm.college || 'College', newBatchForm.collegeCourse || 'Stream', newBatchForm.academicYear || 'Year', newBatchForm.batchName || 'Batch', courses.find((c) => c.id === newBatchForm.selectedCourseId)?.code || 'Course'].join(' - ')}
+                {generateStandardBatchCode(
+                  {
+                    collegeCode: resolveCollegeByValue(newBatchForm.collegeId || newBatchForm.college)?.code || newBatchForm.college,
+                    program: newBatchForm.collegeCourse,
+                    academicYear: newBatchForm.academicYear,
+                    batchNo: newBatchForm.batchName,
+                    courseCode: courses.find((c) => c.id === newBatchForm.selectedCourseId)?.code,
+                  },
+                  { allowPartial: true }
+                )}
               </span>
             </div>
 
@@ -1018,7 +1109,11 @@ export function BatchManagement() {
                     className="kvj-select"
                     required
                     value={newBatchForm.college}
-                    onChange={(e) => setNewBatchForm({ ...newBatchForm, college: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const rec = resolveCollegeByValue(val);
+                      setNewBatchForm({ ...newBatchForm, college: val, collegeId: rec?.id || '' });
+                    }}
                     style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
                   >
                     <option value="">-- Choose College --</option>
@@ -1182,7 +1277,16 @@ export function BatchManagement() {
             <div style={{ background: 'var(--bg-sunken)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>Universal 5-Part Batch Code:</span>
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand)', fontFamily: 'monospace' }}>
-                {[editBatchForm.college || 'College', editBatchForm.collegeCourse || 'Stream', editBatchForm.academicYear || 'Year', editBatchForm.batchName || 'Batch', courses.find((c) => c.id === editBatchForm.selectedCourseId)?.code || 'Course'].join(' - ')}
+                {generateStandardBatchCode(
+                  {
+                    collegeCode: resolveCollegeByValue((editBatchForm as any).collegeId || editBatchForm.college)?.code || editBatchForm.college,
+                    program: editBatchForm.collegeCourse,
+                    academicYear: editBatchForm.academicYear,
+                    batchNo: editBatchForm.batchName,
+                    courseCode: courses.find((c) => c.id === editBatchForm.selectedCourseId)?.code,
+                  },
+                  { allowPartial: true }
+                )}
               </span>
             </div>
 
@@ -1214,7 +1318,11 @@ export function BatchManagement() {
                     className="kvj-select"
                     required
                     value={editBatchForm.college}
-                    onChange={(e) => setEditBatchForm({ ...editBatchForm, college: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const rec = resolveCollegeByValue(val);
+                      setEditBatchForm({ ...editBatchForm, college: val, collegeId: rec?.id || '' });
+                    }}
                     style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
                   >
                     <option value="">-- Choose College --</option>

@@ -4,6 +4,7 @@ import { AppError, Err, Ok, type Result, ErrorCode } from '../../core/result';
 import type { Actor, UUID } from '../../core/types';
 import { supabase } from '../../shared/integration/supabase';
 import { calculateFinalExamEligibility } from './utils/eligibility';
+import { normalizeBatchCode } from './utils/batch-formatter';
 import {
   STUDENT_REPOSITORY_TOKEN,
   COURSE_REPOSITORY_TOKEN,
@@ -188,7 +189,21 @@ export class TrainingService implements ITrainingService {
 
   async createBatch(data: Partial<Batch>, actor: Actor): Promise<Result<Batch>> {
     try {
-      const batch = await this.batchRepo.create(data, actor);
+      const normalizedCode = data.code ? normalizeBatchCode(data.code) : '';
+      if (normalizedCode) {
+        const existing = await this.batchRepo.findByCode?.(normalizedCode);
+        if (existing) {
+          return Err(
+            new AppError({
+              code: ErrorCode.CONFLICT,
+              message: `A batch with code "${normalizedCode}" already exists. Duplicate batch codes are not allowed.`,
+              severity: 'warning',
+            })
+          );
+        }
+      }
+      const payload = normalizedCode ? { ...data, code: normalizedCode } : data;
+      const batch = await this.batchRepo.create(payload, actor);
       await this.activity.log('training', batch.id, actor, 'create', `Scheduled training batch ${batch.code}`);
       await this.audit.log(actor, 'create', 'batches', batch.id, { newValues: batch });
       return Ok(batch);
@@ -199,7 +214,21 @@ export class TrainingService implements ITrainingService {
 
   async updateBatch(id: UUID, data: Partial<Batch>, actor: Actor): Promise<Result<Batch>> {
     try {
-      const batch = await this.batchRepo.update(id, data, actor);
+      const normalizedCode = data.code ? normalizeBatchCode(data.code) : '';
+      if (normalizedCode) {
+        const existing = await this.batchRepo.findByCode?.(normalizedCode);
+        if (existing && existing.id !== id) {
+          return Err(
+            new AppError({
+              code: ErrorCode.CONFLICT,
+              message: `Another batch already uses code "${normalizedCode}". Duplicate batch codes are not allowed.`,
+              severity: 'warning',
+            })
+          );
+        }
+      }
+      const payload = normalizedCode ? { ...data, code: normalizedCode } : data;
+      const batch = await this.batchRepo.update(id, payload, actor);
       await this.activity.log('training', batch.id, actor, 'update', `Updated training batch ${batch.code}`);
       await this.audit.log(actor, 'update', 'batches', batch.id, { newValues: batch });
       return Ok(batch);
